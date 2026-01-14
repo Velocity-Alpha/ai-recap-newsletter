@@ -1,0 +1,14 @@
+{
+  "name": "netlify-backend",
+  "version": "1.0.0",
+  "description": "Netlify backend functions for newsletter",
+  "main": "index.js",
+  "scripts": {
+    "start": "netlify dev"
+  },
+  "dependencies": {
+    "dotenv": "^10.0.0",
+    "pg": "^8.10.0"
+  }
+}
+
