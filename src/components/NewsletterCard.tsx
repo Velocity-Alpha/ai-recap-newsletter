@@ -48,7 +48,7 @@ const NewsletterCard: React.FC<Props> = ({ item }) => {
 
         {/* Title overlay */}
         <div className="absolute bottom-0 left-0 right-0 p-5">
-          <h3 className="text-white font-bold text-lg leading-tight line-clamp-2 group-hover:text-white/90 transition-colors">
+          <h3 className="syne-mono-regular text-white font-bold text-lg leading-tight line-clamp-2 group-hover:text-white/90 transition-colors">
             {item.title}
           </h3>
         </div>

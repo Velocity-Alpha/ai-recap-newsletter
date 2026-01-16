@@ -22,37 +22,31 @@ export default function SubscribeNewsletter() {
       {/* Unique animated background for Subscribe - Radial circles */}
       <div className="absolute inset-0 overflow-hidden">
         {/* Concentric circles pulsing from center */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 border border-primary/15 rounded-full animate-radial"></div>
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 border border-primary/20 rounded-full animate-radial animation-delay-2000"></div>
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 border border-primary/25 rounded-full animate-radial animation-delay-4000"></div>
-        
-        {/* Rotating lines from center */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1 h-40 bg-gradient-to-b from-primary/30 to-transparent origin-top animate-rotate-slow"></div>
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1 h-40 bg-gradient-to-b from-primary/30 to-transparent origin-top animate-rotate-slow animation-delay-1000" style={{ transform: 'rotate(45deg)' }}></div>
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1 h-40 bg-gradient-to-b from-primary/30 to-transparent origin-top animate-rotate-slow animation-delay-2000" style={{ transform: 'rotate(90deg)' }}></div>
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1 h-40 bg-gradient-to-b from-primary/30 to-transparent origin-top animate-rotate-slow animation-delay-3000" style={{ transform: 'rotate(135deg)' }}></div>
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 border border-[#66ccff]/15 rounded-full animate-radial"></div>
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 border border-[#66ccff]/20 rounded-full animate-radial animation-delay-2000"></div>
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 border border-[#66ccff]/25 rounded-full animate-radial animation-delay-4000"></div>
         
         {/* Corner decorations */}
-        <div className="absolute top-10 left-10 w-16 h-16 border-2 border-primary/20 rounded-full animate-pulse-slow"></div>
-        <div className="absolute top-10 right-10 w-12 h-12 border-2 border-primary/20 rotate-45 animate-rotate-slow"></div>
-        <div className="absolute bottom-10 left-10 w-12 h-12 border-2 border-primary/20 rotate-45 animate-rotate-slow animation-delay-2000"></div>
-        <div className="absolute bottom-10 right-10 w-16 h-16 border-2 border-primary/20 rounded-full animate-pulse-slow animation-delay-4000"></div>
+        <div className="absolute top-10 left-10 w-16 h-16 border-2 border-[#66ccff]/20 rounded-full animate-pulse-slow"></div>
+        <div className="absolute top-10 right-10 w-12 h-12 border-2 border-[#66ccff]/20 rotate-45 animate-rotate-slow"></div>
+        <div className="absolute bottom-10 left-10 w-12 h-12 border-2 border-[#66ccff]/20 rotate-45 animate-rotate-slow animation-delay-2000"></div>
+        <div className="absolute bottom-10 right-10 w-16 h-16 border-2 border-[#66ccff]/20 rounded-full animate-pulse-slow animation-delay-4000"></div>
       </div>
       
       <div className="relative z-10 w-full max-w-2xl text-center">
         {/* Heading */}
-        <h1 className="text-4xl md:text-5xl font-bold mb-6 text-foreground">
+        <h1 className="syne-mono-regular text-4xl md:text-5xl font-bold mb-6 text-black">
           Join our AI newsletter
         </h1>
 
         {/* Description */}
-        <p className="text-muted-foreground text-lg mb-10 leading-relaxed">
+        <p className="molengo-regular text-gray-600 text-lg mb-10 leading-relaxed">
           Get the latest AI news, research insights, and practical
           implementation guides delivered to your inbox daily.
         </p>
 
         {/* iframe form */}
-        <div className="w-full h-auto rounded-lg overflow-hidden bg-white shadow-lg p-4">
+        <div className="w-full h-auto rounded-lg overflow-hidden bg-secondary shadow-lg p-4">
           <iframe
             src="https://links.velocityalpha.com/widget/form/U3Z77WiIoyPTx24EFNj1"
             className="w-full h-full border-none rounded-lg"
@@ -72,4 +66,3 @@ export default function SubscribeNewsletter() {
     </section>
   );
 }
-

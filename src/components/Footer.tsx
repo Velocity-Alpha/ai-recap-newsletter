@@ -45,17 +45,7 @@ export default function Footer() {
               Your daily source for AI news, research insights, and practical implementation guides. 
               Stay ahead of the curve in the world of artificial intelligence.
             </p>
-            <div className="flex gap-4">
-              <a href="#" className="text-gray-600 hover:text-[#66ccff] transition-colors">
-                Twitter
-              </a>
-              <a href="#" className="text-gray-600 hover:text-[#66ccff] transition-colors">
-                LinkedIn
-              </a>
-              <a href="#" className="text-gray-600 hover:text-[#66ccff] transition-colors">
-                GitHub
-              </a>
-            </div>
+            
           </div>
 
           {/* Quick Links */}
@@ -80,24 +70,29 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* Resources */}
+          {/* Contact */}
           <div>
-            <h4 className="font-semibold text-black mb-4">Resources</h4>
-            <ul className="space-y-2">
+            <h4 className="font-semibold text-black mb-4">Contact</h4>
+            <ul className="space-y-3 text-gray-600">
               <li>
-                <a href="#" className="text-gray-600 hover:text-[#66ccff] transition-colors">
-                  Archive
+                <div className="font-medium text-black mb-1">Email</div>
+                <a href="mailto:info@velocityalpha.com" className="hover:text-[#66ccff] transition-colors">
+                  info@velocityalpha.com
                 </a>
               </li>
               <li>
-                <a href="#" className="text-gray-600 hover:text-[#66ccff] transition-colors">
-                  About
+                <div className="font-medium text-black mb-1">Phone</div>
+                <a href="tel:+16477392144" className="hover:text-[#66ccff] transition-colors">
+                  +1 (647) 739-2144
                 </a>
               </li>
               <li>
-                <a href="#" className="text-gray-600 hover:text-[#66ccff] transition-colors">
-                  Contact
-                </a>
+                <div className="font-medium text-black mb-1">Address</div>
+                <div className="text-sm">
+                  126 Applefield Dr<br />
+                  Scarborough, ON<br />
+                  Canada M1P 3Y2
+                </div>
               </li>
             </ul>
           </div>
@@ -106,7 +101,7 @@ export default function Footer() {
         {/* Bottom Bar */}
         <div className="mt-12 pt-8 border-t border-gray-200 flex flex-col md:flex-row justify-between items-center">
           <p className="text-sm text-gray-600">
-            © {new Date().getFullYear()} AI Recap. All rights reserved.
+            © 2026 AI Recap by Velocity Alpha. All rights reserved.
           </p>
           <div className="flex gap-6 mt-4 md:mt-0">
             <a href="#" className="text-sm text-gray-600 hover:text-[#66ccff] transition-colors">

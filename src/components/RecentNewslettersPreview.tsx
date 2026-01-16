@@ -13,18 +13,31 @@ const RecentNewslettersPreview: React.FC = () => {
 
   useEffect(() => {
     const fetchData = async () => {
+      setLoading(true);
       try {
         const apiUrl = getApiUrl('getOverviewData');
-        const res = await fetch(apiUrl, {
+        // Request first page with 6 items
+        const url = apiUrl.startsWith('http') 
+          ? new URL(apiUrl)
+          : new URL(apiUrl, window.location.origin);
+        url.searchParams.set('page', '1');
+        url.searchParams.set('limit', '6');
+        
+        const res = await fetch(url.toString(), {
           headers: {
             'Content-Type': 'application/json',
           },
         });
         const data = await res.json();
-        // Only take the first 6 newsletters
-        setNewsletterData((data?.data || []).slice(0, 6));
+        
+        if (data.success && data.data) {
+          setNewsletterData(data.data);
+        } else {
+          setNewsletterData([]);
+        }
       } catch (error) {
         console.error(error);
+        setNewsletterData([]);
       } finally {
         setLoading(false);
       }
@@ -32,16 +45,6 @@ const RecentNewslettersPreview: React.FC = () => {
 
     fetchData();
   }, []);
-
-  if (loading) {
-    return (
-      <section id="newsletters" className="pb-20 max-w-[90%] mx-auto">
-        <div className="text-center py-20">
-          <p className="text-gray-600">Loading newsletters...</p>
-        </div>
-      </section>
-    );
-  }
 
   return (
       <section id="newsletters" className="py-24 bg-[#F5F5F5] relative overflow-hidden">
@@ -89,15 +92,45 @@ const RecentNewslettersPreview: React.FC = () => {
           <div className="inline-block px-4 py-1.5 rounded-full bg-[#66ccff]/10 text-[#66ccff] text-sm font-semibold mb-4 border border-[#66ccff]/20">
             Latest Updates
           </div>
-          <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold text-black mb-6">
+          <h2 className="syne-mono-regular text-4xl md:text-5xl lg:text-6xl font-bold text-black mb-6">
             Recent Newsletters
           </h2>
-          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+          <p className="molengo-regular text-xl text-gray-600 max-w-2xl mx-auto">
             Explore our most recent AI intelligence briefings and insights
           </p>
         </div>
 
-      {newslettersData.length === 0 ? (
+      {loading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8 mb-12">
+          {[...Array(6)].map((_, index) => (
+            <div
+              key={index}
+              className="group bg-white border border-gray-200 rounded-2xl overflow-hidden min-w-[320px] max-w-[400px] animate-pulse"
+            >
+              {/* Image skeleton */}
+              <div className="relative h-[220px] bg-gray-200">
+                {/* Date badge skeleton */}
+                <div className="absolute top-4 left-4 w-24 h-8 bg-gray-300 rounded-full"></div>
+                {/* Title skeleton on image */}
+                <div className="absolute bottom-0 left-0 right-0 p-5 space-y-2">
+                  <div className="h-5 bg-gray-300 rounded w-3/4"></div>
+                  <div className="h-5 bg-gray-300 rounded w-1/2"></div>
+                </div>
+              </div>
+
+              {/* Content skeleton */}
+              <div className="p-6 space-y-4">
+                <div className="space-y-2">
+                  <div className="h-4 bg-gray-200 rounded w-full"></div>
+                  <div className="h-4 bg-gray-200 rounded w-full"></div>
+                  <div className="h-4 bg-gray-200 rounded w-2/3"></div>
+                </div>
+                <div className="h-4 bg-gray-200 rounded w-24"></div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : newslettersData.length === 0 ? (
         <div className="text-center py-20">
           <p className="text-gray-600 text-lg">No newsletters available yet.</p>
         </div>
@@ -120,7 +153,7 @@ const RecentNewslettersPreview: React.FC = () => {
           <div className="text-center">
             <Link
               href="/newsletters"
-              className="group inline-flex items-center gap-2 px-10 py-4 bg-[#66ccff] text-black rounded-xl font-semibold text-lg shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all duration-300 hover:bg-[#66ccff]/90"
+              className="group inline-flex items-center gap-2 px-10 py-4 bg-[#66ccff] text-white rounded-xl font-semibold text-lg shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all duration-300 hover:bg-[#66ccff]/90"
             >
               View All Newsletters
               <span className="group-hover:translate-x-1 transition-transform duration-300">→</span>

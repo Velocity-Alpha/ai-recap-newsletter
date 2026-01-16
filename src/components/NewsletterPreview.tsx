@@ -12,14 +12,15 @@ export default function NewsletterPreview() {
 
   useEffect(() => {
     const fetchData = async () => {
+      setLoading(true);
       try {
         const apiUrl = process.env.NEXT_PUBLIC_NEWSLETTER_URL;
         if (!apiUrl) {
           throw new Error('NEXT_PUBLIC_NEWSLETTER_URL is not set');
         }
-        const res = await fetch(`${apiUrl}/getOverviewData`);
+        const res = await fetch(`${apiUrl}/getOverviewData?page=1&limit=3`);
         const data = await res.json();
-        setNewsletters((data?.data || []).slice(0, 3)); // Show only 3 latest
+        setNewsletters(data?.data || []);
       } catch (error) {
         console.error(error);
       } finally {

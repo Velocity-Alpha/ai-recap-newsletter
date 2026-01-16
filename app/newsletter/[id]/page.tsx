@@ -40,12 +40,15 @@ const Section = ({
     icon: string;
     children: React.ReactNode;
 }) => (
-    <section className="space-y-6">
-        <div className="flex items-center gap-3">
-            <span className="text-2xl">{icon}</span>
-            <h2 className="text-xl font-bold text-black uppercase tracking-wide">
-                {title}
-            </h2>
+    <section className="space-y-8">
+        <div className="relative">
+            <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#66ccff] rounded-full"></div>
+            <div className="flex items-center gap-4 pl-6 py-3">
+                <span className="text-2xl">{icon}</span>
+                <h2 className="text-2xl md:text-3xl font-bold text-black">
+                    {title}
+                </h2>
+            </div>
         </div>
         <div className="space-y-4">{children}</div>
     </section>
@@ -118,13 +121,13 @@ const Page = () => {
         <div className="flex flex-col min-h-screen bg-white">
             <Header />
             <main className="flex-1 relative overflow-hidden bg-white">
-                <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-12">
+                <div className="molengo-regular relative z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-12">
                     {/* HEADER SECTION */}
                     <div className="text-center space-y-6">
                         <div className="inline-block px-4 py-1.5 rounded-full bg-[#66ccff]/10 text-[#66ccff] text-sm font-semibold border border-[#66ccff]/20">
                             AI Recap Newsletter
                         </div>
-                        <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-black">
+                        <h1 className="syne-mono-regular text-4xl md:text-5xl lg:text-6xl font-bold text-black">
                             {title}
                         </h1>
                         {data.published_at && (
@@ -136,14 +139,32 @@ const Page = () => {
 
                     {/* HERO IMAGE */}
                     {imageUrl && (
-                        <div className="relative rounded-xl overflow-hidden border border-gray-200 shadow-xl">
-                            <img src={imageUrl} alt={title} className="w-full h-[400px] md:h-[500px] object-cover" />
+                        <div className="relative -mx-4 sm:-mx-6 lg:-mx-8">
+                            <div className="relative overflow-hidden">
+                                <img src={imageUrl} alt={title} className="w-full h-[400px] md:h-[500px] object-cover" />
+                                {/* Gradient masks on edges to blend with page */}
+                                <div className="absolute inset-0 pointer-events-none">
+                                    {/* Top edge fade */}
+                                    <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-b from-white to-transparent"></div>
+                                    {/* Bottom edge fade */}
+                                    <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-white to-transparent"></div>
+                                    {/* Left edge fade */}
+                                    <div className="absolute top-0 bottom-0 left-0 w-32 bg-gradient-to-r from-white to-transparent"></div>
+                                    {/* Right edge fade */}
+                                    <div className="absolute top-0 bottom-0 right-0 w-32 bg-gradient-to-l from-white to-transparent"></div>
+                                </div>
+                            </div>
                         </div>
                     )}
 
                     {/* EXCERPT/DESCRIPTION (shown when content_json is null) */}
                     {!content_json && excerpt && (
-                        <section className="space-y-6 bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-200 rounded-xl p-8 shadow-md">
+                        <section 
+                            className="space-y-6 border border-blue-200 rounded-xl p-8 shadow-md"
+                            style={{
+                                background: 'radial-gradient(circle at center, rgb(219 234 254 / 0.6), rgb(191 219 254 / 0.4), rgb(147 197 253 / 0.2), transparent)'
+                            }}
+                        >
                             <div className="flex items-center gap-3">
                                 <span className="text-3xl">📋</span>
                                 <h2 className="text-2xl font-bold text-black">
@@ -158,7 +179,12 @@ const Page = () => {
 
                     {/* OVERVIEW (if content_json exists) */}
                     {overview && (
-                        <section className="space-y-6 bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-200 rounded-xl p-8 shadow-md">
+                        <section 
+                            className="space-y-6 border border-blue-200 rounded-xl p-8 shadow-md"
+                            style={{
+                                background: 'radial-gradient(circle at center, rgb(219 234 254 / 0.6), rgb(191 219 254 / 0.4), rgb(147 197 253 / 0.2), transparent)'
+                            }}
+                        >
                             <div className="flex items-center gap-3">
                                 <span className="text-3xl">📋</span>
                                 <h2 className="text-2xl font-bold text-black">
@@ -193,42 +219,42 @@ const Page = () => {
                     {/* TOP STORIES */}
                     {topStories.length > 0 && (
                         <Section title="Top Stories" icon="🔥">
-                            <div className="space-y-6">
+                            <div className="grid gap-6 md:gap-8">
                                 {topStories.map((story: Item, i: number) => (
-                                    <div
-                                        key={i}
-                                        className="space-y-4 bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-200 rounded-xl p-6 shadow-md hover:shadow-lg transition-shadow"
-                                    >
-                                        <h3 className="font-bold text-xl text-black">
-                                            {story.link ? (
-                                                <a
-                                                    href={story.link}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="text-[#66ccff] hover:underline transition-colors"
-                                                >
-                                                    {story.title}
-                                                </a>
-                                            ) : (
-                                                story.title
-                                            )}
-                                        </h3>
-                                        <p className="text-base text-gray-700 leading-relaxed">
-                                            {story.summary}
-                                        </p>
-                                        {story.link && (
-                                            <a
-                                                href={story.link}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="inline-flex items-center gap-2 text-sm text-[#66ccff] hover:underline font-medium"
-                                            >
-                                                <span className="bg-[#66ccff]/20 px-4 py-2 rounded-full">
-                                                    Read More →
-                                                </span>
-                                            </a>
+                                    <article key={i} className="group relative">
+                                        <div className="space-y-3">
+                                            <h3 className="font-bold text-xl text-black group-hover:text-[#66ccff] transition-colors">
+                                                {story.link ? (
+                                                        <a
+                                                            href={story.link}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="hover:underline"
+                                                        >
+                                                            {story.title}
+                                                        </a>
+                                                    ) : (
+                                                        story.title
+                                                    )}
+                                                </h3>
+                                                <p className="text-base text-gray-600 leading-relaxed">
+                                                    {story.summary}
+                                                </p>
+                                                {story.link && (
+                                                    <a
+                                                        href={story.link}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="inline-flex items-center gap-2 text-sm text-[#66ccff] hover:underline font-medium"
+                                                    >
+                                                        Read More →
+                                                    </a>
+                                                )}
+                                        </div>
+                                        {i < topStories.length - 1 && (
+                                            <div className="mt-6 border-t border-gray-100"></div>
                                         )}
-                                    </div>
+                                    </article>
                                 ))}
                             </div>
                         </Section>
@@ -237,42 +263,42 @@ const Page = () => {
                     {/* RESEARCH */}
                     {research.length > 0 && (
                         <Section title="Research & Analysis" icon="📊">
-                            <div className="space-y-6">
+                            <div className="grid gap-6 md:gap-8">
                                 {research.map((item: Item, i: number) => (
-                                    <div
-                                        key={i}
-                                        className="space-y-4 bg-gradient-to-br from-indigo-50 to-blue-50 border border-indigo-200 rounded-xl p-6 shadow-md hover:shadow-lg transition-shadow"
-                                    >
-                                        <h3 className="font-bold text-xl text-black">
-                                            {item.link ? (
-                                                <a
-                                                    href={item.link}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="text-[#66ccff] hover:underline transition-colors"
-                                                >
-                                                    {item.title}
-                                                </a>
-                                            ) : (
-                                                item.title
-                                            )}
-                                        </h3>
-                                        <p className="text-base text-gray-700 leading-relaxed">
-                                            {item.summary}
-                                        </p>
-                                        {item.link && (
-                                            <a
-                                                href={item.link}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="inline-flex items-center gap-2 text-sm text-[#66ccff] hover:underline font-medium"
-                                            >
-                                                <span className="bg-[#66ccff]/20 px-4 py-2 rounded-full">
-                                                    Read More →
-                                                </span>
-                                            </a>
+                                    <article key={i} className="group relative">
+                                        <div className="space-y-3">
+                                            <h3 className="font-bold text-xl text-black group-hover:text-[#66ccff] transition-colors">
+                                                {item.link ? (
+                                                        <a
+                                                            href={item.link}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="hover:underline"
+                                                        >
+                                                            {item.title}
+                                                        </a>
+                                                    ) : (
+                                                        item.title
+                                                    )}
+                                                </h3>
+                                                <p className="text-base text-gray-600 leading-relaxed">
+                                                    {item.summary}
+                                                </p>
+                                                {item.link && (
+                                                    <a
+                                                        href={item.link}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="inline-flex items-center gap-2 text-sm text-[#66ccff] hover:underline font-medium"
+                                                    >
+                                                        Read More →
+                                                    </a>
+                                                )}
+                                        </div>
+                                        {i < research.length - 1 && (
+                                            <div className="mt-6 border-t border-gray-100"></div>
                                         )}
-                                    </div>
+                                    </article>
                                 ))}
                             </div>
                         </Section>
@@ -281,39 +307,42 @@ const Page = () => {
                     {/* TOOLS */}
                     {tools.length > 0 && (
                         <Section title="Trending Tools" icon="🛠️">
-                            <div className="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200 rounded-xl p-6 shadow-md">
+                            <div className="grid gap-6 md:gap-8">
                                 {tools.map((tool: Item, i: number) => (
-                                    <div key={i} className="space-y-4 mb-6 last:mb-0 pb-6 last:pb-0 border-b last:border-b-0 border-green-200">
-                                        <h3 className="font-bold text-xl text-black">
-                                            {tool.link ? (
-                                                <a
-                                                    href={tool.link}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="text-[#66ccff] hover:underline transition-colors"
-                                                >
-                                                    {tool.title}
-                                                </a>
-                                            ) : (
-                                                tool.title
-                                            )}
-                                        </h3>
-                                        <p className="text-base text-gray-700 leading-relaxed">
-                                            {tool.summary}
-                                        </p>
-                                        {tool.link && (
-                                            <a
-                                                href={tool.link}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="inline-flex items-center gap-2 text-sm"
-                                            >
-                                                <span className="bg-orange-500/20 text-orange-600 px-4 py-2 rounded-full font-medium">
-                                                    🔥 Trending
-                                                </span>
-                                            </a>
+                                    <article key={i} className="group relative">
+                                        <div className="space-y-3">
+                                            <h3 className="font-bold text-xl text-black group-hover:text-[#66ccff] transition-colors">
+                                                {tool.link ? (
+                                                        <a
+                                                            href={tool.link}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="hover:underline"
+                                                        >
+                                                            {tool.title}
+                                                        </a>
+                                                    ) : (
+                                                        tool.title
+                                                    )}
+                                                </h3>
+                                                <p className="text-base text-gray-600 leading-relaxed">
+                                                    {tool.summary}
+                                                </p>
+                                                {tool.link && (
+                                                    <a
+                                                        href={tool.link}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="inline-flex items-center gap-2 text-sm text-[#66ccff] hover:underline font-medium"
+                                                    >
+                                                        Read More →
+                                                    </a>
+                                                )}
+                                        </div>
+                                        {i < tools.length - 1 && (
+                                            <div className="mt-6 border-t border-gray-100"></div>
                                         )}
-                                    </div>
+                                    </article>
                                 ))}
                             </div>
                         </Section>
@@ -322,14 +351,16 @@ const Page = () => {
                     {/* QUICK HITS */}
                     {quickHits.length > 0 && (
                         <Section title="Quick Hits" icon="⚡">
-                            <div className="space-y-3 bg-gradient-to-br from-yellow-50 to-amber-50 border border-yellow-200 rounded-xl p-6 shadow-md">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {quickHits.map((hit: Item, i: number) => (
-                                    <div key={i} className="flex gap-3 text-base items-start">
-                                        <span className="text-amber-600 mt-1 text-lg">•</span>
-                                        <p className="text-gray-700">
-                                            <span className="font-semibold text-black">{hit.title}</span>
-                                            {hit.summary && `: ${hit.summary}`}
-                                        </p>
+                                    <div key={i} className="flex gap-3 p-4 rounded-lg hover:bg-gray-50/50 transition-colors">
+                                        <div className="flex-shrink-0 w-2 h-2 rounded-full bg-[#66ccff] mt-2"></div>
+                                        <div className="flex-1">
+                                            <p className="text-base text-gray-700">
+                                                <span className="font-semibold text-black">{hit.title}</span>
+                                                {hit.summary && `: ${hit.summary}`}
+                                            </p>
+                                        </div>
                                     </div>
                                 ))}
                             </div>

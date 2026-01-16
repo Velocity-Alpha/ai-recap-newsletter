@@ -31,6 +31,24 @@ exports.handler = async function(event) {
   }
 
   try {
+    // Parse query parameters
+    const page = parseInt(event.queryStringParameters?.page || '1', 10);
+    const limit = parseInt(event.queryStringParameters?.limit || '6', 10);
+    
+    // Validate parameters
+    const validPage = Math.max(1, page);
+    const validLimit = Math.max(1, Math.min(100, limit)); // Cap at 100 items per page
+    const offset = (validPage - 1) * validLimit;
+
+    // Get total count
+    const countResult = await pool.query(`
+      SELECT COUNT(*) as total
+      FROM newsletter.issues;
+    `);
+    const totalCount = parseInt(countResult.rows[0].total, 10);
+    const totalPages = Math.ceil(totalCount / validLimit);
+
+    // Get paginated results
     const result = await pool.query(`
       SELECT 
         id, 
@@ -40,8 +58,9 @@ exports.handler = async function(event) {
         published_at, 
         created_at  
       FROM newsletter.issues
-      ORDER BY published_at DESC;
-    `);
+      ORDER BY published_at DESC
+      LIMIT $1 OFFSET $2;
+    `, [validLimit, offset]);
     
     return {
       statusCode: 200,
@@ -52,7 +71,14 @@ exports.handler = async function(event) {
       body: JSON.stringify({
         success: true,
         data: result.rows,
-        count: result.rows.length,
+        pagination: {
+          currentPage: validPage,
+          totalPages: totalPages,
+          totalCount: totalCount,
+          limit: validLimit,
+          hasNextPage: validPage < totalPages,
+          hasPreviousPage: validPage > 1
+        },
         timestamp: new Date().toISOString()
       }),
     };

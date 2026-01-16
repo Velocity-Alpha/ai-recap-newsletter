@@ -379,3 +379,29 @@
 .animate-zigzag {
   animation: zigzag 8s linear infinite;
 }
+
+/* Syne Mono font */
+.syne-mono-regular {
+  font-family: "Syne Mono", monospace;
+  font-weight: 400;
+  font-style: normal;
+}
+
+/* WDXL Lubrifont SC font */
+.wdxl-lubrifont-sc-regular {
+  font-family: "WDXL Lubrifont SC", sans-serif;
+  font-weight: 400;
+  font-style: normal;
+}
+
+/* Molengo font */
+.molengo-regular {
+  font-family: "Molengo", sans-serif;
+  font-weight: 400;
+  font-style: normal;
+}
+
+/* Radial gradient utility */
+.bg-gradient-radial {
+  background: radial-gradient(circle at center, var(--tw-gradient-from), var(--tw-gradient-via), var(--tw-gradient-to));
+}

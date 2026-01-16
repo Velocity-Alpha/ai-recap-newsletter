@@ -47,7 +47,7 @@ export default function Hero() {
         </div>
 
         {/* Main Headline */}
-        <h1 className="text-5xl md:text-7xl lg:text-8xl font-bold mb-6 leading-tight tracking-tight">
+        <h1 className="wdxl-lubrifont-sc-regular text-5xl md:text-7xl lg:text-8xl font-bold mb-6 leading-tight tracking-tight">
           <span className="text-black block mb-2">
             Stay Ahead with
           </span>
@@ -55,7 +55,7 @@ export default function Hero() {
         </h1>
 
         {/* Subheadline */}
-        <p className="text-xl md:text-2xl lg:text-3xl text-gray-600 mb-10 max-w-3xl mx-auto leading-relaxed font-light">
+        <p className="molengo-regular text-xl md:text-2xl lg:text-3xl text-gray-600 mb-10 max-w-3xl mx-auto leading-relaxed font-light">
           Get the latest AI news, breakthrough research, and practical insights delivered to your inbox every day. 
           <span className="block mt-2 text-lg md:text-xl">Join thousands of professionals staying ahead of the curve.</span>
         </p>
@@ -66,13 +66,13 @@ export default function Hero() {
             onClick={() => {
               document.getElementById('subscribe')?.scrollIntoView({ behavior: 'smooth' });
             }}
-            className="group px-10 py-5 bg-[#66ccff] text-black rounded-xl font-semibold text-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300 hover:bg-[#66ccff]/90"
+            className="group px-10 py-5 bg-[#66ccff] text-white rounded-xl font-semibold text-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300 hover:bg-[#66ccff]/90"
           >
             Subscribe Free
           </button>
           <Link
             href="/newsletters"
-            className="px-10 py-5 bg-white text-[#66ccff] rounded-xl font-semibold text-lg border-2 border-[#66ccff] shadow-md hover:shadow-lg transform hover:scale-105 transition-all duration-300 hover:bg-[#66ccff] hover:text-black inline-block text-center"
+            className="px-10 py-5 bg-white text-[#66ccff] rounded-xl font-semibold text-lg border-2 border-[#66ccff] shadow-md hover:shadow-lg transform hover:scale-105 transition-all duration-300 hover:bg-[#66ccff] hover:text-white inline-block text-center"
           >
             Browse Newsletters
           </Link>
