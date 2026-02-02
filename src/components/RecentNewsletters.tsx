@@ -63,11 +63,12 @@ const RecentNewsletters: React.FC = () => {
   return (
     <section className="pb-24 max-w-7xl mx-auto pt-16 px-4 sm:px-6 lg:px-8 relative">
       <div className="relative z-10">
-      <div className="text-center mb-12">
-        <h1 className="syne-mono-regular text-4xl md:text-5xl font-bold mb-4 text-black">
+      <div className="text-center mb-16">
+        <div className="text-[13px] font-medium text-[var(--text-muted)] mb-2 uppercase tracking-[0.05em]">Archive</div>
+        <h1 className="font-serif font-normal text-[var(--text-primary)] mb-4" style={{ fontSize: 'var(--text-section)' }}>
           All Newsletters
         </h1>
-        <p className="molengo-regular text-xl text-gray-600 max-w-2xl mx-auto">
+        <p className="text-[var(--text-secondary)] max-w-2xl mx-auto" style={{ fontSize: 'var(--text-body)' }}>
           Browse through all our AI intelligence newsletters
         </p>
       </div>

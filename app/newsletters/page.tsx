@@ -6,9 +6,9 @@ import React from 'react'
 
 export default function NewslettersPage() {
     return (
-        <div className='flex flex-col min-h-screen bg-background'>
+        <div className='flex flex-col min-h-screen bg-[var(--bg-main)]'>
             <Header />
-            <div className="pt-8">
+            <div className="pt-8 relative overflow-hidden">
                 <RecentNewsletters />
             </div>
             <SubscribeNewsletter />

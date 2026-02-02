@@ -18,38 +18,30 @@ export default function SubscribeNewsletter() {
   }, []);
 
   return (
-    <section id="subscribe" className="flex items-center justify-center px-4 py-20 bg-white relative overflow-hidden">
-      {/* Unique animated background for Subscribe - Radial circles */}
-      <div className="absolute inset-0 overflow-hidden">
-        {/* Concentric circles pulsing from center */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 border border-[#66ccff]/15 rounded-full animate-radial"></div>
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 border border-[#66ccff]/20 rounded-full animate-radial animation-delay-2000"></div>
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 border border-[#66ccff]/25 rounded-full animate-radial animation-delay-4000"></div>
-        
-        {/* Corner decorations */}
-        <div className="absolute top-10 left-10 w-16 h-16 border-2 border-[#66ccff]/20 rounded-full animate-pulse-slow"></div>
-        <div className="absolute top-10 right-10 w-12 h-12 border-2 border-[#66ccff]/20 rotate-45 animate-rotate-slow"></div>
-        <div className="absolute bottom-10 left-10 w-12 h-12 border-2 border-[#66ccff]/20 rotate-45 animate-rotate-slow animation-delay-2000"></div>
-        <div className="absolute bottom-10 right-10 w-16 h-16 border-2 border-[#66ccff]/20 rounded-full animate-pulse-slow animation-delay-4000"></div>
-      </div>
+    <section id="subscribe" className="py-24 bg-[var(--watercolor-ink)] relative overflow-hidden">
+      {/* Watercolor background effects */}
+      <div className="absolute -top-1/2 -right-1/5 w-[600px] h-[600px] rounded-full opacity-10"
+           style={{ background: 'radial-gradient(circle, var(--watercolor-blue) 0%, transparent 60%)' }}></div>
+      <div className="absolute -bottom-1/3 -left-1/10 w-[400px] h-[400px] rounded-full opacity-[0.08]"
+           style={{ background: 'radial-gradient(circle, var(--watercolor-rust) 0%, transparent 60%)' }}></div>
       
-      <div className="relative z-10 w-full max-w-2xl text-center">
+      <div className="container mx-auto px-6 max-w-[520px] text-center relative z-10">
         {/* Heading */}
-        <h1 className="syne-mono-regular text-4xl md:text-5xl font-bold mb-6 text-black">
+        <h2 className="font-serif font-normal leading-[1.2] text-white mb-4" style={{ fontSize: 'var(--text-section)' }}>
           Join our AI newsletter
-        </h1>
+        </h2>
 
         {/* Description */}
-        <p className="molengo-regular text-gray-600 text-lg mb-10 leading-relaxed">
+        <p className="text-white/65 mb-10" style={{ fontSize: 'var(--text-body)' }}>
           Get the latest AI news, research insights, and practical
           implementation guides delivered to your inbox daily.
         </p>
 
         {/* iframe form */}
-        <div className="w-full h-auto rounded-lg overflow-hidden bg-secondary shadow-lg p-4">
+        <div className="w-full h-auto rounded overflow-hidden shadow-lg">
           <iframe
             src="https://links.velocityalpha.com/widget/form/U3Z77WiIoyPTx24EFNj1"
-            className="w-full h-full border-none rounded-lg"
+            className="w-full h-full border-none"
             id="inline-3v7ZRjuohbjIgMs6zYMt"
             data-layout='{"id":"INLINE"}'
             data-trigger-type="alwaysShow"
@@ -61,6 +53,10 @@ export default function SubscribeNewsletter() {
             title="Newsletter Signup Form"
           />
         </div>
+        
+        <p className="text-[13px] text-white/40 mt-6">
+          No spam, unsubscribe anytime. We respect your inbox.
+        </p>
 
       </div>
     </section>

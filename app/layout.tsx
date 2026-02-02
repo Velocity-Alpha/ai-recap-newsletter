@@ -1,11 +1,19 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Libre_Baskerville, Source_Sans_3 } from "next/font/google";
 import ScrollProgress from "@/src/components/ScrollProgress";
 import "./globals.css";
 
-const inter = Inter({
+const libreBaskerville = Libre_Baskerville({
+  weight: ['400', '700'],
+  style: ['normal', 'italic'],
   subsets: ["latin"],
-  variable: "--font-inter",
+  variable: "--font-serif",
+});
+
+const sourceSans = Source_Sans_3({
+  weight: ['400', '500', '600', '700', '800', '900'],
+  subsets: ["latin"],
+  variable: "--font-sans",
 });
 
 export const metadata: Metadata = {
@@ -29,12 +37,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Molengo&family=Syne+Mono&family=WDXL+Lubrifont+SC&display=swap" rel="stylesheet" />
-      </head>
-      <body className={`${inter.variable} antialiased`}>
+      <body className={`${libreBaskerville.variable} ${sourceSans.variable} antialiased`}>
         <ScrollProgress />
         {children}
       </body>

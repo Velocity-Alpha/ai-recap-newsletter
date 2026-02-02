@@ -3,6 +3,7 @@ import React from "react";
 import { Newsletter } from "../types/newsletter.types";
 import { useRouter } from "next/navigation";
 import { formatDate } from "../utils/dateFormatter";
+import { MessageSquare, ArrowRight } from "lucide-react";
 
 interface Props {
   item: Newsletter;
@@ -11,65 +12,56 @@ interface Props {
 const NewsletterCard: React.FC<Props> = ({ item }) => {
   const router = useRouter();
   return (
-    <div
-      className="
-        group bg-white text-card-foreground
-        border border-border/50
-        rounded-2xl overflow-hidden
-        min-w-[320px] max-w-[400px]
-        transition-all duration-500
-        hover:border-primary/30
-        hover:shadow-2xl
-        hover:scale-[1.03]
-        focus-within:ring-2 focus-within:ring-ring
-        cursor-pointer
-        relative
-      "
+    <article
+      className="group bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg overflow-hidden transition-all duration-250 hover:-translate-y-0.5 hover:shadow-[0_12px_32px_rgba(0,0,0,0.08)] cursor-pointer"
       onClick={() => router.push(`/newsletter/${item.id}`)}
     >
-      {/* Hover gradient overlay */}
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/0 via-primary/0 to-accent/0 group-hover:from-primary/5 group-hover:via-primary/3 group-hover:to-accent/5 transition-all duration-500 z-10 pointer-events-none"></div>
-
       {/* Image */}
-      <div className="relative h-[220px] overflow-hidden">
-        <img
-          src={item.feature_image_url}
-          alt={item.title}
-          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-        />
+      <div className="relative aspect-[16/10] bg-[var(--bg-warm)] overflow-hidden">
+        {/* Watercolor placeholder effect */}
+        <div className="absolute inset-0" style={{
+          background: 'radial-gradient(ellipse at 30% 40%, var(--watercolor-blue) 0%, transparent 50%), radial-gradient(ellipse at 70% 60%, var(--watercolor-rust) 0%, transparent 50%)',
+          opacity: 0.2
+        }}></div>
 
-        {/* Gradient overlay */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent group-hover:from-black/80 transition-all duration-500"></div>
+        {item.feature_image_url && (
+          <img
+            src={item.feature_image_url}
+            alt={item.title}
+            className="w-full h-full object-cover"
+          />
+        )}
+
+        {!item.feature_image_url && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="w-12 h-12 bg-[var(--bg-card)] rounded flex items-center justify-center shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
+              <MessageSquare size={24} className="stroke-[var(--text-secondary)]" />
+            </div>
+          </div>
+        )}
         
         {/* Date badge */}
-        <div className="absolute top-4 left-4 px-3 py-1.5 bg-white/95 backdrop-blur-md rounded-full border border-white/50 shadow-lg">
-          <p className="text-xs font-semibold text-foreground">{formatDate(item.published_at)}</p>
-        </div>
-
-        {/* Title overlay */}
-        <div className="absolute bottom-0 left-0 right-0 p-5">
-          <h3 className="syne-mono-regular text-white font-bold text-lg leading-tight line-clamp-2 group-hover:text-white/90 transition-colors">
-            {item.title}
-          </h3>
+        <div className="absolute top-4 left-4 text-[11px] font-medium text-[var(--text-secondary)] bg-[var(--bg-card)] px-2.5 py-1 rounded">
+          {formatDate(item.published_at)}
         </div>
       </div>
 
       {/* Content */}
-      <div className="relative z-10 p-6 bg-white">
-        <p className="text-sm text-muted-foreground line-clamp-3 leading-relaxed mb-4">
+      <div className="p-6">
+        <h3 className="font-serif font-normal leading-[1.35] text-[var(--text-primary)] mb-3" style={{ fontSize: 'var(--text-card-title)' }}>
+          {item.title}
+        </h3>
+        
+        <p className="leading-[1.6] text-[var(--text-secondary)] mb-4 line-clamp-2" style={{ fontSize: 'var(--text-body)' }}>
           {item.excerpt}
         </p>
 
-        {/* Read more with enhanced styling */}
-        <div className="inline-flex items-center gap-2 text-sm font-semibold text-primary group-hover:gap-3 transition-all duration-300">
+        <div className="inline-flex items-center gap-1.5 font-medium text-[var(--accent-primary)] group-hover:gap-2.5 transition-all duration-200" style={{ fontSize: 'var(--text-small)' }}>
           <span>Read more</span>
-          <span className="transform group-hover:translate-x-1 transition-transform duration-300">→</span>
+          <ArrowRight size={14} />
         </div>
       </div>
-
-      {/* Decorative corner element */}
-      <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-primary/10 to-transparent rounded-bl-full opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-    </div>
+    </article>
   );
 };
 

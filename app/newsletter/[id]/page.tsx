@@ -1,4 +1,7 @@
 'use client'
+
+import {  ArrowRight } from "lucide-react";
+
 import Header from "@/src/components/Header";
 import Footer from "@/src/components/Footer";
 import SubscribeNewsletter from "@/src/components/SubscribeNewsletter";
@@ -42,15 +45,15 @@ const Section = ({
 }) => (
     <section className="space-y-8">
         <div className="relative">
-            <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#66ccff] rounded-full"></div>
+            <div className="absolute left-0 top-0 bottom-0 w-1 bg-[var(--watercolor-blue)] rounded-full"></div>
             <div className="flex items-center gap-4 pl-6 py-3">
                 <span className="text-2xl">{icon}</span>
-                <h2 className="text-2xl md:text-3xl font-bold text-black">
+                <h2 className="font-serif font-normal text-[var(--text-primary)]" style={{ fontSize: '24px' }}>
                     {title}
                 </h2>
             </div>
         </div>
-        <div className="space-y-4">{children}</div>
+        <div className="space-y-6">{children}</div>
     </section>
 );
 
@@ -120,94 +123,58 @@ const Page = () => {
     return (
         <div className="flex flex-col min-h-screen bg-white">
             <Header />
-            <main className="flex-1 relative overflow-hidden bg-white">
-                <div className="molengo-regular relative z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-12">
+            <main className="flex-1 relative overflow-hidden">
+                <div className="relative z-10 max-w-4xl mx-auto px-6 py-16 space-y-16">
                     {/* HEADER SECTION */}
                     <div className="text-center space-y-6">
-                        <div className="inline-block px-4 py-1.5 rounded-full bg-[#66ccff]/10 text-[#66ccff] text-sm font-semibold border border-[#66ccff]/20">
-                            AI Recap Newsletter
+                        <div className="inline-flex items-center gap-2 font-medium text-[var(--text-muted)] uppercase tracking-[0.1em]" style={{ fontSize: 'calc(var(--text-small) * 0.95)' }}>
+                            {data.published_at ? formatDate(data.published_at) : 'AI Recap Daily'}
                         </div>
-                        <h1 className="syne-mono-regular text-4xl md:text-5xl lg:text-6xl font-bold text-black">
+                        <h1 className="font-serif font-normal leading-[1.12] text-[var(--text-primary)] tracking-[-0.02em]" style={{ fontSize: 'calc(var(--text-hero) * 0.88)' }}>
                             {title}
                         </h1>
-                        {data.published_at && (
-                            <p className="text-lg text-gray-600">
-                                {formatDate(data.published_at)}
-                            </p>
-                        )}
                     </div>
 
                     {/* HERO IMAGE */}
                     {imageUrl && (
-                        <div className="relative -mx-4 sm:-mx-6 lg:-mx-8">
-                            <div className="relative overflow-hidden">
-                                <img src={imageUrl} alt={title} className="w-full h-[400px] md:h-[500px] object-cover" />
-                                {/* Gradient masks on edges to blend with page */}
-                                <div className="absolute inset-0 pointer-events-none">
-                                    {/* Top edge fade */}
-                                    <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-b from-white to-transparent"></div>
-                                    {/* Bottom edge fade */}
-                                    <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-white to-transparent"></div>
-                                    {/* Left edge fade */}
-                                    <div className="absolute top-0 bottom-0 left-0 w-32 bg-gradient-to-r from-white to-transparent"></div>
-                                    {/* Right edge fade */}
-                                    <div className="absolute top-0 bottom-0 right-0 w-32 bg-gradient-to-l from-white to-transparent"></div>
-                                </div>
+                        <div className="relative -mx-6">
+                            <div className="relative">
+                                <img src={imageUrl} alt={title} className="w-full h-auto max-h-[500px] object-cover" />
                             </div>
                         </div>
-                    )}
-
-                    {/* EXCERPT/DESCRIPTION (shown when content_json is null) */}
-                    {!content_json && excerpt && (
-                        <section 
-                            className="space-y-6 border border-blue-200 rounded-xl p-8 shadow-md"
-                            style={{
-                                background: 'radial-gradient(circle at center, rgb(219 234 254 / 0.6), rgb(191 219 254 / 0.4), rgb(147 197 253 / 0.2), transparent)'
-                            }}
-                        >
-                            <div className="flex items-center gap-3">
-                                <span className="text-3xl">📋</span>
-                                <h2 className="text-2xl font-bold text-black">
-                                    Overview
-                                </h2>
-                            </div>
-                            <p className="text-gray-700 text-lg leading-relaxed">
-                                {excerpt}
-                            </p>
-                        </section>
                     )}
 
                     {/* OVERVIEW (if content_json exists) */}
                     {overview && (
                         <section 
-                            className="space-y-6 border border-blue-200 rounded-xl p-8 shadow-md"
-                            style={{
-                                background: 'radial-gradient(circle at center, rgb(219 234 254 / 0.6), rgb(191 219 254 / 0.4), rgb(147 197 253 / 0.2), transparent)'
-                            }}
+                            className="space-y-6 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg p-10 shadow-sm relative overflow-hidden"
                         >
+                            <div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-[var(--watercolor-blue)] to-[var(--watercolor-rust)] opacity-50"></div>
                             <div className="flex items-center gap-3">
                                 <span className="text-3xl">📋</span>
-                                <h2 className="text-2xl font-bold text-black">
+                                <h2 className="font-serif text-[var(--text-primary)]" style={{ fontSize: '24px' }}>
                                     Today&apos;s Overview
                                 </h2>
                             </div>
 
                             {overview.summary && (
-                                <p className="text-gray-700 text-lg leading-relaxed">
+                                <p className="leading-[1.7] text-[var(--text-secondary)] italic" style={{ fontSize: 'calc(var(--text-body) * 0.95)' }}>
                                     {overview.summary}
                                 </p>
                             )}
 
                             {overview.highlights && overview.highlights.length > 0 && (
-                                <div className="border-l-4 border-[#66ccff] pl-6 space-y-3 bg-white/70 rounded-r-lg p-5">
-                                    <p className="text-[#66ccff] text-lg font-semibold uppercase tracking-wide">
+                                <div className="mt-8 space-y-4">
+                                    <p className="text-[var(--accent-warm)] font-bold uppercase tracking-wider" style={{ fontSize: 'calc(var(--text-small) * 0.95)' }}>
                                         Key Highlights
                                     </p>
-                                    <ul className="space-y-2 text-base text-gray-700">
+                                    <ul className="space-y-4">
                                         {overview.highlights.map((point: string, idx: number) => (
-                                            <li key={idx} className="flex gap-3 items-start">
-                                                <span className="text-[#66ccff] mt-1">•</span>
-                                                <span>{point}</span>
+                                            <li key={idx} className="flex gap-4 items-start text-[var(--text-primary)]" style={{ fontSize: 'calc(var(--text-body) * 0.95)' }}>
+                                                <span className="min-w-[20px] h-[20px] flex items-center justify-center bg-[var(--bg-warm)] rounded-full text-[10px] border border-[var(--border-light)] text-[var(--text-muted)] mt-0.5">
+                                                    {idx + 1}
+                                                </span>
+                                                <span className="leading-[1.6]">{point}</span>
                                             </li>
                                         ))}
                                     </ul>
@@ -219,11 +186,11 @@ const Page = () => {
                     {/* TOP STORIES */}
                     {topStories.length > 0 && (
                         <Section title="Top Stories" icon="🔥">
-                            <div className="grid gap-6 md:gap-8">
+                            <div className="grid gap-12">
                                 {topStories.map((story: Item, i: number) => (
-                                    <article key={i} className="group relative">
-                                        <div className="space-y-3">
-                                            <h3 className="font-bold text-xl text-black group-hover:text-[#66ccff] transition-colors">
+                                    <article key={i} className="group">
+                                        <div className="space-y-4">
+                                            <h3 className="font-serif font-normal leading-[1.3] text-[var(--text-primary)] group-hover:text-[var(--accent-primary)] transition-colors" style={{ fontSize: 'calc(var(--text-card-title) * 0.92)' }}>
                                                 {story.link ? (
                                                         <a
                                                             href={story.link}
@@ -237,7 +204,7 @@ const Page = () => {
                                                         story.title
                                                     )}
                                                 </h3>
-                                                <p className="text-base text-gray-600 leading-relaxed">
+                                                <p className="leading-[1.7] text-[var(--text-secondary)]" style={{ fontSize: 'calc(var(--text-body) * 0.95)' }}>
                                                     {story.summary}
                                                 </p>
                                                 {story.link && (
@@ -245,15 +212,12 @@ const Page = () => {
                                                         href={story.link}
                                                         target="_blank"
                                                         rel="noopener noreferrer"
-                                                        className="inline-flex items-center gap-2 text-sm text-[#66ccff] hover:underline font-medium"
+                                                        className="inline-flex items-center gap-1.5 text-[var(--accent-primary)] font-semibold hover:gap-2.5 transition-all duration-200" style={{ fontSize: 'var(--text-small)' }}
                                                     >
-                                                        Read More →
+                                                        Read Full Article <ArrowRight size={14} />
                                                     </a>
                                                 )}
                                         </div>
-                                        {i < topStories.length - 1 && (
-                                            <div className="mt-6 border-t border-gray-100"></div>
-                                        )}
                                     </article>
                                 ))}
                             </div>
@@ -263,11 +227,11 @@ const Page = () => {
                     {/* RESEARCH */}
                     {research.length > 0 && (
                         <Section title="Research & Analysis" icon="📊">
-                            <div className="grid gap-6 md:gap-8">
+                            <div className="grid gap-12">
                                 {research.map((item: Item, i: number) => (
-                                    <article key={i} className="group relative">
-                                        <div className="space-y-3">
-                                            <h3 className="font-bold text-xl text-black group-hover:text-[#66ccff] transition-colors">
+                                    <article key={i} className="group">
+                                        <div className="space-y-4">
+                                            <h3 className="font-serif font-normal leading-[1.3] text-[var(--text-primary)] group-hover:text-[var(--accent-primary)] transition-colors" style={{ fontSize: 'calc(var(--text-card-title) * 0.92)' }}>
                                                 {item.link ? (
                                                         <a
                                                             href={item.link}
@@ -281,7 +245,7 @@ const Page = () => {
                                                         item.title
                                                     )}
                                                 </h3>
-                                                <p className="text-base text-gray-600 leading-relaxed">
+                                                <p className="leading-[1.7] text-[var(--text-secondary)]" style={{ fontSize: 'calc(var(--text-body) * 0.95)' }}>
                                                     {item.summary}
                                                 </p>
                                                 {item.link && (
@@ -289,15 +253,12 @@ const Page = () => {
                                                         href={item.link}
                                                         target="_blank"
                                                         rel="noopener noreferrer"
-                                                        className="inline-flex items-center gap-2 text-sm text-[#66ccff] hover:underline font-medium"
+                                                        className="inline-flex items-center gap-1.5 text-[var(--accent-primary)] font-semibold hover:gap-2.5 transition-all duration-200" style={{ fontSize: 'var(--text-small)' }}
                                                     >
-                                                        Read More →
+                                                        View Paper <ArrowRight size={14} />
                                                     </a>
                                                 )}
                                         </div>
-                                        {i < research.length - 1 && (
-                                            <div className="mt-6 border-t border-gray-100"></div>
-                                        )}
                                     </article>
                                 ))}
                             </div>
@@ -307,41 +268,24 @@ const Page = () => {
                     {/* TOOLS */}
                     {tools.length > 0 && (
                         <Section title="Trending Tools" icon="🛠️">
-                            <div className="grid gap-6 md:gap-8">
+                            <div className="grid gap-8">
                                 {tools.map((tool: Item, i: number) => (
-                                    <article key={i} className="group relative">
-                                        <div className="space-y-3">
-                                            <h3 className="font-bold text-xl text-black group-hover:text-[#66ccff] transition-colors">
-                                                {tool.link ? (
-                                                        <a
-                                                            href={tool.link}
-                                                            target="_blank"
-                                                            rel="noopener noreferrer"
-                                                            className="hover:underline"
-                                                        >
-                                                            {tool.title}
-                                                        </a>
-                                                    ) : (
-                                                        tool.title
-                                                    )}
-                                                </h3>
-                                                <p className="text-base text-gray-600 leading-relaxed">
-                                                    {tool.summary}
-                                                </p>
-                                                {tool.link && (
-                                                    <a
-                                                        href={tool.link}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="inline-flex items-center gap-2 text-sm text-[#66ccff] hover:underline font-medium"
-                                                    >
-                                                        Read More →
-                                                    </a>
-                                                )}
+                                    <article key={i} className="flex gap-6 p-6 bg-[var(--bg-warm)] rounded-lg border border-[var(--border-light)] group hover:bg-[var(--bg-card)] transition-colors duration-250">
+                                        <div className="min-w-[48px] h-[48px] bg-[var(--bg-card)] rounded-lg flex items-center justify-center text-xl shadow-sm border border-[var(--border-light)]">
+                                            ⚙️
                                         </div>
-                                        {i < tools.length - 1 && (
-                                            <div className="mt-6 border-t border-gray-100"></div>
-                                        )}
+                                        <div className="space-y-2">
+                                            <h3 className="font-serif font-normal text-[var(--text-primary)]" style={{ fontSize: 'calc(var(--text-card-title) * 0.92)' }}>
+                                                {tool.link ? (
+                                                    <a href={tool.link} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                                                        {tool.title}
+                                                    </a>
+                                                ) : tool.title}
+                                            </h3>
+                                            <p className="leading-[1.6] text-[var(--text-secondary)]" style={{ fontSize: '14px' }}>
+                                                {tool.summary}
+                                            </p>
+                                        </div>
                                     </article>
                                 ))}
                             </div>
@@ -351,14 +295,14 @@ const Page = () => {
                     {/* QUICK HITS */}
                     {quickHits.length > 0 && (
                         <Section title="Quick Hits" icon="⚡">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 {quickHits.map((hit: Item, i: number) => (
-                                    <div key={i} className="flex gap-3 p-4 rounded-lg hover:bg-gray-50/50 transition-colors">
-                                        <div className="flex-shrink-0 w-2 h-2 rounded-full bg-[#66ccff] mt-2"></div>
+                                    <div key={i} className="flex gap-4 p-5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg">
+                                        <div className="flex-shrink-0 w-2 h-2 rounded-full bg-[var(--watercolor-rust)] mt-2"></div>
                                         <div className="flex-1">
-                                            <p className="text-base text-gray-700">
-                                                <span className="font-semibold text-black">{hit.title}</span>
-                                                {hit.summary && `: ${hit.summary}`}
+                                            <p className="text-[var(--text-primary)]" style={{ fontSize: 'calc(var(--text-body) * 0.95)' }}>
+                                                <span className="font-semibold">{hit.title}</span>
+                                                {hit.summary && <span className="text-[var(--text-secondary)]"> — {hit.summary}</span>}
                                             </p>
                                         </div>
                                     </div>
@@ -367,8 +311,8 @@ const Page = () => {
                         </Section>
                     )}
                     
-                    <SubscribeNewsletter />
                 </div>
+                <SubscribeNewsletter />
             </main>
             <Footer />
         </div>
