@@ -1,14 +1,21 @@
 const pkg = require('pg');
+const path = require('path');
 const dotenv = require('dotenv');
 
-// Load environment variables - system env vars take precedence
-dotenv.config({ override: false });
+// Load environment variables from netlify/.env
+dotenv.config({ path: path.join(__dirname, '../.env') });
 
 const { Pool } = pkg;
 
+if (!process.env.DATABASE_URL) {
+  console.error('ERROR: DATABASE_URL environment variable is not defined');
+}
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false } // required for Neon
+  ssl: {
+    rejectUnauthorized: false
+  }
 });
 
 exports.handler = async function(event) {
@@ -43,6 +50,8 @@ exports.handler = async function(event) {
       ORDER BY published_at DESC;
     `);
     
+    const rows = result.rows || [];
+    
     return {
       statusCode: 200,
       headers: {
@@ -51,8 +60,8 @@ exports.handler = async function(event) {
       },
       body: JSON.stringify({
         success: true,
-        data: result.rows,
-        count: result.rows.length,
+        data: rows,
+        count: rows.length,
         timestamp: new Date().toISOString()
       }),
     };

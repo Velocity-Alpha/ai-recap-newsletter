@@ -1,3 +1,5 @@
+import Image from 'next/image'
+
 export default function Footer() {
   return (
     <footer className="bg-secondary border-t border-border mt-20 relative overflow-hidden">
@@ -27,19 +29,15 @@ export default function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           {/* Brand */}
           <div className="col-span-1 md:col-span-2">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="relative">
-                <div className="absolute inset-0 bg-gradient-to-br from-[#66ccff] to-[#3B82F6] rounded-full blur-sm opacity-60"></div>
-                <div className="relative bg-gradient-to-br from-[#66ccff] to-[#3B82F6] px-3 py-1.5 rounded-lg shadow-md">
-                  <span className="text-white text-lg font-bold tracking-tight">AI</span>
-                </div>
-              </div>
-              <div className="flex flex-col">
-                <span className="text-xl font-bold bg-gradient-to-r from-[#66ccff] to-[#3B82F6] bg-clip-text text-transparent leading-tight">
-                  Recap
-                </span>
-                <span className="text-xs text-gray-500 font-medium -mt-1">Newsletter</span>
-              </div>
+            <div className="flex items-center gap-3 mb-4">
+              <Image
+                src="/logo/logo.png"
+                alt="AI Recap"
+                width={140}
+                height={40}
+                className="h-10 w-auto"
+              />
+              <span className="sr-only">AI Recap</span>
             </div>
             <p className="text-gray-600 mb-4 max-w-md">
               Your daily source for AI news, research insights, and practical implementation guides. 

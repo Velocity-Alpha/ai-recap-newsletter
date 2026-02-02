@@ -11,15 +11,20 @@
   "workspace": {
     "packageJson": {
       "dependencies": [
+        "npm:@radix-ui/react-slot@^1.2.3",
         "npm:@tailwindcss/postcss@4",
         "npm:@types/node@18",
         "npm:@types/react-dom@18",
         "npm:@types/react@18",
+        "npm:class-variance-authority@~0.7.1",
+        "npm:clsx@^2.1.1",
         "npm:eslint-config-next@^14.2.19",
         "npm:eslint@8",
+        "npm:lucide-react@0.522",
         "npm:next@^14.2.19",
         "npm:react-dom@^18.3.1",
         "npm:react@^18.3.1",
+        "npm:tailwind-merge@^3.3.1",
         "npm:tailwindcss@4",
         "npm:typescript@5"
       ]

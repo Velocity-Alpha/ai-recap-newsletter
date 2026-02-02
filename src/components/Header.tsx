@@ -1,27 +1,23 @@
 'use client'
 
+import Image from 'next/image'
 import Link from 'next/link'
 
 export default function Header() {
   return (
     <header className="w-full bg-white border-b border-gray-200 shadow-sm">
       <nav className="mx-auto flex items-center justify-center md:justify-between px-6 py-6 max-w-7xl">
-        {/* Logo - AI Recap with fancy design */}
-        <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity group">
-          <div className="relative">
-            {/* Background gradient circle */}
-            <div className="absolute inset-0 bg-gradient-to-br from-[#66ccff] to-[#3B82F6] rounded-full blur-sm opacity-60 group-hover:opacity-80 transition-opacity"></div>
-            {/* AI Icon/Text */}
-            <div className="relative bg-gradient-to-br from-[#66ccff] to-[#3B82F6] px-4 py-2 rounded-lg shadow-md">
-              <span className="text-white text-xl font-bold tracking-tight">AI</span>
-            </div>
-          </div>
-          <div className="flex flex-col">
-            <span className="text-2xl font-bold bg-gradient-to-r from-[#66ccff] to-[#3B82F6] bg-clip-text text-transparent leading-tight">
-              Recap
-            </span>
-            <span className="text-xs text-gray-500 font-medium -mt-1">Newsletter</span>
-          </div>
+        {/* Logo */}
+        <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+          <Image
+            src="/logo/logo.png"
+            alt="AI Recap"
+            width={140}
+            height={40}
+            priority
+            className="h-10 w-auto"
+          />
+          <span className="sr-only">AI Recap</span>
         </Link>
 
         {/* Desktop Navigation */}

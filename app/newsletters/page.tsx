@@ -1,7 +1,6 @@
-'use client'
-
 import Header from '@/src/components/Header'
 import RecentNewsletters from '@/src/components/RecentNewsletters'
+import SubscribeNewsletter from '@/src/components/SubscribeNewsletter'
 import Footer from '@/src/components/Footer'
 import React from 'react'
 
@@ -12,6 +11,7 @@ export default function NewslettersPage() {
             <div className="pt-8">
                 <RecentNewsletters />
             </div>
+            <SubscribeNewsletter />
             <Footer />
         </div>
     )

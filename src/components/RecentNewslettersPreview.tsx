@@ -6,6 +6,7 @@ import { Newsletter } from "../types/newsletter.types";
 import Link from "next/link";
 import ScrollAnimation from "./ScrollAnimation";
 import { getApiUrl } from "../utils/apiConfig";
+import { Newspaper, Bell } from "lucide-react";
 
 const RecentNewslettersPreview: React.FC = () => {
   const [newslettersData, setNewsletterData] = useState<Newsletter[]>([]);
@@ -131,8 +132,35 @@ const RecentNewslettersPreview: React.FC = () => {
           ))}
         </div>
       ) : newslettersData.length === 0 ? (
-        <div className="text-center py-20">
-          <p className="text-gray-600 text-lg">No newsletters available yet.</p>
+        <div className="text-center py-20 bg-white/50 backdrop-blur-sm rounded-3xl border border-[#66ccff]/10 shadow-xl overflow-hidden relative">
+          {/* Subtle background pattern for the empty state box */}
+          <div className="absolute inset-0 opacity-5 pointer-events-none">
+            <div className="absolute top-0 left-0 w-full h-full" style={{ backgroundImage: 'radial-gradient(#66ccff 1px, transparent 1px)', backgroundSize: '20px 20px' }}></div>
+          </div>
+          
+          <div className="relative z-10 flex flex-col items-center">
+            <div className="w-20 h-20 bg-[#66ccff]/10 rounded-2xl flex items-center justify-center text-[#66ccff] mb-6 transform -rotate-6">
+              <Newspaper size={40} />
+            </div>
+            <h3 className="syne-mono-regular text-2xl md:text-3xl font-bold text-black mb-3">
+              Archives are currently empty
+            </h3>
+            <p className="molengo-regular text-lg text-gray-600 max-w-md mx-auto mb-8">
+              We&apos;re preparing our first set of AI intelligence reports. 
+              Be the first to know when they drop!
+            </p>
+            <a 
+              href="#subscribe" 
+              className="group inline-flex items-center gap-2 px-8 py-3 bg-[#66ccff] text-white rounded-xl font-bold transition-all hover:bg-[#66ccff]/90"
+              onClick={(e) => {
+                e.preventDefault();
+                document.getElementById('subscribe')?.scrollIntoView({ behavior: 'smooth' });
+              }}
+            >
+              <Bell size={18} className="animate-bounce" />
+              Keep Me Updated
+            </a>
+          </div>
         </div>
       ) : (
         <>

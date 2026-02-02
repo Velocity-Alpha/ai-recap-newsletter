@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import NewsletterCard from "./NewsletterCard";
-import Pagination from "./Pagination"; 
+import Pagination from "./Pagination";
 import { Newsletter } from "../types/newsletter.types";
 import { getApiUrl } from "../utils/apiConfig";
+import { Newspaper, Send } from "lucide-react";
 
 const ITEMS_PER_PAGE = 6;
 
@@ -102,8 +103,32 @@ const RecentNewsletters: React.FC = () => {
           ))}
         </div>
       ) : newslettersData.length === 0 ? (
-        <div className="text-center py-20">
-          <p className="text-gray-600">No newsletters available yet.</p>
+        <div className="text-center py-24 flex flex-col items-center justify-center animate-in fade-in slide-in-from-bottom-4 duration-700">
+          <div className="w-24 h-24 bg-blue-50 rounded-full flex items-center justify-center text-[#66ccff] mb-8 shadow-inner">
+            <Newspaper size={48} />
+          </div>
+          <h3 className="syne-mono-regular text-3xl font-bold text-gray-900 mb-4">
+            Intelligence Briefing Pending
+          </h3>
+          <p className="molengo-regular text-xl text-gray-600 max-w-lg mx-auto mb-10 leading-relaxed">
+            Our analysts are currently synthesizing the latest AI breakthroughs. 
+            The next edition of AI Recap is on its way!
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4">
+            <a 
+              href="/#subscribe" 
+              className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-[#66ccff] text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300"
+            >
+              <Send size={20} />
+              Get Notified
+            </a>
+            <button 
+              onClick={() => window.location.reload()}
+              className="px-8 py-4 bg-white text-gray-700 border border-gray-200 rounded-xl font-bold text-lg hover:bg-gray-50 transition-all shadow-sm"
+            >
+              Check Again
+            </button>
+          </div>
         </div>
       ) : (
         <>

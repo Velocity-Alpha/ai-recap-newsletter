@@ -1,15 +1,21 @@
-// netlify/functions/getDataById.js
 const pkg = require('pg');
+const path = require('path');
 const dotenv = require('dotenv');
 
-// Load environment variables - system env vars take precedence
-dotenv.config({ override: false });
+// Load environment variables from netlify/.env
+dotenv.config({ path: path.join(__dirname, '../.env') });
 
 const { Pool } = pkg;
 
+if (!process.env.DATABASE_URL) {
+  console.error('ERROR: DATABASE_URL environment variable is not defined');
+}
+
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL, 
-  ssl: { rejectUnauthorized: false }
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false
+  }
 });
 
 exports.handler = async function(event) {
@@ -87,8 +93,10 @@ exports.handler = async function(event) {
       [issueId]
     );
 
+    const rows = result.rows || [];
+
     // Check if issue exists
-    if (result.rows.length === 0) {
+    if (rows.length === 0) {
       return {
         statusCode: 404,
         headers,
@@ -108,7 +116,7 @@ exports.handler = async function(event) {
       },
       body: JSON.stringify({
         success: true,
-        data: result.rows[0], // Single object
+        data: rows[0], // Single object
         timestamp: new Date().toISOString()
       })
     };

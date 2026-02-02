@@ -37,14 +37,20 @@ A beautiful, light-mode newsletter website with paint-style colors that compleme
 2. **Install dependencies**:
    ```bash
    npm install
+   cd netlify && npm install && cd ..
    ```
 
 3. **Set up environment variables**:
-   - For local development, create a `.env.local` file in the root:
+   - Copy the example environment files and update with your values:
+     ```bash
+     cp .env.local.example .env.local
+     cp netlify/.env.example netlify/.env
+     ```
+   - Update `.env.local` in the root directory:
      ```env
      NEXT_PUBLIC_NEWSLETTER_URL=http://localhost:8888/.netlify/functions
      ```
-   - For Netlify functions, create a `.env` file in the `netlify` folder:
+   - Update `netlify/.env` with your database connection string:
      ```env
      DATABASE_URL=your_database_connection_string
      ```

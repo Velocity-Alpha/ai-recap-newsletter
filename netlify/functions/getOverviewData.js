@@ -1,14 +1,21 @@
 const pkg = require('pg');
+const path = require('path');
 const dotenv = require('dotenv');
 
-// Load environment variables - system env vars take precedence
-dotenv.config({ override: false });
+// Load environment variables from netlify/.env
+dotenv.config({ path: path.join(__dirname, '../.env') });
 
 const { Pool } = pkg;
 
+if (!process.env.DATABASE_URL) {
+  console.error('ERROR: DATABASE_URL environment variable is not defined');
+}
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false } // required for Neon
+  ssl: {
+    rejectUnauthorized: false
+  }
 });
 
 exports.handler = async function(event) {
@@ -45,7 +52,7 @@ exports.handler = async function(event) {
       SELECT COUNT(*) as total
       FROM newsletter.issues;
     `);
-    const totalCount = parseInt(countResult.rows[0].total, 10);
+    const totalCount = parseInt(countResult.rows?.[0]?.total || '0', 10);
     const totalPages = Math.ceil(totalCount / validLimit);
 
     // Get paginated results
@@ -62,6 +69,8 @@ exports.handler = async function(event) {
       ORDER BY published_at DESC
       LIMIT $1 OFFSET $2;
     `, [validLimit, offset]);
+
+    const rows = result.rows || [];
     
     return {
       statusCode: 200,
@@ -71,7 +80,7 @@ exports.handler = async function(event) {
       },
       body: JSON.stringify({
         success: true,
-        data: result.rows,
+        data: rows,
         pagination: {
           currentPage: validPage,
           totalPages: totalPages,
