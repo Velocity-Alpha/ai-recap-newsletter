@@ -6,7 +6,7 @@ import Link from 'next/link'
 export default function Header() {
   return (
     <header className="w-full bg-[var(--bg-card)] border-b border-[var(--border-light)] sticky top-0 z-50">
-      <nav className="container mx-auto flex items-center justify-center md:justify-between px-6 py-4 max-w-[var(--container)]">
+      <nav className="container mx-auto flex items-center justify-between px-6 py-4 max-w-[var(--container)]">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
           <Image
@@ -47,6 +47,14 @@ export default function Header() {
             Subscribe
           </button>
         </div>
+
+        {/* Mobile Subscribe Button */}
+        <button 
+          onClick={() => document.getElementById('subscribe')?.scrollIntoView({ behavior: 'smooth' })}
+          className="md:hidden px-4 py-2 bg-[var(--text-primary)] text-white font-semibold rounded transition-all duration-200 hover:bg-[var(--watercolor-ink)]" style={{ fontSize: 'var(--text-small)' }}
+        >
+          Subscribe
+        </button>
       </nav>
     </header>
   );
