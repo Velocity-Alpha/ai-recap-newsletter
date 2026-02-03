@@ -3,9 +3,9 @@
 This folder contains the backend functions for the Netlify deployment.
 
 ## Files Included
-- `functions/getData.js`: A serverless function to fetch all newsletter data from the database.
-- `functions/getDataById.js`: A serverless function to fetch a specific newsletter by ID.
-- `functions/getOverviewData.js`: A serverless function to fetch newsletter overview data (for listing pages).
+- `functions/fetch-newsletter-by-id.js`: A serverless function to fetch a specific newsletter by ID.
+- `functions/fetch-newsletters-list.js`: A serverless function to fetch newsletter overview data (for listing pages).
+- `functions/fetch-ticker-news.js`: A serverless function to fetch ticker news.
 - `netlify.toml`: Netlify configuration file.
 
 ## Setup Instructions
@@ -29,11 +29,11 @@ This folder contains the backend functions for the Netlify deployment.
      ```bash
      netlify dev
      ```
-   - Access the endpoints at:
+  - Access the endpoints at:
      ```
-     http://localhost:8888/.netlify/functions/getData
-     http://localhost:8888/.netlify/functions/getDataById?id=1
-     http://localhost:8888/.netlify/functions/getOverviewData
+     http://localhost:8888/.netlify/functions/fetch-newsletter-by-id?id=1
+     http://localhost:8888/.netlify/functions/fetch-newsletters-list
+     http://localhost:8888/.netlify/functions/fetch-ticker-news
      ```
 
 4. **Deploy to Netlify**:
@@ -45,12 +45,11 @@ This folder contains the backend functions for the Netlify deployment.
 
 ## API Endpoints
 
-### GET /.netlify/functions/getData
-Returns all newsletter issues with full content.
-
-### GET /.netlify/functions/getDataById?id={id}
+### GET /.netlify/functions/fetch-newsletter-by-id?id={id}
 Returns a specific newsletter issue by ID.
 
-### GET /.netlify/functions/getOverviewData
+### GET /.netlify/functions/fetch-newsletters-list
 Returns newsletter overview data (id, title, excerpt, feature_image_url, published_at) for listing pages.
 
+### GET /.netlify/functions/fetch-ticker-news
+Returns ticker news for the requested symbols.

@@ -18,7 +18,7 @@ export default function NewsletterPreview() {
         if (!apiUrl) {
           throw new Error('NEXT_PUBLIC_NEWSLETTER_URL is not set');
         }
-        const res = await fetch(`${apiUrl}/getOverviewData?page=1&limit=3`);
+        const res = await fetch(`${apiUrl}/fetch-newsletters-list?page=1&limit=3`);
         const data = await res.json();
         setNewsletters(data?.data || []);
       } catch (error) {
@@ -112,4 +112,3 @@ export default function NewsletterPreview() {
     </section>
   );
 }
-

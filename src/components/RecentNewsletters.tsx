@@ -19,7 +19,7 @@ const RecentNewsletters: React.FC = () => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const apiUrl = getApiUrl('getOverviewData');
+        const apiUrl = getApiUrl('fetch-newsletters-list');
         // Handle both absolute and relative URLs
         const url = apiUrl.startsWith('http') 
           ? new URL(apiUrl)

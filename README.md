@@ -31,7 +31,7 @@ A beautiful, light-mode newsletter website with paint-style colors that compleme
 
 1. **Clone and navigate to the project**:
    ```bash
-   cd va_newslatter
+   cd va_newsletter
    ```
 
 2. **Install dependencies**:
@@ -73,7 +73,7 @@ npm run dev
 ## Project Structure
 
 ```
-va_newslatter/
+va_newsletter/
 ├── app/                    # Next.js app directory
 │   ├── page.tsx           # Home page (newsletter listing)
 │   ├── newsletter/
@@ -94,9 +94,9 @@ va_newslatter/
 │       └── dateFormatter.ts
 ├── netlify/
 │   ├── functions/        # Netlify serverless functions
-│   │   ├── getData.js
-│   │   ├── getDataById.js
-│   │   └── getOverviewData.js
+│   │   ├── fetch-newsletter-by-id.js
+│   │   ├── fetch-newsletters-list.js
+│   │   └── fetch-ticker-news.js
 │   └── package.json
 └── netlify.toml          # Netlify configuration
 ```
@@ -128,9 +128,9 @@ The Netlify functions will automatically be deployed with your site.
 
 The Netlify functions provide the following endpoints:
 
-- `/.netlify/functions/getData` - Get all newsletters
-- `/.netlify/functions/getDataById?id={id}` - Get newsletter by ID
-- `/.netlify/functions/getOverviewData` - Get newsletter overview for listings
+- `/.netlify/functions/fetch-newsletter-by-id?id={id}` - Get newsletter by ID
+- `/.netlify/functions/fetch-newsletters-list` - Get newsletter overview for listings
+- `/.netlify/functions/fetch-ticker-news` - Get ticker news
 
 ## Database Schema
 

@@ -66,7 +66,7 @@ const Page = () => {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const apiUrl = getApiUrl('getDataById');
+                const apiUrl = getApiUrl('fetch-newsletter-by-id');
                 const res = await fetch(`${apiUrl}?id=${id}`, {
                   headers: {
                     'Content-Type': 'application/json',
@@ -320,4 +320,3 @@ const Page = () => {
 };
 
 export default Page;
-

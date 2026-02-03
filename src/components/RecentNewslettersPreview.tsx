@@ -14,7 +14,7 @@ const RecentNewslettersPreview: React.FC = () => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const apiUrl = getApiUrl('getOverviewData');
+        const apiUrl = getApiUrl('fetch-newsletters-list');
         // Request first page with 6 items
         const url = apiUrl.startsWith('http') 
           ? new URL(apiUrl)

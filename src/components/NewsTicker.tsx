@@ -35,7 +35,7 @@ export default function NewsTicker() {
     // Fetch ticker news and stats
     const fetchNews = async () => {
       try {
-        const response = await fetch(getApiUrl('getTickerNews'));
+        const response = await fetch(getApiUrl('fetch-ticker-news'));
         const result = await response.json();
         if (result.success) {
           if (result.data && result.data.length > 0) {
