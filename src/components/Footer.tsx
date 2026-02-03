@@ -4,7 +4,7 @@ export default function Footer() {
   return (
     <footer className="bg-[var(--bg-card)] border-t border-[var(--border-light)] py-16">
       <div className="container mx-auto px-6 max-w-[var(--container)]">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {/* Brand */}
           <div className="col-span-1 md:col-span-2">
             <Image
@@ -40,35 +40,6 @@ export default function Footer() {
                 </a>
               </li>
             </ul>
-          </div>
-
-          {/* Contact */}
-          <div>
-            <h4 className="font-semibold text-[var(--text-primary)] mb-6 uppercase tracking-wider" style={{ fontSize: 'var(--text-caption)' }}>Contact</h4>
-            <div className="space-y-4 text-[var(--text-secondary)]">
-              <div>
-                <div className="mb-1" style={{ fontSize: 'var(--text-caption)' }}>Email</div>
-                <a href="mailto:info@velocityalpha.com" className="hover:text-[var(--accent-primary)] transition-colors" style={{ fontSize: 'var(--text-small)' }}>
-                  info@velocityalpha.com
-                </a>
-              </div>
-              <div>
-                <div className="mb-1" style={{ fontSize: 'var(--text-caption)' }}>Phone</div>
-                <a href="tel:+16477392144" className="hover:text-[var(--accent-primary)] transition-colors" style={{ fontSize: 'var(--text-small)' }}>
-                  +1 (647) 739-2144
-                </a>
-              </div>
-            </div>
-          </div>
-          
-          {/* Address */}
-          <div>
-            <h4 className="font-semibold text-[var(--text-primary)] mb-6 uppercase tracking-wider" style={{ fontSize: 'var(--text-caption)' }}>Address</h4>
-            <div className="text-[var(--text-secondary)] leading-[1.5]" style={{ fontSize: 'var(--text-small)' }}>
-              104 Applefield Dr<br />
-              Scarborough, ON<br />
-              Canada M1P 3Y2
-            </div>
           </div>
         </div>
 

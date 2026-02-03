@@ -38,7 +38,7 @@ export default function SubscribeNewsletter() {
         </p>
 
         {/* iframe form */}
-        <div className="w-full h-auto rounded overflow-hidden shadow-lg">
+        <div className="w-full h-auto rounded overflow-hidden">
           <iframe
             src="https://links.velocityalpha.com/widget/form/U3Z77WiIoyPTx24EFNj1"
             className="w-full h-full border-none"
@@ -53,10 +53,6 @@ export default function SubscribeNewsletter() {
             title="Newsletter Signup Form"
           />
         </div>
-        
-        <p className="text-[13px] text-white/40 mt-6">
-          No spam, unsubscribe anytime. We respect your inbox.
-        </p>
 
       </div>
     </section>
