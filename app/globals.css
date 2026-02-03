@@ -190,6 +190,11 @@
   100% { transform: translateY(-320px); }
 }
 
+@keyframes tickerLoop {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(-50%); }
+}
+
 @keyframes fadeIn {
   from {
     opacity: 0;
