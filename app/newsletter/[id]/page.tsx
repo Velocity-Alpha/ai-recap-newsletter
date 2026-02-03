@@ -138,8 +138,20 @@ const Page = () => {
                     {/* HERO IMAGE */}
                     {imageUrl && (
                         <div className="relative -mx-6">
-                            <div className="relative">
-                                <img src={imageUrl} alt={title} className="w-full h-auto max-h-[500px] object-cover" />
+                            <div className="relative p-3 rounded-2xl bg-transparent">
+                                <img
+                                    src={imageUrl}
+                                    alt={title}
+                                    className="w-full h-auto max-h-[500px] object-cover"
+                                    style={{
+                                        maskImage: "radial-gradient(ellipse at center, rgba(0,0,0,1) 55%, rgba(0,0,0,0) 100%)",
+                                        WebkitMaskImage: "radial-gradient(ellipse at center, rgba(0,0,0,1) 55%, rgba(0,0,0,0) 100%)",
+                                        maskSize: "100% 100%",
+                                        WebkitMaskSize: "100% 100%",
+                                        maskRepeat: "no-repeat",
+                                        WebkitMaskRepeat: "no-repeat",
+                                    }}
+                                />
                             </div>
                         </div>
                     )}

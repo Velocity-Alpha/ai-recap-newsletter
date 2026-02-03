@@ -1,4 +1,5 @@
 import Image from 'next/image'
+import Link from 'next/link'
 
 export default function Footer() {
   return (
@@ -7,15 +8,18 @@ export default function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {/* Brand */}
           <div className="col-span-1 md:col-span-2">
-            <Image
-              src="/logo/logo.png"
-              alt="AI Recap"
-              width={140}
-              height={40}
-              className="h-7 w-auto mb-4"
-            />
+            <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity mb-4">
+              <Image
+                src="/logo/logo-2.png"
+                alt="AI Recap"
+                width={120}
+                height={34}
+                className="h-8 w-auto"
+              />
+              <span className="font-sans text-2xl font-black tracking-tight text-black">RECAP</span>
+            </Link>
             <p className="leading-[1.6] text-[var(--text-secondary)] max-w-[320px]" style={{ fontSize: 'var(--text-body)' }}>
-              Your daily source for AI news, research insights, and practical implementation guides. 
+              AI Recap is your daily source for AI news, research insights, and practical implementation guides. 
               Stay ahead of the curve in the world of artificial intelligence.
             </p>
           </div>

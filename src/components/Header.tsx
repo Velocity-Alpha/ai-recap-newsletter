@@ -8,16 +8,16 @@ export default function Header() {
     <header className="w-full bg-[var(--bg-card)] border-b border-[var(--border-light)] sticky top-0 z-50">
       <nav className="container mx-auto flex items-center justify-between px-6 py-4 max-w-[var(--container)]">
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+        <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
           <Image
-            src="/logo/logo.png"
+            src="/logo/logo-2.png"
             alt="AI Recap"
-            width={140}
-            height={40}
+            width={134}
+            height={34}
             priority
-            className="h-10 w-auto"
+            className="h-6 w-auto"
           />
-          <span className="font-sans text-2xl font-black tracking-tight text-black">AI RECAP</span>
+          <span className="font-sans text-2xl font-black tracking-tight text-black">RECAP</span>
         </Link>
 
         {/* Desktop Navigation */}

@@ -25,14 +25,14 @@ export default function SubscribeNewsletter() {
       <div className="absolute -bottom-1/3 -left-1/10 w-[400px] h-[400px] rounded-full opacity-[0.08]"
            style={{ background: 'radial-gradient(circle, var(--watercolor-rust) 0%, transparent 60%)' }}></div>
       
-      <div className="container mx-auto px-6 max-w-[520px] text-center relative z-10">
+      <div className="container mx-auto px-6 max-w-[580px] text-center relative z-10">
         {/* Heading */}
         <h2 className="font-serif font-normal leading-[1.2] text-white mb-4" style={{ fontSize: 'var(--text-section)' }}>
-          Join our AI newsletter
+          Join the AI Recap Newsletter
         </h2>
 
         {/* Description */}
-        <p className="text-white/65 mb-10" style={{ fontSize: 'var(--text-body)' }}>
+        <p className="text-white/65 mb-10 max-w-[480px] mx-auto text-center" style={{ fontSize: 'var(--text-body)' }}>
           Get the latest AI news, research insights, and practical
           implementation guides delivered to your inbox daily.
         </p>

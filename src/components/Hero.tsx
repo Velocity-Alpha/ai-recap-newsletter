@@ -27,7 +27,7 @@ export default function Hero() {
             </h1>
 
             <p className="leading-[1.7] text-[var(--text-secondary)] mb-10 opacity-0 animate-[fadeIn_0.5s_ease-out_0.1s_forwards]" style={{ fontSize: 'var(--text-body)' }}>
-              Get the latest AI news, breakthrough research, and practical insights delivered to your inbox every day. Join thousands of professionals staying ahead of the curve.
+              Get the latest AI news, breakthrough research, and practical insights delivered to your inbox every day by AI Recap. Join thousands of professionals staying ahead of the curve.
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 mb-16 opacity-0 animate-[fadeIn_0.5s_ease-out_0.15s_forwards]">
