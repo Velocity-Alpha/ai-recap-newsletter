@@ -40,11 +40,11 @@ export default function Hero() {
                 Subscribe Free
               </button>
               <Link
-                href="/newsletters"
+                href="/archive"
                 className="px-6 py-3 bg-transparent text-[var(--text-primary)] text-[14px] font-semibold rounded border border-[var(--border)] transition-all duration-200 hover:border-[var(--text-primary)] hover:bg-[var(--bg-warm)] text-center"
               >
-                Browse Archives
-              </Link>
+                Browse Archive
+            </Link>
             </div>
 
             <div className="flex gap-16 pt-10 border-t border-[var(--border-light)] opacity-0 animate-[fadeIn_0.5s_ease-out_0.2s_forwards]">

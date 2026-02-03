@@ -4,7 +4,7 @@ import SubscribeNewsletter from '@/src/components/SubscribeNewsletter'
 import Footer from '@/src/components/Footer'
 import React from 'react'
 
-export default function NewslettersPage() {
+export default function ArchivePage() {
     return (
         <div className='flex flex-col min-h-screen bg-[var(--bg-main)]'>
             <Header />
@@ -16,4 +16,3 @@ export default function NewslettersPage() {
         </div>
     )
 }
-

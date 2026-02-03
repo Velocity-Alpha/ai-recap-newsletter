@@ -49,7 +49,7 @@ export default function NewsletterPreview() {
         {/* Section Header */}
         <div className="text-center mb-12">
           <h2 className="text-4xl md:text-5xl font-bold text-foreground mb-4">
-            Latest Newsletters
+            Latest Editions
           </h2>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
             Explore our most recent AI intelligence briefings
@@ -102,10 +102,10 @@ export default function NewsletterPreview() {
         {/* View All Button */}
         <div className="text-center">
           <Link
-            href="/newsletters"
+            href="/archive"
             className="inline-block px-8 py-3 bg-white text-primary rounded-xl font-semibold border-2 border-primary shadow-md hover:shadow-lg transform hover:scale-105 transition-all duration-200"
           >
-            View All Newsletters
+            View All Editions
           </Link>
         </div>
       </div>

@@ -54,7 +54,7 @@ const RecentNewslettersPreview: React.FC = () => {
             Latest Updates
           </div>
           <h2 className="font-serif font-normal leading-[1.12] tracking-[-0.015em] text-[var(--text-primary)] mb-4" style={{ fontSize: 'var(--text-section)' }}>
-            Recent Newsletters
+            Recent Editions
           </h2>
           <p className="text-[var(--text-secondary)] max-w-[520px] mx-auto leading-[1.7]" style={{ fontSize: 'var(--text-body)' }}>
             Explore our most recent AI intelligence briefings and insights
@@ -70,7 +70,7 @@ const RecentNewslettersPreview: React.FC = () => {
           <div className="text-center py-20">
             <div className="text-[var(--text-secondary)]">
               <h3 className="font-serif mb-3" style={{ fontSize: 'var(--text-section)' }}>
-                Archives are currently empty
+                The archive is currently empty
               </h3>
               <p className="mb-8 max-w-md mx-auto" style={{ fontSize: 'var(--text-body)' }}>
                 We're preparing our first set of AI intelligence reports. 
@@ -95,10 +95,10 @@ const RecentNewslettersPreview: React.FC = () => {
             {/* View All Button */}
             <div className="text-center">
               <Link
-                href="/newsletters"
+                href="/archive"
                 className="inline-block px-6 py-3 bg-transparent text-[var(--text-primary)] text-[14px] font-semibold rounded border border-[var(--border)] transition-all duration-200 hover:border-[var(--text-primary)] hover:bg-[var(--bg-warm)]"
               >
-                View All Newsletters →
+                View All Editions →
               </Link>
             </div>
           </>

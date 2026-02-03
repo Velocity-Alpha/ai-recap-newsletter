@@ -68,10 +68,10 @@ const RecentNewsletters: React.FC = () => {
           Archive
         </div>
         <h1 className="font-serif font-normal text-[var(--text-primary)] mb-4" style={{ fontSize: 'var(--text-section)' }}>
-          All Newsletters
+          Past Editions
         </h1>
         <p className="text-[var(--text-secondary)] max-w-2xl mx-auto leading-[1.7]" style={{ fontSize: 'var(--text-body)' }}>
-          Browse through all our AI intelligence newsletters
+          Browse through past editions of AI Recap
         </p>
       </div>
 

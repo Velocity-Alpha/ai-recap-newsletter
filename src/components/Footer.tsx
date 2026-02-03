@@ -30,8 +30,8 @@ export default function Footer() {
                 </a>
               </li>
               <li>
-                <a href="/newsletters" className="text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-colors" style={{ fontSize: 'var(--text-small)' }}>
-                  Newsletters
+                <a href="/archive" className="text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-colors" style={{ fontSize: 'var(--text-small)' }}>
+                  Archive
                 </a>
               </li>
               <li>
@@ -61,4 +61,3 @@ export default function Footer() {
     </footer>
   );
 }
-

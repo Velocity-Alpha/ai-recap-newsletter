@@ -24,7 +24,7 @@ export default function Header() {
         <div className="hidden md:flex items-center gap-10">
           <a 
             href="/" 
-            className="font-medium text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-colors" style={{ fontSize: 'var(--text-small)' }}
+            className="font-semibold uppercase tracking-[0.1em] text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-colors" style={{ fontSize: 'var(--text-small)' }}
             onClick={(e) => {
               if (window.location.pathname === '/') {
                 e.preventDefault();
@@ -35,10 +35,10 @@ export default function Header() {
             Home
           </a>
           <Link 
-            href="/newsletters" 
-            className="font-medium text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-colors" style={{ fontSize: 'var(--text-small)' }}
+            href="/archive" 
+            className="font-semibold uppercase tracking-[0.1em] text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-colors" style={{ fontSize: 'var(--text-small)' }}
           >
-            Newsletters
+            Archive
           </Link>
           <button 
             onClick={() => document.getElementById('subscribe')?.scrollIntoView({ behavior: 'smooth' })}
@@ -59,4 +59,3 @@ export default function Header() {
     </header>
   );
 }
-
