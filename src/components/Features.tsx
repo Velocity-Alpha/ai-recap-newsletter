@@ -4,33 +4,33 @@ import { Calendar, BookOpen, Wrench, Zap, CheckCircle, BarChart3 } from 'lucide-
 const features = [
   {
     icon: Calendar,
-    title: 'Daily Briefings',
-    description: 'Get curated AI news and insights delivered to your inbox every morning. Stay informed without the noise.',
+    title: 'Morning Briefing',
+    description: 'A calm, short read that lands with your coffee. Just the signal. No noise.',
   },
   {
     icon: BookOpen,
-    title: 'Research Deep Dives',
-    description: 'In-depth analysis of the latest AI research papers and breakthrough technologies from leading institutions.',
+    title: 'Research, distilled',
+    description: 'We read the papers. You get the practical takeaways.',
   },
   {
     icon: Wrench,
-    title: 'Practical Tools',
-    description: 'Discover trending AI tools and learn how to implement them in your projects with step-by-step guides.',
+    title: 'Tools, tested',
+    description: 'Hands-on notes: what works, what breaks, what it costs.',
   },
   {
     icon: Zap,
-    title: 'Quick Insights',
-    description: 'Fast-paced updates on industry news, funding rounds, and major announcements in the AI space.',
+    title: 'Industry pulse',
+    description: 'Funding, policy, and platform shifts distilled to a few readable lines.',
   },
   {
     icon: CheckCircle,
-    title: 'Curated Content',
-    description: 'Our team of experts handpicks the most important stories so you only see what matters.',
+    title: 'Curated, not crowded',
+    description: 'Every item earns its place. No link dumps, no filler, no recycled takes.',
   },
   {
     icon: BarChart3,
-    title: 'Stay Ahead',
-    description: 'Be the first to know about emerging trends and opportunities in the rapidly evolving AI landscape.',
+    title: 'Ahead, not anxious',
+    description: 'Stay oriented. We map the week, you keep momentum.',
   },
 ];
 
@@ -41,13 +41,13 @@ export default function Features() {
         {/* Section Header */}
         <div className="text-center mb-16">
           <div className="uppercase tracking-[0.22em] font-bold text-[var(--accent-warm)] mb-3" style={{ fontSize: 'var(--text-caption)' }}>
-            What You Get
+            The Brief
           </div>
           <h2 className="font-serif font-normal leading-[1.12] tracking-[-0.015em] text-[var(--text-primary)] mb-4" style={{ fontSize: 'var(--text-section)' }}>
-            Everything You Need to Stay Informed
+            A daily briefing for people who build
           </h2>
-          <p className="text-[var(--text-secondary)] max-w-[520px] mx-auto leading-[1.7]" style={{ fontSize: 'var(--text-body)' }}>
-            Curated intelligence on the rapidly evolving world of artificial intelligence
+          <p className="text-[var(--text-secondary)] max-w-[600px] mx-auto leading-[1.7]" style={{ fontSize: 'var(--text-body)' }}>
+            A tight, readable summary of the stories, papers, and tools shaping the week in AI.
           </p>
         </div>
 
