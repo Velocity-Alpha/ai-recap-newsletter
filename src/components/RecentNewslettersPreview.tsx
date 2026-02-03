@@ -50,13 +50,13 @@ const RecentNewslettersPreview: React.FC = () => {
       <div className="container mx-auto px-6 max-w-[var(--container)]">
         {/* Section Header */}
         <div className="text-center mb-16">
-          <div className="text-[13px] font-medium text-[var(--text-muted)] mb-2">
+          <div className="uppercase tracking-[0.22em] font-bold text-[var(--accent-warm)] mb-3" style={{ fontSize: 'var(--text-caption)' }}>
             Latest Updates
           </div>
-          <h2 className="font-serif font-normal leading-[1.2] tracking-[-0.01em] text-[var(--text-primary)] mb-4" style={{ fontSize: 'var(--text-section)' }}>
+          <h2 className="font-serif font-normal leading-[1.12] tracking-[-0.015em] text-[var(--text-primary)] mb-4" style={{ fontSize: 'var(--text-section)' }}>
             Recent Newsletters
           </h2>
-          <p className="text-[var(--text-secondary)] max-w-[480px] mx-auto" style={{ fontSize: 'var(--text-body)' }}>
+          <p className="text-[var(--text-secondary)] max-w-[520px] mx-auto leading-[1.7]" style={{ fontSize: 'var(--text-body)' }}>
             Explore our most recent AI intelligence briefings and insights
           </p>
         </div>
@@ -109,4 +109,3 @@ const RecentNewslettersPreview: React.FC = () => {
 };
 
 export default RecentNewslettersPreview;
-

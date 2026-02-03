@@ -64,11 +64,13 @@ const RecentNewsletters: React.FC = () => {
     <section className="pb-24 max-w-7xl mx-auto pt-16 px-4 sm:px-6 lg:px-8 relative">
       <div className="relative z-10">
       <div className="text-center mb-16">
-        <div className="text-[13px] font-medium text-[var(--text-muted)] mb-2 uppercase tracking-[0.05em]">Archive</div>
+        <div className="uppercase tracking-[0.22em] font-bold text-[var(--accent-warm)] mb-3" style={{ fontSize: 'var(--text-caption)' }}>
+          Archive
+        </div>
         <h1 className="font-serif font-normal text-[var(--text-primary)] mb-4" style={{ fontSize: 'var(--text-section)' }}>
           All Newsletters
         </h1>
-        <p className="text-[var(--text-secondary)] max-w-2xl mx-auto" style={{ fontSize: 'var(--text-body)' }}>
+        <p className="text-[var(--text-secondary)] max-w-2xl mx-auto leading-[1.7]" style={{ fontSize: 'var(--text-body)' }}>
           Browse through all our AI intelligence newsletters
         </p>
       </div>
@@ -157,4 +159,3 @@ const RecentNewsletters: React.FC = () => {
 };
 
 export default RecentNewsletters;
-

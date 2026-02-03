@@ -40,12 +40,14 @@ export default function Features() {
       <div className="container mx-auto px-6 max-w-[var(--container)]">
         {/* Section Header */}
         <div className="text-center mb-16">
-          <div className="text-[13px] font-medium text-[var(--text-muted)] mb-2">Our Services</div>
-          <h2 className="font-serif font-normal leading-[1.2] tracking-[-0.01em] text-[var(--text-primary)] mb-4" style={{ fontSize: 'var(--text-section)' }}>
+          <div className="uppercase tracking-[0.22em] font-bold text-[var(--accent-warm)] mb-3" style={{ fontSize: 'var(--text-caption)' }}>
             What You Get
+          </div>
+          <h2 className="font-serif font-normal leading-[1.12] tracking-[-0.015em] text-[var(--text-primary)] mb-4" style={{ fontSize: 'var(--text-section)' }}>
+            Everything You Need to Stay Informed
           </h2>
-          <p className="text-[var(--text-secondary)] max-w-[480px] mx-auto" style={{ fontSize: 'var(--text-body)' }}>
-            Everything you need to stay informed and ahead in the world of artificial intelligence
+          <p className="text-[var(--text-secondary)] max-w-[520px] mx-auto leading-[1.7]" style={{ fontSize: 'var(--text-body)' }}>
+            Curated intelligence on the rapidly evolving world of artificial intelligence
           </p>
         </div>
 

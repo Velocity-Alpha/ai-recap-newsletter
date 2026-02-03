@@ -18,13 +18,12 @@ export default function Hero() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
           {/* Left column - Content */}
           <div className="max-w-[500px] mx-auto lg:mx-0">
-            <div className="inline-flex items-center gap-2 text-[13px] font-medium text-[var(--text-muted)] mb-6 opacity-0 animate-[fadeIn_0.5s_ease-out_forwards]">
-              <span className="w-1.5 h-1.5 bg-[var(--watercolor-sage)] rounded-full"></span>
-              Daily AI Intelligence from AI Recap
+            <div className="uppercase tracking-[0.22em] font-bold text-[var(--accent-warm)] mb-6 opacity-0 animate-[fadeIn_0.5s_ease-out_forwards]" style={{ fontSize: 'var(--text-caption)' }}>
+              Daily AI Intelligence
             </div>
 
             <h1 className="font-serif font-normal leading-[1.12] tracking-[-0.02em] text-[var(--text-primary)] mb-6 opacity-0 animate-[fadeIn_0.5s_ease-out_0.05s_forwards]" style={{ fontSize: 'var(--text-hero)' }}>
-              Stay Ahead with <em className="italic text-[var(--watercolor-ink)]">AI Recap</em>
+              Stay Ahead of <span className="text-[var(--accent-warm)]">AI</span>
             </h1>
 
             <p className="leading-[1.7] text-[var(--text-secondary)] mb-10 opacity-0 animate-[fadeIn_0.5s_ease-out_0.1s_forwards]" style={{ fontSize: 'var(--text-body)' }}>
@@ -44,7 +43,7 @@ export default function Hero() {
                 href="/newsletters"
                 className="px-6 py-3 bg-transparent text-[var(--text-primary)] text-[14px] font-semibold rounded border border-[var(--border)] transition-all duration-200 hover:border-[var(--text-primary)] hover:bg-[var(--bg-warm)] text-center"
               >
-                Browse Newsletters
+                Browse Archives
               </Link>
             </div>
 
