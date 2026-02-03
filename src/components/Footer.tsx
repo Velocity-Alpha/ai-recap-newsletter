@@ -49,10 +49,10 @@ export default function Footer() {
             © 2026 AI Recap by Velocity Alpha. All rights reserved.
           </p>
           <div className="flex gap-6 mt-4 md:mt-0">
-            <a href="#" className="text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors" style={{ fontSize: 'var(--text-caption)' }}>
+            <a href="/privacy" className="text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors" style={{ fontSize: 'var(--text-caption)' }}>
               Privacy Policy
             </a>
-            <a href="#" className="text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors" style={{ fontSize: 'var(--text-caption)' }}>
+            <a href="/terms" className="text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors" style={{ fontSize: 'var(--text-caption)' }}>
               Terms of Service
             </a>
           </div>
