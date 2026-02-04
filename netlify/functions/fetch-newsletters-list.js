@@ -65,7 +65,7 @@ exports.handler = async function(event) {
         published_at, 
         created_at  
       FROM newsletter.issues
-      WHERE published_at IS NOT NULL
+      WHERE content_json IS NOT NULL AND published_at IS NOT NULL
       ORDER BY published_at DESC
       LIMIT $1 OFFSET $2;
     `, [validLimit, offset]);
