@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack",
+    "dev": "netlify dev --no-open --target-port ${PORT:-3000} --port ${NETLIFY_DEV_PORT:-8888}",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"

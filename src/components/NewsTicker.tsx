@@ -36,6 +36,18 @@ export default function NewsTicker() {
     const fetchNews = async () => {
       try {
         const response = await fetch(getApiUrl('fetch-ticker-news'));
+
+        if (!response.ok) {
+          setStories(FALLBACK_STORIES);
+          return;
+        }
+
+        const contentType = response.headers.get('content-type') || '';
+        if (!contentType.includes('application/json')) {
+          setStories(FALLBACK_STORIES);
+          return;
+        }
+
         const result = await response.json();
         if (result.success) {
           if (result.data && result.data.length > 0) {
@@ -51,7 +63,10 @@ export default function NewsTicker() {
           setStories(FALLBACK_STORIES);
         }
       } catch (error) {
-        console.error('Failed to fetch ticker news:', error);
+        if (process.env.NODE_ENV === 'development') {
+          const message = error instanceof Error ? error.message : 'Unknown fetch error';
+          console.warn(`Ticker feed unavailable, using fallback stories: ${message}`);
+        }
         setStories(FALLBACK_STORIES);
       } finally {
         setLoading(false);

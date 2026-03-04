@@ -1,55 +1,26 @@
-# Netlify Backend Functions
+# Netlify Functions Folder
 
-This folder contains the backend functions for the Netlify deployment.
+This directory only contains serverless function source code and Netlify-specific config.
 
-## Files Included
-- `functions/fetch-newsletter-by-id.js`: A serverless function to fetch a specific newsletter by ID.
-- `functions/fetch-newsletters-list.js`: A serverless function to fetch newsletter overview data (for listing pages).
-- `functions/fetch-ticker-news.js`: A serverless function to fetch ticker news.
-- `netlify.toml`: Netlify configuration file.
+## Local Development
 
-## Setup Instructions
+Run local development from the repository root:
 
-1. **Install Dependencies**:
-   ```bash
-   cd netlify
-   npm install
-   ```
+```bash
+npm run dev
+```
 
-2. **Environment Variables**:
-   - Create a `.env` file in the `netlify` folder (or set in Netlify dashboard).
-   - Add the required environment variable:
-     ```
-     DATABASE_URL=your_database_connection_string
-     ```
-   - For Netlify deployment, add this as an environment variable in the Netlify dashboard under Site settings > Environment variables.
+Do not run `netlify dev` from this directory directly. The root command starts:
+- Next.js target app (default `http://localhost:3000`)
+- Netlify proxy + functions (`http://localhost:8888`)
 
-3. **Run Locally**:
-   - From the project root, start the Netlify development server:
-     ```bash
-     netlify dev
-     ```
-  - Access the endpoints at:
-     ```
-     http://localhost:8888/.netlify/functions/fetch-newsletter-by-id?id=1
-     http://localhost:8888/.netlify/functions/fetch-newsletters-list
-     http://localhost:8888/.netlify/functions/fetch-ticker-news
-     ```
+Optional custom target app port:
 
-4. **Deploy to Netlify**:
-   - Connect your repository to Netlify
-   - Set the build command: `npm run build`
-   - Set the publish directory: `.next`
-   - Add the `DATABASE_URL` environment variable in Netlify dashboard
-   - Deploy!
+```bash
+PORT=3001 npm run dev
+```
 
-## API Endpoints
+## Environment
 
-### GET /.netlify/functions/fetch-newsletter-by-id?id={id}
-Returns a specific newsletter issue by ID.
-
-### GET /.netlify/functions/fetch-newsletters-list
-Returns newsletter overview data (id, title, excerpt, feature_image_url, published_at) for listing pages.
-
-### GET /.netlify/functions/fetch-ticker-news
-Returns ticker news for the requested symbols.
+- `netlify/.env` should define `DATABASE_URL`
+- `NEXT_PUBLIC_NEWSLETTER_URL` is optional and only needed for custom API origin overrides

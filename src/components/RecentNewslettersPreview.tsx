@@ -27,6 +27,18 @@ const RecentNewslettersPreview: React.FC = () => {
             'Content-Type': 'application/json',
           },
         });
+
+        if (!res.ok) {
+          setNewsletterData([]);
+          return;
+        }
+
+        const contentType = res.headers.get('content-type') || '';
+        if (!contentType.includes('application/json')) {
+          setNewsletterData([]);
+          return;
+        }
+
         const data = await res.json();
         
         if (data.success && data.data) {
@@ -35,7 +47,10 @@ const RecentNewslettersPreview: React.FC = () => {
           setNewsletterData([]);
         }
       } catch (error) {
-        console.error(error);
+        if (process.env.NODE_ENV === 'development') {
+          const message = error instanceof Error ? error.message : 'Unknown fetch error';
+          console.warn(`Recent newsletters preview unavailable: ${message}`);
+        }
         setNewsletterData([]);
       } finally {
         setLoading(false);
@@ -73,7 +88,7 @@ const RecentNewslettersPreview: React.FC = () => {
                 The archive is currently empty
               </h3>
               <p className="mb-8 max-w-md mx-auto" style={{ fontSize: 'var(--text-body)' }}>
-                We're preparing our first set of AI intelligence reports. 
+                We&apos;re preparing our first set of AI intelligence reports. 
                 Be the first to know when they drop!
               </p>
               <button 
