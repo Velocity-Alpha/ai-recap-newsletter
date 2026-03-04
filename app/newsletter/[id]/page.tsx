@@ -72,10 +72,25 @@ const Page = () => {
                     'Content-Type': 'application/json',
                   },
                 });
+
+                if (!res.ok) {
+                    setData(null);
+                    return;
+                }
+
+                const contentType = res.headers.get('content-type') || '';
+                if (!contentType.includes('application/json')) {
+                    setData(null);
+                    return;
+                }
+
                 const json = await res.json();
                 setData(json?.data || null);
             } catch (error) {
-                console.error(error);
+                if (process.env.NODE_ENV === 'development') {
+                    const message = error instanceof Error ? error.message : 'Unknown fetch error';
+                    console.warn(`Newsletter detail unavailable: ${message}`);
+                }
             } finally {
                 setLoading(false);
             }
@@ -267,7 +282,7 @@ const Page = () => {
                                                         rel="noopener noreferrer"
                                                         className="inline-flex items-center gap-1.5 text-[var(--accent-primary)] font-semibold hover:gap-2.5 transition-all duration-200" style={{ fontSize: 'var(--text-small)' }}
                                                     >
-                                                        View Paper <ArrowRight size={14} />
+                                                        Read Source <ArrowRight size={14} />
                                                     </a>
                                                 )}
                                         </div>
@@ -282,7 +297,7 @@ const Page = () => {
                         <Section title="Trending Tools" icon="🛠️">
                             <div className="grid gap-8">
                                 {tools.map((tool: Item, i: number) => (
-                                    <article key={i} className="flex gap-6 p-6 bg-[var(--bg-warm)] rounded-lg border border-[var(--border-light)] group hover:bg-[var(--bg-card)] transition-colors duration-250">
+                                    <article key={i} className="flex gap-6 p-6 bg-[var(--bg-card)] rounded-lg group">
                                         <div className="min-w-[48px] h-[48px] bg-[var(--bg-card)] rounded-lg flex items-center justify-center text-xl shadow-sm border border-[var(--border-light)]">
                                             ⚙️
                                         </div>
@@ -313,7 +328,20 @@ const Page = () => {
                                         <div className="flex-shrink-0 w-2 h-2 rounded-full bg-[var(--watercolor-rust)] mt-2"></div>
                                         <div className="flex-1">
                                             <p className="text-[var(--text-primary)]" style={{ fontSize: 'calc(var(--text-body) * 0.95)' }}>
-                                                <span className="font-semibold">{hit.title}</span>
+                                                <span className="font-semibold">
+                                                    {hit.link ? (
+                                                        <a
+                                                            href={hit.link}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="hover:underline"
+                                                        >
+                                                            {hit.title}
+                                                        </a>
+                                                    ) : (
+                                                        hit.title
+                                                    )}
+                                                </span>
                                                 {hit.summary && <span className="text-[var(--text-secondary)]"> — {hit.summary}</span>}
                                             </p>
                                         </div>

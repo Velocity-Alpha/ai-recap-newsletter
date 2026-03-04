@@ -37,7 +37,6 @@ A beautiful, light-mode newsletter website with paint-style colors that compleme
 2. **Install dependencies**:
    ```bash
    npm install
-   cd netlify && npm install && cd ..
    ```
 
 3. **Set up environment variables**:
@@ -46,29 +45,24 @@ A beautiful, light-mode newsletter website with paint-style colors that compleme
      cp .env.local.example .env.local
      cp netlify/.env.example netlify/.env
      ```
-   - Update `.env.local` in the root directory:
-     ```env
-     NEXT_PUBLIC_NEWSLETTER_URL=http://localhost:8888/.netlify/functions
-     ```
+   - Optional: set `NEXT_PUBLIC_NEWSLETTER_URL` in `.env.local` only if you want to override the default API origin.
    - Update `netlify/.env` with your database connection string:
      ```env
      DATABASE_URL=your_database_connection_string
      ```
 
-4. **Run the development server**:
-```bash
-npm run dev
-   ```
-
-5. **Run Netlify functions locally** (in a separate terminal):
+4. **Run everything with one command** (Next.js + Netlify proxy + functions):
    ```bash
-   cd netlify
-   npm install
-   cd ..
-   netlify dev
-```
+   npm run dev
+   ```
+   - Netlify proxy: `http://localhost:8888`
+   - Next.js target app: `http://localhost:3000`
+   - Browser auto-open is disabled by default
 
-   The app will be available at [http://localhost:3000](http://localhost:3000)
+5. **Optional custom frontend port**:
+   ```bash
+   PORT=3001 npm run dev
+   ```
 
 ## Project Structure
 
@@ -119,7 +113,6 @@ The website uses a paint-style color scheme with:
    - Publish directory: `.next`
 3. **Add environment variables** in Netlify dashboard:
    - `DATABASE_URL`: Your PostgreSQL connection string
-   - `NEXT_PUBLIC_NEWSLETTER_URL`: Your Netlify function URL (auto-set if using Netlify)
 4. **Deploy!**
 
 The Netlify functions will automatically be deployed with your site.

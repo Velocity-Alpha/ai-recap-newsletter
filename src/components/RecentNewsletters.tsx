@@ -6,6 +6,7 @@ import Pagination from "./Pagination";
 import { Newsletter } from "../types/newsletter.types";
 import { getApiUrl } from "../utils/apiConfig";
 import { Newspaper, Send } from "lucide-react";
+import Link from "next/link";
 
 const ITEMS_PER_PAGE = 6;
 
@@ -32,6 +33,20 @@ const RecentNewsletters: React.FC = () => {
             'Content-Type': 'application/json',
           },
         });
+
+        if (!res.ok) {
+          setNewsletterData([]);
+          setTotalPages(1);
+          return;
+        }
+
+        const contentType = res.headers.get('content-type') || '';
+        if (!contentType.includes('application/json')) {
+          setNewsletterData([]);
+          setTotalPages(1);
+          return;
+        }
+
         const data = await res.json();
         
         if (data.success && data.data) {
@@ -41,10 +56,15 @@ const RecentNewsletters: React.FC = () => {
           }
         } else {
           setNewsletterData([]);
+          setTotalPages(1);
         }
       } catch (error) {
-        console.error(error);
+        if (process.env.NODE_ENV === 'development') {
+          const message = error instanceof Error ? error.message : 'Unknown fetch error';
+          console.warn(`Recent newsletters archive unavailable: ${message}`);
+        }
         setNewsletterData([]);
+        setTotalPages(1);
       } finally {
         setLoading(false);
       }
@@ -118,13 +138,13 @@ const RecentNewsletters: React.FC = () => {
             The next edition of AI Recap is on its way!
           </p>
           <div className="flex flex-col sm:flex-row gap-4">
-            <a 
+            <Link 
               href="/#subscribe" 
               className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-[#66ccff] text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300"
             >
               <Send size={20} />
               Get Notified
-            </a>
+            </Link>
             <button 
               onClick={() => window.location.reload()}
               className="px-8 py-4 bg-white text-gray-700 border border-gray-200 rounded-xl font-bold text-lg hover:bg-gray-50 transition-all shadow-sm"
