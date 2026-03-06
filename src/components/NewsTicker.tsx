@@ -1,82 +1,144 @@
 'use client'
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { getApiUrl } from '@/utils/apiConfig';
 
 interface TickerStory {
   headline: string;
-  day: string;
-  category: string;
-  createdAt: string;
+  day?: string;
+  category?: string;
+  createdAt?: string;
+  relativeTimeLabel?: string;
 }
 
 const FALLBACK_STORIES: TickerStory[] = [
-  { headline: "New breakthrough in transformer architecture promises 10x efficiency", category: "Product", day: new Date(Date.now() - 1000 * 60 * 15).toISOString(), createdAt: new Date(Date.now() - 1000 * 60 * 15).toISOString() },
-  { headline: "Global summit on AI safety concludes with new framework agreement", category: "Policy", day: new Date(Date.now() - 1000 * 60 * 45).toISOString(), createdAt: new Date(Date.now() - 1000 * 60 * 45).toISOString() },
-  { headline: "Major tech firms increase investment in green AI infrastructure", category: "Funding", day: new Date(Date.now() - 1000 * 60 * 120).toISOString(), createdAt: new Date(Date.now() - 1000 * 60 * 120).toISOString() },
-  { headline: "Researchers open-source new multi-modal model for medical imaging", category: "Product", day: new Date(Date.now() - 1000 * 60 * 300).toISOString(), createdAt: new Date(Date.now() - 1000 * 60 * 300).toISOString() },
-  { headline: "AI-powered educational tools show significant improvement in student outcomes", category: "Product", day: new Date(Date.now() - 1000 * 60 * 600).toISOString(), createdAt: new Date(Date.now() - 1000 * 60 * 600).toISOString() },
-  { headline: "Venture capital firms ramp up funding for early-stage AI startups", category: "Funding", day: new Date(Date.now() - 1000 * 60 * 1440).toISOString(), createdAt: new Date(Date.now() - 1000 * 60 * 1440).toISOString() },
-  { headline: "Legislators debate new copyright protections for AI-generated creative works", category: "Policy", day: new Date(Date.now() - 1000 * 60 * 2000).toISOString(), createdAt: new Date(Date.now() - 1000 * 60 * 2000).toISOString() },
-  { headline: "Industry leaders call for standardized benchmarks in AI performance", category: "Product", day: new Date(Date.now() - 1000 * 60 * 2800).toISOString(), createdAt: new Date(Date.now() - 1000 * 60 * 2800).toISOString() },
-  { headline: "Emerging markets see rapid adoption of mobile-first AI assistants", category: "Product", day: new Date(Date.now() - 1000 * 60 * 4000).toISOString(), createdAt: new Date(Date.now() - 1000 * 60 * 4000).toISOString() },
-  { headline: "New study explores long-term impact of AI on the global labor market", category: "Policy", day: new Date(Date.now() - 1000 * 60 * 5000).toISOString(), createdAt: new Date(Date.now() - 1000 * 60 * 5000).toISOString() }
+  { headline: "New breakthrough in transformer architecture promises 10x efficiency", category: "Product", relativeTimeLabel: "15m ago" },
+  { headline: "Global summit on AI safety concludes with new framework agreement", category: "Policy", relativeTimeLabel: "45m ago" },
+  { headline: "Major tech firms increase investment in green AI infrastructure", category: "Funding", relativeTimeLabel: "2h ago" },
+  { headline: "Researchers open-source new multi-modal model for medical imaging", category: "Product", relativeTimeLabel: "5h ago" },
+  { headline: "AI-powered educational tools show significant improvement in student outcomes", category: "Product", relativeTimeLabel: "10h ago" },
+  { headline: "Venture capital firms ramp up funding for early-stage AI startups", category: "Funding", relativeTimeLabel: "1d ago" },
+  { headline: "Legislators debate new copyright protections for AI-generated creative works", category: "Policy", relativeTimeLabel: "1d ago" },
+  { headline: "Industry leaders call for standardized benchmarks in AI performance", category: "Product", relativeTimeLabel: "2d ago" },
+  { headline: "Emerging markets see rapid adoption of mobile-first AI assistants", category: "Product", relativeTimeLabel: "2d ago" },
+  { headline: "New study explores long-term impact of AI on the global labor market", category: "Policy", relativeTimeLabel: "3d ago" }
 ];
 
+const ITEM_HEIGHT_PX = 80;
+const VIEWPORT_HEIGHT_PX = 240;
+const SECONDS_PER_ITEM = 5;
+
 export default function NewsTicker() {
-  const [stories, setStories] = useState<TickerStory[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [tickerStats, setTickerStats] = useState({
-    stories: 48,
-    tools: 12,
-    papers: 8
-  });
+  const [stories, setStories] = useState<TickerStory[]>(FALLBACK_STORIES);
+  const [animationOffsetSeconds, setAnimationOffsetSeconds] = useState(0);
+  const [tickerStats, setTickerStats] = useState<{
+    stories: number;
+    tools: number;
+    papers: number;
+  } | null>(null);
+  const mountTimeRef = useRef<number | null>(null);
+  const handoffTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
 
   useEffect(() => {
+    mountTimeRef.current = performance.now();
+
+    const clearHandoffTimeout = () => {
+      if (handoffTimeoutRef.current) {
+        window.clearTimeout(handoffTimeoutRef.current);
+        handoffTimeoutRef.current = null;
+      }
+    };
+
+    const getElapsedSeconds = () => {
+      if (!mountTimeRef.current) return 0;
+      return Math.max((performance.now() - mountTimeRef.current) / 1000, 0);
+    };
+
+    const getCurrentOffset = (storyCount: number) => {
+      if (storyCount <= 0) return 0;
+
+      const elapsedSeconds = getElapsedSeconds();
+      const pixelsPerSecond = ITEM_HEIGHT_PX / SECONDS_PER_ITEM;
+      const totalHeight = storyCount * ITEM_HEIGHT_PX;
+
+      return (elapsedSeconds * pixelsPerSecond) % totalHeight;
+    };
+
+    const getNextHiddenIndex = (storyCount: number, currentOffset: number) => {
+      const lastVisibleIndex = Math.floor((currentOffset + VIEWPORT_HEIGHT_PX - 1) / ITEM_HEIGHT_PX);
+      return (lastVisibleIndex + 1) % storyCount;
+    };
+
+    const getMsUntilItemExitsViewport = (
+      storyCount: number,
+      itemIndex: number,
+      currentOffset: number
+    ) => {
+      const pixelsPerSecond = ITEM_HEIGHT_PX / SECONDS_PER_ITEM;
+      const totalHeight = storyCount * ITEM_HEIGHT_PX;
+      let distanceToExit = ((itemIndex + 1) * ITEM_HEIGHT_PX) - currentOffset;
+
+      while (distanceToExit <= 0) {
+        distanceToExit += totalHeight;
+      }
+
+      return Math.ceil((distanceToExit / pixelsPerSecond) * 1000);
+    };
+
     // Fetch ticker news and stats
     const fetchNews = async () => {
       try {
         const response = await fetch(getApiUrl('fetch-ticker-news'));
 
         if (!response.ok) {
-          setStories(FALLBACK_STORIES);
           return;
         }
 
         const contentType = response.headers.get('content-type') || '';
         if (!contentType.includes('application/json')) {
-          setStories(FALLBACK_STORIES);
           return;
         }
 
         const result = await response.json();
         if (result.success) {
           if (result.data && result.data.length > 0) {
-            setStories(result.data);
-          } else {
-            setStories(FALLBACK_STORIES);
+            const liveStories = result.data as TickerStory[];
+            const currentOffset = getCurrentOffset(FALLBACK_STORIES.length);
+            const nextHiddenIndex = getNextHiddenIndex(FALLBACK_STORIES.length, currentOffset);
+            const stagedStories = FALLBACK_STORIES.map((story, index) =>
+              index === nextHiddenIndex ? liveStories[0] : story
+            );
+
+            clearHandoffTimeout();
+            setAnimationOffsetSeconds(getElapsedSeconds());
+            setStories(stagedStories);
+
+            handoffTimeoutRef.current = window.setTimeout(() => {
+              setAnimationOffsetSeconds(getElapsedSeconds());
+              setStories(liveStories);
+              handoffTimeoutRef.current = null;
+            }, getMsUntilItemExitsViewport(FALLBACK_STORIES.length, nextHiddenIndex, currentOffset) + 150);
           }
-          
+
           if (result.stats) {
             setTickerStats(result.stats);
           }
-        } else {
-          setStories(FALLBACK_STORIES);
         }
       } catch (error) {
         if (process.env.NODE_ENV === 'development') {
           const message = error instanceof Error ? error.message : 'Unknown fetch error';
           console.warn(`Ticker feed unavailable, using fallback stories: ${message}`);
         }
-        setStories(FALLBACK_STORIES);
-      } finally {
-        setLoading(false);
       }
     };
 
     fetchNews();
+
+    return clearHandoffTimeout;
   }, []);
 
-  const getTimeAgo = (dateStr: string) => {
+  const getTimeAgo = (dateStr?: string) => {
+    if (!dateStr) return 'Just now';
+
     const now = new Date();
     const storyDate = new Date(dateStr);
     const diffInMinutes = Math.floor((now.getTime() - storyDate.getTime()) / (1000 * 60));
@@ -89,11 +151,27 @@ export default function NewsTicker() {
     return `${diffInDays}d ago`;
   };
 
+  const getStoryTimeLabel = (story: TickerStory) => {
+    if (story.relativeTimeLabel) return story.relativeTimeLabel;
+    return getTimeAgo(story.createdAt || story.day);
+  };
+
   const mapCategoryToTagType = (category: string): 'funding' | 'product' | 'policy' => {
     const c = category?.toLowerCase() || '';
     if (c.includes('funding') || c.includes('investment') || c.includes('money') || c.includes('raised')) return 'funding';
     if (c.includes('policy') || c.includes('legal') || c.includes('regulation') || c.includes('law')) return 'policy';
     return 'product';
+  };
+
+  const getTickerAnimationStyle = () => {
+    if (stories.length <= 3) {
+      return {};
+    }
+
+    return {
+      animation: `tickerLoop ${stories.length * SECONDS_PER_ITEM}s linear infinite`,
+      animationDelay: `-${animationOffsetSeconds}s`,
+    };
   };
 
   return (
@@ -119,25 +197,17 @@ export default function NewsTicker() {
 
         {/* Scrolling content */}
         <div className="relative h-[240px] overflow-hidden">
-          <div 
-            className="flex flex-col" 
-            style={stories.length > 3 ? { 
-              animation: `tickerLoop ${stories.length * 5}s linear infinite`,
-            } : {}}
+          <div
+            className="flex flex-col"
+            style={getTickerAnimationStyle()}
           >
-            {loading ? (
-              <div className="flex flex-col gap-4 px-5 py-4 animate-pulse">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="h-20 bg-[var(--bg-warm)] rounded-md"></div>
-                ))}
-              </div>
-            ) : stories.length > 0 ? (
+            {stories.length > 0 ? (
               <>
                 {/* Original items */}
                 {stories.map((story, index) => (
                   <TickerItem 
                     key={`story-${index}`}
-                    time={getTimeAgo(story.createdAt || story.day)} 
+                    time={getStoryTimeLabel(story)}
                     headline={story.headline} 
                     tag={story.category || 'Product'} 
                     tagType={mapCategoryToTagType(story.category)} 
@@ -147,7 +217,7 @@ export default function NewsTicker() {
                 {stories.length > 3 && stories.map((story, index) => (
                   <TickerItem 
                     key={`story-loop-${index}`}
-                    time={getTimeAgo(story.createdAt || story.day)} 
+                    time={getStoryTimeLabel(story)}
                     headline={story.headline} 
                     tag={story.category || 'Product'} 
                     tagType={mapCategoryToTagType(story.category)} 
@@ -163,24 +233,31 @@ export default function NewsTicker() {
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between px-5 py-3.5 bg-[var(--bg-warm)] border-t border-[var(--border-light)]">
-          <div className="flex gap-5">
-            <div className="text-center">
-              <div className="font-serif text-[16px] text-[var(--text-primary)] leading-none">{tickerStats.stories}</div>
-              <div className="text-[9px] uppercase tracking-[0.05em] text-[var(--text-muted)] mt-0.5">Stories</div>
+        <div className="h-[60px] bg-[var(--bg-warm)] border-t border-[var(--border-light)]">
+          <div
+            className={`flex h-full items-center justify-between px-5 transition-opacity duration-500 ease-out ${
+              tickerStats ? 'opacity-100' : 'opacity-0'
+            }`}
+            aria-hidden={!tickerStats}
+          >
+            <div className="flex gap-5">
+              <div className="text-center">
+                <div className="font-serif text-[16px] text-[var(--text-primary)] leading-none">{tickerStats?.stories ?? ''}</div>
+                <div className="text-[9px] uppercase tracking-[0.05em] text-[var(--text-muted)] mt-0.5">Stories</div>
+              </div>
+              <div className="text-center">
+                <div className="font-serif text-[16px] text-[var(--text-primary)] leading-none">{tickerStats?.tools ?? ''}</div>
+                <div className="text-[9px] uppercase tracking-[0.05em] text-[var(--text-muted)] mt-0.5">Tools</div>
+              </div>
+              <div className="text-center">
+                <div className="font-serif text-[16px] text-[var(--text-primary)] leading-none">{tickerStats?.papers ?? ''}</div>
+                <div className="text-[9px] uppercase tracking-[0.05em] text-[var(--text-muted)] mt-0.5">Papers</div>
+              </div>
             </div>
-            <div className="text-center">
-              <div className="font-serif text-[16px] text-[var(--text-primary)] leading-none">{tickerStats.tools}</div>
-              <div className="text-[9px] uppercase tracking-[0.05em] text-[var(--text-muted)] mt-0.5">Tools</div>
-            </div>
-            <div className="text-center">
-              <div className="font-serif text-[16px] text-[var(--text-primary)] leading-none">{tickerStats.papers}</div>
-              <div className="text-[9px] uppercase tracking-[0.05em] text-[var(--text-muted)] mt-0.5">Papers</div>
-            </div>
+            <span className="text-[12px] font-medium text-[var(--text-muted)] uppercase">
+              This week
+            </span>
           </div>
-          <span className="text-[12px] font-medium text-[var(--text-muted)] uppercase">
-            This week
-          </span>
         </div>
       </div>
     </div>

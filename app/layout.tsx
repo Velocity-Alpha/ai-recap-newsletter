@@ -36,8 +36,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body className={`${libreBaskerville.variable} ${sourceSans.variable} antialiased`}>
+    <html lang="en" suppressHydrationWarning>
+      <body
+        suppressHydrationWarning
+        className={`${libreBaskerville.variable} ${sourceSans.variable} antialiased`}
+      >
         <ScrollProgress />
         {children}
       </body>
