@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "next:dev": "next dev -p ${PORT:-3000}",
     "dev": "netlify dev --no-open --target-port ${PORT:-3000} --port ${NETLIFY_DEV_PORT:-8888}",
     "build": "next build",
     "start": "next start",

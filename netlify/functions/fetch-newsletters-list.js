@@ -47,30 +47,46 @@ exports.handler = async function(event) {
     const validLimit = Math.max(1, Math.min(100, limit)); // Cap at 100 items per page
     const offset = (validPage - 1) * validLimit;
 
-    // Get total count
-    const countResult = await pool.query(`
-      SELECT COUNT(*) as total
-      FROM newsletter.issues;
-    `);
-    const totalCount = parseInt(countResult.rows?.[0]?.total || '0', 10);
-    const totalPages = Math.ceil(totalCount / validLimit);
-
-    // Get paginated results
     const result = await pool.query(`
-      SELECT 
-        id, 
-        title,
-        excerpt,
-        feature_image_url,
-        published_at, 
-        created_at  
-      FROM newsletter.issues
-      WHERE content_json IS NOT NULL AND published_at IS NOT NULL
-      ORDER BY published_at DESC
-      LIMIT $1 OFFSET $2;
+      WITH filtered AS (
+        SELECT
+          id,
+          title,
+          excerpt,
+          feature_image_url,
+          published_at,
+          created_at
+        FROM newsletter.issues
+        WHERE content_json IS NOT NULL
+          AND published_at IS NOT NULL
+      ),
+      total AS (
+        SELECT COUNT(*)::int AS total_count
+        FROM filtered
+      )
+      SELECT
+        paged.id,
+        paged.title,
+        paged.excerpt,
+        paged.feature_image_url,
+        paged.published_at,
+        paged.created_at,
+        total.total_count
+      FROM total
+      LEFT JOIN LATERAL (
+        SELECT *
+        FROM filtered
+        ORDER BY published_at DESC
+        LIMIT $1 OFFSET $2
+      ) paged ON true;
     `, [validLimit, offset]);
 
     const rows = result.rows || [];
+    const totalCount = parseInt(rows?.[0]?.total_count || '0', 10);
+    const totalPages = Math.ceil(totalCount / validLimit);
+    const issues = rows
+      .filter((row) => row.id !== null)
+      .map(({ total_count, ...issue }) => issue);
     
     return {
       statusCode: 200,
@@ -80,7 +96,7 @@ exports.handler = async function(event) {
       },
       body: JSON.stringify({
         success: true,
-        data: rows,
+        data: issues,
         pagination: {
           currentPage: validPage,
           totalPages: totalPages,

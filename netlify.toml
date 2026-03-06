@@ -1,2 +1,6 @@
 [build]
   functions = "netlify/functions"  # This tells Netlify where your serverless functions are
+
+[dev]
+  command = "npm run next:dev"
+  targetPort = 3000

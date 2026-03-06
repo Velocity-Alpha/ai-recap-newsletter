@@ -19,6 +19,11 @@ const Pagination: React.FC<PaginationProps> = ({
     setPageInput(currentPage.toString());
   }, [currentPage]);
 
+  const handleInputChange = (value: string) => {
+    const sanitizedValue = value.replace(/\D/g, "");
+    setPageInput(sanitizedValue);
+  };
+
   const handleInputSubmit = () => {
     const page = Number(pageInput);
 
@@ -31,49 +36,57 @@ const Pagination: React.FC<PaginationProps> = ({
   };
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-4 px-6 py-4">
+    <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-[var(--border-light)] bg-[var(--bg-card)] px-4 py-4 sm:px-6">
       {/* Previous */}
       <button
         onClick={() => onPageChange(currentPage - 1)}
         disabled={currentPage === 1}
-        className={`px-6 py-2 rounded-lg bg-primary text-primary-foreground font-medium
-          transition-colors hover:bg-primary/90
-          ${currentPage === 1 ? "opacity-50 cursor-not-allowed" : ""}`}
+        className={`inline-flex items-center justify-center rounded border px-5 py-2.5 font-semibold shadow-sm transition-[background-color,border-color,color,box-shadow,transform] ${
+          currentPage === 1
+            ? "cursor-not-allowed border-[var(--border-light)] bg-[var(--bg-warm)] text-[var(--text-muted)] opacity-60"
+            : "cursor-pointer border-[var(--border)] bg-[var(--bg-card)] text-[var(--text-primary)] hover:border-[var(--accent-primary)] hover:bg-[var(--bg-warm)] hover:shadow-md active:translate-y-px"
+        }`}
+        style={{ fontSize: 'var(--text-small)' }}
       >
         Previous
       </button>
 
       {/* Page info + input */}
-      <div className="flex items-center gap-2 text-foreground">
-        <span>Page</span>
+      <div
+        className="flex items-center gap-2 whitespace-nowrap font-sans text-[var(--text-secondary)]"
+        style={{ fontSize: 'var(--text-body)' }}
+      >
+        <span className="text-[var(--text-primary)]">Page</span>
 
         <input
           type="text"
+          inputMode="numeric"
+          pattern="[0-9]*"
           min={1}
           max={totalPages}
           value={pageInput}
-          onChange={(e) => setPageInput(e.target.value)}
+          onChange={(e) => handleInputChange(e.target.value)}
           onBlur={handleInputSubmit}
           onKeyDown={(e) => e.key === "Enter" && handleInputSubmit()}
-          className="
-            w-16 px-2 py-1
-            border border-border rounded-md
-            bg-white text-center
-            focus:outline-none focus:ring-2 focus:ring-ring
-            appearance-none
-          "
+          className="h-10 w-[4.5ch] min-w-[4.5ch] rounded border border-[var(--border)] bg-[var(--bg-warm)] px-1.5 text-center font-semibold text-[var(--text-primary)] tabular-nums outline-none transition-colors focus:border-[var(--accent-primary)] focus:bg-[var(--bg-card)]"
+          style={{ fontSize: 'var(--text-body)' }}
         />
 
-        <span>of {totalPages}</span>
+        <span className="tabular-nums">
+          of <span className="ml-1 text-[var(--text-primary)]">{totalPages}</span>
+        </span>
       </div>
 
       {/* Next */}
       <button
         onClick={() => onPageChange(currentPage + 1)}
         disabled={currentPage === totalPages}
-        className={`px-6 py-2 rounded-lg bg-secondary text-secondary-foreground font-medium
-          transition-colors hover:bg-secondary/80
-          ${currentPage === totalPages ? "opacity-50 cursor-not-allowed" : ""}`}
+        className={`inline-flex items-center justify-center rounded border px-5 py-2.5 font-semibold shadow-sm transition-[background-color,border-color,color,box-shadow,transform] ${
+          currentPage === totalPages
+            ? "cursor-not-allowed border-[var(--border-light)] bg-[var(--bg-warm)] text-[var(--text-muted)] opacity-60"
+            : "cursor-pointer border-[var(--border)] bg-[var(--bg-card)] text-[var(--text-primary)] hover:border-[var(--accent-primary)] hover:bg-[var(--bg-warm)] hover:shadow-md active:translate-y-px"
+        }`}
+        style={{ fontSize: 'var(--text-small)' }}
       >
         Next
       </button>
@@ -82,4 +95,3 @@ const Pagination: React.FC<PaginationProps> = ({
 };
 
 export default Pagination;
-

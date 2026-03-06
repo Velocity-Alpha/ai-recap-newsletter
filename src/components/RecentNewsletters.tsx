@@ -6,7 +6,6 @@ import Pagination from "./Pagination";
 import { Newsletter } from "../types/newsletter.types";
 import { getApiUrl } from "../utils/apiConfig";
 import { Newspaper, Send } from "lucide-react";
-import Link from "next/link";
 
 const ITEMS_PER_PAGE = 6;
 
@@ -50,10 +49,14 @@ const RecentNewsletters: React.FC = () => {
         const data = await res.json();
         
         if (data.success && data.data) {
-          setNewsletterData(data.data);
           if (data.pagination) {
             setTotalPages(data.pagination.totalPages);
+            if (data.pagination.totalPages > 0 && currentPage > data.pagination.totalPages) {
+              setCurrentPage(data.pagination.totalPages);
+              return;
+            }
           }
+          setNewsletterData(data.data);
         } else {
           setNewsletterData([]);
           setTotalPages(1);
@@ -126,28 +129,30 @@ const RecentNewsletters: React.FC = () => {
           ))}
         </div>
       ) : newslettersData.length === 0 ? (
-        <div className="text-center py-24 flex flex-col items-center justify-center animate-in fade-in slide-in-from-bottom-4 duration-700">
-          <div className="w-24 h-24 bg-blue-50 rounded-full flex items-center justify-center text-[#66ccff] mb-8 shadow-inner">
+        <div className="mx-auto flex max-w-2xl flex-col items-center justify-center rounded-lg border border-[var(--border-light)] bg-[var(--bg-card)] px-6 py-16 text-center shadow-[0_1px_2px_rgba(0,0,0,0.04),0_4px_12px_rgba(0,0,0,0.06)] animate-in fade-in slide-in-from-bottom-4 duration-700 sm:px-10">
+          <div className="mb-8 flex h-24 w-24 items-center justify-center rounded-full bg-[var(--bg-warm)] text-[var(--accent-primary)] shadow-inner">
             <Newspaper size={48} />
           </div>
-          <h3 className="syne-mono-regular text-3xl font-bold text-gray-900 mb-4">
-            Intelligence Briefing Pending
+          <h3 className="mb-4 font-serif font-normal text-[var(--text-primary)]" style={{ fontSize: 'var(--text-section)' }}>
+            No editions on this page
           </h3>
-          <p className="molengo-regular text-xl text-gray-600 max-w-lg mx-auto mb-10 leading-relaxed">
-            Our analysts are currently synthesizing the latest AI breakthroughs. 
-            The next edition of AI Recap is on its way!
+          <p className="mb-10 max-w-lg text-[var(--text-secondary)] leading-[1.7]" style={{ fontSize: 'var(--text-body)' }}>
+            There isn&apos;t an archive entry here right now. You can subscribe below and we&apos;ll send the next briefing as soon as it goes out.
           </p>
-          <div className="flex flex-col sm:flex-row gap-4">
-            <Link 
-              href="/#subscribe" 
-              className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-[#66ccff] text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300"
+          <div className="flex flex-col gap-4 sm:flex-row">
+            <button
+              type="button"
+              onClick={() => document.getElementById('subscribe')?.scrollIntoView({ behavior: 'smooth' })}
+              className="inline-flex items-center justify-center gap-2 rounded bg-[var(--text-primary)] px-7 py-3 font-semibold text-white transition-colors duration-200 hover:bg-[var(--watercolor-ink)]"
+              style={{ fontSize: 'var(--text-small)' }}
             >
               <Send size={20} />
               Get Notified
-            </Link>
+            </button>
             <button 
               onClick={() => window.location.reload()}
-              className="px-8 py-4 bg-white text-gray-700 border border-gray-200 rounded-xl font-bold text-lg hover:bg-gray-50 transition-all shadow-sm"
+              className="rounded border border-[var(--border)] bg-[var(--bg-card)] px-7 py-3 font-semibold text-[var(--text-primary)] transition-colors duration-200 hover:bg-[var(--bg-warm)]"
+              style={{ fontSize: 'var(--text-small)' }}
             >
               Check Again
             </button>
