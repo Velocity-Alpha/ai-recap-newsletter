@@ -86,6 +86,7 @@ exports.handler = async function(event) {
         title,
         excerpt,
         content_json, 
+        issue_date,
         published_at, 
         created_at  
       FROM newsletter.issues
@@ -112,7 +113,7 @@ exports.handler = async function(event) {
       statusCode: 200,
       headers: {
         ...headers,
-        'Cache-Control': 'public, max-age=3600'
+        'Cache-Control': 'public, max-age=60, stale-while-revalidate=300'
       },
       body: JSON.stringify({
         success: true,

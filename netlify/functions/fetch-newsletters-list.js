@@ -54,6 +54,7 @@ exports.handler = async function(event) {
           title,
           excerpt,
           feature_image_url,
+          issue_date,
           published_at,
           created_at
         FROM newsletter.issues
@@ -69,6 +70,7 @@ exports.handler = async function(event) {
         paged.title,
         paged.excerpt,
         paged.feature_image_url,
+        paged.issue_date,
         paged.published_at,
         paged.created_at,
         total.total_count
@@ -76,7 +78,7 @@ exports.handler = async function(event) {
       LEFT JOIN LATERAL (
         SELECT *
         FROM filtered
-        ORDER BY published_at DESC
+        ORDER BY COALESCE(issue_date, published_at::date) DESC, published_at DESC
         LIMIT $1 OFFSET $2
       ) paged ON true;
     `, [validLimit, offset]);
@@ -86,13 +88,17 @@ exports.handler = async function(event) {
     const totalPages = Math.ceil(totalCount / validLimit);
     const issues = rows
       .filter((row) => row.id !== null)
-      .map(({ total_count, ...issue }) => issue);
+      .map((row) => {
+        const issue = { ...row };
+        delete issue.total_count;
+        return issue;
+      });
     
     return {
       statusCode: 200,
       headers: {
         ...headers,
-        'Cache-Control': 'public, max-age=300'
+        'Cache-Control': 'public, max-age=60, stale-while-revalidate=300'
       },
       body: JSON.stringify({
         success: true,

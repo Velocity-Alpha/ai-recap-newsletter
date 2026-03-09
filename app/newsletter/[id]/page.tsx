@@ -19,6 +19,7 @@ interface Item {
 interface ApiResponse {
     title: string;
     excerpt: string;
+    issue_date?: string | null;
     published_at?: string;
     content_json: {
         imageUrl?: string;
@@ -125,7 +126,8 @@ const Page = () => {
         );
     }
 
-    const { title, excerpt, published_at, content_json } = data;
+    const { title, content_json } = data;
+    const displayDate = data.issue_date ?? data.published_at;
     
     // Extract content_json fields if available, otherwise use empty defaults
     const imageUrl = content_json?.imageUrl;
@@ -143,7 +145,7 @@ const Page = () => {
                     {/* HEADER SECTION */}
                     <div className="text-center space-y-6">
                         <div className="inline-flex items-center gap-2 font-medium text-[var(--text-muted)] uppercase tracking-[0.1em]" style={{ fontSize: 'calc(var(--text-small) * 0.95)' }}>
-                            {data.published_at ? formatDate(data.published_at) : 'AI Recap Daily'}
+                            {displayDate ? formatDate(displayDate) : 'AI Recap Daily'}
                         </div>
                         <h1 className="font-serif font-normal leading-[1.12] text-[var(--text-primary)] tracking-[-0.02em]" style={{ fontSize: 'calc(var(--text-hero) * 0.88)' }}>
                             {title}
