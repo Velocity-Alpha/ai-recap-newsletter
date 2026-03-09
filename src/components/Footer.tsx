@@ -10,7 +10,7 @@ export default function Footer() {
           <div className="col-span-1 md:col-span-2">
             <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity mb-4">
               <Image
-                src="/logo/logo-2.png"
+                src="/logo/logo.png"
                 alt="AI Recap"
                 width={120}
                 height={34}

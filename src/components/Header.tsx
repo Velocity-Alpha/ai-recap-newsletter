@@ -10,7 +10,7 @@ export default function Header() {
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
           <Image
-            src="/logo/logo-2.png"
+            src="/logo/logo.png"
             alt="AI Recap"
             width={134}
             height={34}
