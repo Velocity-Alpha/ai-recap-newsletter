@@ -85,6 +85,7 @@ exports.handler = async function(event) {
         id, 
         title,
         excerpt,
+        feature_image_url,
         content_json, 
         issue_date,
         published_at, 

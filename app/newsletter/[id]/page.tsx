@@ -9,6 +9,7 @@ import { useParams } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import { getApiUrl } from "@/src/utils/apiConfig";
 import { formatDate } from "@/src/utils/dateFormatter";
+import Image from "next/image";
 
 interface Item {
     title: string;
@@ -19,6 +20,7 @@ interface Item {
 interface ApiResponse {
     title: string;
     excerpt: string;
+    feature_image_url?: string | null;
     issue_date?: string | null;
     published_at?: string;
     content_json: {
@@ -130,7 +132,7 @@ const Page = () => {
     const displayDate = data.issue_date ?? data.published_at;
     
     // Extract content_json fields if available, otherwise use empty defaults
-    const imageUrl = content_json?.imageUrl;
+    const imageUrl = data.feature_image_url ?? content_json?.imageUrl;
     const overview = content_json?.overview;
     const topStories = content_json?.topStories || [];
     const research = content_json?.research || [];
@@ -156,10 +158,14 @@ const Page = () => {
                     {imageUrl && (
                         <div className="relative -mx-6">
                             <div className="relative p-3 rounded-2xl bg-transparent">
-                                <img
+                                <div className="relative h-[300px] sm:h-[380px] lg:h-[500px]">
+                                <Image
                                     src={imageUrl}
+                                    sizes="(max-width: 768px) calc(100vw - 3rem), 896px"
                                     alt={title}
-                                    className="w-full h-auto max-h-[500px] object-cover"
+                                    fill
+                                    priority
+                                    className="object-contain"
                                     style={{
                                         maskImage: "radial-gradient(ellipse at center, rgba(0,0,0,1) 55%, rgba(0,0,0,0) 100%)",
                                         WebkitMaskImage: "radial-gradient(ellipse at center, rgba(0,0,0,1) 55%, rgba(0,0,0,0) 100%)",
@@ -169,6 +175,7 @@ const Page = () => {
                                         WebkitMaskRepeat: "no-repeat",
                                     }}
                                 />
+                                </div>
                             </div>
                         </div>
                     )}

@@ -36,7 +36,7 @@ export default function NewsTicker() {
     papers: number;
   } | null>(null);
   const mountTimeRef = useRef<number | null>(null);
-  const handoffTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+  const handoffTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     mountTimeRef.current = performance.now();
@@ -156,7 +156,7 @@ export default function NewsTicker() {
     return getTimeAgo(story.createdAt || story.day);
   };
 
-  const mapCategoryToTagType = (category: string): 'funding' | 'product' | 'policy' => {
+  const mapCategoryToTagType = (category?: string): 'funding' | 'product' | 'policy' => {
     const c = category?.toLowerCase() || '';
     if (c.includes('funding') || c.includes('investment') || c.includes('money') || c.includes('raised')) return 'funding';
     if (c.includes('policy') || c.includes('legal') || c.includes('regulation') || c.includes('law')) return 'policy';
