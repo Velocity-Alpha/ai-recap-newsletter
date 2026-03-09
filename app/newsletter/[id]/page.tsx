@@ -10,6 +10,7 @@ import React, { useEffect, useState } from "react";
 import { getApiUrl } from "@/src/utils/apiConfig";
 import { formatDate } from "@/src/utils/dateFormatter";
 import Image from "next/image";
+import { getTrimmedImageUrl } from "@/src/lib/utils";
 
 interface Item {
     title: string;
@@ -132,7 +133,7 @@ const Page = () => {
     const displayDate = data.issue_date ?? data.published_at;
     
     // Extract content_json fields if available, otherwise use empty defaults
-    const imageUrl = data.feature_image_url ?? content_json?.imageUrl;
+    const imageUrl = getTrimmedImageUrl(data.feature_image_url) ?? getTrimmedImageUrl(content_json?.imageUrl);
     const overview = content_json?.overview;
     const topStories = content_json?.topStories || [];
     const research = content_json?.research || [];

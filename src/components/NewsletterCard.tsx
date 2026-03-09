@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { formatDate } from "../utils/dateFormatter";
 import { MessageSquare, ArrowRight } from "lucide-react";
 import Image from "next/image";
+import { getTrimmedImageUrl } from "../lib/utils";
 
 interface Props {
   item: Newsletter;
@@ -12,7 +13,8 @@ interface Props {
 
 const NewsletterCard: React.FC<Props> = ({ item }) => {
   const router = useRouter();
-  const hasFeatureImage = Boolean(item.feature_image_url);
+  const featureImageUrl = getTrimmedImageUrl(item.feature_image_url);
+  const hasFeatureImage = Boolean(featureImageUrl);
 
   return (
     <article
@@ -29,9 +31,9 @@ const NewsletterCard: React.FC<Props> = ({ item }) => {
           }}></div>
         )}
 
-        {hasFeatureImage && (
+        {featureImageUrl && (
           <Image
-            src={item.feature_image_url}
+            src={featureImageUrl}
             alt={item.title}
             fill
             sizes="(max-width: 768px) calc(100vw - 3rem), (max-width: 1024px) calc(50vw - 2.25rem), 360px"
@@ -39,7 +41,7 @@ const NewsletterCard: React.FC<Props> = ({ item }) => {
           />
         )}
 
-        {!item.feature_image_url && (
+        {!hasFeatureImage && (
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="w-12 h-12 bg-[var(--bg-card)] rounded flex items-center justify-center shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
               <MessageSquare size={24} className="stroke-[var(--text-secondary)]" />
