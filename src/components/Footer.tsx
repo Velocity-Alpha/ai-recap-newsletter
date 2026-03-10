@@ -29,19 +29,24 @@ export default function Footer() {
             <h4 className="font-semibold text-[var(--text-primary)] mb-6 uppercase tracking-wider" style={{ fontSize: 'var(--text-caption)' }}>Quick Links</h4>
             <ul className="space-y-2.5">
               <li>
-                <a href="/" className="text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-colors" style={{ fontSize: 'var(--text-small)' }}>
+                <Link href="/" className="text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-colors" style={{ fontSize: 'var(--text-small)' }}>
                   Home
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="/archive" className="text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-colors" style={{ fontSize: 'var(--text-small)' }}>
+                <Link href="/archive" className="text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-colors" style={{ fontSize: 'var(--text-small)' }}>
                   Archive
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="#subscribe" className="text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-colors" style={{ fontSize: 'var(--text-small)' }}>
+                <Link href="/#subscribe" className="text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-colors" style={{ fontSize: 'var(--text-small)' }}>
                   Subscribe
-                </a>
+                </Link>
+              </li>
+              <li>
+                <Link href="/for-brands" className="text-[var(--text-muted)] hover:text-[var(--accent-primary)] transition-colors" style={{ fontSize: 'var(--text-small)' }}>
+                  For brands
+                </Link>
               </li>
             </ul>
           </div>
@@ -53,12 +58,12 @@ export default function Footer() {
             © 2026 AI Recap by Velocity Alpha. All rights reserved.
           </p>
           <div className="flex gap-6 mt-4 md:mt-0">
-            <a href="/privacy" className="text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors" style={{ fontSize: 'var(--text-caption)' }}>
+            <Link href="/privacy" className="text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors" style={{ fontSize: 'var(--text-caption)' }}>
               Privacy Policy
-            </a>
-            <a href="/terms" className="text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors" style={{ fontSize: 'var(--text-caption)' }}>
+            </Link>
+            <Link href="/terms" className="text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors" style={{ fontSize: 'var(--text-caption)' }}>
               Terms of Service
-            </a>
+            </Link>
           </div>
         </div>
       </div>
