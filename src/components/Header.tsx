@@ -22,7 +22,7 @@ export default function Header() {
 
         {/* Desktop Navigation */}
         <div className="hidden md:flex items-center gap-10">
-          <a 
+          <Link 
             href="/" 
             className="font-semibold uppercase tracking-[0.1em] text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-colors" style={{ fontSize: 'var(--text-small)' }}
             onClick={(e) => {
@@ -33,7 +33,7 @@ export default function Header() {
             }}
           >
             Home
-          </a>
+          </Link>
           <Link 
             href="/archive" 
             className="font-semibold uppercase tracking-[0.1em] text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-colors" style={{ fontSize: 'var(--text-small)' }}

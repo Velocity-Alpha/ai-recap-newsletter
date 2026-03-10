@@ -8,7 +8,7 @@ import SubscribeNewsletter from "@/src/components/SubscribeNewsletter";
 import { useParams } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import { getApiUrl } from "@/src/utils/apiConfig";
-import { formatDate } from "@/src/utils/dateFormatter";
+import { formatNewsletterDate } from "@/src/utils/dateFormatter";
 import Image from "next/image";
 import { getTrimmedImageUrl } from "@/src/lib/utils";
 
@@ -148,7 +148,7 @@ const Page = () => {
                     {/* HEADER SECTION */}
                     <div className="text-center space-y-6">
                         <div className="inline-flex items-center gap-2 font-medium text-[var(--text-muted)] uppercase tracking-[0.1em]" style={{ fontSize: 'calc(var(--text-small) * 0.95)' }}>
-                            {displayDate ? formatDate(displayDate) : 'AI Recap Daily'}
+                            {displayDate ? formatNewsletterDate(displayDate) : 'AI Recap Daily'}
                         </div>
                         <h1 className="font-serif font-normal leading-[1.12] text-[var(--text-primary)] tracking-[-0.02em]" style={{ fontSize: 'calc(var(--text-hero) * 0.88)' }}>
                             {title}

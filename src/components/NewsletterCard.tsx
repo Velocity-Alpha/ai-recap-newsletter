@@ -2,7 +2,7 @@
 import React from "react";
 import { Newsletter } from "../types/newsletter.types";
 import { useRouter } from "next/navigation";
-import { formatDate } from "../utils/dateFormatter";
+import { formatNewsletterDate } from "../utils/dateFormatter";
 import { MessageSquare, ArrowRight } from "lucide-react";
 import Image from "next/image";
 import { getTrimmedImageUrl } from "../lib/utils";
@@ -51,7 +51,7 @@ const NewsletterCard: React.FC<Props> = ({ item }) => {
         
         {/* Date badge */}
         <div className="absolute top-4 left-4 text-[11px] font-medium text-[var(--text-secondary)] bg-[rgba(247,246,243,0.94)] border border-[rgba(212,221,227,0.9)] shadow-[0_1px_2px_rgba(61,79,95,0.06)] px-2.5 py-1 rounded">
-          {formatDate(item.issue_date ?? item.published_at)}
+          {formatNewsletterDate(item.issue_date ?? item.published_at)}
         </div>
       </div>
 
