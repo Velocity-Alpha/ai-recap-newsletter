@@ -55,9 +55,8 @@ export default function SubscribeNewsletter() {
         </div>
 
         {/* Consent Note */}
-        <p className="mt-6 text-white/40 text-[10px] leading-relaxed">
+        <p className="mt-6 text-white/40 text-[14px] leading-relaxed">
           By subscribing, you agree to our <a href="/terms" className="underline hover:text-white/60">Terms of Service</a> and <a href="/privacy" className="underline hover:text-white/60">Privacy Policy</a>. 
-          You can unsubscribe at any time.
         </p>
 
       </div>
