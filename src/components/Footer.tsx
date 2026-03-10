@@ -25,7 +25,7 @@ export default function Footer() {
           </div>
 
           {/* Quick Links */}
-          <div>
+          <div className="md:justify-self-end md:text-right">
             <h4 className="font-semibold text-[var(--text-primary)] mb-6 uppercase tracking-wider" style={{ fontSize: 'var(--text-caption)' }}>Quick Links</h4>
             <ul className="space-y-2.5">
               <li>
@@ -44,7 +44,7 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href="/for-brands" className="text-[var(--text-muted)] hover:text-[var(--accent-primary)] transition-colors" style={{ fontSize: 'var(--text-small)' }}>
+                <Link href="/for-brands" className="text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-colors" style={{ fontSize: 'var(--text-small)' }}>
                   For brands
                 </Link>
               </li>

@@ -269,24 +269,23 @@ export default function ForBrandsContactForm() {
             required
           />
         </label>
-        <div className="hidden sm:block" />
-      </div>
 
-      <label className="grid gap-2">
-        <span className="font-semibold text-white" style={{ fontSize: 'var(--text-small)' }}>
-          Who do you want to reach? <span className="text-white/68">*</span>
-        </span>
-        <input
-          type="text"
-          value={formState.whoYouWantToReach}
-          onChange={(event) => updateField('whoYouWantToReach', event.target.value)}
-          onBlur={() => handleBlur('whoYouWantToReach')}
-          className={getInputClassName('whoYouWantToReach')}
-          placeholder="The audience you want to stay in front of"
-          aria-invalid={Boolean(touched.whoYouWantToReach && errors.whoYouWantToReach)}
-          required
-        />
-      </label>
+        <label className="grid gap-2">
+          <span className="font-semibold text-white" style={{ fontSize: 'var(--text-small)' }}>
+            Who do you want to reach? <span className="text-white/68">*</span>
+          </span>
+          <input
+            type="text"
+            value={formState.whoYouWantToReach}
+            onChange={(event) => updateField('whoYouWantToReach', event.target.value)}
+            onBlur={() => handleBlur('whoYouWantToReach')}
+            className={getInputClassName('whoYouWantToReach')}
+            placeholder="Your target audience"
+            aria-invalid={Boolean(touched.whoYouWantToReach && errors.whoYouWantToReach)}
+            required
+          />
+        </label>
+      </div>
 
       <label className="grid gap-2">
         <span className="font-semibold text-white" style={{ fontSize: 'var(--text-small)' }}>
