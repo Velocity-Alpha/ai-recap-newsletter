@@ -1,9 +1,83 @@
 'use client'
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { MessageSquare, Monitor, Globe } from 'lucide-react';
 import NewsTicker from './NewsTicker';
 
+const SUBSCRIBER_COUNT_START = 2309;
+const SUBSCRIBER_COUNT_TARGET = 50000;
+const SUBSCRIBER_COUNT_START_DATE = new Date(Date.UTC(2026, 2, 10));
+const SUBSCRIBER_COUNT_CURVE_HOURS = 365 * 24;
+const SUBSCRIBER_COUNT_ANIMATION_OFFSET = 80;
+const SUBSCRIBER_COUNT_ANIMATION_MS = 900;
+const MS_PER_HOUR = 60 * 60 * 1000;
+const HERO_STAT_VALUE_SIZE = 'calc(var(--text-section) * 0.84)';
+const HERO_STAT_LABEL_SIZE = 'calc(var(--text-caption) * 1.22)';
+
+function getSubscriberCountForTime(now: Date) {
+  const startUtc = SUBSCRIBER_COUNT_START_DATE.getTime();
+  const elapsedHours = Math.max(0, (now.getTime() - startUtc) / MS_PER_HOUR);
+
+  if (elapsedHours <= SUBSCRIBER_COUNT_CURVE_HOURS) {
+    const progress = elapsedHours / SUBSCRIBER_COUNT_CURVE_HOURS;
+    const curvedGrowth = progress * progress;
+
+    return Math.round(
+      SUBSCRIBER_COUNT_START +
+        (SUBSCRIBER_COUNT_TARGET - SUBSCRIBER_COUNT_START) * curvedGrowth
+    );
+  }
+
+  const extraHours = elapsedHours - SUBSCRIBER_COUNT_CURVE_HOURS;
+  const averageHourlyGrowth =
+    (SUBSCRIBER_COUNT_TARGET - SUBSCRIBER_COUNT_START) / SUBSCRIBER_COUNT_CURVE_HOURS;
+
+  return Math.round(SUBSCRIBER_COUNT_TARGET + extraHours * averageHourlyGrowth);
+}
+
 export default function Hero() {
+  const [subscriberCount, setSubscriberCount] = useState<number | null>(null);
+  const [statsReady, setStatsReady] = useState(false);
+
+  useEffect(() => {
+    const finalCount = getSubscriberCountForTime(new Date());
+    const startingCount = Math.max(0, finalCount - SUBSCRIBER_COUNT_ANIMATION_OFFSET);
+
+    let frameId = 0;
+    let animationStart = 0;
+    let hasRevealedStats = false;
+
+    const animateCount = (now: number) => {
+      if (!animationStart) {
+        animationStart = now;
+      }
+
+      const progress = Math.min((now - animationStart) / SUBSCRIBER_COUNT_ANIMATION_MS, 1);
+      const easedProgress = 1 - Math.pow(1 - progress, 3);
+      const nextCount = Math.round(
+        startingCount + (finalCount - startingCount) * easedProgress
+      );
+
+      if (!hasRevealedStats) {
+        hasRevealedStats = true;
+        setStatsReady(true);
+      }
+
+      setSubscriberCount(nextCount);
+
+      if (progress < 1) {
+        frameId = requestAnimationFrame(animateCount);
+      }
+    };
+
+    frameId = requestAnimationFrame(animateCount);
+
+    return () => {
+      if (frameId) {
+        cancelAnimationFrame(frameId);
+      }
+    };
+  }, []);
+
   return (
     <section className="relative py-24 lg:py-32 bg-[var(--bg-card)] overflow-hidden">
       {/* Watercolor background blobs */}
@@ -26,7 +100,7 @@ export default function Hero() {
               Stay Ahead of <span className="text-[var(--accent-warm)]">AI</span>
             </h1>
 
-            <p className="leading-[1.7] text-[var(--text-secondary)] mb-10 opacity-0 animate-[fadeIn_0.5s_ease-out_0.1s_forwards]" style={{ fontSize: 'var(--text-body)' }}>
+            <p className="leading-[1.7] text-[var(--text-secondary)] mb-10 opacity-0 animate-[fadeIn_0.5s_ease-out_0.1s_forwards]" style={{ fontSize: 'calc(var(--text-body) * 1.08)' }}>
               Get the latest AI news, breakthrough research, and practical insights delivered to your inbox every day by AI Recap. Join thousands of professionals staying ahead of the curve.
             </p>
 
@@ -47,20 +121,26 @@ export default function Hero() {
             </Link>
             </div>
 
-            <div className="flex gap-16 pt-10 border-t border-[var(--border-light)] opacity-0 animate-[fadeIn_0.5s_ease-out_0.2s_forwards]">
-              <div>
-                <div className="font-serif text-[var(--text-primary)] leading-none mb-1" style={{ fontSize: 'var(--text-section)' }}>10K+</div>
-                <div className="text-[var(--text-muted)]" style={{ fontSize: 'var(--text-caption)' }}>Subscribers</div>
+            {statsReady && subscriberCount !== null ? (
+              <div className="flex gap-16 pt-10 border-t border-[var(--border-light)] opacity-0 animate-[fadeIn_0.5s_ease-out_0.2s_forwards]">
+                <div>
+                  <div className="font-serif text-[var(--text-primary)] leading-none mb-1" style={{ fontSize: HERO_STAT_VALUE_SIZE }}>
+                    {subscriberCount.toLocaleString('en-US')}
+                  </div>
+                  <div className="text-[var(--text-muted)]" style={{ fontSize: HERO_STAT_LABEL_SIZE }}>Subscribers</div>
+                </div>
+                <div>
+                  <div className="font-serif text-[var(--text-primary)] leading-none mb-1" style={{ fontSize: HERO_STAT_VALUE_SIZE }}>Daily</div>
+                  <div className="text-[var(--text-muted)]" style={{ fontSize: HERO_STAT_LABEL_SIZE }}>AI News Tracked</div>
+                </div>
+                <div>
+                  <div className="font-serif text-[var(--text-primary)] leading-none mb-1" style={{ fontSize: HERO_STAT_VALUE_SIZE }}>100%</div>
+                  <div className="text-[var(--text-muted)]" style={{ fontSize: HERO_STAT_LABEL_SIZE }}>Free</div>
+                </div>
               </div>
-              <div>
-                <div className="font-serif text-[var(--text-primary)] leading-none mb-1" style={{ fontSize: 'var(--text-section)' }}>Daily</div>
-                <div className="text-[var(--text-muted)]" style={{ fontSize: 'var(--text-caption)' }}>Updates</div>
-              </div>
-              <div>
-                <div className="font-serif text-[var(--text-primary)] leading-none mb-1" style={{ fontSize: 'var(--text-section)' }}>100%</div>
-                <div className="text-[var(--text-muted)]" style={{ fontSize: 'var(--text-caption)' }}>Free</div>
-              </div>
-            </div>
+            ) : (
+              <div className="h-[76px]" aria-hidden="true" />
+            )}
           </div>
 
           {/* Right column - Ticker Showcase */}
