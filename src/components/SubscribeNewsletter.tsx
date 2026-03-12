@@ -5,7 +5,7 @@ export default function SubscribeNewsletter() {
 
   useEffect(() => {
     const script = document.createElement("script");
-    script.src = "https://links.velocityalpha.com/js/form_embed.js";
+    script.src = "https://links.airecap.news/js/form_embed.js";
     script.async = true;
 
     document.body.appendChild(script);
@@ -40,17 +40,21 @@ export default function SubscribeNewsletter() {
         {/* iframe form */}
         <div className="w-full h-auto rounded overflow-hidden">
           <iframe
-            src="https://links.velocityalpha.com/widget/form/U3Z77WiIoyPTx24EFNj1"
-            className="w-full h-full border-none"
-            id="inline-3v7ZRjuohbjIgMs6zYMt"
+            src="https://links.airecap.news/widget/form/cRFEXYhixTIqE6267qMj"
+            className="w-full h-full border-none rounded-none"
+            id="inline-cRFEXYhixTIqE6267qMj"
             data-layout='{"id":"INLINE"}'
             data-trigger-type="alwaysShow"
+            data-trigger-value=""
             data-activation-type="alwaysActivated"
+            data-activation-value=""
             data-deactivation-type="neverDeactivate"
-            data-form-name="Newsletter Signup Form"
-            data-height="491"
-            data-form-id="3v7ZRjuohbjIgMs6zYMt"
-            title="Newsletter Signup Form"
+            data-deactivation-value=""
+            data-form-name="Newsletter Signup Form - Dark"
+            data-height="254"
+            data-layout-iframe-id="inline-cRFEXYhixTIqE6267qMj"
+            data-form-id="cRFEXYhixTIqE6267qMj"
+            title="Newsletter Signup Form - Dark"
           />
         </div>
 
