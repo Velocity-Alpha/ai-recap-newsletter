@@ -36,52 +36,15 @@ export default function NewsTicker() {
     papers: number;
   } | null>(null);
   const mountTimeRef = useRef<number | null>(null);
-  const handoffTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     mountTimeRef.current = performance.now();
 
-    const clearHandoffTimeout = () => {
-      if (handoffTimeoutRef.current) {
-        window.clearTimeout(handoffTimeoutRef.current);
-        handoffTimeoutRef.current = null;
-      }
-    };
-
-    const getElapsedSeconds = () => {
-      if (!mountTimeRef.current) return 0;
-      return Math.max((performance.now() - mountTimeRef.current) / 1000, 0);
-    };
-
     const getCurrentOffset = (storyCount: number) => {
-      if (storyCount <= 0) return 0;
-
-      const elapsedSeconds = getElapsedSeconds();
+      if (storyCount <= 0 || !mountTimeRef.current) return 0;
+      const elapsedSeconds = Math.max((performance.now() - mountTimeRef.current) / 1000, 0);
       const pixelsPerSecond = ITEM_HEIGHT_PX / SECONDS_PER_ITEM;
-      const totalHeight = storyCount * ITEM_HEIGHT_PX;
-
-      return (elapsedSeconds * pixelsPerSecond) % totalHeight;
-    };
-
-    const getNextHiddenIndex = (storyCount: number, currentOffset: number) => {
-      const lastVisibleIndex = Math.floor((currentOffset + VIEWPORT_HEIGHT_PX - 1) / ITEM_HEIGHT_PX);
-      return (lastVisibleIndex + 1) % storyCount;
-    };
-
-    const getMsUntilItemExitsViewport = (
-      storyCount: number,
-      itemIndex: number,
-      currentOffset: number
-    ) => {
-      const pixelsPerSecond = ITEM_HEIGHT_PX / SECONDS_PER_ITEM;
-      const totalHeight = storyCount * ITEM_HEIGHT_PX;
-      let distanceToExit = ((itemIndex + 1) * ITEM_HEIGHT_PX) - currentOffset;
-
-      while (distanceToExit <= 0) {
-        distanceToExit += totalHeight;
-      }
-
-      return Math.ceil((distanceToExit / pixelsPerSecond) * 1000);
+      return (elapsedSeconds * pixelsPerSecond) % (storyCount * ITEM_HEIGHT_PX);
     };
 
     // Fetch ticker news and stats
@@ -103,20 +66,25 @@ export default function NewsTicker() {
           if (result.data && result.data.length > 0) {
             const liveStories = result.data as TickerStory[];
             const currentOffset = getCurrentOffset(FALLBACK_STORIES.length);
-            const nextHiddenIndex = getNextHiddenIndex(FALLBACK_STORIES.length, currentOffset);
-            const stagedStories = FALLBACK_STORIES.map((story, index) =>
-              index === nextHiddenIndex ? liveStories[0] : story
+            const pixelsPerSecond = ITEM_HEIGHT_PX / SECONDS_PER_ITEM;
+
+            // Find which fallback items are currently visible in the viewport
+            const partialOffset = currentOffset % ITEM_HEIGHT_PX;
+            const firstVisibleIndex = Math.floor(currentOffset / ITEM_HEIGHT_PX) % FALLBACK_STORIES.length;
+            // Only preserve the fully-visible items (3 items fill the 240px viewport).
+            // The partial bottom slot is allowed to switch to live content immediately —
+            // that's the "4th story" the user never fully sees before it scrolls in.
+            const NUM_VISIBLE = Math.ceil(VIEWPORT_HEIGHT_PX / ITEM_HEIGHT_PX); // = 3
+
+            // Preserve visible fallback items at the head of the new list so there's
+            // no flash — live stories follow immediately after and take over from there
+            const visibleItems: TickerStory[] = Array.from({ length: NUM_VISIBLE }, (_, i) =>
+              FALLBACK_STORIES[(firstVisibleIndex + i) % FALLBACK_STORIES.length]
             );
+            const transitionList = [...visibleItems, ...liveStories];
 
-            clearHandoffTimeout();
-            setAnimationOffsetSeconds(getElapsedSeconds());
-            setStories(stagedStories);
-
-            handoffTimeoutRef.current = window.setTimeout(() => {
-              setAnimationOffsetSeconds(getElapsedSeconds());
-              setStories(liveStories);
-              handoffTimeoutRef.current = null;
-            }, getMsUntilItemExitsViewport(FALLBACK_STORIES.length, nextHiddenIndex, currentOffset) + 150);
+            setAnimationOffsetSeconds(partialOffset / pixelsPerSecond);
+            setStories(transitionList);
           }
 
           if (result.stats) {
@@ -132,8 +100,6 @@ export default function NewsTicker() {
     };
 
     fetchNews();
-
-    return clearHandoffTimeout;
   }, []);
 
   const getTimeAgo = (dateStr?: string) => {
@@ -196,9 +162,9 @@ export default function NewsTicker() {
         </div>
 
         {/* Scrolling content */}
-        <div className="relative h-[240px] overflow-hidden">
+        <div className="relative h-[240px] overflow-hidden" style={{ contain: 'content' }}>
           <div
-            className="flex flex-col"
+            className="flex flex-col will-change-transform"
             style={getTickerAnimationStyle()}
           >
             {stories.length > 0 ? (
@@ -277,7 +243,7 @@ function TickerItem({ time, headline, tag, tagType }: {
   };
 
   return (
-    <div className="flex gap-4 px-5 py-4 min-h-[80px] border-b border-[var(--border-light)] hover:bg-[var(--bg-warm)] transition-colors duration-200">
+    <div className="flex gap-4 px-5 py-4 min-h-[80px] border-b border-[var(--border-light)]">
       <span className="text-[11px] font-medium text-[var(--text-muted)] whitespace-nowrap min-w-[48px] pt-0.5">{time}</span>
       <div className="flex-1">
         <div className="font-serif text-[15px] text-[var(--text-primary)] leading-[1.4] mb-1.5">{headline}</div>
