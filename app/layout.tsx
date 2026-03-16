@@ -17,6 +17,7 @@ const sourceSans = Source_Sans_3({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://airecap.news"),
   title: "AI Recap - AI Intelligence Newsletter",
   description: "Get the latest AI news, research insights, and practical implementation guides delivered to your inbox daily from AI Recap.",
   icons: {
@@ -28,6 +29,19 @@ export const metadata: Metadata = {
     shortcut: "/favicons/favicon.ico",
   },
   manifest: "/favicons/site.webmanifest",
+  openGraph: {
+    type: "website",
+    siteName: "AI Recap",
+    title: "AI Recap - AI Intelligence Newsletter",
+    description: "Get the latest AI news, research insights, and practical implementation guides delivered to your inbox daily from AI Recap.",
+    images: [{ url: "/logo/OG-Logo.jpg", width: 1200, alt: "AI Recap" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "AI Recap - AI Intelligence Newsletter",
+    description: "Get the latest AI news, research insights, and practical implementation guides delivered to your inbox daily from AI Recap.",
+    images: ["/logo/OG-Logo.jpg"],
+  },
 };
 
 export default function RootLayout({
