@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Libre_Baskerville, Source_Sans_3 } from "next/font/google";
+import Script from "next/script";
 import ScrollProgress from "@/src/components/ScrollProgress";
 import "./globals.css";
 
@@ -51,6 +52,20 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <Script
+          src="https://www.googletagmanager.com/gtag/js?id=G-1ZK1RC1RE1"
+          strategy="afterInteractive"
+        />
+        <Script id="google-analytics" strategy="afterInteractive">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', 'G-1ZK1RC1RE1');
+          `}
+        </Script>
+      </head>
       <body
         suppressHydrationWarning
         className={`${libreBaskerville.variable} ${sourceSans.variable} antialiased`}
