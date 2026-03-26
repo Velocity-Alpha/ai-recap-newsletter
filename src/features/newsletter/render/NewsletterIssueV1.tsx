@@ -52,12 +52,12 @@ function SectionCard({
 }) {
   return (
     <section className={compact ? "mb-12 last:mb-0" : "mb-12 last:mb-0"}>
-      <div className="mb-7 border-b-[1.5px] border-[var(--text-primary)] pb-2.5">
-        <div className="flex items-center gap-3">
+      <div className="mb-10 border-b-[1.5px] border-[var(--text-primary)] pb-2.5">
+        <div className="flex items-center gap-2">
           <span className="flex h-6 w-6 items-center justify-center text-[color:#7b858d] opacity-60">
             {icon}
           </span>
-          <h2 className="font-sans text-[15px] font-medium uppercase tracking-[0.12em] text-[var(--text-secondary)]">
+          <h2 className="font-sans text-[15px] font-semibold uppercase tracking-[0.12em] text-[var(--text-secondary)]">
             {title}
           </h2>
         </div>
@@ -113,7 +113,7 @@ function FeatureStory({ item, ctaLabel }: { item: NewsletterStoryV1; ctaLabel: s
           href={item.link}
           target="_blank"
           rel="noopener noreferrer"
-          className="mt-4 inline-flex w-fit items-center gap-1 border-b-2 pb-0.5 text-[11px] font-medium uppercase tracking-[0.18em] transition hover:opacity-85"
+          className="mt-4 inline-flex w-fit items-center gap-1 border-b-2 pb-0.5 text-[11px] font-semibold uppercase tracking-[0.18em] transition hover:opacity-85"
           style={{ color: LINK_ACCENT, borderColor: LINK_ACCENT }}
         >
           {ctaLabel}
@@ -134,8 +134,8 @@ function InlineLinkedItem({
       <div className="space-y-1.5">
         <StoryLink
           href={item.link}
-          className="inline-block border-b-2 pb-[1px] text-[15px] font-semibold leading-relaxed transition hover:opacity-85 sm:text-[16px]"
-          style={{ color: LINK_ACCENT, borderColor: LINK_ACCENT }}
+          className="text-[15px] font-semibold leading-relaxed underline decoration-2 underline-offset-[3px] transition hover:opacity-85 sm:text-[16px]"
+          style={{ color: LINK_ACCENT, textDecorationColor: LINK_ACCENT }}
         >
           {item.title}
         </StoryLink>

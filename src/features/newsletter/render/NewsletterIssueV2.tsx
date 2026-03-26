@@ -53,12 +53,12 @@ function SectionCard({
 }) {
   return (
     <section className={compact ? "mb-12 last:mb-0" : "mb-12 last:mb-0"}>
-      <div className="mb-7 border-b-[1.5px] border-[var(--text-primary)] pb-2.5">
-        <div className="flex items-center gap-3">
+      <div className="mb-10 border-b-[1.5px] border-[var(--text-primary)] pb-2.5">
+        <div className="flex items-center gap-2">
           <span className="flex h-6 w-6 items-center justify-center text-[color:#7b858d] opacity-60">
             {icon}
           </span>
-          <h2 className="font-sans text-[15px] font-medium uppercase tracking-[0.12em] text-[var(--text-secondary)]">
+          <h2 className="font-sans text-[15px] font-semibold uppercase tracking-[0.12em] text-[var(--text-secondary)]">
             {title}
           </h2>
         </div>
@@ -112,8 +112,8 @@ function needsSpacer(previous: string, next: string) {
 
 function HighlightedBullet({ bullet }: { bullet: HighlightBullet }) {
   return (
-    <li className="flex items-start gap-3 text-[15px] leading-8 text-[color:#4f616d] sm:text-[16px]">
-      <span className="mt-[11px] h-[5px] w-[5px] flex-shrink-0 rounded-full bg-[color:#6a7a86]" />
+    <li className="flex items-start gap-3 text-[17px] leading-[1.7] text-[color:#4f616d] sm:text-[18px]">
+      <span className="mt-[13px] h-[5px] w-[5px] flex-shrink-0 rounded-full bg-[color:#6a7a86]" />
       <span>
         {bullet.before}
         {needsSpacer(bullet.before, bullet.highlight) ? " " : null}
@@ -157,7 +157,7 @@ function FeatureStory({ item }: { item: NewsletterFeatureItemV2 }) {
             href={item.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="mt-4 block w-fit border-b-2 pb-0.5 text-[11px] font-medium uppercase tracking-[0.18em] transition hover:opacity-85"
+            className="mt-4 block w-fit border-b-2 pb-0.5 text-[11px] font-semibold uppercase tracking-[0.18em] transition hover:opacity-85"
             style={{ color: LINK_ACCENT, borderColor: LINK_ACCENT }}
           >
             Read more →
@@ -249,13 +249,13 @@ export function NewsletterIssueV2({ issue }: { issue: ParsedNewsletterIssueV2 })
         )}
 
         {content.overview && (
-          <OverviewSection icon={<FileText size={15} strokeWidth={1.8} />} title="Today’s Overview">
+          <OverviewSection icon={<FileText size={15} strokeWidth={2.5} />} title="Today’s Overview">
             <p className="text-[17px] leading-[1.7] text-[color:#4f616d] sm:text-[18px]">{content.overview.summary}</p>
           </OverviewSection>
         )}
 
         {content.headlines.length > 0 && (
-          <SectionCard icon={<Flame size={15} strokeWidth={1.8} />} title="Top Stories">
+          <SectionCard icon={<Flame size={15} strokeWidth={2.5} />} title="Top Stories">
             <div className="space-y-10">
               {content.headlines.map((item) => (
                 <FeatureStory key={item.storyId ?? item.headline} item={item} />
@@ -265,7 +265,7 @@ export function NewsletterIssueV2({ issue }: { issue: ParsedNewsletterIssueV2 })
         )}
 
         {content.researchAndAnalysis.length > 0 && (
-          <SectionCard icon={<FlaskConical size={15} strokeWidth={1.8} />} title="Research & Analysis">
+          <SectionCard icon={<FlaskConical size={15} strokeWidth={2.5} />} title="Research & Analysis">
             <div className="space-y-10">
               {content.researchAndAnalysis.map((item) => (
                 <FeatureStory key={item.storyId ?? item.headline} item={item} />
@@ -275,13 +275,13 @@ export function NewsletterIssueV2({ issue }: { issue: ParsedNewsletterIssueV2 })
         )}
 
         {content.tools.length > 0 && (
-          <SectionCard icon={<Wrench size={15} strokeWidth={1.8} />} title="Trending AI Tools" compact>
+          <SectionCard icon={<Wrench size={15} strokeWidth={2.5} />} title="Trending AI Tools" compact>
             <LinkList items={content.tools} getText={(item) => ("detail" in item ? item.detail : "")} />
           </SectionCard>
         )}
 
         {content.quickHits.length > 0 && (
-          <SectionCard icon={<Sparkles size={15} strokeWidth={1.8} />} title="Quick Hits" compact>
+          <SectionCard icon={<Sparkles size={15} strokeWidth={2.5} />} title="Quick Hits" compact>
             <LinkList items={content.quickHits} getText={(item) => ("text" in item ? item.text : "")} />
           </SectionCard>
         )}
