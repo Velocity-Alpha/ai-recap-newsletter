@@ -1,6 +1,12 @@
 [build]
   functions = "netlify/functions"  # This tells Netlify where your serverless functions are
 
+[context.production.environment]
+  NEXT_PUBLIC_GA_MEASUREMENT_ID = "G-1ZK1RC1RE1"
+
+[context.staging.environment]
+  NEXT_PUBLIC_GA_MEASUREMENT_ID = "G-8GQC9DS1S7"
+
 [dev]
   command = "npm run next:dev"
   targetPort = 3000

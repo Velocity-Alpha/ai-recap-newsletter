@@ -45,6 +45,7 @@ A beautiful, light-mode newsletter website with paint-style colors that compleme
      cp .env.local.example .env.local
      cp netlify/.env.example netlify/.env
      ```
+   - Leave `NEXT_PUBLIC_GA_MEASUREMENT_ID` unset in `.env.local` unless you explicitly want to test analytics against a non-production property.
    - Optional: set `NEXT_PUBLIC_NEWSLETTER_URL` in `.env.local` only if you want to override the default API origin.
    - Update `netlify/.env` with your database connection string:
      ```env
@@ -113,6 +114,9 @@ The website uses a paint-style color scheme with:
    - Publish directory: `.next`
 3. **Add environment variables** in Netlify dashboard:
    - `DATABASE_URL`: Your PostgreSQL connection string
+   - Google Analytics is configured in `netlify.toml` by deploy context:
+     - `production` -> `G-1ZK1RC1RE1`
+     - `staging` -> `G-8GQC9DS1S7`
 4. **Deploy!**
 
 The Netlify functions will automatically be deployed with your site.
