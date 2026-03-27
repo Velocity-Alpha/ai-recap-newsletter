@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Libre_Baskerville, Source_Sans_3 } from "next/font/google";
-import Script from "next/script";
+import GoogleAnalytics from "@/src/components/GoogleAnalytics";
 import ScrollProgress from "@/src/components/ScrollProgress";
 import "./globals.css";
 
@@ -55,22 +55,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        {gaMeasurementId ? (
-          <>
-            <Script
-              src={`https://www.googletagmanager.com/gtag/js?id=${gaMeasurementId}`}
-              strategy="afterInteractive"
-            />
-            <Script id="google-analytics" strategy="afterInteractive">
-              {`
-                window.dataLayer = window.dataLayer || [];
-                function gtag(){dataLayer.push(arguments);}
-                gtag('js', new Date());
-                gtag('config', '${gaMeasurementId}');
-              `}
-            </Script>
-          </>
-        ) : null}
+        <GoogleAnalytics measurementId={gaMeasurementId} />
       </head>
       <body
         suppressHydrationWarning
