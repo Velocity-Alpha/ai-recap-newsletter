@@ -2,6 +2,7 @@ export type NewsletterSchemaVersion = 1 | 2;
 
 export interface NewsletterIssueApiResponse {
   id?: number | null;
+  slug?: string | null;
   title: string;
   excerpt: string;
   feature_image_url?: string | null;
@@ -19,6 +20,7 @@ export interface HighlightBullet {
 export interface ParsedNewsletterIssueBase {
   schemaVersion: NewsletterSchemaVersion;
   id: number | null;
+  slug: string | null;
   title: string;
   excerpt: string;
   issueDate: string | null;

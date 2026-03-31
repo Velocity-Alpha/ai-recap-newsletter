@@ -51,6 +51,7 @@ exports.handler = async function(event) {
       WITH filtered AS (
         SELECT
           id,
+          slug,
           title,
           excerpt,
           feature_image_url,
@@ -67,6 +68,7 @@ exports.handler = async function(event) {
       )
       SELECT
         paged.id,
+        paged.slug,
         paged.title,
         paged.excerpt,
         paged.feature_image_url,

@@ -2,7 +2,6 @@ const pkg = require('pg');
 const path = require('path');
 const dotenv = require('dotenv');
 
-// Load environment variables from netlify/.env
 dotenv.config({ path: path.join(__dirname, '../.env') });
 
 const { Pool } = pkg;
@@ -19,7 +18,6 @@ const pool = new Pool({
 });
 
 exports.handler = async function(event) {
-  // Set CORS headers
   const headers = {
     'Content-Type': 'application/json',
     'Access-Control-Allow-Origin': '*',
@@ -28,7 +26,6 @@ exports.handler = async function(event) {
     'Access-Control-Max-Age': '86400'
   };
 
-  // Handle OPTIONS preflight request
   if (event.httpMethod === 'OPTIONS') {
     return {
       statusCode: 200,
@@ -37,7 +34,6 @@ exports.handler = async function(event) {
     };
   }
 
-  // Only allow GET requests
   if (event.httpMethod !== 'GET') {
     return {
       statusCode: 405,
@@ -50,55 +46,38 @@ exports.handler = async function(event) {
   }
 
   try {
-    // Extract ID from query parameters
-    const { id } = event.queryStringParameters || {};
-    
-    // Validate ID
-    if (!id) {
+    const { slug } = event.queryStringParameters || {};
+
+    if (!slug) {
       return {
         statusCode: 400,
         headers,
         body: JSON.stringify({
           success: false,
-          error: 'Missing ID parameter',
-          message: 'Please provide an ID like: ?id=1'
+          error: 'Missing slug parameter',
+          message: 'Please provide a slug like: ?slug=my-issue'
         })
       };
     }
 
-    const issueId = parseInt(id);
-    if (isNaN(issueId) || issueId <= 0) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({
-          success: false,
-          error: 'Invalid ID',
-          message: 'ID must be a positive number'
-        })
-      };
-    }
-
-    // Query database
     const result = await pool.query(
-      `SELECT 
-        id, 
+      `SELECT
+        id,
         slug,
         title,
         excerpt,
         feature_image_url,
-        content_json, 
+        content_json,
         issue_date,
-        published_at, 
-        created_at  
+        published_at,
+        created_at
       FROM newsletter.issues
-      WHERE id = $1`,
-      [issueId]
+      WHERE slug = $1`,
+      [slug]
     );
 
     const rows = result.rows || [];
 
-    // Check if issue exists
     if (rows.length === 0) {
       return {
         statusCode: 404,
@@ -106,7 +85,7 @@ exports.handler = async function(event) {
         body: JSON.stringify({
           success: false,
           error: 'Record not found',
-          message: `No Record found with ID: ${issueId}`
+          message: `No record found with slug: ${slug}`
         })
       };
     }
@@ -119,11 +98,10 @@ exports.handler = async function(event) {
       },
       body: JSON.stringify({
         success: true,
-        data: rows[0], // Single object
+        data: rows[0],
         timestamp: new Date().toISOString()
       })
     };
-
   } catch (err) {
     console.error('Database error:', err);
     return {

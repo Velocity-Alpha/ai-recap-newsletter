@@ -1,5 +1,6 @@
 export interface Newsletter {
   id: string;
+  slug: string;
   title: string;
   excerpt: string;
   issue_date?: string | null;

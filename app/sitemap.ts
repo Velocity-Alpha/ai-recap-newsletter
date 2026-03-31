@@ -14,6 +14,7 @@ function getServerApiUrl(endpoint: string): string {
 
 interface NewsletterEntry {
     id: string;
+    slug: string;
     published_at: string;
     issue_date?: string;
 }
@@ -63,7 +64,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
     const newsletterEntries: MetadataRoute.Sitemap = newsletters.map(
         (entry) => ({
-            url: `${siteUrl}/newsletter/${entry.id}`,
+            url: `${siteUrl}/issue/${entry.slug}`,
             lastModified: entry.issue_date ?? entry.published_at,
             changeFrequency: "never",
         })

@@ -38,3 +38,27 @@ export async function fetchNewsletterIssueById(id: string): Promise<ParsedNewsle
     return null;
   }
 }
+
+export async function fetchNewsletterIssueBySlug(slug: string): Promise<ParsedNewsletterIssue | null> {
+  try {
+    const apiUrl = getServerApiUrl("fetch-newsletter-by-slug");
+    const response = await fetch(`${apiUrl}?slug=${encodeURIComponent(slug)}`, {
+      next: { revalidate: 3600 },
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const json = await response.json();
+    const data = json?.data as NewsletterIssueApiResponse | undefined;
+
+    if (!data) {
+      return null;
+    }
+
+    return parseNewsletterIssue(data);
+  } catch {
+    return null;
+  }
+}

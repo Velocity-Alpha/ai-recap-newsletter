@@ -17,7 +17,7 @@ const NewsletterCard: React.FC<Props> = ({ item }) => {
 
   return (
     <Link
-      href={`/newsletter/${item.id}`}
+      href={`/issue/${item.slug}`}
       aria-label={`Open newsletter: ${item.title}`}
       className="group block h-full cursor-pointer rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] focus-visible:ring-offset-2"
     >

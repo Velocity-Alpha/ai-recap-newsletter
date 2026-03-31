@@ -74,6 +74,7 @@ export function createIssueBase<TSchemaVersion extends NewsletterSchemaVersion>(
   return {
     schemaVersion: options.schemaVersion,
     id: typeof issue.id === "number" ? issue.id : null,
+    slug: typeof issue.slug === "string" ? issue.slug : null,
     title: options.title ?? issue.title,
     excerpt: issue.excerpt,
     issueDate,
