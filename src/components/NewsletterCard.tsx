@@ -14,10 +14,11 @@ interface Props {
 const NewsletterCard: React.FC<Props> = ({ item }) => {
   const featureImageUrl = getTrimmedImageUrl(item.feature_image_url);
   const hasFeatureImage = Boolean(featureImageUrl);
+  const href = item.slug ? `/issue/${item.slug}` : `/newsletter/${item.id}`;
 
   return (
     <Link
-      href={`/issue/${item.slug}`}
+      href={href}
       aria-label={`Open newsletter: ${item.title}`}
       className="group block h-full cursor-pointer rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] focus-visible:ring-offset-2"
     >

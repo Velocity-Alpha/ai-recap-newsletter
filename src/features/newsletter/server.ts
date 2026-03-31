@@ -2,14 +2,14 @@ import { parseNewsletterIssue } from "@/src/features/newsletter/parsers";
 import type { NewsletterIssueApiResponse, ParsedNewsletterIssue } from "@/src/features/newsletter/types";
 
 function getServerApiUrl(endpoint: string): string {
-  const baseUrl = process.env.NEXT_PUBLIC_NEWSLETTER_URL?.trim();
-  if (baseUrl) {
-    return `${baseUrl.replace(/\/+$/, "")}/${endpoint}`;
-  }
-
   const siteUrl = process.env.URL?.trim();
   if (siteUrl) {
     return `${siteUrl}/.netlify/functions/${endpoint}`;
+  }
+
+  const baseUrl = process.env.NEXT_PUBLIC_NEWSLETTER_URL?.trim();
+  if (baseUrl) {
+    return `${baseUrl.replace(/\/+$/, "")}/${endpoint}`;
   }
 
   return `http://localhost:8888/.netlify/functions/${endpoint}`;

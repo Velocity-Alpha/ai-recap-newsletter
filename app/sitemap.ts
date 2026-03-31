@@ -1,20 +1,20 @@
 import type { MetadataRoute } from "next";
 
 function getServerApiUrl(endpoint: string): string {
-    const baseUrl = process.env.NEXT_PUBLIC_NEWSLETTER_URL?.trim();
-    if (baseUrl) {
-        return `${baseUrl.replace(/\/+$/, "")}/${endpoint}`;
-    }
     const siteUrl = process.env.URL?.trim();
     if (siteUrl) {
         return `${siteUrl}/.netlify/functions/${endpoint}`;
+    }
+    const baseUrl = process.env.NEXT_PUBLIC_NEWSLETTER_URL?.trim();
+    if (baseUrl) {
+        return `${baseUrl.replace(/\/+$/, "")}/${endpoint}`;
     }
     return `http://localhost:8888/.netlify/functions/${endpoint}`;
 }
 
 interface NewsletterEntry {
     id: string;
-    slug: string;
+    slug?: string | null;
     published_at: string;
     issue_date?: string;
 }
@@ -64,7 +64,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
     const newsletterEntries: MetadataRoute.Sitemap = newsletters.map(
         (entry) => ({
-            url: `${siteUrl}/issue/${entry.slug}`,
+            url: entry.slug
+                ? `${siteUrl}/issue/${entry.slug}`
+                : `${siteUrl}/newsletter/${entry.id}`,
             lastModified: entry.issue_date ?? entry.published_at,
             changeFrequency: "never",
         })
