@@ -4,7 +4,7 @@ import Link from 'next/link';
 import NewsTicker from './NewsTicker';
 
 const SUBSCRIBER_COUNT_START = 2309;
-const SUBSCRIBER_COUNT_TARGET = 50000;
+const SUBSCRIBER_COUNT_TARGET = 10000;
 const SUBSCRIBER_COUNT_START_DATE = new Date(Date.UTC(2026, 2, 10));
 const SUBSCRIBER_COUNT_CURVE_HOURS = 365 * 24;
 const SUBSCRIBER_COUNT_ANIMATION_OFFSET = 80;
