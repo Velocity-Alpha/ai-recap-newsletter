@@ -1,4 +1,13 @@
 import { spawn } from "node:child_process";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+import dotenv from "dotenv";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({
+  path: path.join(__dirname, "..", ".env.local"),
+});
 
 const args = process.argv.slice(2);
 const productionDatabaseUrl = process.env.PRODUCTION_DATABASE_URL?.trim();

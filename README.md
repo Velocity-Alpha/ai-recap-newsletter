@@ -34,7 +34,11 @@ The app runs directly on Next.js in local development. No `netlify dev` proxy or
    ```bash
    npm run prisma:migrate:baseline
    ```
-5. Start the app:
+5. If your local runtime user needs grants repaired or initialized, apply the bootstrap once:
+   ```bash
+   npm run db:bootstrap
+   ```
+6. Start the app:
    ```bash
    npm run dev
    ```
@@ -50,7 +54,11 @@ The app runs directly on Next.js in local development. No `netlify dev` proxy or
    ```bash
    npm run prisma:migrate:dev -- --name describe_change
    ```
-4. Before pushing, run the full verification pass:
+4. If the migration introduces new tables or sequences and your local runtime user is separate from your admin user, reapply grants:
+   ```bash
+   npm run db:bootstrap
+   ```
+5. Before pushing, run the full verification pass:
    ```bash
    npm run verify
    ```
@@ -69,8 +77,12 @@ Core commands:
 - `npm run prisma:migrate:dev -- --name describe_change` creates and applies a new migration in development
 - `npm run prisma:migrate:status` shows migration status for the database in `DATABASE_URL`
 - `npm run prisma:migrate:deploy` applies committed migrations to the database in `DATABASE_URL`
+- `npm run db:bootstrap` reapplies the runtime grants in `prisma/bootstrap/001_grant_newsletter_web.sql` using `DATABASE_URL`
+- `npm run db:bootstrap:prod` reapplies the same runtime grants using `PRODUCTION_DATABASE_URL`
 
 This repo includes a baseline migration in `prisma/migrations/0_init`. Use the baseline command only once per existing database. New databases created through Prisma do not need that step.
+
+The privilege bootstrap is intentionally kept separate from Prisma schema migrations. Prisma handles schema changes; the bootstrap script handles runtime access for `newsletter_web` across current and future tables/sequences in the `newsletter` schema.
 
 ## Production deploy workflow
 
@@ -94,9 +106,24 @@ npm run prisma:migrate:prod:baseline
    ```bash
    npm run prisma:migrate:prod:deploy
    ```
+   This command now runs the Prisma migration deploy first, then reapplies the `newsletter_web` grants automatically.
 3. Deploy the application to Netlify after the production migration succeeds.
 
 If a deploy does not include schema changes, you can skip the Prisma migrate step and deploy the app normally.
+
+### One-time repair for an existing environment
+
+If a runtime role like `newsletter_web` is already missing privileges, run:
+
+```bash
+npm run db:bootstrap
+```
+
+or for production:
+
+```bash
+npm run db:bootstrap:prod
+```
 
 ## API routes
 
@@ -141,5 +168,6 @@ Required environment variables:
 Optional:
 
 - `PRODUCTION_DATABASE_URL` for running Prisma production migration commands from your local machine
+- `NEWSLETTER_RUNTIME_DB_ROLE` to override the runtime role name used by the bootstrap scripts. Defaults to `newsletter_web`.
 
 Google Analytics IDs remain configured per deploy context in `netlify.toml`.

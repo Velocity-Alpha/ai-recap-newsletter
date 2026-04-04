@@ -16,9 +16,11 @@
     "prisma:migrate:dev": "prisma migrate dev",
     "prisma:migrate:deploy": "prisma migrate deploy",
     "prisma:migrate:status": "prisma migrate status",
+    "db:bootstrap": "node scripts/run-db-bootstrap.mjs --url-env DATABASE_URL",
+    "db:bootstrap:prod": "node scripts/run-db-bootstrap.mjs --url-env PRODUCTION_DATABASE_URL",
     "prisma:migrate:prod:baseline": "node scripts/run-prisma-prod.mjs migrate resolve --applied 0_init",
     "prisma:migrate:prod:status": "node scripts/run-prisma-prod.mjs migrate status",
-    "prisma:migrate:prod:deploy": "node scripts/run-prisma-prod.mjs migrate deploy"
+    "prisma:migrate:prod:deploy": "node scripts/run-prisma-prod.mjs migrate deploy && npm run db:bootstrap:prod"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.6.0",
