@@ -1,19 +1,31 @@
-import { NextResponse } from "next/server";
-
 import { getCachedNewsletterIssueApiResponseBySlug } from "@/src/features/newsletter/server";
+import {
+  createRequestLogContext,
+  jsonWithRequestId,
+  logRequestError,
+  logRequestStart,
+  logRequestSuccess,
+  logRequestWarning,
+} from "@/src/server/observability";
 
 export const runtime = "nodejs";
 
 export async function GET(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ slug: string }> },
 ) {
+  const requestContext = createRequestLogContext("api.issues.by-slug", request);
+  logRequestStart(requestContext);
+
   try {
     const { slug } = await context.params;
     const normalizedSlug = slug.trim();
 
     if (!normalizedSlug) {
-      return NextResponse.json(
+      logRequestWarning(requestContext, "Missing slug parameter");
+
+      return jsonWithRequestId(
+        requestContext,
         {
           success: false,
           error: "Missing slug parameter",
@@ -26,7 +38,12 @@ export async function GET(
     const data = await getCachedNewsletterIssueApiResponseBySlug(normalizedSlug);
 
     if (!data) {
-      return NextResponse.json(
+      logRequestWarning(requestContext, "Issue not found by slug", {
+        slug: normalizedSlug,
+      });
+
+      return jsonWithRequestId(
+        requestContext,
         {
           success: false,
           error: "Record not found",
@@ -36,7 +53,13 @@ export async function GET(
       );
     }
 
-    return NextResponse.json(
+    logRequestSuccess(requestContext, {
+      slug: normalizedSlug,
+      issueId: data.id,
+    });
+
+    return jsonWithRequestId(
+      requestContext,
       {
         success: true,
         data,
@@ -49,7 +72,10 @@ export async function GET(
       },
     );
   } catch (error) {
-    return NextResponse.json(
+    logRequestError(requestContext, "Issue lookup by slug failed", error);
+
+    return jsonWithRequestId(
+      requestContext,
       {
         success: false,
         error: "Database error",

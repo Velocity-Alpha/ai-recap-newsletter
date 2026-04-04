@@ -1,6 +1,11 @@
-import { NextResponse } from "next/server";
-
 import { getCachedNewsletterListPage } from "@/src/features/newsletter/server";
+import {
+  createRequestLogContext,
+  jsonWithRequestId,
+  logRequestError,
+  logRequestStart,
+  logRequestSuccess,
+} from "@/src/server/observability";
 
 export const runtime = "nodejs";
 
@@ -15,13 +20,25 @@ function parseLimitParam(value: string | null) {
 }
 
 export async function GET(request: Request) {
+  const requestContext = createRequestLogContext("api.newsletters.list", request);
+  logRequestStart(requestContext);
+
   try {
     const { searchParams } = new URL(request.url);
     const page = parsePageParam(searchParams.get("page"));
     const limit = parseLimitParam(searchParams.get("limit"));
     const { data, pagination } = await getCachedNewsletterListPage(page, limit);
 
-    return NextResponse.json(
+    logRequestSuccess(requestContext, {
+      page,
+      limit,
+      resultCount: data.length,
+      totalCount: pagination.totalCount,
+      totalPages: pagination.totalPages,
+    });
+
+    return jsonWithRequestId(
+      requestContext,
       {
         success: true,
         data,
@@ -35,7 +52,10 @@ export async function GET(request: Request) {
       },
     );
   } catch (error) {
-    return NextResponse.json(
+    logRequestError(requestContext, "Newsletter list query failed", error);
+
+    return jsonWithRequestId(
+      requestContext,
       {
         success: false,
         error: "Database query failed",

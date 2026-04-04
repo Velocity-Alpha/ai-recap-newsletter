@@ -1,3 +1,5 @@
+import { logServerError, logServerInfo, maskEmail } from "@/src/server/observability";
+
 function getResendApiKey() {
   const apiKey = process.env.RESEND_API_KEY?.trim();
 
@@ -34,6 +36,11 @@ export async function sendSubscriberOtpEmail(input: { email: string; code: strin
   const logoUrl = `${getSiteUrl()}/logo/logo-padded.png`;
   const from = `${getResendFromName()} <${getResendFromEmail()}>`;
 
+  logServerInfo("subscriber.email.send.start", {
+    email: maskEmail(input.email),
+    from,
+  });
+
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
@@ -68,6 +75,22 @@ export async function sendSubscriberOtpEmail(input: { email: string; code: strin
   });
 
   if (!response.ok) {
-    throw new Error("Could not send OTP email.");
+    const responseBody = await response.text();
+
+    logServerError("subscriber.email.send.failure", new Error(`Resend responded with ${response.status}`), {
+      email: maskEmail(input.email),
+      status: response.status,
+      statusText: response.statusText,
+      body: responseBody,
+      from,
+    });
+
+    throw new Error(`Could not send OTP email (status ${response.status}).`);
   }
+
+  logServerInfo("subscriber.email.send.success", {
+    email: maskEmail(input.email),
+    from,
+    status: response.status,
+  });
 }

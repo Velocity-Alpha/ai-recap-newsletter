@@ -1,14 +1,28 @@
-import { NextResponse } from "next/server";
-
 import { getCachedTickerFeed } from "@/src/features/newsletter/server";
+import {
+  createRequestLogContext,
+  jsonWithRequestId,
+  logRequestError,
+  logRequestStart,
+  logRequestSuccess,
+} from "@/src/server/observability";
 
 export const runtime = "nodejs";
 
-export async function GET() {
+export async function GET(request: Request) {
+  const requestContext = createRequestLogContext("api.ticker", request);
+  logRequestStart(requestContext);
+
   try {
     const { data, stats, count } = await getCachedTickerFeed();
 
-    return NextResponse.json(
+    logRequestSuccess(requestContext, {
+      count,
+      stats,
+    });
+
+    return jsonWithRequestId(
+      requestContext,
       {
         success: true,
         data,
@@ -23,7 +37,10 @@ export async function GET() {
       },
     );
   } catch (error) {
-    return NextResponse.json(
+    logRequestError(requestContext, "Ticker query failed", error);
+
+    return jsonWithRequestId(
+      requestContext,
       {
         success: false,
         error: "Database query failed",

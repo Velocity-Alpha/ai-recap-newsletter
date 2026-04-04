@@ -20,7 +20,7 @@ describe("GET /api/ticker", () => {
       count: 1,
     });
 
-    const response = await GET();
+    const response = await GET(new Request("http://localhost/api/ticker"));
     const json = await response.json();
 
     expect(response.status).toBe(200);
@@ -32,7 +32,7 @@ describe("GET /api/ticker", () => {
   it("returns 500 when the ticker helper fails", async () => {
     serverFns.getCachedTickerFeed.mockRejectedValue(new Error("boom"));
 
-    const response = await GET();
+    const response = await GET(new Request("http://localhost/api/ticker"));
 
     expect(response.status).toBe(500);
   });

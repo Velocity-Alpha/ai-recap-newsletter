@@ -1,19 +1,33 @@
-import { NextResponse } from "next/server";
-
 import { getCachedNewsletterIssueApiResponseById } from "@/src/features/newsletter/server";
+import {
+  createRequestLogContext,
+  jsonWithRequestId,
+  logRequestError,
+  logRequestStart,
+  logRequestSuccess,
+  logRequestWarning,
+} from "@/src/server/observability";
 
 export const runtime = "nodejs";
 
 export async function GET(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
+  const requestContext = createRequestLogContext("api.newsletters.by-id", request);
+  logRequestStart(requestContext);
+
   try {
     const { id } = await context.params;
     const issueId = Number.parseInt(id, 10);
 
     if (!Number.isFinite(issueId) || issueId <= 0) {
-      return NextResponse.json(
+      logRequestWarning(requestContext, "Invalid issue ID", {
+        id,
+      });
+
+      return jsonWithRequestId(
+        requestContext,
         {
           success: false,
           error: "Invalid ID",
@@ -26,7 +40,12 @@ export async function GET(
     const data = await getCachedNewsletterIssueApiResponseById(issueId);
 
     if (!data) {
-      return NextResponse.json(
+      logRequestWarning(requestContext, "Issue not found by ID", {
+        issueId,
+      });
+
+      return jsonWithRequestId(
+        requestContext,
         {
           success: false,
           error: "Record not found",
@@ -36,7 +55,13 @@ export async function GET(
       );
     }
 
-    return NextResponse.json(
+    logRequestSuccess(requestContext, {
+      issueId,
+      slug: data.slug,
+    });
+
+    return jsonWithRequestId(
+      requestContext,
       {
         success: true,
         data,
@@ -49,7 +74,10 @@ export async function GET(
       },
     );
   } catch (error) {
-    return NextResponse.json(
+    logRequestError(requestContext, "Issue lookup by ID failed", error);
+
+    return jsonWithRequestId(
+      requestContext,
       {
         success: false,
         error: "Database error",
