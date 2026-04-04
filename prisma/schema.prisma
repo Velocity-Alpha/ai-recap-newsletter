@@ -1,0 +1,92 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  schemas  = ["newsletter", "public"]
+}
+
+model AuthCode {
+  id                BigInt    @id @default(autoincrement())
+  email             String
+  codeHash          String    @map("code_hash")
+  purpose           String    @default("sign_in")
+  expiresAt         DateTime  @map("expires_at") @db.Timestamptz(6)
+  consumedAt        DateTime? @map("consumed_at") @db.Timestamptz(6)
+  requestIp         String?   @map("request_ip")
+  requestUserAgent  String?   @map("request_user_agent")
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([email, expiresAt(sort: Desc)], map: "auth_codes_email_expires_idx")
+  @@map("auth_codes")
+  @@schema("newsletter")
+}
+
+model Issue {
+  id                  BigInt    @id @default(autoincrement())
+  title               String
+  publishedAt         DateTime? @map("published_at") @db.Timestamptz(6)
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  html                String?
+  featureImageUrl     String?   @map("feature_image_url")
+  excerpt             String?
+  contentJson         Json?     @map("content_json")
+  issueDate           DateTime? @map("issue_date") @db.Date
+  promptFeaturedImage String?   @map("prompt_featured_image")
+  slug                String?   @unique @default(dbgenerated("COALESCE(newsletter.slugify_issue_title(title), (id)::text)"))
+
+  @@unique([title, publishedAt], map: "issues_title_published_unique")
+  @@index([createdAt(sort: Desc)])
+  @@index([publishedAt(sort: Desc)])
+  @@map("issues")
+  @@schema("newsletter")
+}
+
+model ScraperBookmark {
+  source      String   @id
+  lastSuccess DateTime @map("last_success") @db.Timestamptz(6)
+
+  @@map("scraper_bookmarks")
+  @@schema("newsletter")
+}
+
+model Story {
+  id                       Int       @id @default(autoincrement())
+  guid                     String?   @unique
+  day                      DateTime? @db.Date
+  headline                 String?
+  url                      String?
+  summary                  String?
+  category                 String?
+  source                   String?
+  createdAt                DateTime? @default(now()) @db.Timestamptz(6)
+  updatedAt                DateTime? @default(now()) @db.Timestamptz(6)
+  storyDetails             String?   @map("story_details")
+  importanceScore          Int?      @map("importance_score") @db.SmallInt
+  usedInPublicationDate    DateTime? @map("used_in_publication_date") @db.Date
+  queuedForPublicationDate DateTime? @map("queued_for_publication_date") @db.Date
+  excludeFromCandidates    Boolean?  @default(false) @map("exclude_from_candidates")
+
+  @@index([queuedForPublicationDate], map: "queued_for_publication_date_idx")
+  @@map("stories")
+  @@schema("newsletter")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model Subscriber {
+  id           BigInt    @id @default(autoincrement())
+  email        String    @unique
+  status       String    @default("active")
+  source       String    @default("article_gate")
+  subscribedAt DateTime  @default(now()) @map("subscribed_at") @db.Timestamptz(6)
+  lastSeenAt   DateTime? @map("last_seen_at") @db.Timestamptz(6)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+  firstName    String?   @map("first_name")
+
+  @@index([status])
+  @@map("subscribers")
+  @@schema("newsletter")
+}

@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import type { ResponseCookies } from "next/dist/compiled/@edge-runtime/cookies";
 
 import type { SubscriberRecord, SubscriberSessionPayload } from "@/src/features/subscriber/types";
-import { getPool } from "@/src/server/db";
+import { prisma } from "@/src/server/prisma";
 
 const COOKIE_NAME = "ai_recap_subscriber";
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
@@ -12,6 +12,18 @@ const OTP_TTL_MINUTES = 10;
 
 type CookieReader = {
   get(name: string): { value: string } | undefined;
+};
+
+type SubscriberRow = {
+  id: bigint;
+  email: string;
+  firstName: string | null;
+  status: string;
+  source: string;
+  subscribedAt: Date;
+  lastSeenAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
 };
 
 function getSessionSecret() {
@@ -50,6 +62,20 @@ function deserializeSessionPayload(value: string) {
   } catch {
     return null;
   }
+}
+
+function mapSubscriberRecord(record: SubscriberRow): SubscriberRecord {
+  return {
+    id: Number(record.id),
+    email: record.email,
+    firstName: record.firstName,
+    status: record.status as SubscriberRecord["status"],
+    source: record.source,
+    subscribedAt: record.subscribedAt.toISOString(),
+    lastSeenAt: record.lastSeenAt?.toISOString() ?? null,
+    createdAt: record.createdAt.toISOString(),
+    updatedAt: record.updatedAt.toISOString(),
+  };
 }
 
 export function createSubscriberSessionToken(payload: SubscriberSessionPayload) {
@@ -141,49 +167,20 @@ export async function getSubscriberSessionFromCookies(
   return verifySubscriberSessionToken(token);
 }
 
-function mapSubscriberRow(row: Record<string, unknown>): SubscriberRecord {
-  return {
-    id: Number(row.id),
-    email: String(row.email),
-    firstName: row.first_name ? String(row.first_name) : null,
-    status: String(row.status) as SubscriberRecord["status"],
-    source: String(row.source),
-    subscribedAt: String(row.subscribed_at),
-    lastSeenAt: row.last_seen_at ? String(row.last_seen_at) : null,
-    createdAt: String(row.created_at),
-    updatedAt: String(row.updated_at),
-  };
-}
-
 export async function findSubscriberByEmail(email: string) {
-  const normalizedEmail = normalizeSubscriberEmail(email);
-  const result = await getPool().query(
-    `SELECT id, email, first_name, status, source, subscribed_at, last_seen_at, created_at, updated_at
-     FROM newsletter.subscribers
-     WHERE email = $1`,
-    [normalizedEmail],
-  );
+  const record = await prisma.subscriber.findUnique({
+    where: { email: normalizeSubscriberEmail(email) },
+  });
 
-  if (result.rows.length === 0) {
-    return null;
-  }
-
-  return mapSubscriberRow(result.rows[0]);
+  return record ? mapSubscriberRecord(record) : null;
 }
 
 export async function findSubscriberById(id: number) {
-  const result = await getPool().query(
-    `SELECT id, email, first_name, status, source, subscribed_at, last_seen_at, created_at, updated_at
-     FROM newsletter.subscribers
-     WHERE id = $1`,
-    [id],
-  );
+  const record = await prisma.subscriber.findUnique({
+    where: { id: BigInt(id) },
+  });
 
-  if (result.rows.length === 0) {
-    return null;
-  }
-
-  return mapSubscriberRow(result.rows[0]);
+  return record ? mapSubscriberRecord(record) : null;
 }
 
 export async function findSubscriberByIdSafely(id: number) {
@@ -202,61 +199,72 @@ export async function upsertSubscriber(input: {
 }) {
   const normalizedEmail = normalizeSubscriberEmail(input.email);
   const normalizedFirstName = input.firstName?.trim() || null;
-  const result = await getPool().query(
-    `INSERT INTO newsletter.subscribers (
-       email,
-       first_name,
-       status,
-       source,
-       subscribed_at,
-       last_seen_at
-     )
-     VALUES ($1, $2, $3, $4, now(), now())
-     ON CONFLICT (email)
-     DO UPDATE SET
-       status = EXCLUDED.status,
-       first_name = COALESCE(EXCLUDED.first_name, newsletter.subscribers.first_name),
-       source = COALESCE(newsletter.subscribers.source, EXCLUDED.source),
-       subscribed_at = CASE
-         WHEN newsletter.subscribers.status = 'active' THEN newsletter.subscribers.subscribed_at
-         ELSE now()
-       END,
-       last_seen_at = now()
-     RETURNING id, email, first_name, status, source, subscribed_at, last_seen_at, created_at, updated_at`,
-    [normalizedEmail, normalizedFirstName, input.status ?? "active", input.source],
-  );
+  const nextStatus = input.status ?? "active";
+  const now = new Date();
 
-  return mapSubscriberRow(result.rows[0]);
+  const record = await prisma.$transaction(async (tx) => {
+    const existing = await tx.subscriber.findUnique({
+      where: { email: normalizedEmail },
+    });
+
+    if (!existing) {
+      return tx.subscriber.create({
+        data: {
+          email: normalizedEmail,
+          firstName: normalizedFirstName,
+          status: nextStatus,
+          source: input.source,
+          subscribedAt: now,
+          lastSeenAt: now,
+        },
+      });
+    }
+
+    return tx.subscriber.update({
+      where: { email: normalizedEmail },
+      data: {
+        status: nextStatus,
+        firstName: normalizedFirstName ?? existing.firstName,
+        source: existing.source,
+        subscribedAt: existing.status === "active" ? existing.subscribedAt : now,
+        lastSeenAt: now,
+      },
+    });
+  });
+
+  return mapSubscriberRecord(record);
 }
 
 export async function touchSubscriberSeenAt(id: number) {
-  await getPool().query(
-    `UPDATE newsletter.subscribers
-     SET last_seen_at = now()
-     WHERE id = $1`,
-    [id],
-  );
+  await prisma.subscriber.update({
+    where: { id: BigInt(id) },
+    data: {
+      lastSeenAt: new Date(),
+    },
+  });
 }
 
 export async function markSubscriberUnsubscribed(input: {
   email: string;
 }) {
   const normalizedEmail = normalizeSubscriberEmail(input.email);
+  const existing = await prisma.subscriber.findUnique({
+    where: { email: normalizedEmail },
+  });
 
-  const result = await getPool().query(
-    `UPDATE newsletter.subscribers
-     SET status = 'unsubscribed',
-         last_seen_at = now()
-     WHERE email = $1
-     RETURNING id, email, first_name, status, source, subscribed_at, last_seen_at, created_at, updated_at`,
-    [normalizedEmail],
-  );
-
-  if (result.rows.length === 0) {
+  if (!existing) {
     return null;
   }
 
-  return mapSubscriberRow(result.rows[0]);
+  const record = await prisma.subscriber.update({
+    where: { email: normalizedEmail },
+    data: {
+      status: "unsubscribed",
+      lastSeenAt: new Date(),
+    },
+  });
+
+  return mapSubscriberRecord(record);
 }
 
 export function createOneTimeCode() {
@@ -284,71 +292,88 @@ export async function storeOneTimeCode(input: {
   const normalizedEmail = normalizeSubscriberEmail(input.email);
   const codeHash = hashOneTimeCode(normalizedEmail, input.code);
 
-  await getPool().query(
-    `UPDATE newsletter.auth_codes
-     SET consumed_at = now()
-     WHERE email = $1
-       AND purpose = 'sign_in'
-       AND consumed_at IS NULL`,
-    [normalizedEmail],
-  );
-
-  await getPool().query(
-    `INSERT INTO newsletter.auth_codes (
-       email,
-       code_hash,
-       purpose,
-       expires_at,
-       request_ip,
-       request_user_agent
-     )
-     VALUES ($1, $2, 'sign_in', $3, $4, $5)`,
-    [normalizedEmail, codeHash, getOtpExpiryDate(), input.requestIp ?? null, input.requestUserAgent ?? null],
-  );
+  await prisma.$transaction([
+    prisma.authCode.updateMany({
+      where: {
+        email: normalizedEmail,
+        purpose: "sign_in",
+        consumedAt: null,
+      },
+      data: {
+        consumedAt: new Date(),
+      },
+    }),
+    prisma.authCode.create({
+      data: {
+        email: normalizedEmail,
+        codeHash,
+        purpose: "sign_in",
+        expiresAt: getOtpExpiryDate(),
+        requestIp: input.requestIp ?? null,
+        requestUserAgent: input.requestUserAgent ?? null,
+      },
+    }),
+  ]);
 }
 
 export async function consumeOneTimeCode(email: string, code: string) {
   const normalizedEmail = normalizeSubscriberEmail(email);
   const codeHash = hashOneTimeCode(normalizedEmail, code);
 
-  const result = await getPool().query(
-    `UPDATE newsletter.auth_codes
-     SET consumed_at = now()
-     WHERE id = (
-       SELECT id
-       FROM newsletter.auth_codes
-       WHERE email = $1
-         AND code_hash = $2
-         AND purpose = 'sign_in'
-         AND consumed_at IS NULL
-         AND expires_at > now()
-       ORDER BY created_at DESC
-       LIMIT 1
-     )
-     RETURNING id`,
-    [normalizedEmail, codeHash],
-  );
+  return prisma.$transaction(async (tx) => {
+    const authCode = await tx.authCode.findFirst({
+      where: {
+        email: normalizedEmail,
+        codeHash,
+        purpose: "sign_in",
+        consumedAt: null,
+        expiresAt: {
+          gt: new Date(),
+        },
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
 
-  return result.rows.length > 0;
+    if (!authCode) {
+      return false;
+    }
+
+    const result = await tx.authCode.updateMany({
+      where: {
+        id: authCode.id,
+        consumedAt: null,
+      },
+      data: {
+        consumedAt: new Date(),
+      },
+    });
+
+    return result.count > 0;
+  });
 }
 
 export async function deleteOneTimeCode(email: string, code: string) {
   const normalizedEmail = normalizeSubscriberEmail(email);
   const codeHash = hashOneTimeCode(normalizedEmail, code);
 
-  await getPool().query(
-    `DELETE FROM newsletter.auth_codes
-     WHERE email = $1
-       AND code_hash = $2
-       AND purpose = 'sign_in'
-       AND consumed_at IS NULL`,
-    [normalizedEmail, codeHash],
-  );
+  await prisma.authCode.deleteMany({
+    where: {
+      email: normalizedEmail,
+      codeHash,
+      purpose: "sign_in",
+      consumedAt: null,
+    },
+  });
 }
 
 export async function cleanupExpiredOneTimeCodes() {
-  await getPool().query(
-    `DELETE FROM newsletter.auth_codes
-     WHERE created_at < now() - interval '7 days'`,
-  );
+  await prisma.authCode.deleteMany({
+    where: {
+      createdAt: {
+        lt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+      },
+    },
+  });
 }

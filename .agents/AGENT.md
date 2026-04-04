@@ -24,8 +24,6 @@ When performing tasks, reference the specialized guidelines in `.agents/skills/`
 
 ### [Neon Postgres Skill](skills/neon-postgres/SKILL.md)
 **Use when**:
-- Working with database schemas or migrations in `infrastructure/db`.
-- Implementing data fetching logic using `@neondatabase/serverless`.
 - Automating database workflows via the Neon CLI.
 - Managing Neon project resources or branching strategies.
 
