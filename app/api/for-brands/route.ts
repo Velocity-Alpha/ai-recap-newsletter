@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server'
 
-const FOR_BRANDS_WEBHOOK_URL =
+const DEFAULT_FOR_BRANDS_WEBHOOK_URL =
   'https://services.leadconnectorhq.com/hooks/fDAdpJZcGhmldVYsosCp/webhook-trigger/010cd443-f883-4f43-a3e9-96af35e039de'
+
+function getForBrandsWebhookUrl() {
+  return process.env.FOR_BRANDS_WEBHOOK_URL?.trim() || DEFAULT_FOR_BRANDS_WEBHOOK_URL
+}
 
 type LeadPayload = {
   name?: string
@@ -120,7 +124,7 @@ export async function POST(request: Request) {
     submittedAt: new Date().toISOString(),
   }
 
-  const response = await fetch(FOR_BRANDS_WEBHOOK_URL, {
+  const response = await fetch(getForBrandsWebhookUrl(), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

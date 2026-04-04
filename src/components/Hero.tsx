@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import NewsTicker from './NewsTicker';
+import type { TickerStats, TickerStory } from '@/src/features/newsletter/repository';
 
 const SUBSCRIBER_COUNT_START = 2309;
 const SUBSCRIBER_COUNT_TARGET = 10000;
@@ -34,7 +35,12 @@ function getSubscriberCountForTime(now: Date) {
   return Math.round(SUBSCRIBER_COUNT_TARGET + extraHours * averageHourlyGrowth);
 }
 
-export default function Hero() {
+interface HeroProps {
+  initialTickerStories: TickerStory[];
+  initialTickerStats: TickerStats | null;
+}
+
+export default function Hero({ initialTickerStories, initialTickerStats }: HeroProps) {
   const [subscriberCount, setSubscriberCount] = useState<number | null>(null);
   const [statsReady, setStatsReady] = useState(false);
 
@@ -144,7 +150,10 @@ export default function Hero() {
           </div>
 
           {/* Right column - Ticker Showcase */}
-          <NewsTicker />
+          <NewsTicker
+            initialStories={initialTickerStories}
+            initialTickerStats={initialTickerStats}
+          />
         </div>
       </div>
     </section>

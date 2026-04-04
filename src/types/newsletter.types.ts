@@ -5,7 +5,7 @@ export interface Newsletter {
   excerpt: string;
   issue_date?: string | null;
   published_at: string;
-  feature_image_url: string;
+  feature_image_url?: string | null;
 }
 
 export type {

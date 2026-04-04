@@ -23,7 +23,7 @@ export default function PrivacyPage() {
             <section>
               <h2 className="text-2xl font-serif font-bold text-[var(--text-primary)] mb-4">1. About This Policy</h2>
               <p>
-                AI Recap ("we", "our", or "us"), operated by Velocity Alpha, respects your privacy and is committed to protecting it. This Privacy Policy describes how we collect, use, and share your information when you use our website and subscribe to our newsletter (collectively, the "Services").
+                AI Recap (&quot;we&quot;, &quot;our&quot;, or &quot;us&quot;), operated by Velocity Alpha, respects your privacy and is committed to protecting it. This Privacy Policy describes how we collect, use, and share your information when you use our website and subscribe to our newsletter (collectively, the &quot;Services&quot;).
               </p>
               <p className="mt-4">
                 Although we are based in Canada, this policy is designed to comply with global privacy standards, including the GDPR (Europe), CCPA (California), and PIPEDA (Canada).
@@ -57,7 +57,7 @@ export default function PrivacyPage() {
             <section>
               <h2 className="text-2xl font-serif font-bold text-[var(--text-primary)] mb-4">4. Sharing Your Information</h2>
               <p>
-                We don't sell your personal data. We only share it with trusted service providers who help us run AI Recap, such as:
+                We don&apos;t sell your personal data. We only share it with trusted service providers who help us run AI Recap, such as:
               </p>
               <ul className="list-disc pl-6 space-y-2 mt-2">
                 <li><strong>Netlify:</strong> For website hosting and analytics.</li>
@@ -75,7 +75,7 @@ export default function PrivacyPage() {
               <ul className="list-disc pl-6 space-y-2 mt-2">
                 <li><strong>Access & Correction:</strong> You can ask for a copy of the data we have about you or ask us to fix inaccuracies.</li>
                 <li><strong>Deletion:</strong> You can ask us to delete your information (subject to certain legal exceptions).</li>
-                <li><strong>Opt-out:</strong> You can unsubscribe from our newsletter at any time by clicking the "unsubscribe" link at the bottom of any email.</li>
+                <li><strong>Opt-out:</strong> You can unsubscribe from our newsletter at any time by clicking the &quot;unsubscribe&quot; link at the bottom of any email.</li>
               </ul>
               <p className="mt-4">
                 To exercise these rights, please contact us at <a href="mailto:borna@velocityalpha.com" className="text-[var(--accent-primary)] hover:underline">borna@velocityalpha.com</a>.

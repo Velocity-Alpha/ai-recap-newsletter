@@ -3,8 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "next:dev": "next dev -p ${PORT:-3000}",
-    "dev": "netlify dev --no-open --target-port ${PORT:-3000} --port ${NETLIFY_DEV_PORT:-8888}",
+    "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
@@ -14,7 +13,6 @@
     "@radix-ui/react-slot": "^1.2.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "dotenv": "^17.2.3",
     "framer-motion": "^12.35.2",
     "lucide-react": "^0.522.0",
     "next": "^16.1.6",

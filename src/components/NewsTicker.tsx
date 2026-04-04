@@ -1,16 +1,11 @@
 'use client'
-import { useEffect, useRef, useState } from 'react';
-import { getApiUrl } from '@/utils/apiConfig';
+import type { TickerStats, TickerStory } from '@/src/features/newsletter/repository';
 
-interface TickerStory {
-  headline: string;
-  day?: string;
-  category?: string;
-  createdAt?: string;
+interface DisplayTickerStory extends TickerStory {
   relativeTimeLabel?: string;
 }
 
-const FALLBACK_STORIES: TickerStory[] = [
+const FALLBACK_STORIES: DisplayTickerStory[] = [
   { headline: "New breakthrough in transformer architecture promises 10x efficiency", category: "Product", relativeTimeLabel: "15m ago" },
   { headline: "Global summit on AI safety concludes with new framework agreement", category: "Policy", relativeTimeLabel: "45m ago" },
   { headline: "Major tech firms increase investment in green AI infrastructure", category: "Funding", relativeTimeLabel: "2h ago" },
@@ -23,84 +18,16 @@ const FALLBACK_STORIES: TickerStory[] = [
   { headline: "New study explores long-term impact of AI on the global labor market", category: "Policy", relativeTimeLabel: "3d ago" }
 ];
 
-const ITEM_HEIGHT_PX = 80;
-const VIEWPORT_HEIGHT_PX = 240;
 const SECONDS_PER_ITEM = 5;
 
-export default function NewsTicker() {
-  const [stories, setStories] = useState<TickerStory[]>(FALLBACK_STORIES);
-  const [animationOffsetSeconds, setAnimationOffsetSeconds] = useState(0);
-  const [tickerStats, setTickerStats] = useState<{
-    stories: number;
-    tools: number;
-    papers: number;
-  } | null>(null);
-  const mountTimeRef = useRef<number | null>(null);
+interface NewsTickerProps {
+  initialStories: TickerStory[];
+  initialTickerStats: TickerStats | null;
+}
 
-  useEffect(() => {
-    mountTimeRef.current = performance.now();
-
-    const getCurrentOffset = (storyCount: number) => {
-      if (storyCount <= 0 || !mountTimeRef.current) return 0;
-      const elapsedSeconds = Math.max((performance.now() - mountTimeRef.current) / 1000, 0);
-      const pixelsPerSecond = ITEM_HEIGHT_PX / SECONDS_PER_ITEM;
-      return (elapsedSeconds * pixelsPerSecond) % (storyCount * ITEM_HEIGHT_PX);
-    };
-
-    // Fetch ticker news and stats
-    const fetchNews = async () => {
-      try {
-        const response = await fetch(getApiUrl('fetch-ticker-news'));
-
-        if (!response.ok) {
-          return;
-        }
-
-        const contentType = response.headers.get('content-type') || '';
-        if (!contentType.includes('application/json')) {
-          return;
-        }
-
-        const result = await response.json();
-        if (result.success) {
-          if (result.data && result.data.length > 0) {
-            const liveStories = result.data as TickerStory[];
-            const currentOffset = getCurrentOffset(FALLBACK_STORIES.length);
-            const pixelsPerSecond = ITEM_HEIGHT_PX / SECONDS_PER_ITEM;
-
-            // Find which fallback items are currently visible in the viewport
-            const partialOffset = currentOffset % ITEM_HEIGHT_PX;
-            const firstVisibleIndex = Math.floor(currentOffset / ITEM_HEIGHT_PX) % FALLBACK_STORIES.length;
-            // Only preserve the fully-visible items (3 items fill the 240px viewport).
-            // The partial bottom slot is allowed to switch to live content immediately —
-            // that's the "4th story" the user never fully sees before it scrolls in.
-            const NUM_VISIBLE = Math.ceil(VIEWPORT_HEIGHT_PX / ITEM_HEIGHT_PX); // = 3
-
-            // Preserve visible fallback items at the head of the new list so there's
-            // no flash — live stories follow immediately after and take over from there
-            const visibleItems: TickerStory[] = Array.from({ length: NUM_VISIBLE }, (_, i) =>
-              FALLBACK_STORIES[(firstVisibleIndex + i) % FALLBACK_STORIES.length]
-            );
-            const transitionList = [...visibleItems, ...liveStories];
-
-            setAnimationOffsetSeconds(partialOffset / pixelsPerSecond);
-            setStories(transitionList);
-          }
-
-          if (result.stats) {
-            setTickerStats(result.stats);
-          }
-        }
-      } catch (error) {
-        if (process.env.NODE_ENV === 'development') {
-          const message = error instanceof Error ? error.message : 'Unknown fetch error';
-          console.warn(`Ticker feed unavailable, using fallback stories: ${message}`);
-        }
-      }
-    };
-
-    fetchNews();
-  }, []);
+export default function NewsTicker({ initialStories, initialTickerStats }: NewsTickerProps) {
+  const stories = initialStories.length > 0 ? initialStories : FALLBACK_STORIES;
+  const tickerStats = initialTickerStats;
 
   const getTimeAgo = (dateStr?: string) => {
     if (!dateStr) return 'Just now';
@@ -117,8 +44,10 @@ export default function NewsTicker() {
     return `${diffInDays}d ago`;
   };
 
-  const getStoryTimeLabel = (story: TickerStory) => {
-    if (story.relativeTimeLabel) return story.relativeTimeLabel;
+  const getStoryTimeLabel = (story: DisplayTickerStory | TickerStory) => {
+    if ("relativeTimeLabel" in story && story.relativeTimeLabel) {
+      return story.relativeTimeLabel;
+    }
     return getTimeAgo(story.createdAt || story.day);
   };
 
@@ -136,7 +65,6 @@ export default function NewsTicker() {
 
     return {
       animation: `tickerLoop ${stories.length * SECONDS_PER_ITEM}s linear infinite`,
-      animationDelay: `-${animationOffsetSeconds}s`,
     };
   };
 

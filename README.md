@@ -1,145 +1,76 @@
-# AI Intelligence Newsletter - Standalone Website
+# AI Recap Newsletter
 
-A beautiful, light-mode newsletter website with paint-style colors that complement Gemini image generation. This is a standalone Next.js application for displaying AI intelligence newsletters.
+AI Recap is a Next.js 16 App Router application for publishing and gating newsletter issues, browsing the archive, and collecting newsletter and for-brands leads.
 
-## Features
+## Stack
 
-- 🎨 **Light Mode Design**: Beautiful paint-style color palette with soft pastels and warm tones
-- 📰 **Newsletter Listing**: Browse recent newsletters with pagination
-- 📖 **Detailed Newsletter View**: Read full newsletter content with organized sections
-- 📧 **Newsletter Subscription**: Integrated subscription form
-- 🚀 **Netlify Integration**: Serverless functions for data fetching
-- 📱 **Responsive Design**: Works beautifully on all devices
+- Next.js 16
+- TypeScript
+- Tailwind CSS 4
+- PostgreSQL via `pg`
+- Netlify hosting for the Next.js app
 
-## Tech Stack
+## Local development
 
-- **Next.js 16** - React framework
-- **TypeScript** - Type safety
-- **Tailwind CSS 4** - Styling with custom paint-style theme
-- **Netlify Functions** - Serverless backend
-- **PostgreSQL** - Database (via Neon or similar)
-
-## Getting Started
-
-### Prerequisites
-
-- Node.js 18+ 
-- npm or yarn
-- PostgreSQL database (Neon, Supabase, etc.)
-
-### Installation
-
-1. **Clone and navigate to the project**:
-   ```bash
-   cd va_newsletter
-   ```
-
-2. **Install dependencies**:
+1. Install dependencies:
    ```bash
    npm install
    ```
-
-3. **Set up environment variables**:
-   - Copy the example environment files and update with your values:
-     ```bash
-     cp .env.local.example .env.local
-     cp netlify/.env.example netlify/.env
-     ```
-   - Leave `NEXT_PUBLIC_GA_MEASUREMENT_ID` unset in `.env.local` unless you explicitly want to test analytics against a non-production property.
-   - Optional: set `NEXT_PUBLIC_NEWSLETTER_URL` in `.env.local` only if you want to override the default API origin.
-   - Update `netlify/.env` with your database connection string:
-     ```env
-     DATABASE_URL=your_database_connection_string
-     ```
-
-4. **Run everything with one command** (Next.js + Netlify proxy + functions):
+2. Copy the env template:
+   ```bash
+   cp .env.local.example .env.local
+   ```
+3. Fill in the required values in `.env.local`:
+   - `DATABASE_URL`
+   - `SESSION_SECRET`
+   - `RESEND_API_KEY`
+   - `RESEND_FROM_EMAIL`
+   - `GHL_SUBSCRIBE_WEBHOOK_URL`
+4. Start the app:
    ```bash
    npm run dev
    ```
-   - Netlify proxy: `http://localhost:8888`
-   - Next.js target app: `http://localhost:3000`
-   - Browser auto-open is disabled by default
 
-5. **Optional custom frontend port**:
-   ```bash
-   PORT=3001 npm run dev
-   ```
+The app runs directly on Next.js in local development. No `netlify dev` proxy or custom function harness is required.
 
-## Project Structure
+## API routes
 
-```
-va_newsletter/
-├── app/                    # Next.js app directory
-│   ├── page.tsx           # Home page (newsletter listing)
-│   ├── newsletter/
-│   │   └── [id]/
-│   │       └── page.tsx   # Individual newsletter page
-│   ├── layout.tsx         # Root layout
-│   └── globals.css        # Global styles with paint theme
-├── src/
-│   ├── components/        # React components
-│   │   ├── Header.tsx
-│   │   ├── NewsletterCard.tsx
-│   │   ├── RecentNewsletters.tsx
-│   │   ├── SubscribeNewsletter.tsx
-│   │   └── Pagination.tsx
-│   ├── types/            # TypeScript types
-│   │   └── newsletter.types.ts
-│   └── utils/            # Utility functions
-│       └── dateFormatter.ts
-├── netlify/
-│   ├── functions/        # Netlify serverless functions
-│   │   ├── fetch-newsletter-by-id.js
-│   │   ├── fetch-newsletters-list.js
-│   │   └── fetch-ticker-news.js
-│   └── package.json
-└── netlify.toml          # Netlify configuration
-```
+Read routes:
 
-## Color Palette
+- `GET /api/newsletters?page=&limit=`
+- `GET /api/newsletters/[id]`
+- `GET /api/issues/[slug]`
+- `GET /api/ticker`
 
-The website uses a paint-style color scheme with:
-- **Primary**: Rich purple (#7C3AED)
-- **Accent**: Soft pink (#EC4899)
-- **Backgrounds**: Warm whites and soft pastels
-- **Gradients**: Lavender, peach, mint, sky blue, coral, amber, rose
+Mutation routes:
 
-## Deployment
+- `POST /api/for-brands`
+- `POST /api/subscriber/subscribe`
+- `POST /api/subscriber/request-code`
+- `POST /api/subscriber/verify-code`
+- `POST /api/subscriber/sign-out`
+- `POST /api/subscriber/unsubscribe`
 
-### Deploy to Netlify
+## Architecture
 
-1. **Connect your repository** to Netlify
-2. **Set build settings**:
-   - Build command: `npm run build`
-   - Publish directory: `.next`
-3. **Add environment variables** in Netlify dashboard:
-   - `DATABASE_URL`: Your PostgreSQL connection string
-   - Google Analytics is configured in `netlify.toml` by deploy context:
-     - `production` -> `G-1ZK1RC1RE1`
-     - `staging` -> `G-8GQC9DS1S7`
-4. **Deploy!**
+- Server-rendered pages read newsletter data through shared server helpers in `src/features/newsletter/server.ts`.
+- Database access is centralized in `src/server/db.ts`.
+- Raw newsletter SQL lives in `src/features/newsletter/repository.ts`.
+- Route handlers under `app/api` provide the public JSON interface.
 
-The Netlify functions will automatically be deployed with your site.
+## Deploying to Netlify
 
-## API Endpoints
+This repository stays on Netlify, but it no longer uses hand-written Netlify Functions. Netlify deploys the Next.js app and its App Router route handlers directly.
 
-The Netlify functions provide the following endpoints:
+Required environment variables:
 
-- `/.netlify/functions/fetch-newsletter-by-id?id={id}` - Get newsletter by ID
-- `/.netlify/functions/fetch-newsletters-list` - Get newsletter overview for listings
-- `/.netlify/functions/fetch-ticker-news` - Get ticker news
+- `DATABASE_URL`
+- `SESSION_SECRET`
+- `RESEND_API_KEY`
+- `RESEND_FROM_NAME`
+- `RESEND_FROM_EMAIL`
+- `GHL_SUBSCRIBE_WEBHOOK_URL`
+- `FOR_BRANDS_WEBHOOK_URL` if you want to override the default for-brands destination
+- `NEXT_PUBLIC_SITE_URL`
 
-## Database Schema
-
-The application expects a PostgreSQL database with a `newsletter.issues` table containing:
-- `id` (integer)
-- `title` (text)
-- `excerpt` (text)
-- `content_json` (jsonb)
-- `feature_image_url` (text)
-- `published_at` (timestamp)
-- `created_at` (timestamp)
-
-## License
-
-Private project
+Google Analytics IDs remain configured per deploy context in `netlify.toml`.

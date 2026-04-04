@@ -5,7 +5,7 @@ import ArticleAccessGate from "@/src/components/ArticleAccessGate";
 import SubscriptionSuccessToast from "@/src/components/SubscriptionSuccessToast";
 import { NewsletterIssueV1 } from "@/src/features/newsletter/render/NewsletterIssueV1";
 import { NewsletterIssueV2 } from "@/src/features/newsletter/render/NewsletterIssueV2";
-import { findSubscriberById, getSubscriberSessionFromCookies } from "@/src/features/subscriber/server";
+import { findSubscriberByIdSafely, getSubscriberSessionFromCookies } from "@/src/features/subscriber/server";
 import type { ParsedNewsletterIssue } from "@/src/features/newsletter/types";
 
 function NewsletterNotFound() {
@@ -20,7 +20,7 @@ export default async function NewsletterContent({ issue }: { issue: ParsedNewsle
   const session = await getSubscriberSessionFromCookies();
   const subscriber =
     session && issue
-      ? await findSubscriberById(session.subscriberId)
+      ? await findSubscriberByIdSafely(session.subscriberId)
       : null;
   const hasSubscriberAccess =
     Boolean(subscriber) &&

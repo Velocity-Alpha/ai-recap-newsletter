@@ -8,8 +8,10 @@ import {
 } from "@/src/features/subscriber/service";
 
 const serverFns = vi.hoisted(() => ({
+  cleanupExpiredOneTimeCodes: vi.fn(),
   consumeOneTimeCode: vi.fn(),
   createOneTimeCode: vi.fn(),
+  deleteOneTimeCode: vi.fn(),
   findSubscriberByEmail: vi.fn(),
   isValidSubscriberEmail: vi.fn(),
   markSubscriberUnsubscribed: vi.fn(),

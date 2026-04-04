@@ -1,43 +1,18 @@
 import crypto from "crypto";
 import { cookies } from "next/headers";
 import type { ResponseCookies } from "next/dist/compiled/@edge-runtime/cookies";
-import { Pool } from "pg";
 
 import type { SubscriberRecord, SubscriberSessionPayload } from "@/src/features/subscriber/types";
+import { getPool } from "@/src/server/db";
 
 const COOKIE_NAME = "ai_recap_subscriber";
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
 const OTP_LENGTH = 6;
 const OTP_TTL_MINUTES = 10;
 
-let pool: Pool | null = null;
-
 type CookieReader = {
   get(name: string): { value: string } | undefined;
 };
-
-function getDatabaseUrl() {
-  const databaseUrl = process.env.DATABASE_URL?.trim();
-
-  if (!databaseUrl) {
-    throw new Error("DATABASE_URL is not configured.");
-  }
-
-  return databaseUrl;
-}
-
-function getPool() {
-  if (!pool) {
-    pool = new Pool({
-      connectionString: getDatabaseUrl(),
-      ssl: {
-        rejectUnauthorized: false,
-      },
-    });
-  }
-
-  return pool;
-}
 
 function getSessionSecret() {
   const secret = process.env.SESSION_SECRET?.trim();
@@ -209,6 +184,14 @@ export async function findSubscriberById(id: number) {
   }
 
   return mapSubscriberRow(result.rows[0]);
+}
+
+export async function findSubscriberByIdSafely(id: number) {
+  try {
+    return await findSubscriberById(id);
+  } catch {
+    return null;
+  }
 }
 
 export async function upsertSubscriber(input: {

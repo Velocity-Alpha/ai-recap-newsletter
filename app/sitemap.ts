@@ -1,64 +1,25 @@
 import type { MetadataRoute } from "next";
+import { getSafeCachedPublishedNewsletterEntries } from "@/src/features/newsletter/server";
 
-function getServerApiUrl(endpoint: string): string {
-    const siteUrl = process.env.URL?.trim();
-    if (siteUrl) {
-        return `${siteUrl}/.netlify/functions/${endpoint}`;
-    }
-    const baseUrl = process.env.NEXT_PUBLIC_NEWSLETTER_URL?.trim();
-    if (baseUrl) {
-        return `${baseUrl.replace(/\/+$/, "")}/${endpoint}`;
-    }
-    return `http://localhost:8888/.netlify/functions/${endpoint}`;
+function getSiteUrl() {
+    return process.env.NEXT_PUBLIC_SITE_URL?.trim()
+        ?? process.env.URL?.trim()
+        ?? "http://localhost:3000";
 }
 
 interface NewsletterEntry {
     id: string;
     slug?: string | null;
     published_at: string;
-    issue_date?: string;
-}
-
-interface NewsletterListResponse {
-    success: boolean;
-    data: NewsletterEntry[];
-    pagination: {
-        currentPage: number;
-        totalPages: number;
-        hasNextPage: boolean;
-    };
+    issue_date?: string | null;
 }
 
 async function fetchAllNewsletters(): Promise<NewsletterEntry[]> {
-    const collected: NewsletterEntry[] = [];
-    const apiUrl = getServerApiUrl("fetch-newsletters-list");
-    let page = 1;
-
-    while (true) {
-        let json: NewsletterListResponse;
-        try {
-            const res = await fetch(`${apiUrl}?page=${page}&limit=100`, {
-                next: { revalidate: 3600 },
-            });
-            if (!res.ok) break;
-            json = await res.json();
-            if (!json.success) break;
-        } catch {
-            break;
-        }
-
-        collected.push(...json.data);
-
-        if (!json.pagination.hasNextPage) break;
-        page++;
-    }
-
-    return collected;
+    return getSafeCachedPublishedNewsletterEntries();
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-    const siteUrl =
-        process.env.URL?.trim() ?? "http://localhost:8888";
+    const siteUrl = getSiteUrl();
 
     const newsletters = await fetchAllNewsletters();
 

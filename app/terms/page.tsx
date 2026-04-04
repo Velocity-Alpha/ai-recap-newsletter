@@ -23,7 +23,7 @@ export default function TermsPage() {
             <section>
               <h2 className="text-2xl font-serif font-bold text-[var(--text-primary)] mb-4">1. Acceptance of Terms</h2>
               <p>
-                By accessing AI Recap (the "Service"), operated by Velocity Alpha ("we", "us", or "our"), you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use our Service.
+                By accessing AI Recap (the &quot;Service&quot;), operated by Velocity Alpha (&quot;we&quot;, &quot;us&quot;, or &quot;our&quot;), you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use our Service.
               </p>
             </section>
 
@@ -54,7 +54,7 @@ export default function TermsPage() {
             <section>
               <h2 className="text-2xl font-serif font-bold text-[var(--text-primary)] mb-4">5. Disclaimer of Warranties</h2>
               <p className="italic">
-                The Service is provided on an "AS IS" and "AS AVAILABLE" basis.
+                The Service is provided on an &quot;AS IS&quot; and &quot;AS AVAILABLE&quot; basis.
               </p>
               <p className="mt-4">
                 Velocity Alpha makes no warranties, expressed or implied, regarding the accuracy, completeness, or reliability of the content provided. We do not guarantee that the Service will be uninterrupted, secure, or error-free. Your use of the Service is at your own risk.
@@ -88,7 +88,7 @@ export default function TermsPage() {
             <section>
               <h2 className="text-2xl font-serif font-bold text-[var(--text-primary)] mb-4">9. Changes to Terms</h2>
               <p>
-                We reserve the right to modify these Terms at any time. We will indicate the "Last Updated" date at the top of this page. Your continued use of the Service after changes are posted constitutes your acceptance of the new Terms.
+                We reserve the right to modify these Terms at any time. We will indicate the &quot;Last Updated&quot; date at the top of this page. Your continued use of the Service after changes are posted constitutes your acceptance of the new Terms.
               </p>
             </section>
 
