@@ -1,22 +1,49 @@
 # AI Recap Newsletter Agent Guide
 
-## Project Overview
+## Product
 
-**AI Recap Newsletter** is a high-end, editorial daily briefing platform. It delivers curated AI news.
+- AI Recap is an automated AI newsletter product.
+- The goal is operational reliability first: subscriber access, issue rendering, and API behavior should stay stable.
+- The product should feel like a high-end editorial daily briefing: authoritative and warm, not corporate or SaaS-y.
 
-- **Architecture**: Next.js (App Router) frontend and backend APIs.
-- **Database**: Serverless Postgres via **Neon**.
-- **Styling**: Tailwind CSS 4 with a custom design system based on editorial typography and "watercolor" aesthetics.
-- **Deployment**: Netlify.
+## System Context
 
----
+- Content + publishing website: Next.js App Router app in this repo.
+- Automation/ops pipeline: n8n handles ingestion and the HITL workflow outside this repo.
+- Newsletter subscription source of truth is split across this app and external automations like GHL.
+- GHL sends the actual emails.
 
-## Core Principles
+## Stack
 
-1.  **Editorial Integrity**: Every UI decision and piece of copy should feel authoritative and warm, not corporate or "SaaS-y".
-2.  **Zero-Downtime DB**: Prioritize safe schema changes using Neon's branching and migration best practices.
-3.  **Modern Stack**: Leverage Tailwind 4 features and Next.js App Router patterns effectively.
+- Next.js 16
+- React 18
+- TypeScript
+- Postgres on Neon via Prisma
+- Tailwind CSS 4
+- Vitest
+- ESLint
+- Netlify deployment
 
 ## Coding Rules
-1. Always use TDD (red, green, refactor) when implementing
-2. Always use SOLID principles for clean code
+
+- Use test-driven development by default.
+- Follow SOLID principles where they improve clarity and maintainability.
+- Do not mark a feature/fix as done until it is fully verified with the relevant automated checks.
+- Prefer targeted tests while iterating, then broader verification when the scope justifies it.
+- If you cannot run a needed check, say so explicitly in the handoff.
+
+## Workflow Expectations
+
+- Read the relevant code paths before making assumptions.
+- Keep changes small and coherent.
+- Add brief comments only where the intent would otherwise be easy to misread.
+- Update tests when behavior changes.
+- Prioritize safe schema changes using Neon's branching and migration best practices.
+- Use modern Tailwind 4 and Next.js App Router patterns.
+
+## Key References
+
+- README for setup, env vars, deploy, and API inventory:
+  [README.md](./README.md)
+- Prisma schema:
+  [prisma/schema.prisma](./prisma/schema.prisma)

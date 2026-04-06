@@ -9,6 +9,9 @@ import {
   logRequestWarning,
 } from "@/src/server/observability";
 
+// Public unsubscribe endpoint for signed tokens only.
+// This exists for email-link/browser flows and must never accept raw email addresses.
+// Current production unsubscribe traffic comes through the GHL webhook route instead.
 async function getTokenFromRequest(request: Request) {
   const url = new URL(request.url);
   const queryToken = url.searchParams.get("token");
