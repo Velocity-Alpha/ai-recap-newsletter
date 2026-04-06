@@ -5,7 +5,7 @@ import ArticleAccessGate from "@/src/components/ArticleAccessGate";
 import SubscriptionSuccessToast from "@/src/components/SubscriptionSuccessToast";
 import { NewsletterIssueV1 } from "@/src/features/newsletter/render/NewsletterIssueV1";
 import { NewsletterIssueV2 } from "@/src/features/newsletter/render/NewsletterIssueV2";
-import { findSubscriberByIdSafely, getSubscriberSessionFromCookies } from "@/src/features/subscriber/server";
+import { hasActiveSubscriberSession } from "@/src/features/subscriber/server";
 import type { ParsedNewsletterIssue } from "@/src/features/newsletter/types";
 
 function NewsletterNotFound() {
@@ -17,20 +17,12 @@ function NewsletterNotFound() {
 }
 
 export default async function NewsletterContent({ issue }: { issue: ParsedNewsletterIssue | null }) {
-  const session = await getSubscriberSessionFromCookies();
-  const subscriber =
-    session && issue
-      ? await findSubscriberByIdSafely(session.subscriberId)
-      : null;
-  const hasSubscriberAccess =
-    Boolean(subscriber) &&
-    subscriber?.status === "active" &&
-    subscriber.email === session?.email;
+  const hasSubscriberAccess = issue ? await hasActiveSubscriberSession() : false;
   const shouldShowGate = Boolean(issue && !hasSubscriberAccess);
 
   return (
     <div className="flex min-h-screen flex-col bg-white">
-      <Header />
+      <Header showSubscribeButton={!hasSubscriberAccess} />
       <SubscriptionSuccessToast />
 
       {issue ? (
@@ -57,7 +49,7 @@ export default async function NewsletterContent({ issue }: { issue: ParsedNewsle
         <NewsletterNotFound />
       )}
 
-      <Footer />
+      <Footer showSubscribeLink={!hasSubscriberAccess} />
     </div>
   );
 }

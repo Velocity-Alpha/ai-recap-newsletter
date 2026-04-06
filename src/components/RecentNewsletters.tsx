@@ -9,12 +9,14 @@ interface RecentNewslettersProps {
   newsletters: Newsletter[];
   currentPage: number;
   totalPages: number;
+  showSubscribeButton?: boolean;
 }
 
 const RecentNewsletters: React.FC<RecentNewslettersProps> = ({
   newsletters,
   currentPage,
   totalPages,
+  showSubscribeButton = true,
 }) => {
   return (
     <section className="pb-24 max-w-7xl mx-auto pt-16 px-4 sm:px-6 lg:px-8 relative">
@@ -43,14 +45,16 @@ const RecentNewsletters: React.FC<RecentNewslettersProps> = ({
             There isn&apos;t an archive entry here right now. You can subscribe below and we&apos;ll send the next briefing as soon as it goes out.
           </p>
           <div className="flex flex-col gap-4 sm:flex-row">
-            <Link
-              href="#subscribe"
-              className="inline-flex items-center justify-center gap-2 rounded bg-[var(--text-primary)] px-7 py-3 font-semibold text-white transition-colors duration-200 hover:bg-[var(--watercolor-ink)]"
-              style={{ fontSize: 'var(--text-small)' }}
-            >
-              <Send size={20} />
-              Get Notified
-            </Link>
+            {showSubscribeButton ? (
+              <Link
+                href="#subscribe"
+                className="inline-flex items-center justify-center gap-2 rounded bg-[var(--text-primary)] px-7 py-3 font-semibold text-white transition-colors duration-200 hover:bg-[var(--watercolor-ink)]"
+                style={{ fontSize: 'var(--text-small)' }}
+              >
+                <Send size={20} />
+                Get Notified
+              </Link>
+            ) : null}
             <Link
               href={currentPage <= 1 ? "/archive" : `/archive?page=${currentPage}`}
               className="rounded border border-[var(--border)] bg-[var(--bg-card)] px-7 py-3 font-semibold text-[var(--text-primary)] transition-colors duration-200 hover:bg-[var(--bg-warm)]"

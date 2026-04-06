@@ -227,6 +227,22 @@ export async function getSubscriberSessionFromCookies(
   return verifySubscriberSessionToken(token);
 }
 
+export async function hasActiveSubscriberSession(cookieStore?: CookieReader) {
+  const session = await getSubscriberSessionFromCookies(cookieStore);
+
+  if (!session) {
+    return false;
+  }
+
+  const subscriber = await findSubscriberByIdSafely(session.subscriberId);
+
+  return Boolean(
+    subscriber &&
+    subscriber.status === "active" &&
+    subscriber.email === session.email,
+  );
+}
+
 export async function findSubscriberByEmail(email: string) {
   const record = await prisma.subscriber.findUnique({
     where: { email: normalizeSubscriberEmail(email) },

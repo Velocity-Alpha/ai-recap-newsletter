@@ -5,33 +5,29 @@ import RecentNewslettersPreview from '@/src/components/RecentNewslettersPreview'
 import SubscribeNewsletter from '@/src/components/SubscribeNewsletter'
 import Footer from '@/src/components/Footer'
 import { getSafeCachedNewsletterListPage, getSafeCachedTickerFeed } from '@/src/features/newsletter/server'
-import { findSubscriberByIdSafely, getSubscriberSessionFromCookies } from '@/src/features/subscriber/server'
+import { hasActiveSubscriberSession } from '@/src/features/subscriber/server'
 import React from 'react'
 
 export default async function HomePage() {
-  const [session, newsletterPage, tickerFeed] = await Promise.all([
-    getSubscriberSessionFromCookies(),
+  const [isSignedIn, newsletterPage, tickerFeed] = await Promise.all([
+    hasActiveSubscriberSession(),
     getSafeCachedNewsletterListPage(1, 6),
     getSafeCachedTickerFeed(),
   ])
-  const subscriber = session ? await findSubscriberByIdSafely(session.subscriberId) : null
-  const showSubscribe = Boolean(
-    !subscriber ||
-    subscriber.status !== 'active' ||
-    subscriber.email !== session?.email
-  )
+  const showSubscribe = !isSignedIn
 
   return (
         <div className='flex flex-col min-h-screen bg-[var(--bg-main)]'>
-            <Header />
+            <Header showSubscribeButton={showSubscribe} />
             <Hero
+              showSubscribeButton={showSubscribe}
               initialTickerStories={tickerFeed.data}
               initialTickerStats={tickerFeed.stats}
             />
             <Features />
-            <RecentNewslettersPreview newsletters={newsletterPage.data} />
+            <RecentNewslettersPreview newsletters={newsletterPage.data} showSubscribeButton={showSubscribe} />
             {showSubscribe ? <SubscribeNewsletter /> : null}
-            <Footer />
+            <Footer showSubscribeLink={showSubscribe} />
         </div>
     )
 }

@@ -4,9 +4,13 @@ import Link from "next/link";
 
 interface RecentNewslettersPreviewProps {
   newsletters: Newsletter[];
+  showSubscribeButton?: boolean;
 }
 
-const RecentNewslettersPreview: React.FC<RecentNewslettersPreviewProps> = ({ newsletters }) => {
+const RecentNewslettersPreview: React.FC<RecentNewslettersPreviewProps> = ({
+  newsletters,
+  showSubscribeButton = true,
+}) => {
   return (
       <section id="newsletters" className="py-24 bg-[var(--bg-card)] relative">
       <div className="container mx-auto px-6 max-w-[var(--container)]">
@@ -34,12 +38,14 @@ const RecentNewslettersPreview: React.FC<RecentNewslettersPreviewProps> = ({ new
                 We&apos;re preparing our first set of AI intelligence reports. 
                 Be the first to know when they drop!
               </p>
-              <Link 
-                href="#subscribe"
-                className="px-6 py-3 bg-[var(--text-primary)] text-white font-semibold rounded transition-all duration-200 hover:bg-[var(--watercolor-ink)]" style={{ fontSize: 'var(--text-small)' }}
-              >
-                Keep Me Updated
-              </Link>
+              {showSubscribeButton ? (
+                <Link 
+                  href="#subscribe"
+                  className="px-6 py-3 bg-[var(--text-primary)] text-white font-semibold rounded transition-all duration-200 hover:bg-[var(--watercolor-ink)]" style={{ fontSize: 'var(--text-small)' }}
+                >
+                  Keep Me Updated
+                </Link>
+              ) : null}
             </div>
           </div>
         ) : (

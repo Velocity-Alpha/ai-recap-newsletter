@@ -38,9 +38,14 @@ function getSubscriberCountForTime(now: Date) {
 interface HeroProps {
   initialTickerStories: TickerStory[];
   initialTickerStats: TickerStats | null;
+  showSubscribeButton?: boolean;
 }
 
-export default function Hero({ initialTickerStories, initialTickerStats }: HeroProps) {
+export default function Hero({
+  initialTickerStories,
+  initialTickerStats,
+  showSubscribeButton = true,
+}: HeroProps) {
   const [subscriberCount, setSubscriberCount] = useState<number | null>(null);
   const [statsReady, setStatsReady] = useState(false);
 
@@ -111,14 +116,16 @@ export default function Hero({ initialTickerStories, initialTickerStats }: HeroP
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 mb-16 opacity-0 animate-[fadeIn_0.5s_ease-out_0.15s_forwards]">
-              <button
-                onClick={() => {
-                  document.getElementById('subscribe')?.scrollIntoView({ behavior: 'smooth' });
-                }}
-                className="px-6 py-3 bg-[var(--text-primary)] text-white text-[14px] font-semibold rounded transition-all duration-200 hover:bg-[var(--watercolor-ink)]"
-              >
-                Subscribe Free
-              </button>
+              {showSubscribeButton ? (
+                <button
+                  onClick={() => {
+                    document.getElementById('subscribe')?.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                  className="cursor-pointer px-6 py-3 bg-[var(--text-primary)] text-white text-[14px] font-semibold rounded transition-all duration-200 hover:bg-[var(--watercolor-ink)]"
+                >
+                  Subscribe Free
+                </button>
+              ) : null}
               <Link
                 href="/archive"
                 className="px-6 py-3 bg-transparent text-[var(--text-primary)] text-[14px] font-semibold rounded border border-[var(--border)] transition-all duration-200 hover:border-[var(--text-primary)] hover:bg-[var(--bg-warm)] text-center"

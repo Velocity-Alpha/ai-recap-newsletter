@@ -1,61 +1,12 @@
-'use client'
+import HeaderClient from '@/src/components/HeaderClient'
+import { hasActiveSubscriberSession } from '@/src/features/subscriber/server'
 
-import Image from 'next/image'
-import Link from 'next/link'
+type HeaderProps = {
+  showSubscribeButton?: boolean
+}
 
-export default function Header() {
-  return (
-    <header className="w-full bg-[var(--bg-card)] border-b border-[var(--border-light)] sticky top-0 z-50">
-      <nav className="container mx-auto flex items-center justify-between px-6 py-4 max-w-[var(--container)]">
-        {/* Logo */}
-        <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-          <Image
-            src="/logo/logo.png"
-            alt="AI Recap"
-            width={134}
-            height={34}
-            priority
-            className="h-6 w-auto"
-          />
-          <span className="font-sans text-2xl font-black tracking-tight text-black">RECAP</span>
-        </Link>
+export default async function Header({ showSubscribeButton }: HeaderProps) {
+  const resolvedShowSubscribeButton = showSubscribeButton ?? !(await hasActiveSubscriberSession())
 
-        {/* Desktop Navigation */}
-        <div className="hidden md:flex items-center gap-10">
-          <Link 
-            href="/" 
-            className="font-semibold uppercase tracking-[0.1em] text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-colors" style={{ fontSize: 'var(--text-small)' }}
-            onClick={(e) => {
-              if (window.location.pathname === '/') {
-                e.preventDefault();
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }
-            }}
-          >
-            Home
-          </Link>
-          <Link 
-            href="/archive" 
-            className="font-semibold uppercase tracking-[0.1em] text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-colors" style={{ fontSize: 'var(--text-small)' }}
-          >
-            Archive
-          </Link>
-          <button 
-            onClick={() => document.getElementById('subscribe')?.scrollIntoView({ behavior: 'smooth' })}
-            className="px-6 py-3 bg-[var(--text-primary)] text-white font-semibold rounded transition-all duration-200 hover:bg-[var(--watercolor-ink)]" style={{ fontSize: 'var(--text-small)' }}
-          >
-            Subscribe
-          </button>
-        </div>
-
-        {/* Mobile Subscribe Button */}
-        <button 
-          onClick={() => document.getElementById('subscribe')?.scrollIntoView({ behavior: 'smooth' })}
-          className="md:hidden px-4 py-2 bg-[var(--text-primary)] text-white font-semibold rounded transition-all duration-200 hover:bg-[var(--watercolor-ink)]" style={{ fontSize: 'var(--text-small)' }}
-        >
-          Subscribe
-        </button>
-      </nav>
-    </header>
-  );
+  return <HeaderClient showSubscribeButton={resolvedShowSubscribeButton} />
 }
