@@ -10,6 +10,7 @@ import {
   storeOneTimeCode,
   touchSubscriberSeenAt,
   upsertSubscriber,
+  verifySubscriberUnsubscribeToken,
 } from "@/src/features/subscriber/server";
 import { sendSubscriberOtpEmail } from "@/src/features/subscriber/email";
 import { submitSubscriberToGhl } from "@/src/features/subscriber/ghl";
@@ -162,6 +163,42 @@ export async function unsubscribeSubscriber(input: {
 
   if (!subscriber) {
     throw new SubscriberError("Subscriber not found.", 404);
+  }
+
+  return markSubscriberUnsubscribed({
+    email: normalizedEmail,
+  });
+}
+
+export async function unsubscribeSubscriberByToken(input: {
+  token?: string | null;
+}) {
+  const token = typeof input.token === "string" ? input.token.trim() : "";
+
+  if (!token) {
+    return null;
+  }
+
+  const payload = verifySubscriberUnsubscribeToken(token);
+
+  if (!payload) {
+    return null;
+  }
+
+  return markSubscriberUnsubscribed({
+    email: payload.email,
+  });
+}
+
+export async function unsubscribeSubscriberFromWebhook(input: {
+  email?: string | null;
+}) {
+  const normalizedEmail = typeof input.email === "string" && input.email.trim().length > 0
+    ? validateSubscriberEmail(input.email)
+    : null;
+
+  if (!normalizedEmail) {
+    throw new SubscriberError("Provide email.", 400);
   }
 
   return markSubscriberUnsubscribed({

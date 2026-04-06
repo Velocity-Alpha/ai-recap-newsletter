@@ -4,6 +4,8 @@ import {
   requestSubscriberSignInCode,
   subscribeAndUpsertSubscriber,
   unsubscribeSubscriber,
+  unsubscribeSubscriberByToken,
+  unsubscribeSubscriberFromWebhook,
   verifySubscriberSignInCode,
 } from "@/src/features/subscriber/service";
 
@@ -19,6 +21,7 @@ const serverFns = vi.hoisted(() => ({
   storeOneTimeCode: vi.fn(),
   touchSubscriberSeenAt: vi.fn(),
   upsertSubscriber: vi.fn(),
+  verifySubscriberUnsubscribeToken: vi.fn(),
 }));
 
 const ghlFns = vi.hoisted(() => ({
@@ -166,6 +169,49 @@ describe("subscriber service", () => {
       email: "reader@example.com",
     });
 
+    expect(serverFns.markSubscriberUnsubscribed).toHaveBeenCalledWith({
+      email: "reader@example.com",
+    });
+  });
+
+  it("ignores unsubscribe tokens that are missing or invalid", async () => {
+    serverFns.verifySubscriberUnsubscribeToken.mockReturnValue(null);
+
+    await expect(unsubscribeSubscriberByToken({ token: "bad-token" })).resolves.toBeNull();
+    expect(serverFns.markSubscriberUnsubscribed).not.toHaveBeenCalled();
+  });
+
+  it("marks a subscriber inactive from a signed unsubscribe token", async () => {
+    serverFns.verifySubscriberUnsubscribeToken.mockReturnValue({
+      purpose: "unsubscribe",
+      email: "reader@example.com",
+      issuedAt: Date.now(),
+      expiresAt: Date.now() + 60_000,
+    });
+    serverFns.markSubscriberUnsubscribed.mockResolvedValue({
+      id: 10,
+      email: "reader@example.com",
+      firstName: "Reader",
+      status: "unsubscribed",
+    });
+
+    await unsubscribeSubscriberByToken({
+      token: "signed-token",
+    });
+
+    expect(serverFns.markSubscriberUnsubscribed).toHaveBeenCalledWith({
+      email: "reader@example.com",
+    });
+  });
+
+  it("allows the webhook flow to be idempotent when the subscriber is missing", async () => {
+    serverFns.markSubscriberUnsubscribed.mockResolvedValue(null);
+
+    await expect(
+      unsubscribeSubscriberFromWebhook({
+        email: "reader@example.com",
+      }),
+    ).resolves.toBeNull();
     expect(serverFns.markSubscriberUnsubscribed).toHaveBeenCalledWith({
       email: "reader@example.com",
     });

@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  createSubscriberUnsubscribeToken,
   createSubscriberSessionToken,
+  verifySubscriberUnsubscribeToken,
   verifySubscriberSessionToken,
 } from "@/src/features/subscriber/server";
 
@@ -49,5 +51,21 @@ describe("subscriber session token", () => {
     });
 
     expect(verifySubscriberSessionToken(token)).toBeNull();
+  });
+
+  it("verifies a valid unsubscribe token", () => {
+    const token = createSubscriberUnsubscribeToken("Reader@example.com");
+
+    expect(verifySubscriberUnsubscribeToken(token)).toMatchObject({
+      purpose: "unsubscribe",
+      email: "reader@example.com",
+    });
+  });
+
+  it("rejects an unsubscribe token with an invalid signature", () => {
+    const token = createSubscriberUnsubscribeToken("reader@example.com");
+    const [payload] = token.split(".");
+
+    expect(verifySubscriberUnsubscribeToken(`${payload}.invalid-signature`)).toBeNull();
   });
 });

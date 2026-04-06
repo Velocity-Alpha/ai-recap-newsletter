@@ -7,6 +7,7 @@ import { prisma } from "@/src/server/prisma";
 
 const COOKIE_NAME = "ai_recap_subscriber";
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
+const UNSUBSCRIBE_TOKEN_MAX_AGE_SECONDS = 60 * 60 * 24 * 365;
 const OTP_LENGTH = 6;
 const OTP_TTL_MINUTES = 10;
 
@@ -24,6 +25,13 @@ type SubscriberRow = {
   lastSeenAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
+};
+
+type SubscriberUnsubscribeTokenPayload = {
+  purpose: "unsubscribe";
+  email: string;
+  issuedAt: number;
+  expiresAt: number;
 };
 
 function getSessionSecret() {
@@ -51,14 +59,14 @@ function signValue(value: string) {
     .digest("base64url");
 }
 
-function serializeSessionPayload(payload: SubscriberSessionPayload) {
+function serializePayload(payload: unknown) {
   return Buffer.from(JSON.stringify(payload)).toString("base64url");
 }
 
-function deserializeSessionPayload(value: string) {
+function deserializePayload<T>(value: string) {
   try {
     const decoded = Buffer.from(value, "base64url").toString("utf8");
-    return JSON.parse(decoded) as SubscriberSessionPayload;
+    return JSON.parse(decoded) as T;
   } catch {
     return null;
   }
@@ -79,7 +87,7 @@ function mapSubscriberRecord(record: SubscriberRow): SubscriberRecord {
 }
 
 export function createSubscriberSessionToken(payload: SubscriberSessionPayload) {
-  const encodedPayload = serializeSessionPayload(payload);
+  const encodedPayload = serializePayload(payload);
   const signature = signValue(encodedPayload);
 
   return `${encodedPayload}.${signature}`;
@@ -107,12 +115,64 @@ export function verifySubscriberSessionToken(token: string | undefined | null) {
     return null;
   }
 
-  const payload = deserializeSessionPayload(encodedPayload);
+  const payload = deserializePayload<SubscriberSessionPayload>(encodedPayload);
   if (!payload) {
     return null;
   }
 
   if (!payload.subscriberId || !payload.email || !payload.expiresAt) {
+    return null;
+  }
+
+  if (payload.expiresAt <= Date.now()) {
+    return null;
+  }
+
+  return payload;
+}
+
+export function createSubscriberUnsubscribeToken(email: string) {
+  const now = Date.now();
+  const payload: SubscriberUnsubscribeTokenPayload = {
+    purpose: "unsubscribe",
+    email: normalizeSubscriberEmail(email),
+    issuedAt: now,
+    expiresAt: now + UNSUBSCRIBE_TOKEN_MAX_AGE_SECONDS * 1000,
+  };
+  const encodedPayload = serializePayload(payload);
+  const signature = signValue(encodedPayload);
+
+  return `${encodedPayload}.${signature}`;
+}
+
+export function verifySubscriberUnsubscribeToken(token: string | undefined | null) {
+  if (!token) {
+    return null;
+  }
+
+  const [encodedPayload, signature] = token.split(".");
+
+  if (!encodedPayload || !signature) {
+    return null;
+  }
+
+  const expectedSignature = signValue(encodedPayload);
+  const expectedBuffer = Buffer.from(expectedSignature);
+  const signatureBuffer = Buffer.from(signature);
+
+  if (
+    expectedBuffer.length !== signatureBuffer.length ||
+    !crypto.timingSafeEqual(expectedBuffer, signatureBuffer)
+  ) {
+    return null;
+  }
+
+  const payload = deserializePayload<SubscriberUnsubscribeTokenPayload>(encodedPayload);
+  if (!payload) {
+    return null;
+  }
+
+  if (payload.purpose !== "unsubscribe" || !payload.email || !payload.expiresAt) {
     return null;
   }
 

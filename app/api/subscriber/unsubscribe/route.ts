@@ -1,4 +1,4 @@
-import { SubscriberError, unsubscribeSubscriber } from "@/src/features/subscriber/service";
+import { unsubscribeSubscriberByToken } from "@/src/features/subscriber/service";
 import type { UnsubscribeResponse } from "@/src/features/subscriber/types";
 import {
   createRequestLogContext,
@@ -7,14 +7,21 @@ import {
   logRequestStart,
   logRequestSuccess,
   logRequestWarning,
-  maskEmail,
 } from "@/src/server/observability";
 
-async function getPayload(request: Request) {
+async function getTokenFromRequest(request: Request) {
+  const url = new URL(request.url);
+  const queryToken = url.searchParams.get("token");
+
+  if (queryToken) {
+    return queryToken;
+  }
+
   const contentType = request.headers.get("content-type") ?? "";
 
   if (contentType.includes("application/json")) {
-    return (await request.json()) as { email?: string };
+    const payload = (await request.json().catch(() => null)) as { token?: string } | null;
+    return payload?.token ?? "";
   }
 
   if (
@@ -22,66 +29,48 @@ async function getPayload(request: Request) {
     contentType.includes("multipart/form-data")
   ) {
     const formData = await request.formData();
-    return {
-      email: formData.get("email")?.toString(),
-    };
+    return formData.get("token")?.toString() ?? "";
   }
 
-  return {};
+  return "";
 }
 
-export async function POST(request: Request) {
+async function handleUnsubscribe(request: Request) {
   const context = createRequestLogContext("api.subscriber.unsubscribe", request);
-  let email: string | null | undefined;
 
   logRequestStart(context, {
     contentType: request.headers.get("content-type"),
   });
 
   try {
-    const payload = await getPayload(request);
-    email = payload.email ?? null;
-    await unsubscribeSubscriber({
-      email: payload.email,
-    });
+    const token = await getTokenFromRequest(request);
+    const result = await unsubscribeSubscriberByToken({ token });
 
-    logRequestSuccess(context, {
-      email: maskEmail(email),
-    });
+    if (result) {
+      logRequestSuccess(context, {
+        unsubscribed: true,
+      });
+    } else {
+      logRequestWarning(context, "Subscriber unsubscribe ignored", {
+        reason: "invalid_or_missing_token",
+      });
+    }
 
     return jsonWithRequestId<UnsubscribeResponse>(context, {
       success: true,
     });
   } catch (error) {
-    if (error instanceof SubscriberError) {
-      logRequestWarning(context, "Subscriber unsubscribe rejected", {
-        email: maskEmail(email),
-        statusCode: error.statusCode,
-        reason: error.message,
-      });
-
-      return jsonWithRequestId(
-        context,
-        { error: error.message },
-        { status: error.statusCode },
-      );
-    }
-
     if (error instanceof Error && /not configured/i.test(error.message)) {
-      logRequestError(context, "Subscriber unsubscribe route is not configured", error, {
-        email: maskEmail(email),
-      });
+      logRequestError(context, "Subscriber unsubscribe route is not configured", error);
 
       return jsonWithRequestId(
         context,
-        { error: "Subscriber unsubscribe is not configured yet. Set DATABASE_URL." },
+        { error: "Subscriber unsubscribe is not configured yet. Set DATABASE_URL and SESSION_SECRET." },
         { status: 500 },
       );
     }
 
-    logRequestError(context, "Unexpected subscriber unsubscribe failure", error, {
-      email: maskEmail(email),
-    });
+    logRequestError(context, "Unexpected subscriber unsubscribe failure", error);
 
     return jsonWithRequestId(
       context,
@@ -89,4 +78,12 @@ export async function POST(request: Request) {
       { status: 500 },
     );
   }
+}
+
+export async function GET(request: Request) {
+  return handleUnsubscribe(request);
+}
+
+export async function POST(request: Request) {
+  return handleUnsubscribe(request);
 }
