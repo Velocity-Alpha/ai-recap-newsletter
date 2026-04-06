@@ -2,6 +2,8 @@ import Footer from "@/src/components/Footer";
 import Header from "@/src/components/Header";
 import { unsubscribeSubscriberByToken } from "@/src/features/subscriber/service";
 
+// Browser-facing unsubscribe page for signed links such as /unsubscribe?token=...
+// Keep this separate from the GHL webhook path so humans never need to know webhook secrets.
 type UnsubscribePageProps = {
   searchParams: Promise<{ token?: string | string[] }>;
 };
