@@ -109,6 +109,26 @@ describe("subscriber service", () => {
     expect(emailFns.sendSubscriberOtpEmail).not.toHaveBeenCalled();
   });
 
+  it("rejects OTP requests for unsubscribed subscribers with a specific code", async () => {
+    serverFns.findSubscriberByEmail.mockResolvedValue({
+      id: 6,
+      email: "reader@example.com",
+      firstName: "Reader",
+      status: "unsubscribed",
+    });
+
+    await expect(
+      requestSubscriberSignInCode({
+        email: "reader@example.com",
+      }),
+    ).rejects.toMatchObject({
+      statusCode: 404,
+      code: "unsubscribed",
+      message: "You unsubscribed from emails. Resubscribe to restore access.",
+    });
+    expect(emailFns.sendSubscriberOtpEmail).not.toHaveBeenCalled();
+  });
+
   it("rejects invalid or expired OTP codes", async () => {
     serverFns.findSubscriberByEmail.mockResolvedValue({
       id: 5,

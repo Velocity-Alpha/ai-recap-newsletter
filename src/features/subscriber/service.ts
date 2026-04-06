@@ -172,7 +172,19 @@ export async function unsubscribeSubscriber(input: {
 async function findRequiredActiveSubscriber(email: string): Promise<SubscriberRecord> {
   const subscriber = await findSubscriberByEmail(email);
 
-  if (!subscriber || subscriber.status !== "active") {
+  if (!subscriber) {
+    throw new SubscriberError("We couldn't find an active subscription for that email.", 404);
+  }
+
+  if (subscriber.status === "unsubscribed") {
+    throw new SubscriberError(
+      "You unsubscribed from emails. Resubscribe to restore access.",
+      404,
+      "unsubscribed",
+    );
+  }
+
+  if (subscriber.status !== "active") {
     throw new SubscriberError("We couldn't find an active subscription for that email.", 404);
   }
 

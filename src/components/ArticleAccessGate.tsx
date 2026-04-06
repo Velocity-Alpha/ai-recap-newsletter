@@ -7,6 +7,7 @@ import { useState } from "react";
 export const SUBSCRIBED_TOAST_STORAGE_KEY = "ai-recap:subscriber-toast";
 
 type GateStep = "email" | "subscribe" | "sign_in_code";
+type SubscribeReason = "new" | "unsubscribed";
 
 function getErrorMessage(error: unknown, fallback: string) {
   if (error instanceof Error && error.message) {
@@ -47,6 +48,7 @@ async function postJson<TResponse>(url: string, body: object) {
 
 export default function ArticleAccessGate() {
   const [step, setStep] = useState<GateStep>("email");
+  const [subscribeReason, setSubscribeReason] = useState<SubscribeReason>("new");
   const [firstName, setFirstName] = useState("");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
@@ -75,7 +77,15 @@ export default function ArticleAccessGate() {
       await requestCodeForEmail(email);
     } catch (submitError) {
       if (submitError instanceof ApiRequestError && submitError.status === 404) {
-        setStatusMessage(`This email isn't subscribed yet. Add your first name to unlock the rest.`);
+        const nextSubscribeReason =
+          submitError.code === "unsubscribed" ? "unsubscribed" : "new";
+
+        setSubscribeReason(nextSubscribeReason);
+        setStatusMessage(
+          nextSubscribeReason === "unsubscribed"
+            ? "You unsubscribed from emails. Resubscribe to restore access."
+            : "This email isn't subscribed yet. Add your first name to unlock the rest.",
+        );
         setStep("subscribe");
         return;
       }
@@ -185,7 +195,9 @@ export default function ArticleAccessGate() {
           {step === "email"
             ? "Enter your email. If you're already subscribed, we'll send a sign-in code. If not, you'll subscribe in the next step."
             : step === "subscribe"
-              ? "This email isn't subscribed yet. Add your first name to unlock this article and future issues."
+              ? subscribeReason === "unsubscribed"
+                ? "You unsubscribed from emails. Resubscribe to restore access."
+                : "This email isn't subscribed yet. Add your first name to unlock this article and future issues."
               : `Enter the 6-digit code we sent to ${email.trim().toLowerCase()}.`}
         </p>
 
@@ -247,6 +259,7 @@ export default function ArticleAccessGate() {
                 setFirstName("");
                 setError(null);
                 setStatusMessage(null);
+                setSubscribeReason("new");
                 setStep("email");
               }}
               className="text-[14px] font-semibold text-[var(--accent-primary)] transition hover:opacity-75"
@@ -298,6 +311,7 @@ export default function ArticleAccessGate() {
                   setCode("");
                   setError(null);
                   setStatusMessage(null);
+                  setSubscribeReason("new");
                   setStep("email");
                 }}
                 className="font-semibold text-[var(--accent-primary)] transition hover:opacity-75"

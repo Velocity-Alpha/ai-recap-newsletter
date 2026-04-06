@@ -46,7 +46,7 @@ export async function POST(request: Request) {
 
       return jsonWithRequestId(
         context,
-        { error: error.message },
+        { error: error.message, code: error.code },
         { status: error.statusCode },
       );
     }
