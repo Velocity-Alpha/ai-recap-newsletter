@@ -1,6 +1,6 @@
-import { subscribeAndUpsertSubscriber, SubscriberError } from "@/src/features/subscriber/service";
-import { setSubscriberSessionCookie } from "@/src/features/subscriber/server";
-import type { SubscribeResponse } from "@/src/features/subscriber/types";
+import { subscribeAndUpsertSubscriber, SubscriberError } from "@/features/subscriber/service";
+import { setSubscriberSessionCookie } from "@/features/subscriber/session";
+import type { SubscribeResponse } from "@/features/subscriber/types";
 import {
   createRequestLogContext,
   jsonWithRequestId,
@@ -9,7 +9,7 @@ import {
   logRequestSuccess,
   logRequestWarning,
   maskEmail,
-} from "@/src/server/observability";
+} from "@/server/observability";
 
 export async function POST(request: Request) {
   const context = createRequestLogContext("api.subscriber.subscribe", request);

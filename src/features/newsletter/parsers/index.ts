@@ -1,4 +1,4 @@
-import type { NewsletterIssueApiResponse, ParsedNewsletterContent, ParsedNewsletterIssue } from "@/src/features/newsletter/types";
+import type { NewsletterIssueApiResponse, ParsedNewsletterContent, ParsedNewsletterIssue } from "@/features/newsletter/types";
 import { getNewsletterContentImageUrl, getNewsletterSchemaVersion } from "./shared";
 import { parseNewsletterContentV1, parseNewsletterIssueV1 } from "./v1";
 import { parseNewsletterContentV2, parseNewsletterIssueV2 } from "./v2";

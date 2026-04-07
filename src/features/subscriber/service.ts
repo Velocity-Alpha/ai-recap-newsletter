@@ -1,20 +1,21 @@
 import {
+  findSubscriberByEmail,
+  markSubscriberUnsubscribed,
+  touchSubscriberSeenAt,
+  upsertSubscriber,
+} from "@/features/subscriber/repository";
+import { sendSubscriberOtpEmail } from "@/features/subscriber/email";
+import { submitSubscriberToGhl } from "@/features/subscriber/ghl";
+import { isValidSubscriberEmail, normalizeSubscriberEmail } from "@/features/subscriber/identity";
+import {
   cleanupExpiredOneTimeCodes,
   consumeOneTimeCode,
   createOneTimeCode,
   deleteOneTimeCode,
-  findSubscriberByEmail,
-  isValidSubscriberEmail,
-  markSubscriberUnsubscribed,
-  normalizeSubscriberEmail,
   storeOneTimeCode,
-  touchSubscriberSeenAt,
-  upsertSubscriber,
-  verifySubscriberUnsubscribeToken,
-} from "@/src/features/subscriber/server";
-import { sendSubscriberOtpEmail } from "@/src/features/subscriber/email";
-import { submitSubscriberToGhl } from "@/src/features/subscriber/ghl";
-import type { SubscriberRecord } from "@/src/features/subscriber/types";
+} from "@/features/subscriber/otp";
+import { verifySubscriberUnsubscribeToken } from "@/features/subscriber/tokens";
+import type { SubscriberRecord } from "@/features/subscriber/types";
 
 export class SubscriberError extends Error {
   statusCode: number;

@@ -1,8 +1,8 @@
 import {
   SubscriberError,
   unsubscribeSubscriberFromWebhook,
-} from "@/src/features/subscriber/service";
-import type { UnsubscribeResponse } from "@/src/features/subscriber/types";
+} from "@/features/subscriber/service";
+import type { UnsubscribeResponse } from "@/features/subscriber/types";
 import {
   createRequestLogContext,
   jsonWithRequestId,
@@ -11,7 +11,7 @@ import {
   logRequestSuccess,
   logRequestWarning,
   maskEmail,
-} from "@/src/server/observability";
+} from "@/server/observability";
 
 // This is the route currently used by GHL unsubscribe automation.
 // It is server-to-server only: raw email is allowed here because the request must carry

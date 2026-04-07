@@ -1,6 +1,6 @@
-import type { NewsletterIssueApiResponse } from "@/src/features/newsletter/types";
-import type { Newsletter } from "@/src/types/newsletter.types";
-import { prisma } from "@/src/server/prisma";
+import type { NewsletterIssueApiResponse } from "@/features/newsletter/types";
+import type { NewsletterListItem } from "@/features/newsletter/types/list";
+import { prisma } from "@/server/prisma";
 
 export interface NewsletterListPagination {
   currentPage: number;
@@ -12,7 +12,7 @@ export interface NewsletterListPagination {
 }
 
 export interface NewsletterListPage {
-  data: Newsletter[];
+  data: NewsletterListItem[];
   pagination: NewsletterListPagination;
 }
 
@@ -106,7 +106,7 @@ function normalizeListPage(page: number) {
   return normalizePositiveInteger(page, 1);
 }
 
-function mapNewsletterRow(row: NewsletterListRow): Newsletter {
+function mapNewsletterRow(row: NewsletterListRow): NewsletterListItem {
   return {
     id: String(row.id),
     slug: row.slug ?? "",

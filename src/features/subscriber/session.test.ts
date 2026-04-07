@@ -1,11 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
-  createSubscriberUnsubscribeToken,
   createSubscriberSessionToken,
-  verifySubscriberUnsubscribeToken,
   verifySubscriberSessionToken,
-} from "@/src/features/subscriber/server";
+} from "@/features/subscriber/session";
+import {
+  createSubscriberUnsubscribeToken,
+  verifySubscriberUnsubscribeToken,
+} from "@/features/subscriber/tokens";
 
 describe("subscriber session token", () => {
   beforeEach(() => {

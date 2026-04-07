@@ -1,4 +1,4 @@
-import { logServerError, logServerInfo, maskEmail } from "@/src/server/observability";
+import { logServerError, logServerInfo, maskEmail } from "@/server/observability";
 
 function getResendApiKey() {
   const apiKey = process.env.RESEND_API_KEY?.trim();

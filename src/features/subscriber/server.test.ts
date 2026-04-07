@@ -32,7 +32,7 @@ const prismaMock = vi.hoisted(() => {
   };
 });
 
-vi.mock("@/src/server/prisma", () => prismaMock);
+vi.mock("@/server/prisma", () => prismaMock);
 
 import {
   cleanupExpiredOneTimeCodes,
@@ -48,7 +48,7 @@ import {
   storeOneTimeCode,
   upsertSubscriber,
   verifySubscriberSessionToken,
-} from "@/src/features/subscriber/server";
+} from "@/features/subscriber/server";
 
 describe("subscriber server", () => {
   beforeEach(() => {

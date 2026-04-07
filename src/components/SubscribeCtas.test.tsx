@@ -23,7 +23,7 @@ vi.mock("next/link", () => ({
   ),
 }));
 
-vi.mock("@/src/components/NewsTicker", () => ({
+vi.mock("@/components/NewsTicker", () => ({
   default: () => <div>NewsTicker</div>,
 }));
 
@@ -32,10 +32,10 @@ vi.mock("lucide-react", () => ({
   Send: () => <svg />,
 }));
 
-import FooterClient from "@/src/components/FooterClient";
-import Hero from "@/src/components/Hero";
-import RecentNewsletters from "@/src/components/RecentNewsletters";
-import RecentNewslettersPreview from "@/src/components/RecentNewslettersPreview";
+import FooterClient from "@/components/FooterClient";
+import Hero from "@/components/Hero";
+import RecentNewsletters from "@/components/RecentNewsletters";
+import RecentNewslettersPreview from "@/components/RecentNewslettersPreview";
 
 describe("subscribe CTA visibility", () => {
   it("hides the hero subscribe button for signed-in readers", () => {

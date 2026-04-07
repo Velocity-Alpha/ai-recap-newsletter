@@ -1,5 +1,5 @@
-import HeaderClient from '@/src/components/HeaderClient'
-import { hasActiveSubscriberSession } from '@/src/features/subscriber/server'
+import HeaderClient from '@/components/HeaderClient'
+import { hasActiveSubscriberSession } from '@/features/subscriber/session'
 
 type HeaderProps = {
   showSubscribeButton?: boolean

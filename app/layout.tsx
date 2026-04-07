@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Libre_Baskerville, Source_Sans_3 } from "next/font/google";
-import GoogleAnalytics from "@/src/components/GoogleAnalytics";
-import ScrollProgress from "@/src/components/ScrollProgress";
+import GoogleAnalytics from "@/components/GoogleAnalytics";
+import ScrollProgress from "@/components/ScrollProgress";
 import "./globals.css";
 
 const gaMeasurementId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID?.trim();

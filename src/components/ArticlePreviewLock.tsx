@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import { getArticlePreviewHeight } from "@/src/components/articlePreview";
+import { getArticlePreviewHeight } from "@/components/articlePreview";
 
 export default function ArticlePreviewLock({
   children,

@@ -4,9 +4,9 @@ const serviceFns = vi.hoisted(() => ({
   unsubscribeSubscriberByToken: vi.fn(),
 }));
 
-vi.mock("@/src/features/subscriber/service", () => serviceFns);
+vi.mock("@/features/subscriber/service", () => serviceFns);
 
-import { GET, POST } from "@/app/api/subscriber/unsubscribe/route";
+import { GET, POST } from "./route";
 
 describe("/api/subscriber/unsubscribe", () => {
   beforeEach(() => {

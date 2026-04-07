@@ -4,9 +4,9 @@ const serverFns = vi.hoisted(() => ({
   getCachedNewsletterIssueApiResponseBySlug: vi.fn(),
 }));
 
-vi.mock("@/src/features/newsletter/server", () => serverFns);
+vi.mock("@/features/newsletter/server", () => serverFns);
 
-import { GET } from "@/app/api/issues/[slug]/route";
+import { GET } from "./route";
 
 describe("GET /api/issues/[slug]", () => {
   beforeEach(() => {

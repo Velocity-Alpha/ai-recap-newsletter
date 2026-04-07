@@ -1,9 +1,9 @@
 import NewsletterCard from "./NewsletterCard";
-import { Newsletter } from "../types/newsletter.types";
+import type { NewsletterListItem } from "@/features/newsletter/types";
 import Link from "next/link";
 
 interface RecentNewslettersPreviewProps {
-  newsletters: Newsletter[];
+  newsletters: NewsletterListItem[];
   showSubscribeButton?: boolean;
 }
 

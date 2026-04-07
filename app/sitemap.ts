@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { getSafeCachedPublishedNewsletterEntries } from "@/src/features/newsletter/server";
+import { getSafeCachedPublishedNewsletterEntries } from "@/features/newsletter/server";
 
 function getSiteUrl() {
     return process.env.NEXT_PUBLIC_SITE_URL?.trim()

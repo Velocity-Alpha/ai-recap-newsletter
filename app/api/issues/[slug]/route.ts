@@ -1,4 +1,4 @@
-import { getCachedNewsletterIssueApiResponseBySlug } from "@/src/features/newsletter/server";
+import { getCachedNewsletterIssueApiResponseBySlug } from "@/features/newsletter/server";
 import {
   createRequestLogContext,
   jsonWithRequestId,
@@ -6,7 +6,7 @@ import {
   logRequestStart,
   logRequestSuccess,
   logRequestWarning,
-} from "@/src/server/observability";
+} from "@/server/observability";
 
 export const runtime = "nodejs";
 

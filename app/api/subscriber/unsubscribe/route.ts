@@ -1,5 +1,5 @@
-import { unsubscribeSubscriberByToken } from "@/src/features/subscriber/service";
-import type { UnsubscribeResponse } from "@/src/features/subscriber/types";
+import { unsubscribeSubscriberByToken } from "@/features/subscriber/service";
+import type { UnsubscribeResponse } from "@/features/subscriber/types";
 import {
   createRequestLogContext,
   jsonWithRequestId,
@@ -7,7 +7,7 @@ import {
   logRequestStart,
   logRequestSuccess,
   logRequestWarning,
-} from "@/src/server/observability";
+} from "@/server/observability";
 
 // Public unsubscribe endpoint for signed tokens only.
 // This exists for email-link/browser flows and must never accept raw email addresses.

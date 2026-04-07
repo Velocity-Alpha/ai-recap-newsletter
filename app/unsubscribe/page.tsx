@@ -1,6 +1,6 @@
-import Footer from "@/src/components/Footer";
-import Header from "@/src/components/Header";
-import { unsubscribeSubscriberByToken } from "@/src/features/subscriber/service";
+import Footer from "@/components/Footer";
+import Header from "@/components/Header";
+import { unsubscribeSubscriberByToken } from "@/features/subscriber/service";
 
 // Browser-facing unsubscribe page for signed links such as /unsubscribe?token=...
 // Keep this separate from the GHL webhook path so humans never need to know webhook secrets.

@@ -1,8 +1,8 @@
 'use client'
 
-import FadeInView from '@/src/components/for-brands/FadeInView'
-import TextReveal from '@/src/components/for-brands/TextReveal'
-import ForBrandsContactForm from '@/src/components/ForBrandsContactForm'
+import FadeInView from '@/components/for-brands/FadeInView'
+import TextReveal from '@/components/for-brands/TextReveal'
+import ForBrandsContactForm from '@/components/ForBrandsContactForm'
 
 export default function CtaSection() {
   return (

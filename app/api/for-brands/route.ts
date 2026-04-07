@@ -6,7 +6,7 @@ import {
   logRequestSuccess,
   logRequestWarning,
   maskEmail,
-} from "@/src/server/observability";
+} from "@/server/observability";
 
 const DEFAULT_FOR_BRANDS_WEBHOOK_URL =
   "https://services.leadconnectorhq.com/hooks/fDAdpJZcGhmldVYsosCp/webhook-trigger/010cd443-f883-4f43-a3e9-96af35e039de";

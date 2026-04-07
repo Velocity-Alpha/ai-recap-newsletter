@@ -7,14 +7,14 @@ import {
   Wrench,
 } from "lucide-react";
 
-import { formatNewsletterDate, formatNewsletterDateWithWeekday } from "@/src/utils/dateFormatter";
+import { formatNewsletterDate, formatNewsletterDateWithWeekday } from "@/features/newsletter/formatters/date";
 import type {
   HighlightBullet,
   NewsletterCompactListItemV2,
   NewsletterFeatureItemV2,
   NewsletterLinkListItemV2,
   ParsedNewsletterIssueV2,
-} from "@/src/features/newsletter/types";
+} from "@/features/newsletter/types";
 
 const LINK_ACCENT = "#b7410e";
 

@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import NewsTicker from './NewsTicker';
-import type { TickerStats, TickerStory } from '@/src/features/newsletter/repository';
+import type { TickerStats, TickerStory } from '@/features/newsletter/repository';
 
 const SUBSCRIBER_COUNT_START = 2309;
 const SUBSCRIBER_COUNT_TARGET = 10000;

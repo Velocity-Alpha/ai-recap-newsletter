@@ -2,11 +2,11 @@ import React from "react";
 import Link from "next/link";
 import NewsletterCard from "./NewsletterCard";
 import Pagination from "./Pagination";
-import { Newsletter } from "../types/newsletter.types";
+import type { NewsletterListItem } from "@/features/newsletter/types";
 import { Newspaper, Send } from "lucide-react";
 
 interface RecentNewslettersProps {
-  newsletters: Newsletter[];
+  newsletters: NewsletterListItem[];
   currentPage: number;
   totalPages: number;
   showSubscribeButton?: boolean;

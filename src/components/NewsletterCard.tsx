@@ -1,14 +1,14 @@
 'use client'
 import React from "react";
-import { Newsletter } from "../types/newsletter.types";
-import { formatNewsletterDate } from "../utils/dateFormatter";
+import type { NewsletterListItem } from "@/features/newsletter/types";
+import { formatNewsletterDate } from "@/features/newsletter/formatters/date";
+import { getTrimmedImageUrl } from "@/features/newsletter/media";
 import { MessageSquare } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { getTrimmedImageUrl } from "../lib/utils";
 
 interface Props {
-  item: Newsletter;
+  item: NewsletterListItem;
 }
 
 const NewsletterCard: React.FC<Props> = ({ item }) => {

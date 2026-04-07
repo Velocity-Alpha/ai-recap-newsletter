@@ -7,20 +7,29 @@ import {
   unsubscribeSubscriberByToken,
   unsubscribeSubscriberFromWebhook,
   verifySubscriberSignInCode,
-} from "@/src/features/subscriber/service";
+} from "@/features/subscriber/service";
 
 const serverFns = vi.hoisted(() => ({
+  findSubscriberByEmail: vi.fn(),
+  markSubscriberUnsubscribed: vi.fn(),
+  touchSubscriberSeenAt: vi.fn(),
+  upsertSubscriber: vi.fn(),
+}));
+
+const identityFns = vi.hoisted(() => ({
+  isValidSubscriberEmail: vi.fn(),
+  normalizeSubscriberEmail: vi.fn(),
+}));
+
+const otpFns = vi.hoisted(() => ({
   cleanupExpiredOneTimeCodes: vi.fn(),
   consumeOneTimeCode: vi.fn(),
   createOneTimeCode: vi.fn(),
   deleteOneTimeCode: vi.fn(),
-  findSubscriberByEmail: vi.fn(),
-  isValidSubscriberEmail: vi.fn(),
-  markSubscriberUnsubscribed: vi.fn(),
-  normalizeSubscriberEmail: vi.fn(),
   storeOneTimeCode: vi.fn(),
-  touchSubscriberSeenAt: vi.fn(),
-  upsertSubscriber: vi.fn(),
+}));
+
+const tokenFns = vi.hoisted(() => ({
   verifySubscriberUnsubscribeToken: vi.fn(),
 }));
 
@@ -32,16 +41,19 @@ const emailFns = vi.hoisted(() => ({
   sendSubscriberOtpEmail: vi.fn(),
 }));
 
-vi.mock("@/src/features/subscriber/server", () => serverFns);
-vi.mock("@/src/features/subscriber/ghl", () => ghlFns);
-vi.mock("@/src/features/subscriber/email", () => emailFns);
+vi.mock("@/features/subscriber/repository", () => serverFns);
+vi.mock("@/features/subscriber/identity", () => identityFns);
+vi.mock("@/features/subscriber/otp", () => otpFns);
+vi.mock("@/features/subscriber/tokens", () => tokenFns);
+vi.mock("@/features/subscriber/ghl", () => ghlFns);
+vi.mock("@/features/subscriber/email", () => emailFns);
 
 describe("subscriber service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    serverFns.isValidSubscriberEmail.mockReturnValue(true);
-    serverFns.normalizeSubscriberEmail.mockImplementation((email: string) => email.trim().toLowerCase());
-    serverFns.createOneTimeCode.mockReturnValue("123456");
+    identityFns.isValidSubscriberEmail.mockReturnValue(true);
+    identityFns.normalizeSubscriberEmail.mockImplementation((email: string) => email.trim().toLowerCase());
+    otpFns.createOneTimeCode.mockReturnValue("123456");
   });
 
   it("treats an active subscriber as an idempotent subscribe success", async () => {
@@ -139,7 +151,7 @@ describe("subscriber service", () => {
       firstName: "Reader",
       status: "active",
     });
-    serverFns.consumeOneTimeCode.mockResolvedValue(false);
+    otpFns.consumeOneTimeCode.mockResolvedValue(false);
 
     await expect(
       verifySubscriberSignInCode({
@@ -175,14 +187,14 @@ describe("subscriber service", () => {
   });
 
   it("ignores unsubscribe tokens that are missing or invalid", async () => {
-    serverFns.verifySubscriberUnsubscribeToken.mockReturnValue(null);
+    tokenFns.verifySubscriberUnsubscribeToken.mockReturnValue(null);
 
     await expect(unsubscribeSubscriberByToken({ token: "bad-token" })).resolves.toBeNull();
     expect(serverFns.markSubscriberUnsubscribed).not.toHaveBeenCalled();
   });
 
   it("marks a subscriber inactive from a signed unsubscribe token", async () => {
-    serverFns.verifySubscriberUnsubscribeToken.mockReturnValue({
+    tokenFns.verifySubscriberUnsubscribeToken.mockReturnValue({
       purpose: "unsubscribe",
       email: "reader@example.com",
       issuedAt: Date.now(),

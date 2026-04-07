@@ -1,7 +1,7 @@
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
 
-import { PrismaClient } from "@/src/generated/prisma";
+import { PrismaClient } from "@/generated/prisma";
 
 function getDatabaseUrl() {
   const databaseUrl = process.env.DATABASE_URL?.trim();

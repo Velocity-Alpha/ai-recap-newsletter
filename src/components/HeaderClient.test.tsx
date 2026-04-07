@@ -23,7 +23,7 @@ vi.mock("next/link", () => ({
   ),
 }));
 
-import HeaderClient from "@/src/components/HeaderClient";
+import HeaderClient from "@/components/HeaderClient";
 
 describe("HeaderClient", () => {
   it("hides subscribe buttons for signed-in readers", () => {

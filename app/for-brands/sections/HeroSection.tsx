@@ -3,8 +3,8 @@
 import Link from 'next/link'
 import { ArrowRight } from 'lucide-react'
 import { motion } from 'framer-motion'
-import TextReveal from '@/src/components/for-brands/TextReveal'
-import FadeInView from '@/src/components/for-brands/FadeInView'
+import TextReveal from '@/components/for-brands/TextReveal'
+import FadeInView from '@/components/for-brands/FadeInView'
 
 const PROOF_POINTS = [
   { label: 'Your time', value: '5-min review' },

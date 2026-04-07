@@ -19,7 +19,7 @@ const parseNewsletterDate = (rawDate: string): Date | null => {
     ? new Date(
         Number(dateOnlyMatch[1]),
         Number(dateOnlyMatch[2]) - 1,
-        Number(dateOnlyMatch[3])
+        Number(dateOnlyMatch[3]),
       )
     : new Date(rawDate);
 

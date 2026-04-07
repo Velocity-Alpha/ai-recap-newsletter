@@ -1,5 +1,5 @@
-import FooterClient from '@/src/components/FooterClient'
-import { hasActiveSubscriberSession } from '@/src/features/subscriber/server'
+import FooterClient from '@/components/FooterClient'
+import { hasActiveSubscriberSession } from '@/features/subscriber/session'
 
 type FooterProps = {
   showSubscribeLink?: boolean

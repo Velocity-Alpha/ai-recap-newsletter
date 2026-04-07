@@ -1,11 +1,11 @@
-import { getCachedNewsletterListPage } from "@/src/features/newsletter/server";
+import { getCachedNewsletterListPage } from "@/features/newsletter/server";
 import {
   createRequestLogContext,
   jsonWithRequestId,
   logRequestError,
   logRequestStart,
   logRequestSuccess,
-} from "@/src/server/observability";
+} from "@/server/observability";
 
 export const runtime = "nodejs";
 

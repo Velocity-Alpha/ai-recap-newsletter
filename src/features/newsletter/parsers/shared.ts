@@ -1,5 +1,5 @@
-import { getTrimmedImageUrl } from "@/src/lib/utils";
-import type { NewsletterIssueApiResponse, NewsletterSchemaVersion, ParsedNewsletterIssueBase } from "@/src/features/newsletter/types";
+import { getTrimmedImageUrl } from "@/features/newsletter/media";
+import type { NewsletterIssueApiResponse, NewsletterSchemaVersion, ParsedNewsletterIssueBase } from "@/features/newsletter/types";
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);

@@ -1,5 +1,5 @@
-import { requestSubscriberSignInCode, SubscriberError } from "@/src/features/subscriber/service";
-import type { RequestCodeResponse } from "@/src/features/subscriber/types";
+import { requestSubscriberSignInCode, SubscriberError } from "@/features/subscriber/service";
+import type { RequestCodeResponse } from "@/features/subscriber/types";
 import {
   createRequestLogContext,
   jsonWithRequestId,
@@ -8,7 +8,7 @@ import {
   logRequestSuccess,
   logRequestWarning,
   maskEmail,
-} from "@/src/server/observability";
+} from "@/server/observability";
 
 export async function POST(request: Request) {
   const context = createRequestLogContext("api.subscriber.request-code", request);

@@ -8,8 +8,8 @@ import {
   Wrench,
 } from "lucide-react";
 
-import { formatNewsletterDate } from "@/src/utils/dateFormatter";
-import type { ParsedNewsletterIssueV1, NewsletterStoryV1 } from "@/src/features/newsletter/types";
+import { formatNewsletterDate } from "@/features/newsletter/formatters/date";
+import type { ParsedNewsletterIssueV1, NewsletterStoryV1 } from "@/features/newsletter/types";
 
 const LINK_ACCENT = "#b7410e";
 

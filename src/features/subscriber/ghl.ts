@@ -1,5 +1,5 @@
-import { normalizeSubscriberEmail } from "@/src/features/subscriber/server";
-import { logServerError, logServerInfo, logServerWarn, maskEmail } from "@/src/server/observability";
+import { normalizeSubscriberEmail } from "@/features/subscriber/identity";
+import { logServerError, logServerInfo, logServerWarn, maskEmail } from "@/server/observability";
 
 function getGhlSubscribeWebhookUrl() {
   const webhookUrl = process.env.GHL_SUBSCRIBE_WEBHOOK_URL?.trim();

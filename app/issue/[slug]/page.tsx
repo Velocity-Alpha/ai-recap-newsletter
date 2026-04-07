@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
-import { fetchNewsletterIssueBySlug } from "@/src/features/newsletter/server";
-import NewsletterContent from "./NewsletterContent";
+import { buildNewsletterIssueJsonLd, buildNewsletterIssueMetadata } from "@/features/newsletter/page";
+import { fetchNewsletterIssueBySlug } from "@/features/newsletter/server";
+import NewsletterIssuePage from "@/features/newsletter/ui/NewsletterIssuePage";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -10,32 +11,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const { slug } = await params;
   const issue = await fetchNewsletterIssueBySlug(slug);
 
-  if (!issue) {
-    return {};
-  }
-
-  return {
-    title: `${issue.title} | AI Recap`,
-    description: issue.description,
-    alternates: {
-      canonical: `/issue/${slug}`,
-    },
-    openGraph: {
-      type: "article",
-      title: issue.title,
-      description: issue.description,
-      publishedTime: issue.issueDate ?? issue.publishedAt ?? undefined,
-      ...(issue.imageUrl && {
-        images: [{ url: issue.imageUrl, alt: issue.title }],
-      }),
-    },
-    twitter: {
-      card: "summary_large_image",
-      title: issue.title,
-      description: issue.description,
-      ...(issue.imageUrl && { images: [issue.imageUrl] }),
-    },
-  };
+  return buildNewsletterIssueMetadata(issue, `/issue/${slug}`);
 }
 
 export default async function Page({ params }: PageProps) {
@@ -43,25 +19,9 @@ export default async function Page({ params }: PageProps) {
   const issue = await fetchNewsletterIssueBySlug(slug);
 
   if (!issue) {
-    return <NewsletterContent issue={null} />;
+    return <NewsletterIssuePage issue={null} />;
   }
-
-  const jsonLd = {
-    "@context": "https://schema.org",
-    "@type": "NewsArticle",
-    headline: issue.title,
-    description: issue.description,
-    ...(issue.imageUrl && { image: issue.imageUrl }),
-    datePublished: issue.issueDate ?? issue.publishedAt ?? undefined,
-    publisher: {
-      "@type": "Organization",
-      name: "AI Recap",
-      logo: {
-        "@type": "ImageObject",
-        url: "https://airecap.news/logo/OG-Logo.jpg",
-      },
-    },
-  };
+  const jsonLd = buildNewsletterIssueJsonLd(issue);
 
   return (
     <>
@@ -69,7 +29,7 @@ export default async function Page({ params }: PageProps) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <NewsletterContent issue={issue} />
+      <NewsletterIssuePage issue={issue} />
     </>
   );
 }

@@ -1,5 +1,5 @@
 'use client'
-import type { TickerStats, TickerStory } from '@/src/features/newsletter/repository';
+import type { TickerStats, TickerStory } from '@/features/newsletter/repository';
 
 interface DisplayTickerStory extends TickerStory {
   relativeTimeLabel?: string;

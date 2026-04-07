@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { sendSubscriberOtpEmail } from "@/src/features/subscriber/email";
+import { sendSubscriberOtpEmail } from "@/features/subscriber/email";
 
 describe("subscriber email", () => {
   const originalEnv = { ...process.env };

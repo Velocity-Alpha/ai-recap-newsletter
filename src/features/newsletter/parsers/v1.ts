@@ -1,4 +1,4 @@
-import type { NewsletterContentV1, NewsletterIssueApiResponse, ParsedNewsletterContentV1, ParsedNewsletterIssueV1, NewsletterOverviewV1, NewsletterStoryV1 } from "@/src/features/newsletter/types";
+import type { NewsletterContentV1, NewsletterIssueApiResponse, ParsedNewsletterContentV1, ParsedNewsletterIssueV1, NewsletterOverviewV1, NewsletterStoryV1 } from "@/features/newsletter/types";
 import { createIssueBase, getNumber, getString, getStringArray, isRecord } from "./shared";
 
 const EMPTY_CONTENT: ParsedNewsletterContentV1 = {

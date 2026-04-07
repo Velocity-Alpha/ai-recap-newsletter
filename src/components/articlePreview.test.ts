@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { getArticlePreviewHeight } from "@/src/components/articlePreview";
+import { getArticlePreviewHeight } from "@/components/articlePreview";
 
 describe("getArticlePreviewHeight", () => {
   it("uses a smaller preview height on mobile", () => {

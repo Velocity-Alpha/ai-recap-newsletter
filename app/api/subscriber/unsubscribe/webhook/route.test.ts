@@ -14,9 +14,9 @@ const serviceFns = vi.hoisted(() => ({
   unsubscribeSubscriberFromWebhook: vi.fn(),
 }));
 
-vi.mock("@/src/features/subscriber/service", () => serviceFns);
+vi.mock("@/features/subscriber/service", () => serviceFns);
 
-import { POST } from "@/app/api/subscriber/unsubscribe/webhook/route";
+import { POST } from "./route";
 
 describe("/api/subscriber/unsubscribe/webhook", () => {
   beforeEach(() => {

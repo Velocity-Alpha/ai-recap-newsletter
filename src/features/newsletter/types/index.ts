@@ -2,6 +2,7 @@ import type { ParsedNewsletterIssueBase } from "./shared";
 import type { ParsedNewsletterContentV1 } from "./v1";
 import type { ParsedNewsletterContentV2 } from "./v2";
 
+export type { NewsletterListItem } from "./list";
 export type { HighlightBullet, NewsletterIssueApiResponse, NewsletterSchemaVersion, ParsedNewsletterIssueBase } from "./shared";
 export type { NewsletterContentV1, NewsletterOverviewV1, NewsletterStoryV1, ParsedNewsletterContentV1 } from "./v1";
 export type {

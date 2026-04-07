@@ -1,7 +1,7 @@
 'use client'
 
-import AnimatedCounter from '@/src/components/for-brands/AnimatedCounter'
-import FadeInView from '@/src/components/for-brands/FadeInView'
+import AnimatedCounter from '@/components/for-brands/AnimatedCounter'
+import FadeInView from '@/components/for-brands/FadeInView'
 
 const stats = [
   { value: 5, suffix: ' min', label: 'Your weekly commitment' },

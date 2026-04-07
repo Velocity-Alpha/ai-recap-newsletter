@@ -2,9 +2,9 @@
 
 import { Ghost, Megaphone, Clock } from 'lucide-react'
 import { motion } from 'framer-motion'
-import FadeInView from '@/src/components/for-brands/FadeInView'
-import TextReveal from '@/src/components/for-brands/TextReveal'
-import StaggerChildren, { staggerItem } from '@/src/components/for-brands/StaggerChildren'
+import FadeInView from '@/components/for-brands/FadeInView'
+import TextReveal from '@/components/for-brands/TextReveal'
+import StaggerChildren, { staggerItem } from '@/components/for-brands/StaggerChildren'
 
 const painPoints = [
   {

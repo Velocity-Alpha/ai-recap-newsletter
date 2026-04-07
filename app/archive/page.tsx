@@ -1,9 +1,9 @@
-import Header from '@/src/components/Header'
-import RecentNewsletters from '@/src/components/RecentNewsletters'
-import SubscribeNewsletter from '@/src/components/SubscribeNewsletter'
-import Footer from '@/src/components/Footer'
-import { getSafeCachedNewsletterListPage } from '@/src/features/newsletter/server'
-import { hasActiveSubscriberSession } from '@/src/features/subscriber/server'
+import Header from '@/components/Header'
+import RecentNewsletters from '@/components/RecentNewsletters'
+import SubscribeNewsletter from '@/components/SubscribeNewsletter'
+import Footer from '@/components/Footer'
+import { getSafeCachedNewsletterListPage } from '@/features/newsletter/server'
+import { hasActiveSubscriberSession } from '@/features/subscriber/session'
 import React from 'react'
 
 interface ArchivePageProps {

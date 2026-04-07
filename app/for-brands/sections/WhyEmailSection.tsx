@@ -1,7 +1,7 @@
 'use client'
 
 import { Mail, BookOpenText } from 'lucide-react'
-import FadeInView from '@/src/components/for-brands/FadeInView'
+import FadeInView from '@/components/for-brands/FadeInView'
 
 const comparisons = [
   {

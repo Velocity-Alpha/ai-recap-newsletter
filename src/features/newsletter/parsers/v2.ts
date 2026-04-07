@@ -7,7 +7,7 @@ import type {
   NewsletterLinkListItemV2,
   ParsedNewsletterContentV2,
   ParsedNewsletterIssueV2,
-} from "@/src/features/newsletter/types";
+} from "@/features/newsletter/types";
 import { createIssueBase, getNestedRecord, getNumber, getString, isRecord } from "./shared";
 
 const EMPTY_CONTENT: ParsedNewsletterContentV2 = {

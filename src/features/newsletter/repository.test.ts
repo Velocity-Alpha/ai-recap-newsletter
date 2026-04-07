@@ -7,7 +7,7 @@ const prismaMock = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("@/src/server/prisma", () => ({
+vi.mock("@/server/prisma", () => ({
   prisma: prismaMock,
 }));
 
@@ -17,7 +17,7 @@ import {
   fetchNewsletterListPage,
   fetchPublishedNewsletterEntries,
   fetchTickerFeed,
-} from "@/src/features/newsletter/repository";
+} from "@/features/newsletter/repository";
 
 describe("newsletter repository", () => {
   beforeEach(() => {

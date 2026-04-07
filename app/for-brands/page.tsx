@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 
-import Footer from '@/src/components/Footer'
-import Header from '@/src/components/Header'
+import Footer from '@/components/Footer'
+import Header from '@/components/Header'
 import HeroSection from './sections/HeroSection'
 import PainSection from './sections/PainSection'
 import SolutionSection from './sections/SolutionSection'

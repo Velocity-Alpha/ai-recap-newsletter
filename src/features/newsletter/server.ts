@@ -1,7 +1,7 @@
 import { unstable_cache } from "next/cache";
 
-import { parseNewsletterIssue } from "@/src/features/newsletter/parsers";
-import type { NewsletterIssueApiResponse, ParsedNewsletterIssue } from "@/src/features/newsletter/types";
+import { parseNewsletterIssue } from "@/features/newsletter/parsers";
+import type { NewsletterIssueApiResponse, ParsedNewsletterIssue } from "@/features/newsletter/types";
 import {
   type NewsletterListPage,
   type PublishedNewsletterEntry,
@@ -11,7 +11,7 @@ import {
   fetchNewsletterListPage,
   fetchPublishedNewsletterEntries,
   fetchTickerFeed,
-} from "@/src/features/newsletter/repository";
+} from "@/features/newsletter/repository";
 
 export const getCachedNewsletterIssueApiResponseById = unstable_cache(
   async (id: number) => fetchNewsletterIssueApiResponseById(id),

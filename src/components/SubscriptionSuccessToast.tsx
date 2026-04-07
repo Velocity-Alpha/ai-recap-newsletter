@@ -3,7 +3,7 @@
 import { CheckCircle2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import { SUBSCRIBED_TOAST_STORAGE_KEY } from "@/src/components/ArticleAccessGate";
+import { SUBSCRIBED_TOAST_STORAGE_KEY } from "@/components/ArticleAccessGate";
 
 export default function SubscriptionSuccessToast() {
   const [rendered, setRendered] = useState(false);
