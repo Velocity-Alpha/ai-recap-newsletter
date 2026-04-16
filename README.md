@@ -29,8 +29,9 @@ The app runs directly on Next.js in local development. No `netlify dev` proxy or
    - `SESSION_SECRET`
    - `RESEND_API_KEY`
    - `RESEND_FROM_EMAIL`
-   - `GHL_SUBSCRIBE_WEBHOOK_URL`
-   - `GHL_UNSUBSCRIBE_WEBHOOK_SECRET`
+   - `BEEHIIV_API_KEY`
+   - `BEEHIIV_PUBLICATION_ID`
+   - `BEEHIIV_UNSUBSCRIBE_WEBHOOK_SECRET`
 4. If this local database already existed before Prisma Migrate was introduced, mark the baseline once:
    ```bash
    npm run prisma:migrate:baseline
@@ -143,7 +144,7 @@ Mutation routes:
 - `POST /api/subscriber/verify-code`
 - `POST /api/subscriber/sign-out`
 - `GET|POST /api/subscriber/unsubscribe` with a signed `token`
-- `POST /api/subscriber/unsubscribe/webhook` with `Authorization: Bearer <GHL_UNSUBSCRIBE_WEBHOOK_SECRET>` or `x-webhook-secret`
+- `POST /api/subscriber/unsubscribe/webhook` with `Authorization: Bearer <BEEHIIV_UNSUBSCRIBE_WEBHOOK_SECRET>` or `x-webhook-secret`
 
 Public unsubscribe page:
 
@@ -167,8 +168,9 @@ Required environment variables:
 - `RESEND_API_KEY`
 - `RESEND_FROM_NAME`
 - `RESEND_FROM_EMAIL`
-- `GHL_SUBSCRIBE_WEBHOOK_URL`
-- `GHL_UNSUBSCRIBE_WEBHOOK_SECRET`
+- `BEEHIIV_API_KEY`
+- `BEEHIIV_PUBLICATION_ID`
+- `BEEHIIV_UNSUBSCRIBE_WEBHOOK_SECRET`
 - `FOR_BRANDS_WEBHOOK_URL` if you want to override the default for-brands destination
 - `NEXT_PUBLIC_SITE_URL`
 
