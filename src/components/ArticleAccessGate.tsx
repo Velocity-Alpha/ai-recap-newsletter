@@ -67,6 +67,15 @@ export default function ArticleAccessGate() {
     setStep("sign_in_code");
   }
 
+  async function submitSubscription() {
+    await postJson("/api/subscriber/subscribe", {
+      firstName,
+      email,
+      source: "article_gate",
+      path: pathname,
+    });
+  }
+
   async function handleEmailSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSubmitting(true);
@@ -103,13 +112,7 @@ export default function ArticleAccessGate() {
     setStatusMessage(null);
 
     try {
-      await postJson("/api/subscriber/subscribe", {
-        firstName,
-        email,
-        source: "article_gate",
-        path: pathname,
-      });
-
+      await submitSubscription();
       sessionStorage.setItem(SUBSCRIBED_TOAST_STORAGE_KEY, "1");
       router.refresh();
     } catch (submitError) {
