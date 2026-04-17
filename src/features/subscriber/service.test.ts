@@ -25,7 +25,7 @@ const serverFns = vi.hoisted(() => ({
 }));
 
 const ghlFns = vi.hoisted(() => ({
-  submitSubscriberToGhl: vi.fn(),
+  submitSubscriberToBeehiiv: vi.fn(),
 }));
 
 const emailFns = vi.hoisted(() => ({
@@ -33,7 +33,7 @@ const emailFns = vi.hoisted(() => ({
 }));
 
 vi.mock("@/src/features/subscriber/server", () => serverFns);
-vi.mock("@/src/features/subscriber/ghl", () => ghlFns);
+vi.mock("@/src/features/subscriber/beehiiv", () => ghlFns);
 vi.mock("@/src/features/subscriber/email", () => emailFns);
 
 describe("subscriber service", () => {
@@ -69,11 +69,11 @@ describe("subscriber service", () => {
       statusCode: 409,
       code: "already_subscribed",
     });
-    expect(ghlFns.submitSubscriberToGhl).not.toHaveBeenCalled();
+    expect(ghlFns.submitSubscriberToBeehiiv).not.toHaveBeenCalled();
     expect(serverFns.touchSubscriberSeenAt).not.toHaveBeenCalled();
   });
 
-  it("subscribes a new reader through GHL before creating local access", async () => {
+  it("subscribes a new reader through Beehiiv before creating local access", async () => {
     serverFns.findSubscriberByEmail.mockResolvedValue(null);
     serverFns.upsertSubscriber.mockResolvedValue({ id: 2, email: "reader@example.com", firstName: "Reader", status: "active" });
 
@@ -84,7 +84,7 @@ describe("subscriber service", () => {
       path: "/issue/test",
     });
 
-    expect(ghlFns.submitSubscriberToGhl).toHaveBeenCalledWith({
+    expect(ghlFns.submitSubscriberToBeehiiv).toHaveBeenCalledWith({
       firstName: "Reader",
       email: "reader@example.com",
       source: "article_gate",
