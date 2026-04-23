@@ -1,4 +1,5 @@
-export const subscriberWelcomeEmailTemplate = {
+export function buildSubscriberWelcomeEmail(siteUrl: string) {
+  return {
   subject: "Welcome to AI Recap",
   html: `
     <div style="display:none;font-size:1px;color:#ffffff;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;">
@@ -43,7 +44,7 @@ export const subscriberWelcomeEmailTemplate = {
                       <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 20px 0;">
                         <tr>
                           <td align="center" style="border:1px solid #e7e5e4;border-radius:8px;background-color:#ffffff;padding:12px;">
-                            <img src="https://beehiiv-images-production.s3.amazonaws.com/uploads/asset/file/c9e711a1-cc2f-416b-8b39-b83856149fbb/69b2f47abfc81f6c79bd7721.gif?t=1776774248" alt="Gmail: drag to Primary tab and star the email" width="560" style="display:block;width:100%;max-width:560px;height:auto;border:0;outline:none;text-decoration:none;" />
+                            <img src="${siteUrl}/uploads/email_one.gif" alt="Gmail: drag to Primary tab and star the email" width="560" style="display:block;width:100%;max-width:560px;height:auto;border:0;outline:none;text-decoration:none;" />
                           </td>
                         </tr>
                       </table>
@@ -52,7 +53,7 @@ export const subscriberWelcomeEmailTemplate = {
                       <table width="100%" cellpadding="0" cellspacing="0" border="0">
                         <tr>
                           <td align="center" style="border:1px solid #e7e5e4;border-radius:8px;background-color:#ffffff;padding:12px;">
-                            <img src="https://beehiiv-images-production.s3.amazonaws.com/uploads/asset/file/87b9c2e4-96ea-4fde-b240-ab8b4c8213ab/69b2f957005051f72f2e4aa6.gif?t=1776774268" alt="Outlook: drag from Other to Focused inbox" width="560" style="display:block;width:100%;max-width:560px;height:auto;border:0;outline:none;text-decoration:none;" />
+                            <img src="${siteUrl}/uploads/email_two.gif" alt="Outlook: drag from Other to Focused inbox" width="560" style="display:block;width:100%;max-width:560px;height:auto;border:0;outline:none;text-decoration:none;" />
                           </td>
                         </tr>
                       </table>
@@ -87,4 +88,5 @@ export const subscriberWelcomeEmailTemplate = {
     "Borna",
     "Founder, AI Recap",
   ].join("\n"),
-} as const;
+  } as const;
+}

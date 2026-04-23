@@ -4,7 +4,7 @@ import {
   sendSubscriberOtpEmail,
   sendSubscriberWelcomeEmail,
 } from "@/src/features/subscriber/email";
-import { subscriberWelcomeEmailTemplate } from "@/src/features/subscriber/welcomeEmailTemplate";
+import { buildSubscriberWelcomeEmail } from "@/src/features/subscriber/welcomeEmailTemplate";
 
 describe("subscriber email", () => {
   const originalEnv = { ...process.env };
@@ -83,8 +83,10 @@ describe("subscriber email", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [, request] = fetchMock.mock.calls[0];
     const body = JSON.parse(String(request.body));
-    expect(body.subject).toBe(subscriberWelcomeEmailTemplate.subject);
-    expect(body.html).toBe(subscriberWelcomeEmailTemplate.html);
-    expect(body.text).toBe(subscriberWelcomeEmailTemplate.text);
+    const expected = buildSubscriberWelcomeEmail("https://airecap.news");
+    expect(body.subject).toBe(expected.subject);
+    expect(body.text).toBe(expected.text);
+    expect(body.html).toContain('src="https://airecap.news/uploads/email_one.gif"');
+    expect(body.html).toContain('src="https://airecap.news/uploads/email_two.gif"');
   });
 });

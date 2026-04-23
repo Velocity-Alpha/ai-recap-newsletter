@@ -1,5 +1,5 @@
 import { logServerError, logServerInfo, maskEmail } from "@/src/server/observability";
-import { subscriberWelcomeEmailTemplate } from "@/src/features/subscriber/welcomeEmailTemplate";
+import { buildSubscriberWelcomeEmail } from "@/src/features/subscriber/welcomeEmailTemplate";
 
 function getResendApiKey() {
   const apiKey = process.env.RESEND_API_KEY?.trim();
@@ -25,12 +25,13 @@ function getResendFromName() {
   return process.env.RESEND_FROM_NAME?.trim() || "AI Recap";
 }
 
+
+// Get the site url from the environment variable - for the email templates to use absolute URLs for assets.
 function getSiteUrl() {
   return (
     process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
-    process.env.URL?.trim() ||
-    "https://airecap.news"
-  ).replace(/\/+$/, "");
+    process.env.URL?.trim()
+  )?.replace(/\/+$/, "") || "";
 }
 
 async function sendSubscriberEmail(input: {
@@ -115,11 +116,12 @@ export async function sendSubscriberOtpEmail(input: { email: string; code: strin
 }
 
 export async function sendSubscriberWelcomeEmail(input: { email: string }) {
+  const template = buildSubscriberWelcomeEmail(getSiteUrl());
   await sendSubscriberEmail({
     email: input.email,
-    subject: subscriberWelcomeEmailTemplate.subject,
-    html: subscriberWelcomeEmailTemplate.html,
-    text: subscriberWelcomeEmailTemplate.text,
+    subject: template.subject,
+    html: template.html,
+    text: template.text,
     eventName: "subscriber.welcome-email.send",
     errorMessage: "Could not send welcome email",
   });
