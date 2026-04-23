@@ -12,7 +12,10 @@ import {
   upsertSubscriber,
   verifySubscriberUnsubscribeToken,
 } from "@/src/features/subscriber/server";
-import { sendSubscriberOtpEmail } from "@/src/features/subscriber/email";
+import {
+  sendSubscriberOtpEmail,
+  sendSubscriberWelcomeEmail,
+} from "@/src/features/subscriber/email";
 import { submitSubscriberToBeehiiv } from "@/src/features/subscriber/beehiiv";
 import type { SubscriberRecord } from "@/src/features/subscriber/types";
 
@@ -85,6 +88,10 @@ export async function subscribeAndUpsertSubscriber(input: {
     firstName: normalizedFirstName,
     source: input.source,
     status: "active",
+  });
+
+  await sendSubscriberWelcomeEmail({
+    email: normalizedEmail,
   });
 
   return {

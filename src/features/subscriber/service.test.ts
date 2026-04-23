@@ -30,6 +30,7 @@ const ghlFns = vi.hoisted(() => ({
 
 const emailFns = vi.hoisted(() => ({
   sendSubscriberOtpEmail: vi.fn(),
+  sendSubscriberWelcomeEmail: vi.fn(),
 }));
 
 vi.mock("@/src/features/subscriber/server", () => serverFns);
@@ -95,6 +96,9 @@ describe("subscriber service", () => {
       firstName: "Reader",
       source: "article_gate",
       status: "active",
+    });
+    expect(emailFns.sendSubscriberWelcomeEmail).toHaveBeenCalledWith({
+      email: "reader@example.com",
     });
     expect(result.newlySubscribed).toBe(true);
   });
