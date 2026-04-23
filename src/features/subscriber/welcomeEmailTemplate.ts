@@ -33,7 +33,7 @@ export function buildSubscriberWelcomeEmail(siteUrl: string) {
                       <table cellpadding="0" cellspacing="0" border="0" style="margin-bottom:22px;">
                         <tr>
                           <td style="background-color:#78716c;border-radius:6px;">
-                            <a href="mailto:hello@airecap.news?subject=AI%20Recap&body=Hey%20Borna%2C%20I%27m%20human." style="display:inline-block;padding:12px 22px;font-size:14px;font-weight:700;color:#ffffff;text-decoration:none;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">CONFIRM EMAIL</a>
+                            <a href="mailto:hello@updates.airecap.news?subject=AI%20Recap&body=Hey%20Borna%2C%20I%27m%20human." style="display:inline-block;padding:12px 22px;font-size:14px;font-weight:700;color:#ffffff;text-decoration:none;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">CONFIRM EMAIL</a>
                           </td>
                         </tr>
                       </table>
