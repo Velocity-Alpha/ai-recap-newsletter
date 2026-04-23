@@ -12,8 +12,11 @@ import {
   upsertSubscriber,
   verifySubscriberUnsubscribeToken,
 } from "@/src/features/subscriber/server";
-import { sendSubscriberOtpEmail } from "@/src/features/subscriber/email";
-import { submitSubscriberToGhl } from "@/src/features/subscriber/ghl";
+import {
+  sendSubscriberOtpEmail,
+  sendSubscriberWelcomeEmail,
+} from "@/src/features/subscriber/email";
+import { submitSubscriberToBeehiiv } from "@/src/features/subscriber/beehiiv";
 import type { SubscriberRecord } from "@/src/features/subscriber/types";
 
 export class SubscriberError extends Error {
@@ -73,7 +76,7 @@ export async function subscribeAndUpsertSubscriber(input: {
     );
   }
 
-  await submitSubscriberToGhl({
+  await submitSubscriberToBeehiiv({
     firstName: normalizedFirstName,
     email: normalizedEmail,
     source: input.source,
@@ -85,6 +88,10 @@ export async function subscribeAndUpsertSubscriber(input: {
     firstName: normalizedFirstName,
     source: input.source,
     status: "active",
+  });
+
+  await sendSubscriberWelcomeEmail({
+    email: normalizedEmail,
   });
 
   return {

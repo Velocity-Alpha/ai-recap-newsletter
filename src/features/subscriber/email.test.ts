@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { sendSubscriberOtpEmail } from "@/src/features/subscriber/email";
+import {
+  sendSubscriberOtpEmail,
+  sendSubscriberWelcomeEmail,
+} from "@/src/features/subscriber/email";
+import { buildSubscriberWelcomeEmail } from "@/src/features/subscriber/welcomeEmailTemplate";
 
 describe("subscriber email", () => {
   const originalEnv = { ...process.env };
@@ -63,5 +67,26 @@ describe("subscriber email", () => {
         body: '{"message":"sender not verified"}',
       }),
     );
+  });
+
+  it("uses the shared welcome email template for new subscribers", async () => {
+    process.env.RESEND_FROM_EMAIL = "login@updates.airecap.news";
+    fetchMock.mockResolvedValue({
+      ok: true,
+      status: 202,
+    });
+
+    await sendSubscriberWelcomeEmail({
+      email: "reader@example.com",
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [, request] = fetchMock.mock.calls[0];
+    const body = JSON.parse(String(request.body));
+    const expected = buildSubscriberWelcomeEmail("https://airecap.news");
+    expect(body.subject).toBe(expected.subject);
+    expect(body.text).toBe(expected.text);
+    expect(body.html).toContain('src="https://airecap.news/uploads/email_one.gif"');
+    expect(body.html).toContain('src="https://airecap.news/uploads/email_two.gif"');
   });
 });

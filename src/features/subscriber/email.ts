@@ -1,4 +1,5 @@
 import { logServerError, logServerInfo, maskEmail } from "@/src/server/observability";
+import { buildSubscriberWelcomeEmail } from "@/src/features/subscriber/welcomeEmailTemplate";
 
 function getResendApiKey() {
   const apiKey = process.env.RESEND_API_KEY?.trim();
@@ -24,19 +25,26 @@ function getResendFromName() {
   return process.env.RESEND_FROM_NAME?.trim() || "AI Recap";
 }
 
+
+// Get the site url from the environment variable - for the email templates to use absolute URLs for assets.
 function getSiteUrl() {
   return (
     process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
-    process.env.URL?.trim() ||
-    "https://airecap.news"
-  ).replace(/\/+$/, "");
+    process.env.URL?.trim()
+  )?.replace(/\/+$/, "") || "";
 }
 
-export async function sendSubscriberOtpEmail(input: { email: string; code: string }) {
-  const logoUrl = `${getSiteUrl()}/logo/logo-padded.png`;
+async function sendSubscriberEmail(input: {
+  email: string;
+  subject: string;
+  html: string;
+  text: string;
+  eventName: string;
+  errorMessage: string;
+}) {
   const from = `${getResendFromName()} <${getResendFromEmail()}>`;
 
-  logServerInfo("subscriber.email.send.start", {
+  logServerInfo(`${input.eventName}.start`, {
     email: maskEmail(input.email),
     from,
   });
@@ -50,8 +58,40 @@ export async function sendSubscriberOtpEmail(input: { email: string; code: strin
     body: JSON.stringify({
       from,
       to: [input.email],
-      subject: "Your AI Recap sign-in code",
-      html: `
+      subject: input.subject,
+      html: input.html,
+      text: input.text,
+    }),
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    const responseBody = await response.text();
+
+    logServerError(`${input.eventName}.failure`, new Error(`Resend responded with ${response.status}`), {
+      email: maskEmail(input.email),
+      status: response.status,
+      statusText: response.statusText,
+      body: responseBody,
+      from,
+    });
+
+    throw new Error(`${input.errorMessage} (status ${response.status}).`);
+  }
+
+  logServerInfo(`${input.eventName}.success`, {
+    email: maskEmail(input.email),
+    from,
+    status: response.status,
+  });
+}
+
+export async function sendSubscriberOtpEmail(input: { email: string; code: string }) {
+  const logoUrl = `${getSiteUrl()}/logo/logo-padded.png`;
+  await sendSubscriberEmail({
+    email: input.email,
+    subject: "Your AI Recap sign-in code",
+    html: `
         <div style="font-family: 'Source Sans 3', Arial, sans-serif; background:#f7f6f3; padding:32px; color:#2c3e4a;">
           <div style="max-width:640px; margin:0 auto; background:#ffffff; border:1px solid #e8edf0; border-radius:24px; padding:48px 40px;">
             <div style="margin:0 auto 32px; text-align:center;">
@@ -69,28 +109,20 @@ export async function sendSubscriberOtpEmail(input: { email: string; code: strin
           </div>
         </div>
       `,
-      text: `Your AI Recap sign-in code is ${input.code}. It expires in 10 minutes.`,
-    }),
-    cache: "no-store",
+    text: `Your AI Recap sign-in code is ${input.code}. It expires in 10 minutes.`,
+    eventName: "subscriber.email.send",
+    errorMessage: "Could not send OTP email",
   });
+}
 
-  if (!response.ok) {
-    const responseBody = await response.text();
-
-    logServerError("subscriber.email.send.failure", new Error(`Resend responded with ${response.status}`), {
-      email: maskEmail(input.email),
-      status: response.status,
-      statusText: response.statusText,
-      body: responseBody,
-      from,
-    });
-
-    throw new Error(`Could not send OTP email (status ${response.status}).`);
-  }
-
-  logServerInfo("subscriber.email.send.success", {
-    email: maskEmail(input.email),
-    from,
-    status: response.status,
+export async function sendSubscriberWelcomeEmail(input: { email: string }) {
+  const template = buildSubscriberWelcomeEmail(getSiteUrl());
+  await sendSubscriberEmail({
+    email: input.email,
+    subject: template.subject,
+    html: template.html,
+    text: template.text,
+    eventName: "subscriber.welcome-email.send",
+    errorMessage: "Could not send welcome email",
   });
 }

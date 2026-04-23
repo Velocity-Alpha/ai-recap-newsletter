@@ -60,6 +60,15 @@ export default function SubscribeNewsletter() {
     setStep("sign_in_code");
   }
 
+  async function submitSubscription() {
+    await postJson("/api/subscriber/subscribe", {
+      firstName,
+      email,
+      source: "homepage",
+      path: "/",
+    });
+  }
+
   async function handleEmailSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSubmitting(true);
@@ -88,12 +97,7 @@ export default function SubscribeNewsletter() {
     setStatusMessage(null);
 
     try {
-      await postJson("/api/subscriber/subscribe", {
-        firstName,
-        email,
-        source: "homepage",
-        path: "/",
-      });
+      await submitSubscription();
       setStep("subscribed");
     } catch (submitError) {
       if (submitError instanceof ApiRequestError && submitError.code === "already_subscribed") {
