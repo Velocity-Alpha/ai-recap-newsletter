@@ -15,7 +15,11 @@ function parseCookieHeader(cookieHeader: string | null): Map<string, string> {
   for (const cookie of cookieHeader.split(";")) {
     const [rawName, ...rawValueParts] = cookie.trim().split("=");
     if (!rawName || rawValueParts.length === 0) continue;
-    cookies.set(rawName, decodeURIComponent(rawValueParts.join("=")));
+    try {
+      cookies.set(rawName, decodeURIComponent(rawValueParts.join("=")));
+    } catch {
+      // malformed percent-encoding — skip this cookie
+    }
   }
 
   return cookies;
@@ -23,7 +27,10 @@ function parseCookieHeader(cookieHeader: string | null): Map<string, string> {
 
 export async function hasValidApprovalSession(request: Request): Promise<boolean> {
   const password = process.env.APPROVAL_PASSWORD;
-  if (!password) return true;
+  if (!password) {
+    // Only allow open access in non-production environments when the password is unconfigured.
+    return process.env.NODE_ENV !== "production";
+  }
 
   const expectedToken = await createApprovalSessionToken(password);
   const cookies = parseCookieHeader(request.headers.get("cookie"));

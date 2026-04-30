@@ -31,7 +31,11 @@ function LoginForm() {
 
     if (res.ok) {
       setRedirecting(true);
-      const redirect = searchParams.get("redirect") || "/approval";
+      const rawRedirect = searchParams.get("redirect") ?? "";
+      const redirect =
+        rawRedirect.startsWith("/") && !rawRedirect.startsWith("//")
+          ? rawRedirect
+          : "/approval";
       router.push(redirect);
     } else {
       setLoading(false);

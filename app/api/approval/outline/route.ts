@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { createApprovalOutlineData } from "@/src/features/newsletter/curation.service";
 import { hasValidApprovalSession } from "@/src/server/approval-auth";
+import { logServerError, logServerInfo } from "@/src/server/observability";
 
 function parseDateParam(value: string | null): Date {
   if (!value) return new Date();
@@ -17,11 +18,20 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const date = parseDateParam(searchParams.get("date"));
 
-  console.log("[approval:outline] api.request", { date: date.toISOString() });
+  logServerInfo("approval.outline.api.request", { date: date.toISOString() });
 
-  const data = await createApprovalOutlineData(date);
+  try {
+    const data = await createApprovalOutlineData(date);
 
-  console.log("[approval:outline] api.ready", { date: date.toISOString() });
+    logServerInfo("approval.outline.api.ready", { date: date.toISOString() });
 
-  return NextResponse.json(data);
+    return NextResponse.json(data);
+  } catch (error) {
+    logServerError("approval.outline.api.error", error, { date: date.toISOString() });
+
+    return NextResponse.json(
+      { error: "Failed to load approval outline data." },
+      { status: 500 }
+    );
+  }
 }

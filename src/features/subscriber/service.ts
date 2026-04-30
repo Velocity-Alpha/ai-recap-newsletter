@@ -90,8 +90,8 @@ export async function subscribeAndUpsertSubscriber(input: {
     status: "active",
   });
 
-  await sendSubscriberWelcomeEmail({
-    email: normalizedEmail,
+  Promise.resolve(sendSubscriberWelcomeEmail({ email: normalizedEmail })).catch((err) => {
+    console.error("[subscriber] welcome_email.failed", { email: normalizedEmail, err });
   });
 
   return {

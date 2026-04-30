@@ -22,7 +22,16 @@ export async function POST(request: Request) {
       return jsonWithRequestId(context, { error: "Unauthorized." }, { status: 401 });
     }
 
-    const payload = await request.json();
+    let payload: unknown;
+    try {
+      payload = await request.json();
+    } catch {
+      return jsonWithRequestId(
+        context,
+        { success: false, error: "Request body must be valid JSON." },
+        { status: 400 }
+      );
+    }
 
     // Validate N8N_WEBHOOK_JWT_SECRET exists
     const webhookSecret = process.env.N8N_WEBHOOK_JWT_SECRET;

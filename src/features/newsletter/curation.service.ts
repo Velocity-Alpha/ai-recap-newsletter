@@ -2,7 +2,7 @@ import { OpenRouter } from "@openrouter/sdk";
 import type { ChatMessages, ChatRequest } from "@openrouter/sdk/models";
 import { Prisma } from "@/src/generated/prisma";
 import { prisma } from "@/src/server/prisma";
-import { logServerError, logServerWarn } from "@/src/server/observability";
+import { logServerError, logServerInfo, logServerWarn } from "@/src/server/observability";
 
 interface StoryRecord {
   id: number;
@@ -438,13 +438,13 @@ function toDateOnlyIso(value: Date): string {
  */
 async function getReferencedStories(date: Date): Promise<StoryRecord[]> {
   const dateOnly = toDateOnlyIso(date);
-  console.log("[approval:outline] fetch.referenced.query", {
+  logServerInfo("approval.outline.fetch.referenced.query", {
     requestedDateIso: date.toISOString(),
     dateOnly,
   });
 
   const rows = await prisma.$queryRaw<RawStoryRow[]>(Prisma.sql`
-    SELECT DISTINCT ON (guid)
+    SELECT DISTINCT ON (COALESCE(guid, id::text))
       id,
       guid,
       day,
@@ -461,17 +461,7 @@ async function getReferencedStories(date: Date): Promise<StoryRecord[]> {
       AND used_in_publication_date >= ${dateOnly}::date - INTERVAL '2 days'
   `);
 
-  console.log("[approval:outline] fetch.referenced.rows", {
-    rowCount: rows.length,
-    sample: rows.slice(0, 10).map((row) => ({
-      id: row.id,
-      guid: row.guid,
-      day: row.day,
-      headline: row.headline,
-      usedWindowDate: dateOnly,
-      importance_score: row.importance_score,
-    })),
-  });
+  logServerInfo("approval.outline.fetch.referenced.rows", { rowCount: rows.length });
 
   return rows.map(toStoryRecord);
 }
@@ -484,13 +474,13 @@ async function getReferencedStories(date: Date): Promise<StoryRecord[]> {
  */
 async function getCandidateStories(date: Date): Promise<StoryRecord[]> {
   const dateOnly = toDateOnlyIso(date);
-  console.log("[approval:outline] fetch.candidates.query", {
+  logServerInfo("approval.outline.fetch.candidates.query", {
     requestedDateIso: date.toISOString(),
     dateOnly,
   });
 
   const rows = await prisma.$queryRaw<RawStoryRow[]>(Prisma.sql`
-    SELECT DISTINCT ON (guid)
+    SELECT DISTINCT ON (COALESCE(guid, id::text))
       id,
       guid,
       day,
@@ -515,18 +505,7 @@ async function getCandidateStories(date: Date): Promise<StoryRecord[]> {
       AND exclude_from_candidates IS FALSE
   `);
 
-  console.log("[approval:outline] fetch.candidates.rows", {
-    rowCount: rows.length,
-    sample: rows.slice(0, 12).map((row) => ({
-      id: row.id,
-      guid: row.guid,
-      day: row.day,
-      headline: row.headline,
-      url: row.url,
-      category: row.category,
-      importance_score: row.importance_score,
-    })),
-  });
+  logServerInfo("approval.outline.fetch.candidates.rows", { rowCount: rows.length });
 
   return rows.map(toStoryRecord);
 }
@@ -636,13 +615,12 @@ async function deduplicateWithAI(
     story_details: cleanText(s.story_details),
   }));
 
-  console.log("[approval:outline] dedup.start", {
+  logServerInfo("approval.outline.dedup.start", {
     incomingCount: incomingPayload.length,
     referencedCount: referencedPayload.length,
-    incomingIds: incomingPayload.slice(0, 12).map((story) => story.id),
   });
 
-  console.log("[approval:outline] dedup.provider", {
+  logServerInfo("approval.outline.dedup.provider", {
     provider: "openrouter",
     models: OPENROUTER_DEDUP_MODELS,
     hasApiKey: Boolean(apiKey),
@@ -710,7 +688,7 @@ ${JSON.stringify({
       )
     );
 
-    console.log("[approval:outline] dedup.openrouter_response", {
+    logServerInfo("approval.outline.dedup.openrouter_response", {
       responseModel: response.model,
       promptTokens: response.usage?.promptTokens ?? null,
       completionTokens: response.usage?.completionTokens ?? null,
@@ -723,8 +701,6 @@ ${JSON.stringify({
       return incomingStories.map((s) => s.id);
     }
 
-    console.log("[approval:outline] dedup.raw_response", textContent);
-
     const validIds = new Set(incomingStories.map((story) => story.id));
     const keptIds = parseDeduplicationKeptStoryIds(textContent, validIds);
     if (!keptIds) {
@@ -735,10 +711,7 @@ ${JSON.stringify({
       return incomingStories.map((s) => s.id);
     }
 
-    console.log("[approval:outline] dedup.result", {
-      keptCount: keptIds.length,
-      keptIds,
-    });
+    logServerInfo("approval.outline.dedup.result", { keptCount: keptIds.length });
 
     return keptIds;
   } catch (error) {
@@ -864,9 +837,7 @@ function createSectionBlueprints(
 export async function createApprovalOutlineData(
   date: Date
 ): Promise<ApprovalOutlineData> {
-  console.log("[approval:outline] create.start", {
-    date: date.toISOString(),
-  });
+  logServerInfo("approval.outline.create.start", { date: date.toISOString() });
 
   // Fetch stories
   const [referencedStories, candidateStories] = await Promise.all([
@@ -874,24 +845,15 @@ export async function createApprovalOutlineData(
     getCandidateStories(date),
   ]);
 
-  console.log("[approval:outline] fetch.result", {
+  logServerInfo("approval.outline.fetch.result", {
     referencedCount: referencedStories.length,
     candidateCount: candidateStories.length,
-    referencedIds: referencedStories.slice(0, 10).map((story) => story.id),
-    candidateIds: candidateStories.slice(0, 15).map((story) => story.id),
   });
 
   // Process and rank candidates
   const rankedCandidates = processAndRankStories(candidateStories);
 
-  console.log("[approval:outline] rank.result", {
-    rankedCount: rankedCandidates.length,
-    topRankedIds: rankedCandidates.slice(0, 15).map((story) => ({
-      id: story.id,
-      combined_score: story.combined_score,
-      category: story.category,
-    })),
-  });
+  logServerInfo("approval.outline.rank.result", { rankedCount: rankedCandidates.length });
 
   // AI deduplication
   const keptStoryIds = await deduplicateWithAI(rankedCandidates, referencedStories);
@@ -902,16 +864,15 @@ export async function createApprovalOutlineData(
     keptStoryIdSet.has(story.id)
   );
 
-  console.log("[approval:outline] dedup.filtered", {
+  logServerInfo("approval.outline.dedup.filtered", {
     keptCount: keptStoryIds.length,
     dedupedCount: dedupedStories.length,
-    dedupedIds: dedupedStories.slice(0, 15).map((story) => story.id),
   });
 
   // Group by category
   const grouped = groupStoriesByCategory(dedupedStories);
 
-  console.log("[approval:outline] grouped", {
+  logServerInfo("approval.outline.grouped", {
     researchCount: grouped.research.length,
     toolsCount: grouped.tools.length,
     generalCount: grouped.general.length,
@@ -948,16 +909,9 @@ export async function createApprovalOutlineData(
     }
   }
 
-  console.log("[approval:outline] final", {
+  logServerInfo("approval.outline.final", {
     sectionCount: candidate_sections.length,
-    sections: candidate_sections.map((section) => ({
-      key: section.key,
-      selectedCount: section.selected.length,
-      fillInCount: section.fill_ins.length,
-      selectedIds: section.selected.map((story) => story.id),
-      fillInIds: section.fill_ins.map((story) => story.id),
-    })),
-    selectedStoryIds: Array.from(selected_story_ids),
+    selectedStoryCount: selected_story_ids.size,
   });
 
   return {

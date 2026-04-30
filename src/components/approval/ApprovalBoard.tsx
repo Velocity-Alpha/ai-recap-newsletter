@@ -780,7 +780,7 @@ export default function ApprovalBoard({
                                       ? "border-[rgba(184,133,110,0.28)] bg-[rgba(255,244,236,0.92)] text-[var(--accent-warm)]"
                                       : "border-[var(--border-light)] text-[var(--text-muted)] hover:border-[rgba(184,133,110,0.28)] hover:text-[var(--accent-warm)]"
                                   }`}
-                                  aria-label={isExcluded ? "Included in issue" : "Exclude from issue"}
+                                  aria-label={isExcluded ? "Include in issue" : "Exclude from issue"}
                                 >
                                   <Trash2 className="h-3.5 w-3.5" />
                                 </button>

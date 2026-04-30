@@ -11,3 +11,5 @@ src/generated/prisma
 .netlify
 netlify/
 netlify/deno.lock
+# Developer-local MCP config
+.mcp.json
