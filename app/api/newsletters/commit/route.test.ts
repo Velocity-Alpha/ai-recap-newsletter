@@ -11,7 +11,7 @@ describe("POST /api/newsletters/commit", () => {
     vi.clearAllMocks();
     vi.stubGlobal("fetch", fetchMock);
     process.env.APPROVAL_PASSWORD = "approval-secret";
-    process.env.JWT_SECRET = "jwt-secret";
+    process.env.N8N_WEBHOOK_JWT_SECRET = "n8n-webhook-jwt-secret";
     process.env.OUTLINE_COMMIT_WEBHOOK_URL =
       "https://n8n.velocityalpha.com/webhook/story/approval";
   });

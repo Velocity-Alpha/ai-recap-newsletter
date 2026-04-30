@@ -33,7 +33,7 @@ The app runs directly on Next.js in local development. No `netlify dev` proxy or
    - `BEEHIIV_PUBLICATION_ID`
    - `GHL_UNSUBSCRIBE_WEBHOOK_SECRET`
    - `APPROVAL_PASSWORD`
-   - `JWT_SECRET`
+   - `N8N_WEBHOOK_JWT_SECRET`
    - `OPENROUTER_API_KEY`
 4. If this local database already existed before Prisma Migrate was introduced, mark the baseline once:
    ```bash
@@ -178,7 +178,7 @@ Required environment variables:
 - `BEEHIIV_PUBLICATION_ID`
 - `GHL_UNSUBSCRIBE_WEBHOOK_SECRET`
 - `APPROVAL_PASSWORD`
-- `JWT_SECRET`
+- `N8N_WEBHOOK_JWT_SECRET`
 - `OPENROUTER_API_KEY`
 - `FOR_BRANDS_WEBHOOK_URL` if you want to override the default for-brands destination
 - `NEXT_PUBLIC_SITE_URL`

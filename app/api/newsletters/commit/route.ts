@@ -24,10 +24,10 @@ export async function POST(request: Request) {
 
     const payload = await request.json();
 
-    // Validate JWT_SECRET exists
-    const jwtSecret = process.env.JWT_SECRET;
-    if (!jwtSecret) {
-      throw new Error("JWT_SECRET is not defined in environment variables");
+    // Validate N8N_WEBHOOK_JWT_SECRET exists
+    const webhookSecret = process.env.N8N_WEBHOOK_JWT_SECRET;
+    if (!webhookSecret) {
+      throw new Error("N8N_WEBHOOK_JWT_SECRET is not defined in environment variables");
     }
 
     const authClaims = {
@@ -37,7 +37,7 @@ export async function POST(request: Request) {
     };
 
     // Sign a plain-object JWT for webhook authentication.
-    const token = jwt.sign(authClaims, jwtSecret, {
+    const token = jwt.sign(authClaims, webhookSecret, {
       algorithm: "HS256",
       expiresIn: "1h", // Token expires in 1 hour
     });
