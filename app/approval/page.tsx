@@ -5,10 +5,10 @@ import { useSearchParams } from "next/navigation";
 
 import ApprovalBoard from "@/src/components/approval/ApprovalBoard";
 import {
-  type ApprovalDraftData,
-  readApprovalDraftCache,
-  writeApprovalDraftCache,
-} from "@/src/features/newsletter/approval-cache";
+  type ApprovalOutlineData,
+  readApprovalOutlineCache,
+  writeApprovalOutlineCache,
+} from "@/src/features/newsletter/approval-outline-cache";
 
 function parseDateKey(value: string | null): string {
   const candidate = value ? new Date(value) : new Date();
@@ -16,7 +16,7 @@ function parseDateKey(value: string | null): string {
   return date.toISOString().slice(0, 10);
 }
 
-function formatDraftDate(dateKey: string): string {
+function formatOutlineDate(dateKey: string): string {
   return new Intl.DateTimeFormat("en-US", {
     weekday: "long",
     month: "long",
@@ -72,46 +72,46 @@ function ErrorState({ message }: { message: string }) {
 export default function ApprovalPage() {
   const searchParams = useSearchParams();
   const dateKey = parseDateKey(searchParams.get("date"));
-  const [draftData, setDraftData] = useState<ApprovalDraftData | null>(null);
+  const [outlineData, setOutlineData] = useState<ApprovalOutlineData | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const cached = readApprovalDraftCache(dateKey);
+    const cached = readApprovalOutlineCache(dateKey);
     if (cached) {
       queueMicrotask(() => {
-        setDraftData(cached);
+        setOutlineData(cached);
       });
       return;
     }
 
-    console.log("[approval:cache] miss — fetching from API", { dateKey });
+    console.log("[approval:cache] miss - fetching outline from API", { dateKey });
 
     const params = new URLSearchParams({ date: dateKey });
-    fetch(`/api/approval/draft?${params}`)
+    fetch(`/api/approval/outline?${params}`)
       .then((res) => {
         if (!res.ok) throw new Error(`Server returned ${res.status}`);
-        return res.json() as Promise<ApprovalDraftData>;
+        return res.json() as Promise<ApprovalOutlineData>;
       })
       .then((data) => {
-        writeApprovalDraftCache(dateKey, data);
-        setDraftData(data);
+        writeApprovalOutlineCache(dateKey, data);
+        setOutlineData(data);
       })
       .catch((err: unknown) => {
         const message = err instanceof Error ? err.message : "Unknown error";
-        console.error("[approval:cache] fetch failed", { dateKey, message });
+        console.error("[approval:cache] outline fetch failed", { dateKey, message });
         setError(message);
       });
   }, [dateKey]);
 
   if (error) return <ErrorState message={error} />;
-  if (!draftData) return <LoadingState />;
+  if (!outlineData) return <LoadingState />;
 
   return (
     <ApprovalBoard
-      draftDateLabel={formatDraftDate(dateKey)}
-      referenceStories={draftData.reference_stories}
-      candidateSections={draftData.candidate_sections}
-      candidateMap={draftData.candidate_map}
+      outlineDateLabel={formatOutlineDate(dateKey)}
+      referenceStories={outlineData.reference_stories}
+      candidateSections={outlineData.candidate_sections}
+      candidateMap={outlineData.candidate_map}
     />
   );
 }

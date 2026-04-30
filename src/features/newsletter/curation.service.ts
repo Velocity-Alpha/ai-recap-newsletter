@@ -37,7 +37,7 @@ interface ReferenceStory {
   summary: string;
 }
 
-interface DraftApprovalData {
+interface ApprovalOutlineData {
   reference_stories: ReferenceStory[];
   candidate_sections: CandidateSection[];
   candidate_map: Record<
@@ -433,12 +433,12 @@ function toDateOnlyIso(value: Date): string {
  * Loads recently used stories for the requested publication date.
  *
  * These are not candidates. They are reference material for semantic
- * deduplication so the draft does not repeat stories that appeared in the
+ * deduplication so the outline does not repeat stories that appeared in the
  * last few issues.
  */
 async function getReferencedStories(date: Date): Promise<StoryRecord[]> {
   const dateOnly = toDateOnlyIso(date);
-  console.log("[approval:draft] fetch.referenced.query", {
+  console.log("[approval:outline] fetch.referenced.query", {
     requestedDateIso: date.toISOString(),
     dateOnly,
   });
@@ -461,7 +461,7 @@ async function getReferencedStories(date: Date): Promise<StoryRecord[]> {
       AND used_in_publication_date >= ${dateOnly}::date - INTERVAL '2 days'
   `);
 
-  console.log("[approval:draft] fetch.referenced.rows", {
+  console.log("[approval:outline] fetch.referenced.rows", {
     rowCount: rows.length,
     sample: rows.slice(0, 10).map((row) => ({
       id: row.id,
@@ -477,14 +477,14 @@ async function getReferencedStories(date: Date): Promise<StoryRecord[]> {
 }
 
 /**
- * Loads eligible unpublished candidate stories for the approval draft.
+ * Loads eligible unpublished candidate stories for the approval outline.
  *
  * The SQL filter keeps the candidate pool recent, sufficiently important,
  * usable as a source link, and not already consumed by a publication.
  */
 async function getCandidateStories(date: Date): Promise<StoryRecord[]> {
   const dateOnly = toDateOnlyIso(date);
-  console.log("[approval:draft] fetch.candidates.query", {
+  console.log("[approval:outline] fetch.candidates.query", {
     requestedDateIso: date.toISOString(),
     dateOnly,
   });
@@ -515,7 +515,7 @@ async function getCandidateStories(date: Date): Promise<StoryRecord[]> {
       AND exclude_from_candidates IS FALSE
   `);
 
-  console.log("[approval:draft] fetch.candidates.rows", {
+  console.log("[approval:outline] fetch.candidates.rows", {
     rowCount: rows.length,
     sample: rows.slice(0, 12).map((row) => ({
       id: row.id,
@@ -574,7 +574,7 @@ function processAndRankStories(
 
 /**
  * Identifies transient network failures where AI deduplication should be
- * skipped without blocking the rest of draft creation.
+ * skipped without blocking the rest of outline creation.
  */
 function isAiConnectionError(error: unknown): boolean {
   if (!(error instanceof Error)) {
@@ -602,7 +602,7 @@ function isAiConnectionError(error: unknown): boolean {
  *
  * The model compares candidates against recently used stories and against each
  * other, then returns the IDs that should remain. If OpenRouter is unavailable,
- * returns every incoming ID so draft generation can continue deterministically.
+ * returns every incoming ID so outline creation can continue deterministically.
  */
 async function deduplicateWithAI(
   incomingStories: ProcessedStory[],
@@ -636,13 +636,13 @@ async function deduplicateWithAI(
     story_details: cleanText(s.story_details),
   }));
 
-  console.log("[approval:draft] dedup.start", {
+  console.log("[approval:outline] dedup.start", {
     incomingCount: incomingPayload.length,
     referencedCount: referencedPayload.length,
     incomingIds: incomingPayload.slice(0, 12).map((story) => story.id),
   });
 
-  console.log("[approval:draft] dedup.provider", {
+  console.log("[approval:outline] dedup.provider", {
     provider: "openrouter",
     models: OPENROUTER_DEDUP_MODELS,
     hasApiKey: Boolean(apiKey),
@@ -710,7 +710,7 @@ ${JSON.stringify({
       )
     );
 
-    console.log("[approval:draft] dedup.openrouter_response", {
+    console.log("[approval:outline] dedup.openrouter_response", {
       responseModel: response.model,
       promptTokens: response.usage?.promptTokens ?? null,
       completionTokens: response.usage?.completionTokens ?? null,
@@ -723,7 +723,7 @@ ${JSON.stringify({
       return incomingStories.map((s) => s.id);
     }
 
-    console.log("[approval:draft] dedup.raw_response", textContent);
+    console.log("[approval:outline] dedup.raw_response", textContent);
 
     const validIds = new Set(incomingStories.map((story) => story.id));
     const keptIds = parseDeduplicationKeptStoryIds(textContent, validIds);
@@ -735,7 +735,7 @@ ${JSON.stringify({
       return incomingStories.map((s) => s.id);
     }
 
-    console.log("[approval:draft] dedup.result", {
+    console.log("[approval:outline] dedup.result", {
       keptCount: keptIds.length,
       keptIds,
     });
@@ -852,7 +852,7 @@ function createSectionBlueprints(
 }
 
 /**
- * Creates all data needed to render the newsletter draft approval screen.
+ * Creates all data needed to render the newsletter outline approval screen.
  *
  * Pipeline:
  * 1. Load recently published reference stories and unpublished candidates.
@@ -861,10 +861,10 @@ function createSectionBlueprints(
  * 4. Group survivors into editorial sections and fill-in pools.
  * 5. Return section data, a full story lookup map, and initially selected IDs.
  */
-export async function createDraftApprovalData(
+export async function createApprovalOutlineData(
   date: Date
-): Promise<DraftApprovalData> {
-  console.log("[approval:draft] create.start", {
+): Promise<ApprovalOutlineData> {
+  console.log("[approval:outline] create.start", {
     date: date.toISOString(),
   });
 
@@ -874,7 +874,7 @@ export async function createDraftApprovalData(
     getCandidateStories(date),
   ]);
 
-  console.log("[approval:draft] fetch.result", {
+  console.log("[approval:outline] fetch.result", {
     referencedCount: referencedStories.length,
     candidateCount: candidateStories.length,
     referencedIds: referencedStories.slice(0, 10).map((story) => story.id),
@@ -884,7 +884,7 @@ export async function createDraftApprovalData(
   // Process and rank candidates
   const rankedCandidates = processAndRankStories(candidateStories);
 
-  console.log("[approval:draft] rank.result", {
+  console.log("[approval:outline] rank.result", {
     rankedCount: rankedCandidates.length,
     topRankedIds: rankedCandidates.slice(0, 15).map((story) => ({
       id: story.id,
@@ -902,7 +902,7 @@ export async function createDraftApprovalData(
     keptStoryIdSet.has(story.id)
   );
 
-  console.log("[approval:draft] dedup.filtered", {
+  console.log("[approval:outline] dedup.filtered", {
     keptCount: keptStoryIds.length,
     dedupedCount: dedupedStories.length,
     dedupedIds: dedupedStories.slice(0, 15).map((story) => story.id),
@@ -911,7 +911,7 @@ export async function createDraftApprovalData(
   // Group by category
   const grouped = groupStoriesByCategory(dedupedStories);
 
-  console.log("[approval:draft] grouped", {
+  console.log("[approval:outline] grouped", {
     researchCount: grouped.research.length,
     toolsCount: grouped.tools.length,
     generalCount: grouped.general.length,
@@ -948,7 +948,7 @@ export async function createDraftApprovalData(
     }
   }
 
-  console.log("[approval:draft] final", {
+  console.log("[approval:outline] final", {
     sectionCount: candidate_sections.length,
     sections: candidate_sections.map((section) => ({
       key: section.key,

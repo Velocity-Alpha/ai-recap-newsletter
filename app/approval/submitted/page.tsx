@@ -12,7 +12,7 @@ export default function ApprovalSubmittedPage() {
             Successfully submitted.
           </h1>
           <p className="mt-4 text-base leading-7 text-[var(--text-secondary)]">
-            The approval payload has been sent. You can return to the board if you need to review another draft.
+            The approved outline has been committed for generation. You can return to the board if you need to review another outline.
           </p>
           <div className="mt-8 flex justify-center">
             <Link

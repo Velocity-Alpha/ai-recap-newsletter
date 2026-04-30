@@ -61,7 +61,7 @@ type ReferenceStory = {
 };
 
 type ApprovalBoardProps = {
-  draftDateLabel: string;
+  outlineDateLabel: string;
   referenceStories: ReferenceStory[];
   candidateSections: CandidateSection[];
   candidateMap: Record<string, CandidateMapEntry>;
@@ -106,16 +106,16 @@ function initSections(candidateSections: CandidateSection[]): SectionState[] {
 }
 
 export default function ApprovalBoard({
-  draftDateLabel,
+  outlineDateLabel,
   referenceStories,
   candidateSections,
   candidateMap,
 }: ApprovalBoardProps) {
   const router = useRouter();
-  const [publishModalOpen, setPublishModalOpen] = useState(false);
-  const [isPublishing, setIsPublishing] = useState(false);
-  const [publishResponseMessage, setPublishResponseMessage] = useState<string | null>(null);
-  const [publishErrorMessage, setPublishErrorMessage] = useState<string | null>(null);
+  const [commitModalOpen, setCommitModalOpen] = useState(false);
+  const [isCommitting, setIsCommitting] = useState(false);
+  const [commitResponseMessage, setCommitResponseMessage] = useState<string | null>(null);
+  const [commitErrorMessage, setCommitErrorMessage] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [previewStoryId, setPreviewStoryId] = useState<number | null>(null);
   const [sections, setSections] = useState<SectionState[]>(() => initSections(candidateSections));
@@ -289,7 +289,7 @@ export default function ApprovalBoard({
     const errors: string[] = [];
 
     if (!headlineStoryId) {
-      errors.push("Choose a newsletter headline before publishing.");
+      errors.push("Choose a newsletter headline before committing the outline.");
     }
 
     for (const section of totals.sections) {
@@ -312,7 +312,7 @@ export default function ApprovalBoard({
     return Array.from(new Set(errors));
   }, [excludeState, headlineStoryId, sections, totals.sections]);
 
-  const publishPayload = useMemo(() => {
+  const commitPayload = useMemo(() => {
     const candidateSections = sections.map((section) => {
       const selected = section.stories
         .filter((slot) => slot.status === "selected")
@@ -441,39 +441,39 @@ export default function ApprovalBoard({
     ];
   }, [candidateMap, excludeState, headlineStoryId, notesOverrides, sections, urlOverrides]);
 
-  const handlePublishDraft = () => {
-    setPublishResponseMessage(null);
-    setPublishErrorMessage(null);
-    setPublishModalOpen(true);
+  const handleCommitOutline = () => {
+    setCommitResponseMessage(null);
+    setCommitErrorMessage(null);
+    setCommitModalOpen(true);
   };
 
-  const handlePublishContinue = async () => {
-    setIsPublishing(true);
-    setPublishErrorMessage(null);
-    setPublishResponseMessage(null);
+  const handleCommitContinue = async () => {
+    setIsCommitting(true);
+    setCommitErrorMessage(null);
+    setCommitResponseMessage(null);
 
     try {
-      const response = await fetch("/api/newsletters/publish", {
+      const response = await fetch("/api/newsletters/commit", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(publishPayload),
+        body: JSON.stringify(commitPayload),
       });
 
       const result = (await response.json()) as { success?: boolean; message?: string; error?: string };
 
       if (!response.ok || !result.success) {
-        throw new Error(result.error || result.message || "Publish request failed.");
+        throw new Error(result.error || result.message || "Outline commit request failed.");
       }
 
-      setPublishResponseMessage(result.message || "Publish payload sent successfully.");
-      setPublishModalOpen(false);
+      setCommitResponseMessage(result.message || "Outline committed for generation.");
+      setCommitModalOpen(false);
       router.push("/approval/submitted");
     } catch (error) {
-      setPublishErrorMessage(error instanceof Error ? error.message : "Unknown publish error.");
+      setCommitErrorMessage(error instanceof Error ? error.message : "Unknown outline commit error.");
     } finally {
-      setIsPublishing(false);
+      setIsCommitting(false);
     }
   };
 
@@ -494,7 +494,7 @@ export default function ApprovalBoard({
           <div className="mx-2 h-4 w-px shrink-0 bg-[var(--border-light)]" />
 
           <div className="flex shrink-0 items-center rounded-full border border-[var(--border-light)] bg-white/70 px-3 py-1 text-[11px] font-medium text-[var(--text-secondary)]">
-            {draftDateLabel}
+            {outlineDateLabel}
           </div>
 
           {/* Per-section pills */}
@@ -537,10 +537,10 @@ export default function ApprovalBoard({
           <div className="ml-auto shrink-0 pl-2">
             <Button
               className="bg-[var(--text-primary)] px-3 py-1.5 text-xs text-white hover:bg-[var(--watercolor-ink)] disabled:cursor-not-allowed disabled:opacity-50"
-              onClick={handlePublishDraft}
+              onClick={handleCommitOutline}
               disabled={validationErrors.length > 0}
             >
-              Submit
+              Commit
             </Button>
           </div>
         </div>
@@ -915,32 +915,32 @@ export default function ApprovalBoard({
         </main>
       </div>
 
-      {/* Mobile publish bar */}
+      {/* Mobile commit bar */}
       <div className="pointer-events-none fixed inset-x-0 bottom-0 z-20 border-t border-[var(--border-light)] bg-[rgba(250,250,248,0.92)] px-4 py-3 backdrop-blur sm:hidden">
         <Button
           className="pointer-events-auto w-full bg-[var(--text-primary)] text-white hover:bg-[var(--watercolor-ink)] disabled:cursor-not-allowed disabled:opacity-50"
-          onClick={handlePublishDraft}
+          onClick={handleCommitOutline}
           disabled={validationErrors.length > 0}
         >
-          Submit
+          Commit
         </Button>
       </div>
 
-      {publishModalOpen ? (
+      {commitModalOpen ? (
         <div className="fixed inset-0 z-[60] flex items-end justify-center bg-[rgba(44,62,74,0.22)] p-0 backdrop-blur-[2px] sm:items-center sm:p-6">
           <div className="w-full max-w-2xl overflow-hidden rounded-t-[20px] border border-[var(--border-light)] bg-[var(--bg-card)] shadow-[0_30px_80px_rgba(61,79,95,0.22)] sm:rounded-[20px]">
             <div className="flex items-center justify-between border-b border-[var(--border-light)] px-5 py-4 sm:px-6">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--accent-primary)]">
-                  {validationErrors.length > 0 ? "Publish Blocked" : "Publish Summary"}
+                  {validationErrors.length > 0 ? "Commit Blocked" : "Commit Summary"}
                 </p>
                 <p className="mt-1 text-sm text-[var(--text-secondary)]">
                   {validationErrors.length > 0
                     ? "Resolve these issues before continuing."
-                    : "Everything looks ready. Review the draft summary before publish."}
+                    : "Everything looks ready. Review the outline summary before committing it to generation."}
                 </p>
               </div>
-              <Button variant="ghost" onClick={() => setPublishModalOpen(false)}>Close</Button>
+              <Button variant="ghost" onClick={() => setCommitModalOpen(false)}>Close</Button>
             </div>
 
             <div className="max-h-[70vh] overflow-y-auto px-5 py-5 sm:px-6">
@@ -961,15 +961,15 @@ export default function ApprovalBoard({
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {publishResponseMessage ? (
+                  {commitResponseMessage ? (
                     <div className="rounded-xl border border-[rgba(107,155,184,0.24)] bg-[rgba(232,242,248,0.7)] px-4 py-3 text-sm text-[var(--watercolor-ink)]">
-                      {publishResponseMessage}
+                      {commitResponseMessage}
                     </div>
                   ) : null}
 
-                  {publishErrorMessage ? (
+                  {commitErrorMessage ? (
                     <div className="rounded-xl border border-[rgba(184,133,110,0.28)] bg-[rgba(255,244,236,0.92)] px-4 py-3 text-sm text-[var(--accent-warm)]">
-                      {publishErrorMessage}
+                      {commitErrorMessage}
                     </div>
                   ) : null}
 
@@ -1003,12 +1003,12 @@ export default function ApprovalBoard({
             </div>
 
             <div className="flex items-center justify-end gap-3 border-t border-[var(--border-light)] px-5 py-4 sm:px-6">
-              <Button variant="outline" onClick={() => setPublishModalOpen(false)} disabled={isPublishing}>
+              <Button variant="outline" onClick={() => setCommitModalOpen(false)} disabled={isCommitting}>
                 Cancel
               </Button>
               {validationErrors.length === 0 ? (
-                <Button className="bg-[var(--text-primary)] text-white hover:bg-[var(--watercolor-ink)]" onClick={handlePublishContinue} disabled={isPublishing}>
-                  {isPublishing ? "Sending..." : "Continue"}
+                <Button className="bg-[var(--text-primary)] text-white hover:bg-[var(--watercolor-ink)]" onClick={handleCommitContinue} disabled={isCommitting}>
+                  {isCommitting ? "Committing..." : "Commit outline"}
                 </Button>
               ) : null}
             </div>

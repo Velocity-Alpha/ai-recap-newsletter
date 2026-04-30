@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { createDraftApprovalData } from "@/src/features/newsletter/curation.service";
+import { createApprovalOutlineData } from "@/src/features/newsletter/curation.service";
 import { hasValidApprovalSession } from "@/src/server/approval-auth";
 
 function parseDateParam(value: string | null): Date {
@@ -17,11 +17,11 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const date = parseDateParam(searchParams.get("date"));
 
-  console.log("[approval:draft] api.request", { date: date.toISOString() });
+  console.log("[approval:outline] api.request", { date: date.toISOString() });
 
-  const data = await createDraftApprovalData(date);
+  const data = await createApprovalOutlineData(date);
 
-  console.log("[approval:draft] api.ready", { date: date.toISOString() });
+  console.log("[approval:outline] api.ready", { date: date.toISOString() });
 
   return NextResponse.json(data);
 }

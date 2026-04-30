@@ -11,7 +11,7 @@ import jwt from "jsonwebtoken";
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
-  const context = createRequestLogContext("api.newsletters.publish", request);
+  const context = createRequestLogContext("api.newsletters.commit", request);
 
   logRequestStart(context, {
     contentType: request.headers.get("content-type"),
@@ -43,7 +43,7 @@ export async function POST(request: Request) {
     });
 
     const webhookUrl =
-      process.env.DRAFT_PUBLISH_WEBHOOK_URL ??
+      process.env.OUTLINE_COMMIT_WEBHOOK_URL ??
       "https://n8n.velocityalpha.com/webhook/story/approval";
     const webhookHostname = new URL(webhookUrl).hostname;
     const webhookResponse = await fetch(webhookUrl, {
@@ -74,12 +74,12 @@ export async function POST(request: Request) {
 
     return jsonWithRequestId(context, {
       success: true,
-      message: "Publish payload forwarded to approval webhook.",
+      message: "Outline committed to generation webhook.",
       receivedAt: new Date().toISOString(),
       webhookResponse: webhookData,
     });
   } catch (error) {
-    logRequestError(context, "Publish workflow failed", error);
+    logRequestError(context, "Outline commit workflow failed", error);
 
     return jsonWithRequestId(
       context,

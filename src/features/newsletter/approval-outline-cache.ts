@@ -1,8 +1,8 @@
-export const APPROVAL_DRAFT_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+export const APPROVAL_OUTLINE_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
-const CACHE_KEY_PREFIX = "approval_draft_";
+const CACHE_KEY_PREFIX = "approval_outline_";
 
-export type ApprovalDraftData = {
+export type ApprovalOutlineData = {
   reference_stories: {
     id: number;
     day: string | null;
@@ -33,31 +33,32 @@ export type ApprovalDraftData = {
       combined_score: number;
     }
   >;
+  selected_story_ids: number[];
 };
 
 type CacheStorage = Pick<Storage, "getItem" | "removeItem" | "setItem">;
 
 type CachedEntry = {
-  data: ApprovalDraftData;
+  data: ApprovalOutlineData;
   cachedAt: number;
 };
 
-function getApprovalDraftCacheKey(dateKey: string): string {
+function getApprovalOutlineCacheKey(dateKey: string): string {
   return `${CACHE_KEY_PREFIX}${dateKey}`;
 }
 
-export function readApprovalDraftCache(
+export function readApprovalOutlineCache(
   dateKey: string,
   storage: CacheStorage = localStorage,
   now = Date.now()
-): ApprovalDraftData | null {
+): ApprovalOutlineData | null {
   try {
-    const raw = storage.getItem(getApprovalDraftCacheKey(dateKey));
+    const raw = storage.getItem(getApprovalOutlineCacheKey(dateKey));
     if (!raw) return null;
 
     const entry: CachedEntry = JSON.parse(raw);
-    if (now - entry.cachedAt > APPROVAL_DRAFT_CACHE_TTL_MS) {
-      storage.removeItem(getApprovalDraftCacheKey(dateKey));
+    if (now - entry.cachedAt > APPROVAL_OUTLINE_CACHE_TTL_MS) {
+      storage.removeItem(getApprovalOutlineCacheKey(dateKey));
       console.log("[approval:cache] expired", { dateKey });
       return null;
     }
@@ -72,15 +73,15 @@ export function readApprovalDraftCache(
   }
 }
 
-export function writeApprovalDraftCache(
+export function writeApprovalOutlineCache(
   dateKey: string,
-  data: ApprovalDraftData,
+  data: ApprovalOutlineData,
   storage: CacheStorage = localStorage,
   now = Date.now()
 ): void {
   try {
     const entry: CachedEntry = { data, cachedAt: now };
-    storage.setItem(getApprovalDraftCacheKey(dateKey), JSON.stringify(entry));
+    storage.setItem(getApprovalOutlineCacheKey(dateKey), JSON.stringify(entry));
     console.log("[approval:cache] stored", { dateKey });
   } catch {
     // localStorage may be full or unavailable; this should not block approval.

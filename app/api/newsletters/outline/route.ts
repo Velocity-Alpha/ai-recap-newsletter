@@ -1,4 +1,4 @@
-import { createDraftApprovalData } from "@/src/features/newsletter/curation.service";
+import { createApprovalOutlineData } from "@/src/features/newsletter/curation.service";
 import {
   createRequestLogContext,
   jsonWithRequestId,
@@ -25,7 +25,7 @@ function getDateFromQuery(searchParams: URLSearchParams): Date {
 }
 
 export async function GET(request: Request) {
-  const context = createRequestLogContext("api.newsletters.draft", request);
+  const context = createRequestLogContext("api.newsletters.outline", request);
   logRequestStart(context);
 
   try {
@@ -36,16 +36,16 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     const date = getDateFromQuery(url.searchParams);
 
-    const draftData = await createDraftApprovalData(date);
+    const outlineData = await createApprovalOutlineData(date);
 
     logRequestSuccess(context, {
-      sectionsCount: draftData.candidate_sections.length,
-      storiesCount: draftData.selected_story_ids.length,
+      sectionsCount: outlineData.candidate_sections.length,
+      storiesCount: outlineData.selected_story_ids.length,
     });
 
-    return jsonWithRequestId(context, draftData);
+    return jsonWithRequestId(context, outlineData);
   } catch (error) {
-    logRequestError(context, "Draft creation failed", error);
+    logRequestError(context, "Outline creation failed", error);
     return jsonWithRequestId(
       context,
       {

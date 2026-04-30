@@ -138,6 +138,8 @@ Read routes:
 - `GET /api/newsletters/[id]`
 - `GET /api/issues/[slug]`
 - `GET /api/ticker`
+- `GET /api/approval/outline?date=` for the password-protected approval board outline
+- `GET /api/newsletters/outline?date=` for the authenticated newsletter outline API
 
 Mutation routes:
 
@@ -148,6 +150,7 @@ Mutation routes:
 - `POST /api/subscriber/sign-out`
 - `GET|POST /api/subscriber/unsubscribe` with a signed `token`
 - `POST /api/subscriber/unsubscribe/webhook` with `Authorization: Bearer <GHL_UNSUBSCRIBE_WEBHOOK_SECRET>` or `x-webhook-secret`
+- `POST /api/newsletters/commit` to commit an approved outline to the generation webhook
 
 Public unsubscribe page:
 
@@ -183,7 +186,7 @@ Required environment variables:
 Optional:
 
 - `PRODUCTION_DATABASE_URL` for running Prisma production migration commands from your local machine
-- `DRAFT_PUBLISH_WEBHOOK_URL` to override the approval draft publish webhook destination. Defaults to the production n8n story approval webhook.
+- `OUTLINE_COMMIT_WEBHOOK_URL` to override the approval outline commit webhook destination. Defaults to the production n8n story approval webhook.
 - `NEWSLETTER_RUNTIME_DB_ROLE` to override the runtime role name used by the bootstrap scripts. Defaults to `newsletter_web`.
 
 Google Analytics IDs remain configured per deploy context in `netlify.toml`.
