@@ -1,0 +1,85 @@
+import {
+  createRequestLogContext,
+  jsonWithRequestId,
+  logRequestError,
+  logRequestStart,
+  logRequestSuccess,
+} from "@/src/server/observability";
+import jwt from "jsonwebtoken";
+
+export const runtime = "nodejs";
+
+export async function POST(request: Request) {
+  const context = createRequestLogContext("api.newsletters.publish", request);
+
+  logRequestStart(context, {
+    contentType: request.headers.get("content-type"),
+  });
+
+  try {
+    const payload = await request.json();
+
+    // Validate JWT_SECRET exists
+    const jwtSecret = process.env.JWT_SECRET;
+    if (!jwtSecret) {
+      throw new Error("JWT_SECRET is not defined in environment variables");
+    }
+
+    const authClaims = {
+      scope: "story-approval",
+      payloadType: Array.isArray(payload) ? "array" : typeof payload,
+      issuedFor: "n8n-story-approval-webhook",
+    };
+
+    // Sign a plain-object JWT for webhook authentication.
+    const token = jwt.sign(authClaims, jwtSecret, {
+      algorithm: "HS256",
+      expiresIn: "1h", // Token expires in 1 hour
+    });
+
+    // Forward to webhook
+    const webhookUrl = "https://n8n.velocityalpha.com/webhook/story/approval";
+    const webhookResponse = await fetch(webhookUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!webhookResponse.ok) {
+      const errorText = await webhookResponse.text();
+      throw new Error(
+        `Webhook returned ${webhookResponse.status}: ${errorText}`,
+      );
+    }
+
+    const webhookData = await webhookResponse.json();
+
+    logRequestSuccess(context, {
+      hasPayload: payload !== null && payload !== undefined,
+      payloadType: Array.isArray(payload) ? "array" : typeof payload,
+      webhookStatus: webhookResponse.status,
+      forwardedSuccessfully: true,
+    });
+
+    return jsonWithRequestId(context, {
+      success: true,
+      message: "Publish payload forwarded to approval webhook.",
+      receivedAt: new Date().toISOString(),
+      webhookResponse: webhookData,
+    });
+  } catch (error) {
+    logRequestError(context, "Publish workflow failed", error);
+
+    return jsonWithRequestId(
+      context,
+      {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 },
+    );
+  }
+}
