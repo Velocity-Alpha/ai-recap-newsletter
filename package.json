@@ -23,12 +23,14 @@
     "prisma:migrate:prod:deploy": "node scripts/run-prisma-prod.mjs migrate deploy && npm run db:bootstrap:prod"
   },
   "dependencies": {
+    "@openrouter/sdk": "^0.12.23",
     "@prisma/adapter-pg": "^7.6.0",
     "@prisma/client": "^7.6.0",
     "@radix-ui/react-slot": "^1.2.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "framer-motion": "^12.35.2",
+    "jsonwebtoken": "^9.0.3",
     "lucide-react": "^0.522.0",
     "next": "^16.1.6",
     "pg": "^8.18.0",
@@ -38,6 +40,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^18",
     "@types/pg": "^8.20.0",
     "@types/react": "^18",
