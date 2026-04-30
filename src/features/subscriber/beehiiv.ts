@@ -45,7 +45,6 @@ export async function submitSubscriberToBeehiiv(input: BeehiivSubscribeInput) {
   });
 
   try {
-    console.log("[beehiiv] submitting subscription", { email: maskEmail(input.email), source: input.source, path: input.path, firstName: input.firstName ?? null });
     const response = await fetch(
       `https://api.beehiiv.com/v2/publications/${publicationId}/subscriptions`,
       {

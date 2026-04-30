@@ -91,4 +91,23 @@ describe("subscriber email", () => {
     expect(body.html).toContain('src="https://airecap.news/uploads/email_one.gif"');
     expect(body.html).toContain('src="https://airecap.news/uploads/email_two.gif"');
   });
+
+  it("falls back to the production site URL for email assets", async () => {
+    process.env.RESEND_FROM_EMAIL = "login@updates.airecap.news";
+    delete process.env.NEXT_PUBLIC_SITE_URL;
+    delete process.env.URL;
+    fetchMock.mockResolvedValue({
+      ok: true,
+      status: 202,
+    });
+
+    await sendSubscriberWelcomeEmail({
+      email: "reader@example.com",
+    });
+
+    const [, request] = fetchMock.mock.calls[0];
+    const body = JSON.parse(String(request.body));
+    expect(body.html).toContain('src="https://airecap.news/uploads/email_one.gif"');
+    expect(body.html).not.toContain('src="/uploads/email_one.gif"');
+  });
 });

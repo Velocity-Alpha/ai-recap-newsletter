@@ -30,7 +30,8 @@ function getResendFromName() {
 function getSiteUrl() {
   return (
     process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
-    process.env.URL?.trim()
+    process.env.URL?.trim() ||
+    "https://airecap.news"
   )?.replace(/\/+$/, "") || "";
 }
 
