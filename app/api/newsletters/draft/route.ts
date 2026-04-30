@@ -6,6 +6,7 @@ import {
   logRequestStart,
   logRequestSuccess,
 } from "@/src/server/observability";
+import { hasValidApprovalSession } from "@/src/server/approval-auth";
 
 export const runtime = "nodejs";
 
@@ -28,6 +29,10 @@ export async function GET(request: Request) {
   logRequestStart(context);
 
   try {
+    if (!(await hasValidApprovalSession(request))) {
+      return jsonWithRequestId(context, { error: "Unauthorized." }, { status: 401 });
+    }
+
     const url = new URL(request.url);
     const date = getDateFromQuery(url.searchParams);
 

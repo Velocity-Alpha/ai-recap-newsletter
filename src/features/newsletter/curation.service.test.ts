@@ -4,6 +4,7 @@ import {
   buildDeduplicationResponseFormat,
   buildOpenRouterDeduplicationRequest,
   buildOpenRouterDeduplicationRequestOptions,
+  cleanText,
   OPENROUTER_RESPONSE_CACHE_TTL_SECONDS,
   parseDeduplicationKeptStoryIds,
   runWithOpenRouterDeduplicationTimeout,
@@ -67,18 +68,18 @@ describe("newsletter curation OpenRouter request", () => {
     });
   });
 
-  it("uses a manual abort signal with no SDK retries for interactive approval requests", () => {
-    const options = buildOpenRouterDeduplicationRequestOptions(60_000);
+  it("uses no SDK retries or SDK timeout for interactive approval requests", () => {
+    const options = buildOpenRouterDeduplicationRequestOptions();
 
     expect(options).toMatchObject({
       retries: { strategy: "none" },
     });
     expect(options).not.toHaveProperty("timeoutMs");
-    expect(options?.signal).toBeInstanceOf(AbortSignal);
+    expect(options).not.toHaveProperty("signal");
   });
 
   it("enables OpenRouter response caching for repeated server-side deduplication requests", () => {
-    const options = buildOpenRouterDeduplicationRequestOptions(60_000);
+    const options = buildOpenRouterDeduplicationRequestOptions();
 
     expect(OPENROUTER_RESPONSE_CACHE_TTL_SECONDS).toBe(86_400);
     expect(options?.headers).toMatchObject({
@@ -109,5 +110,17 @@ describe("newsletter curation OpenRouter request", () => {
         new Set([10])
       )
     ).toBeNull();
+
+    expect(
+      parseDeduplicationKeptStoryIds("not json", new Set([10]))
+    ).toBeNull();
+  });
+
+  it("cleans markdown and URLs without injecting replacement placeholders", () => {
+    expect(
+      cleanText(
+        "- **[OpenAI launches model](https://example.com)** read more at https://example.com"
+      )
+    ).toBe("OpenAI launches model");
   });
 });

@@ -31,7 +31,9 @@ The app runs directly on Next.js in local development. No `netlify dev` proxy or
    - `RESEND_FROM_EMAIL`
    - `BEEHIIV_API_KEY`
    - `BEEHIIV_PUBLICATION_ID`
-   - `BEEHIIV_UNSUBSCRIBE_WEBHOOK_SECRET`
+   - `GHL_UNSUBSCRIBE_WEBHOOK_SECRET`
+   - `APPROVAL_PASSWORD`
+   - `JWT_SECRET`
    - `OPENROUTER_API_KEY`
 4. If this local database already existed before Prisma Migrate was introduced, mark the baseline once:
    ```bash
@@ -145,7 +147,7 @@ Mutation routes:
 - `POST /api/subscriber/verify-code`
 - `POST /api/subscriber/sign-out`
 - `GET|POST /api/subscriber/unsubscribe` with a signed `token`
-- `POST /api/subscriber/unsubscribe/webhook` with `Authorization: Bearer <BEEHIIV_UNSUBSCRIBE_WEBHOOK_SECRET>` or `x-webhook-secret`
+- `POST /api/subscriber/unsubscribe/webhook` with `Authorization: Bearer <GHL_UNSUBSCRIBE_WEBHOOK_SECRET>` or `x-webhook-secret`
 
 Public unsubscribe page:
 
@@ -171,13 +173,17 @@ Required environment variables:
 - `RESEND_FROM_EMAIL`
 - `BEEHIIV_API_KEY`
 - `BEEHIIV_PUBLICATION_ID`
-- `BEEHIIV_UNSUBSCRIBE_WEBHOOK_SECRET`
+- `GHL_UNSUBSCRIBE_WEBHOOK_SECRET`
+- `APPROVAL_PASSWORD`
+- `JWT_SECRET`
+- `OPENROUTER_API_KEY`
 - `FOR_BRANDS_WEBHOOK_URL` if you want to override the default for-brands destination
 - `NEXT_PUBLIC_SITE_URL`
 
 Optional:
 
 - `PRODUCTION_DATABASE_URL` for running Prisma production migration commands from your local machine
+- `DRAFT_PUBLISH_WEBHOOK_URL` to override the approval draft publish webhook destination. Defaults to the production n8n story approval webhook.
 - `NEWSLETTER_RUNTIME_DB_ROLE` to override the runtime role name used by the bootstrap scripts. Defaults to `newsletter_web`.
 
 Google Analytics IDs remain configured per deploy context in `netlify.toml`.

@@ -1,3 +1,5 @@
+const CONFIRMATION_EMAIL = "hello@updates.airecap.news";
+
 export function buildSubscriberWelcomeEmail(siteUrl: string) {
   return {
   subject: "Welcome to AI Recap",
@@ -33,7 +35,7 @@ export function buildSubscriberWelcomeEmail(siteUrl: string) {
                       <table cellpadding="0" cellspacing="0" border="0" style="margin-bottom:22px;">
                         <tr>
                           <td style="background-color:#78716c;border-radius:6px;">
-                            <a href="mailto:hello@updates.airecap.news?subject=AI%20Recap&body=Hey%20Borna%2C%20I%27m%20human." style="display:inline-block;padding:12px 22px;font-size:14px;font-weight:700;color:#ffffff;text-decoration:none;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">CONFIRM EMAIL</a>
+                            <a href="mailto:${CONFIRMATION_EMAIL}?subject=AI%20Recap&body=Hey%20Borna%2C%20I%27m%20human." style="display:inline-block;padding:12px 22px;font-size:14px;font-weight:700;color:#ffffff;text-decoration:none;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">CONFIRM EMAIL</a>
                           </td>
                         </tr>
                       </table>
@@ -81,7 +83,7 @@ export function buildSubscriberWelcomeEmail(siteUrl: string) {
     "Models. Research. Launches. Major moves. Delivered in about 3 minutes.",
     "",
     "Before your first briefing:",
-    "1. Confirm you're human by emailing hello@airecap.news with the subject 'AI Recap'.",
+    `1. Confirm you're human by emailing ${CONFIRMATION_EMAIL} with the subject 'AI Recap'.`,
     "2. If this email landed in Promotions, Spam, or Other, move it to your main inbox.",
     "",
     "Your first AI briefing arrives soon.",

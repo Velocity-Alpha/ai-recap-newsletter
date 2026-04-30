@@ -5,6 +5,7 @@ import {
   logRequestStart,
   logRequestSuccess,
 } from "@/src/server/observability";
+import { hasValidApprovalSession } from "@/src/server/approval-auth";
 import jwt from "jsonwebtoken";
 
 export const runtime = "nodejs";
@@ -17,6 +18,10 @@ export async function POST(request: Request) {
   });
 
   try {
+    if (!(await hasValidApprovalSession(request))) {
+      return jsonWithRequestId(context, { error: "Unauthorized." }, { status: 401 });
+    }
+
     const payload = await request.json();
 
     // Validate JWT_SECRET exists
@@ -37,8 +42,10 @@ export async function POST(request: Request) {
       expiresIn: "1h", // Token expires in 1 hour
     });
 
-    // Forward to webhook
-    const webhookUrl = "https://n8n.velocityalpha.com/webhook/story/approval";
+    const webhookUrl =
+      process.env.DRAFT_PUBLISH_WEBHOOK_URL ??
+      "https://n8n.velocityalpha.com/webhook/story/approval";
+    const webhookHostname = new URL(webhookUrl).hostname;
     const webhookResponse = await fetch(webhookUrl, {
       method: "POST",
       headers: {
@@ -61,6 +68,7 @@ export async function POST(request: Request) {
       hasPayload: payload !== null && payload !== undefined,
       payloadType: Array.isArray(payload) ? "array" : typeof payload,
       webhookStatus: webhookResponse.status,
+      webhookHostname,
       forwardedSuccessfully: true,
     });
 

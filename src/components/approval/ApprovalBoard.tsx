@@ -135,7 +135,11 @@ export default function ApprovalBoard({
   const toggleExpand = (id: number) =>
     setExpandedIds((prev) => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
       return next;
     });
 
@@ -488,6 +492,10 @@ export default function ApprovalBoard({
           </button>
 
           <div className="mx-2 h-4 w-px shrink-0 bg-[var(--border-light)]" />
+
+          <div className="flex shrink-0 items-center rounded-full border border-[var(--border-light)] bg-white/70 px-3 py-1 text-[11px] font-medium text-[var(--text-secondary)]">
+            {draftDateLabel}
+          </div>
 
           {/* Per-section pills */}
           {totals.sections.map((section) => {
@@ -1036,9 +1044,7 @@ export default function ApprovalBoard({
                       year: "numeric",
                       timeZone: "UTC",
                     }).format(
-                      previewStory.day instanceof Date
-                        ? previewStory.day
-                        : new Date(String(previewStory.day).slice(0, 10) + "T00:00:00Z")
+                      new Date(String(previewStory.day).slice(0, 10) + "T00:00:00Z")
                     )}
                   </span>
                 ) : null}

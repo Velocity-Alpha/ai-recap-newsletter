@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { createDraftApprovalData } from "@/src/features/newsletter/curation.service";
+import { hasValidApprovalSession } from "@/src/server/approval-auth";
 
 function parseDateParam(value: string | null): Date {
   if (!value) return new Date();
@@ -9,6 +10,10 @@ function parseDateParam(value: string | null): Date {
 }
 
 export async function GET(request: Request) {
+  if (!(await hasValidApprovalSession(request))) {
+    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  }
+
   const { searchParams } = new URL(request.url);
   const date = parseDateParam(searchParams.get("date"));
 

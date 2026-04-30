@@ -86,6 +86,8 @@ describe("subscriber email", () => {
     const expected = buildSubscriberWelcomeEmail("https://airecap.news");
     expect(body.subject).toBe(expected.subject);
     expect(body.text).toBe(expected.text);
+    expect(body.text).toContain("hello@updates.airecap.news");
+    expect(body.text).not.toContain("hello@airecap.news");
     expect(body.html).toContain('src="https://airecap.news/uploads/email_one.gif"');
     expect(body.html).toContain('src="https://airecap.news/uploads/email_two.gif"');
   });

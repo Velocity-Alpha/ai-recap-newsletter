@@ -158,23 +158,14 @@ export function buildOpenRouterDeduplicationRequest(
  * with a read-only `message` property and crash while the SDK wraps the error.
  */
 export function buildOpenRouterDeduplicationRequestOptions(
-  timeoutMs = getAiDedupTimeoutMs()
+  signal?: AbortSignal
 ): OpenRouterRequestOptions {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => {
-    controller.abort(
-      new Error(`OpenRouter deduplication timed out after ${timeoutMs}ms`)
-    );
-  }, timeoutMs);
-
-  timeout.unref?.();
-
   return {
     headers: {
       "X-OpenRouter-Cache": "true",
       "X-OpenRouter-Cache-TTL": String(OPENROUTER_RESPONSE_CACHE_TTL_SECONDS),
     },
-    signal: controller.signal,
+    ...(signal ? { signal } : {}),
     retries: { strategy: "none" },
   };
 }
@@ -187,19 +178,24 @@ export function buildOpenRouterDeduplicationRequestOptions(
  * `chat.send()` promise, so the approval page needs this outer timer too.
  */
 export function runWithOpenRouterDeduplicationTimeout<T>(
-  operation: Promise<T>,
+  operation: Promise<T> | ((signal: AbortSignal) => Promise<T>),
   timeoutMs = getAiDedupTimeoutMs()
 ): Promise<T> {
   let timeout: ReturnType<typeof setTimeout> | undefined;
+  const controller = new AbortController();
+  const operationPromise =
+    typeof operation === "function" ? operation(controller.signal) : operation;
 
   const timeoutPromise = new Promise<never>((_, reject) => {
     timeout = setTimeout(() => {
-      reject(new Error(`OpenRouter deduplication timed out after ${timeoutMs}ms`));
+      const error = new Error(`OpenRouter deduplication timed out after ${timeoutMs}ms`);
+      controller.abort(error);
+      reject(error);
     }, timeoutMs);
     timeout.unref?.();
   });
 
-  return Promise.race([operation, timeoutPromise]).finally(() => {
+  return Promise.race([operationPromise, timeoutPromise]).finally(() => {
     if (timeout) clearTimeout(timeout);
   });
 }
@@ -215,7 +211,13 @@ export function parseDeduplicationKeptStoryIds(
   textContent: string,
   validStoryIds: Set<number>
 ): number[] | null {
-  const parsed = JSON.parse(textContent.trim()) as { kept_story_ids?: unknown };
+  let parsed: { kept_story_ids?: unknown };
+  try {
+    parsed = JSON.parse(textContent.trim()) as { kept_story_ids?: unknown };
+  } catch {
+    return null;
+  }
+
   if (!Array.isArray(parsed.kept_story_ids)) {
     return null;
   }
@@ -232,34 +234,35 @@ export function parseDeduplicationKeptStoryIds(
 }
 
 // Patterns to remove from text
-const REMOVAL_PATTERNS = [
-  /sponsored by[^.!?]*[.!?]/gi,
-  /together with[^.!?]*[.!?]/gi,
-  /presented by[^.!?]*[.!?]/gi,
-  /partner content[^.!?]*[.!?]/gi,
-  /paid partnership[^.!?]*[.!?]/gi,
-  /in partnership with[^.!?]*[.!?]/gi,
-  /brought to you by[^.!?]*[.!?]/gi,
-  /tldr[^.!?]*[.!?]/gi,
-  /ai breakfast[^.!?]*[.!?]/gi,
-  /rundown(?: ai)?[^.!?]*[.!?]/gi,
-  /source:\s*[^.!?\\n]+(?:[.!?]|$)/gi,
-  /via\s*[^.!?\\n]+(?:[.!?]|$)/gi,
-  /as reported by[^.!?\\n]+[.!?]/gi,
-  /learn more\s*(?:on|at|via|about)?\s*[^.!?\\n]*[.!?]?/gi,
-  /read more\s*(?:on|at|via|about)?\s*[^.!?\\n]*[.!?]?/gi,
-  /check it out\s*(?:on|at|via)?\s*[^.!?\\n]*[.!?]?/gi,
-  /visit\s*(?:our)?\s*(?:website|site)\s*[^.!?\\n]*[.!?]?/gi,
-  /for more information\s*[^.!?\\n]*[.!?]?/gi,
-  /https?:\/\/[^\s]+/g,
-  /www\.[^\s]+/g,
-  /\[([^\]]+)\]\(([^)]+)\)/g,
-  /`/g,
-  /\*\*/g,
-  /\*/g,
-  /#+\s*/g,
-  /^\s*[-•*]\s+/gm,
-  /\n\s*[-•*]\s+/g,
+const REMOVAL_PATTERNS: Array<{ pattern: RegExp; replacement: string }> = [
+  { pattern: /sponsored by[^.!?]*[.!?]/gi, replacement: "" },
+  { pattern: /together with[^.!?]*[.!?]/gi, replacement: "" },
+  { pattern: /presented by[^.!?]*[.!?]/gi, replacement: "" },
+  { pattern: /partner content[^.!?]*[.!?]/gi, replacement: "" },
+  { pattern: /paid partnership[^.!?]*[.!?]/gi, replacement: "" },
+  { pattern: /in partnership with[^.!?]*[.!?]/gi, replacement: "" },
+  { pattern: /brought to you by[^.!?]*[.!?]/gi, replacement: "" },
+  { pattern: /tldr[^.!?]*[.!?]/gi, replacement: "" },
+  { pattern: /ai breakfast[^.!?]*[.!?]/gi, replacement: "" },
+  { pattern: /rundown(?: ai)?[^.!?]*[.!?]/gi, replacement: "" },
+  { pattern: /source:\s*[^.!?\\n]+(?:[.!?]|$)/gi, replacement: "" },
+  { pattern: /via\s*[^.!?\\n]+(?:[.!?]|$)/gi, replacement: "" },
+  { pattern: /as reported by[^.!?\\n]+[.!?]/gi, replacement: "" },
+  { pattern: /\[([^\]]+)\]\(([^)]+)\)/g, replacement: "$1" },
+  { pattern: /https?:\/\/[^\s]+/g, replacement: "" },
+  { pattern: /www\.[^\s]+/g, replacement: "" },
+  { pattern: /learn more\s*(?:on|at|via|about)?\s*[^.!?\\n]*[.!?]?/gi, replacement: "" },
+  { pattern: /read more\s*(?:on|at|via|about)?\s*[^.!?\\n]*[.!?]?/gi, replacement: "" },
+  { pattern: /read more\s*(?:on|at|via|about)?/gi, replacement: "" },
+  { pattern: /check it out\s*(?:on|at|via)?\s*[^.!?\\n]*[.!?]?/gi, replacement: "" },
+  { pattern: /visit\s*(?:our)?\s*(?:website|site)\s*[^.!?\\n]*[.!?]?/gi, replacement: "" },
+  { pattern: /for more information\s*[^.!?\\n]*[.!?]?/gi, replacement: "" },
+  { pattern: /`/g, replacement: "" },
+  { pattern: /\*\*/g, replacement: "" },
+  { pattern: /\*/g, replacement: "" },
+  { pattern: /#+\s*/g, replacement: "" },
+  { pattern: /^\s*[-•*]\s+/gm, replacement: "" },
+  { pattern: /\n\s*[-•*]\s+/g, replacement: "\n" },
 ];
 
 // Keywords for scoring
@@ -318,13 +321,13 @@ const RESEARCH_KEYWORDS = [
  * newsletter-specific boilerplate. Cleaning here keeps ranking and AI
  * deduplication focused on the actual story content.
  */
-function cleanText(value: string | null | undefined): string {
+export function cleanText(value: string | null | undefined): string {
   if (!value) return "";
 
   let cleaned = String(value);
 
-  for (const pattern of REMOVAL_PATTERNS) {
-    cleaned = cleaned.replace(pattern, "$1");
+  for (const { pattern, replacement } of REMOVAL_PATTERNS) {
+    cleaned = cleaned.replace(pattern, replacement);
   }
 
   cleaned = cleaned.replace(/…/g, "");
@@ -700,10 +703,10 @@ ${JSON.stringify({
       },
     ];
 
-    const response = await runWithOpenRouterDeduplicationTimeout(
+    const response = await runWithOpenRouterDeduplicationTimeout((signal) =>
       client.chat.send(
         buildOpenRouterDeduplicationRequest(messages),
-        buildOpenRouterDeduplicationRequestOptions()
+        buildOpenRouterDeduplicationRequestOptions(signal)
       )
     );
 
@@ -894,8 +897,9 @@ export async function createDraftApprovalData(
   const keptStoryIds = await deduplicateWithAI(rankedCandidates, referencedStories);
 
   // Filter to kept stories
-  const dedupedStories = rankedCandidates.filter((s) =>
-    keptStoryIds.includes(s.id)
+  const keptStoryIdSet = new Set<number>(keptStoryIds);
+  const dedupedStories = rankedCandidates.filter((story) =>
+    keptStoryIdSet.has(story.id)
   );
 
   console.log("[approval:draft] dedup.filtered", {
@@ -923,10 +927,13 @@ export async function createDraftApprovalData(
   // Build candidate map and selected IDs
   const candidate_map: Record<string, ProcessedStory> = {};
   const selected_story_ids = new Set<number>();
+  const dedupedStoryMap = new Map<number, ProcessedStory>(
+    dedupedStories.map((story) => [story.id, story])
+  );
 
   for (const section of candidate_sections) {
     for (const story of section.selected) {
-      const fullStory = dedupedStories.find((s) => s.id === story.id);
+      const fullStory = dedupedStoryMap.get(story.id);
       if (fullStory) {
         candidate_map[String(story.id)] = fullStory;
         selected_story_ids.add(story.id);
@@ -934,7 +941,7 @@ export async function createDraftApprovalData(
     }
 
     for (const story of section.fill_ins) {
-      const fullStory = dedupedStories.find((s) => s.id === story.id);
+      const fullStory = dedupedStoryMap.get(story.id);
       if (fullStory) {
         candidate_map[String(story.id)] = fullStory;
       }
