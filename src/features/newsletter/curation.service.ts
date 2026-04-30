@@ -1,4 +1,5 @@
-import OpenAI from "openai";
+import { OpenRouter } from "@openrouter/sdk";
+import type { ChatMessages, ChatRequest } from "@openrouter/sdk/models";
 import { Prisma } from "@/src/generated/prisma";
 import { prisma } from "@/src/server/prisma";
 import { logServerError, logServerWarn } from "@/src/server/observability";
@@ -67,6 +68,168 @@ const SECTION_LIMITS = {
   quickHits: 6,
 };
 const FILL_IN_LIMIT = 3;
+const OPENROUTER_DEDUP_MODELS = [
+  "deepseek/deepseek-v4-flash",
+  "google/gemini-3-flash-preview",
+];
+const DEFAULT_AI_DEDUP_TIMEOUT_MS = 60_000;
+export const OPENROUTER_RESPONSE_CACHE_TTL_SECONDS = 86_400;
+const DEDUPLICATION_RESPONSE_SCHEMA = {
+  type: "object",
+  properties: {
+    kept_story_ids: {
+      type: "array",
+      description:
+        "IDs from incoming_stories that should remain after removing semantic duplicates.",
+      items: {
+        type: "integer",
+      },
+    },
+  },
+  required: ["kept_story_ids"],
+  additionalProperties: false,
+};
+
+type OpenRouterRequestOptions = Parameters<OpenRouter["chat"]["send"]>[1];
+
+function getAiDedupTimeoutMs(): number {
+  const configured = Number(process.env.OPENROUTER_DEDUP_TIMEOUT_MS);
+  return Number.isFinite(configured) && configured > 0
+    ? configured
+    : DEFAULT_AI_DEDUP_TIMEOUT_MS;
+}
+
+/**
+ * Defines the structured output contract OpenRouter should enforce.
+ *
+ * OpenRouter's SDK uses camelCase for `responseFormat` / `jsonSchema` and
+ * serializes those fields to the API's `response_format` / `json_schema`
+ * shape. `strict` plus `additionalProperties: false` keeps the response small
+ * and predictable.
+ */
+export function buildDeduplicationResponseFormat(): ChatRequest["responseFormat"] {
+  return {
+    type: "json_schema",
+    jsonSchema: {
+      name: "newsletter_deduplication_result",
+      strict: true,
+      schema: DEDUPLICATION_RESPONSE_SCHEMA,
+    },
+  };
+}
+
+/**
+ * Builds the OpenRouter chat request used for AI duplicate detection.
+ *
+ * The request intentionally uses a model fallback list instead of a single
+ * model so DeepSeek V4 Flash is tried first and Gemini Flash is used if
+ * DeepSeek cannot serve the request. Provider routing is price-sorted,
+ * restricted to providers that support every requested parameter, and excludes
+ * providers that collect data.
+ * The response is constrained with OpenRouter structured outputs so parsing is
+ * based on a stable JSON Schema instead of prompt-only JSON instructions.
+ */
+export function buildOpenRouterDeduplicationRequest(
+  messages: ChatRequest["messages"]
+) {
+  return {
+    chatRequest: {
+      models: OPENROUTER_DEDUP_MODELS,
+      messages,
+      provider: {
+        allowFallbacks: true,
+        dataCollection: "deny",
+        requireParameters: true,
+        sort: "price",
+      },
+      responseFormat: buildDeduplicationResponseFormat(),
+      stream: false,
+    } satisfies ChatRequest,
+  };
+}
+
+/**
+ * Keeps the approval page responsive even when an upstream model or provider
+ * stalls. The curation flow can safely continue without AI deduplication, so
+ * this path should fail fast instead of retrying for a long time.
+ *
+ * This deliberately avoids the SDK's `timeoutMs` option. In Node/Next, that
+ * option currently uses `AbortSignal.timeout()`, which can throw a DOMException
+ * with a read-only `message` property and crash while the SDK wraps the error.
+ */
+export function buildOpenRouterDeduplicationRequestOptions(
+  timeoutMs = getAiDedupTimeoutMs()
+): OpenRouterRequestOptions {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => {
+    controller.abort(
+      new Error(`OpenRouter deduplication timed out after ${timeoutMs}ms`)
+    );
+  }, timeoutMs);
+
+  timeout.unref?.();
+
+  return {
+    headers: {
+      "X-OpenRouter-Cache": "true",
+      "X-OpenRouter-Cache-TTL": String(OPENROUTER_RESPONSE_CACHE_TTL_SECONDS),
+    },
+    signal: controller.signal,
+    retries: { strategy: "none" },
+  };
+}
+
+/**
+ * Enforces a wall-clock timeout around the full OpenRouter operation.
+ *
+ * OpenRouter can send headers or whitespace keepalive bytes before the model
+ * finishes. In that case an HTTP abort/SDK timeout may no longer bound the full
+ * `chat.send()` promise, so the approval page needs this outer timer too.
+ */
+export function runWithOpenRouterDeduplicationTimeout<T>(
+  operation: Promise<T>,
+  timeoutMs = getAiDedupTimeoutMs()
+): Promise<T> {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeout = setTimeout(() => {
+      reject(new Error(`OpenRouter deduplication timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+    timeout.unref?.();
+  });
+
+  return Promise.race([operation, timeoutPromise]).finally(() => {
+    if (timeout) clearTimeout(timeout);
+  });
+}
+
+/**
+ * Parses and validates the structured deduplication response.
+ *
+ * The schema should prevent malformed payloads, but this keeps the service
+ * defensive against provider bugs, model fallback quirks, or hand-crafted test
+ * payloads. It also filters out IDs that do not belong to this candidate set.
+ */
+export function parseDeduplicationKeptStoryIds(
+  textContent: string,
+  validStoryIds: Set<number>
+): number[] | null {
+  const parsed = JSON.parse(textContent.trim()) as { kept_story_ids?: unknown };
+  if (!Array.isArray(parsed.kept_story_ids)) {
+    return null;
+  }
+
+  const keptIds = new Set<number>();
+  for (const id of parsed.kept_story_ids) {
+    const numericId = Number(id);
+    if (Number.isInteger(numericId) && validStoryIds.has(numericId)) {
+      keptIds.add(numericId);
+    }
+  }
+
+  return Array.from(keptIds);
+}
 
 // Patterns to remove from text
 const REMOVAL_PATTERNS = [
@@ -148,6 +311,13 @@ const RESEARCH_KEYWORDS = [
   "report",
 ];
 
+/**
+ * Normalizes scraped newsletter text before scoring, comparing, and displaying it.
+ *
+ * Source feeds often include sponsor blurbs, markdown syntax, links, and
+ * newsletter-specific boilerplate. Cleaning here keeps ranking and AI
+ * deduplication focused on the actual story content.
+ */
 function cleanText(value: string | null | undefined): string {
   if (!value) return "";
 
@@ -168,6 +338,13 @@ function cleanText(value: string | null | undefined): string {
   return cleaned;
 }
 
+/**
+ * Scores a story for editorially useful AI-news keywords.
+ *
+ * This is a lightweight boost layered on top of `importance_score`; it helps
+ * surface tools, launches, research, and analysis without making category
+ * labels the only signal.
+ */
 function calculateKeywordScore(story: {
   headline: string | null;
   summary: string | null;
@@ -183,6 +360,9 @@ function calculateKeywordScore(story: {
   return score;
 }
 
+/**
+ * Collapses source category labels into the buckets used by the approval UI.
+ */
 function normalizeCategory(category: string | null | undefined): string {
   const normalized = String(category ?? "").toLowerCase().trim();
   if (normalized === "research" || normalized === "analysis") return "research";
@@ -190,6 +370,9 @@ function normalizeCategory(category: string | null | undefined): string {
   return "general";
 }
 
+/**
+ * Converts a full story row into the compact option shape shown in a section.
+ */
 function toOption(story: StoryRecord & { keyword_score: number }) {
   return {
     id: story.id,
@@ -198,6 +381,10 @@ function toOption(story: StoryRecord & { keyword_score: number }) {
   };
 }
 
+/**
+ * Converts previously published stories into the reference format returned to
+ * the approval screen and supplied to AI deduplication.
+ */
 function toReferenceStory(story: StoryRecord): ReferenceStory {
   const raw = story.day;
   const dayStr =
@@ -214,6 +401,9 @@ function toReferenceStory(story: StoryRecord): ReferenceStory {
   };
 }
 
+/**
+ * Normalizes raw Prisma SQL rows into the service's internal story type.
+ */
 function toStoryRecord(row: RawStoryRow): StoryRecord {
   return {
     id: Number(row.id),
@@ -229,10 +419,20 @@ function toStoryRecord(row: RawStoryRow): StoryRecord {
   };
 }
 
+/**
+ * Formats dates as YYYY-MM-DD for date-window SQL filters.
+ */
 function toDateOnlyIso(value: Date): string {
   return value.toISOString().slice(0, 10);
 }
 
+/**
+ * Loads recently used stories for the requested publication date.
+ *
+ * These are not candidates. They are reference material for semantic
+ * deduplication so the draft does not repeat stories that appeared in the
+ * last few issues.
+ */
 async function getReferencedStories(date: Date): Promise<StoryRecord[]> {
   const dateOnly = toDateOnlyIso(date);
   console.log("[approval:draft] fetch.referenced.query", {
@@ -273,6 +473,12 @@ async function getReferencedStories(date: Date): Promise<StoryRecord[]> {
   return rows.map(toStoryRecord);
 }
 
+/**
+ * Loads eligible unpublished candidate stories for the approval draft.
+ *
+ * The SQL filter keeps the candidate pool recent, sufficiently important,
+ * usable as a source link, and not already consumed by a publication.
+ */
 async function getCandidateStories(date: Date): Promise<StoryRecord[]> {
   const dateOnly = toDateOnlyIso(date);
   console.log("[approval:draft] fetch.candidates.query", {
@@ -322,6 +528,13 @@ async function getCandidateStories(date: Date): Promise<StoryRecord[]> {
   return rows.map(toStoryRecord);
 }
 
+/**
+ * Cleans candidate text, calculates editorial keyword boosts, and sorts the
+ * stories by combined quality signals.
+ *
+ * The returned order drives section selection later, so higher-ranked stories
+ * are chosen before lower-ranked fill-ins.
+ */
 function processAndRankStories(
   stories: StoryRecord[]
 ): ProcessedStory[] {
@@ -356,6 +569,10 @@ function processAndRankStories(
   });
 }
 
+/**
+ * Identifies transient network failures where AI deduplication should be
+ * skipped without blocking the rest of draft creation.
+ */
 function isAiConnectionError(error: unknown): boolean {
   if (!(error instanceof Error)) {
     return false;
@@ -365,14 +582,25 @@ function isAiConnectionError(error: unknown): boolean {
   const code = nestedCause?.code;
 
   return (
+    error.name === "RequestTimeoutError" ||
+    error.name === "RequestAbortedError" ||
+    error.name === "ConnectionError" ||
     code === "ENOTFOUND" ||
     code === "ECONNREFUSED" ||
     code === "ECONNRESET" ||
     code === "ETIMEDOUT" ||
-    error.message.toLowerCase().includes("connection error")
+    error.message.toLowerCase().includes("connection error") ||
+    error.message.toLowerCase().includes("timed out")
   );
 }
 
+/**
+ * Uses OpenRouter to remove semantic duplicates from the ranked candidate list.
+ *
+ * The model compares candidates against recently used stories and against each
+ * other, then returns the IDs that should remain. If OpenRouter is unavailable,
+ * returns every incoming ID so draft generation can continue deterministically.
+ */
 async function deduplicateWithAI(
   incomingStories: ProcessedStory[],
   referencedStories: StoryRecord[]
@@ -385,13 +613,10 @@ async function deduplicateWithAI(
     return incomingStories.map((s) => s.id);
   }
 
-  const client = new OpenAI({
+  const client = new OpenRouter({
     apiKey,
-    baseURL: "https://openrouter.ai/api/v1",
-    defaultHeaders: {
-      "HTTP-Referer": process.env.NEXT_PUBLIC_SITE_URL || "https://airecap.news",
-      "X-OpenRouter-Title": "AI Recap",
-    },
+    httpReferer: process.env.NEXT_PUBLIC_SITE_URL || "https://airecap.news",
+    appTitle: "AI Recap",
   });
 
   const incomingPayload = incomingStories.map((s) => ({
@@ -416,22 +641,21 @@ async function deduplicateWithAI(
 
   console.log("[approval:draft] dedup.provider", {
     provider: "openrouter",
-    model: "openai/gpt-5.4-mini",
+    models: OPENROUTER_DEDUP_MODELS,
     hasApiKey: Boolean(apiKey),
+    timeoutMs: getAiDedupTimeoutMs(),
   });
 
   try {
-    const response = await client.chat.completions.create({
-      model: "openai/gpt-5.4-mini",
-      messages: [
-        {
-          role: "system",
-          content:
-            "You identify duplicate news stories by comparing the underlying event being reported. Return only valid JSON.",
-        },
-        {
-          role: "user",
-          content: `You will receive a JSON object with:
+    const messages: ChatMessages[] = [
+      {
+        role: "system",
+        content:
+          "You identify duplicate news stories by comparing the underlying event being reported. Return only valid JSON.",
+      },
+      {
+        role: "user",
+        content: `You will receive a JSON object with:
 
 * \`incoming_stories\`: an array of incoming story objects that have not been used before.
 * \`previously_used_stories\`: an array of story objects that have already been used.
@@ -473,19 +697,21 @@ ${JSON.stringify({
   incoming_stories: incomingPayload,
   previously_used_stories: referencedPayload,
 })}`,
-        },
-      ],
-      max_tokens: 512,
-      response_format: {
-        type: "json_object",
       },
-    });
+    ];
+
+    const response = await runWithOpenRouterDeduplicationTimeout(
+      client.chat.send(
+        buildOpenRouterDeduplicationRequest(messages),
+        buildOpenRouterDeduplicationRequestOptions()
+      )
+    );
 
     console.log("[approval:draft] dedup.openrouter_response", {
       responseModel: response.model,
-      promptTokens: response.usage?.prompt_tokens ?? null,
-      completionTokens: response.usage?.completion_tokens ?? null,
-      totalTokens: response.usage?.total_tokens ?? null,
+      promptTokens: response.usage?.promptTokens ?? null,
+      completionTokens: response.usage?.completionTokens ?? null,
+      totalTokens: response.usage?.totalTokens ?? null,
     });
 
     const textContent = response.choices[0]?.message?.content;
@@ -496,19 +722,15 @@ ${JSON.stringify({
 
     console.log("[approval:draft] dedup.raw_response", textContent);
 
-    const parsed = JSON.parse(textContent) as { kept_story_ids?: unknown };
-    if (!Array.isArray(parsed.kept_story_ids)) {
+    const validIds = new Set(incomingStories.map((story) => story.id));
+    const keptIds = parseDeduplicationKeptStoryIds(textContent, validIds);
+    if (!keptIds) {
       logServerError(
         "newsletter.ai_dedup.invalid_payload",
         new Error("OpenRouter response did not contain kept_story_ids array"),
       );
       return incomingStories.map((s) => s.id);
     }
-
-    const validIds = new Set(incomingStories.map((story) => story.id));
-    const keptIds = parsed.kept_story_ids
-      .map((id) => Number(id))
-      .filter((id) => Number.isInteger(id) && validIds.has(id));
 
     console.log("[approval:draft] dedup.result", {
       keptCount: keptIds.length,
@@ -529,6 +751,9 @@ ${JSON.stringify({
   }
 }
 
+/**
+ * Splits ranked, deduplicated stories into the section buckets used by the UI.
+ */
 function groupStoriesByCategory(stories: ProcessedStory[]): {
   research: ProcessedStory[];
   tools: ProcessedStory[];
@@ -552,6 +777,12 @@ function groupStoriesByCategory(stories: ProcessedStory[]): {
   return { research, tools, general };
 }
 
+/**
+ * Builds the approval-board section payload from ranked category buckets.
+ *
+ * Each section has primary `selected` stories plus extra `fill_ins` that can
+ * be promoted manually by an editor if they reject or swap a selected story.
+ */
 function createSectionBlueprints(
   research: ProcessedStory[],
   tools: ProcessedStory[],
@@ -617,6 +848,16 @@ function createSectionBlueprints(
     .filter((section) => section.selected.length || section.fill_ins.length);
 }
 
+/**
+ * Creates all data needed to render the newsletter draft approval screen.
+ *
+ * Pipeline:
+ * 1. Load recently published reference stories and unpublished candidates.
+ * 2. Clean and rank candidates.
+ * 3. Remove semantic duplicates with AI when configured.
+ * 4. Group survivors into editorial sections and fill-in pools.
+ * 5. Return section data, a full story lookup map, and initially selected IDs.
+ */
 export async function createDraftApprovalData(
   date: Date
 ): Promise<DraftApprovalData> {

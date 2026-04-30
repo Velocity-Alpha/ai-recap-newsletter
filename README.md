@@ -32,6 +32,7 @@ The app runs directly on Next.js in local development. No `netlify dev` proxy or
    - `BEEHIIV_API_KEY`
    - `BEEHIIV_PUBLICATION_ID`
    - `BEEHIIV_UNSUBSCRIBE_WEBHOOK_SECRET`
+   - `OPENROUTER_API_KEY`
 4. If this local database already existed before Prisma Migrate was introduced, mark the baseline once:
    ```bash
    npm run prisma:migrate:baseline

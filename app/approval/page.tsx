@@ -4,44 +4,11 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 import ApprovalBoard from "@/src/components/approval/ApprovalBoard";
-
-const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
-const CACHE_KEY_PREFIX = "approval_draft_";
-
-type DraftData = {
-  reference_stories: {
-    id: number;
-    day: string | null;
-    headline: string;
-    summary: string;
-  }[];
-  candidate_sections: {
-    key: string;
-    label: string;
-    max: number;
-    selected: { id: number; headline: string; summary: string }[];
-    fill_ins: { id: number; headline: string; summary: string }[];
-  }[];
-  candidate_map: Record<string, {
-    id: number;
-    guid: string | null;
-    day: string | null;
-    headline: string | null;
-    summary: string | null;
-    story_details: string | null;
-    category: string | null;
-    source: string | null;
-    url: string | null;
-    importance_score: number | null;
-    keyword_score: number;
-    combined_score: number;
-  }>;
-};
-
-type CachedEntry = {
-  data: DraftData;
-  cachedAt: number;
-};
+import {
+  type ApprovalDraftData,
+  readApprovalDraftCache,
+  writeApprovalDraftCache,
+} from "@/src/features/newsletter/approval-cache";
 
 function parseDateKey(value: string | null): string {
   const candidate = value ? new Date(value) : new Date();
@@ -57,33 +24,6 @@ function formatDraftDate(dateKey: string): string {
     year: "numeric",
     timeZone: "UTC",
   }).format(new Date(dateKey));
-}
-
-function readCache(dateKey: string): DraftData | null {
-  try {
-    const raw = localStorage.getItem(`${CACHE_KEY_PREFIX}${dateKey}`);
-    if (!raw) return null;
-    const entry: CachedEntry = JSON.parse(raw);
-    if (Date.now() - entry.cachedAt > CACHE_TTL_MS) {
-      localStorage.removeItem(`${CACHE_KEY_PREFIX}${dateKey}`);
-      console.log("[approval:cache] expired", { dateKey });
-      return null;
-    }
-    console.log("[approval:cache] hit", { dateKey, cachedAt: new Date(entry.cachedAt).toISOString() });
-    return entry.data;
-  } catch {
-    return null;
-  }
-}
-
-function writeCache(dateKey: string, data: DraftData): void {
-  try {
-    const entry: CachedEntry = { data, cachedAt: Date.now() };
-    localStorage.setItem(`${CACHE_KEY_PREFIX}${dateKey}`, JSON.stringify(entry));
-    console.log("[approval:cache] stored", { dateKey });
-  } catch {
-    // localStorage may be full or unavailable — not a hard failure
-  }
 }
 
 function LoadingState() {
@@ -132,13 +72,15 @@ function ErrorState({ message }: { message: string }) {
 export default function ApprovalPage() {
   const searchParams = useSearchParams();
   const dateKey = parseDateKey(searchParams.get("date"));
-  const [draftData, setDraftData] = useState<DraftData | null>(null);
+  const [draftData, setDraftData] = useState<ApprovalDraftData | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const cached = readCache(dateKey);
+    const cached = readApprovalDraftCache(dateKey);
     if (cached) {
-      setDraftData(cached);
+      queueMicrotask(() => {
+        setDraftData(cached);
+      });
       return;
     }
 
@@ -148,10 +90,10 @@ export default function ApprovalPage() {
     fetch(`/api/approval/draft?${params}`)
       .then((res) => {
         if (!res.ok) throw new Error(`Server returned ${res.status}`);
-        return res.json() as Promise<DraftData>;
+        return res.json() as Promise<ApprovalDraftData>;
       })
       .then((data) => {
-        writeCache(dateKey, data);
+        writeApprovalDraftCache(dateKey, data);
         setDraftData(data);
       })
       .catch((err: unknown) => {
