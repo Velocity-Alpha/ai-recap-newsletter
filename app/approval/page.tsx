@@ -1,14 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
-import ApprovalBoard from "@/src/components/approval/ApprovalBoard";
+import ApprovalBoard from "@/components/approval/ApprovalBoard";
 import {
   type ApprovalOutlineData,
   readApprovalOutlineCache,
   writeApprovalOutlineCache,
-} from "@/src/features/newsletter/approval-outline-cache";
+} from "@/features/newsletter/approval-outline-cache";
 
 function parseDateKey(value: string | null): string {
   const candidate = value ? new Date(value) : new Date();
@@ -69,7 +69,7 @@ function ErrorState({ message }: { message: string }) {
   );
 }
 
-export default function ApprovalPage() {
+function ApprovalPageContent() {
   const searchParams = useSearchParams();
   const dateKey = parseDateKey(searchParams.get("date"));
   const [outlineData, setOutlineData] = useState<ApprovalOutlineData | null>(null);
@@ -113,5 +113,13 @@ export default function ApprovalPage() {
       candidateSections={outlineData.candidate_sections}
       candidateMap={outlineData.candidate_map}
     />
+  );
+}
+
+export default function ApprovalPage() {
+  return (
+    <Suspense fallback={<LoadingState />}>
+      <ApprovalPageContent />
+    </Suspense>
   );
 }
