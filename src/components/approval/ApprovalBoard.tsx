@@ -9,12 +9,12 @@ import {
   ChevronUp,
   ExternalLink,
   Flag,
-  Eye,
   GripVertical,
   Hammer,
   PanelLeftClose,
   PanelLeftOpen,
   BookOpen,
+  Pencil,
   Sparkles,
   Star,
   Trash2,
@@ -61,6 +61,7 @@ type ReferenceStory = {
 };
 
 type ApprovalBoardProps = {
+  dateKey: string;
   outlineDateLabel: string;
   referenceStories: ReferenceStory[];
   candidateSections: CandidateSection[];
@@ -106,6 +107,7 @@ function initSections(candidateSections: CandidateSection[]): SectionState[] {
 }
 
 export default function ApprovalBoard({
+  dateKey,
   outlineDateLabel,
   referenceStories,
   candidateSections,
@@ -427,19 +429,18 @@ export default function ApprovalBoard({
       ];
     });
 
-    return [
-      {
-        approved_ids_by_section: approvedIdsBySection,
-        excluded_stories: excludedStories,
-        newsletter_headline: headlineStoryId,
-        candidate_sections: candidateSections,
-        candidate_map: candidateMapPayload,
-        selected_story_ids: selectedStoryIds,
-        stories,
-        queue_update_count: selectedStoryIds.length,
-      },
-    ];
-  }, [candidateMap, excludeState, headlineStoryId, notesOverrides, sections, urlOverrides]);
+    return {
+      date: dateKey,
+      approved_ids_by_section: approvedIdsBySection,
+      excluded_stories: excludedStories,
+      newsletter_headline: headlineStoryId,
+      candidate_sections: candidateSections,
+      candidate_map: candidateMapPayload,
+      selected_story_ids: selectedStoryIds,
+      stories,
+      queue_update_count: selectedStoryIds.length,
+    };
+  }, [candidateMap, dateKey, excludeState, headlineStoryId, notesOverrides, sections, urlOverrides]);
 
   const handleCommitOutline = () => {
     setCommitResponseMessage(null);
@@ -797,11 +798,14 @@ export default function ApprovalBoard({
                                   </a>
                                 ) : null}
                                 <button
-                                  onClick={() => setPreviewStoryId(story.id)}
+                                  onClick={() => {
+                                    setPreviewStoryId(story.id);
+                                    setEditingPreviewId(story.id);
+                                  }}
                                   className="inline-flex h-6 w-6 items-center justify-center rounded text-[var(--text-muted)] hover:text-[var(--accent-primary)] transition"
-                                  aria-label="Preview"
+                                  aria-label="Edit"
                                 >
-                                  <Eye className="h-3.5 w-3.5" />
+                                  <Pencil className="h-3.5 w-3.5" />
                                 </button>
                                 <button
                                   onClick={() => toggleExpand(story.id)}

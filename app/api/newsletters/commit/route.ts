@@ -10,6 +10,19 @@ import jwt from "jsonwebtoken";
 
 export const runtime = "nodejs";
 
+function normalizeCommitPayload(payload: unknown): Record<string, unknown> {
+  if (payload && typeof payload === "object" && !Array.isArray(payload)) {
+    return payload as Record<string, unknown>;
+  }
+  if (Array.isArray(payload) && payload.length === 1) {
+    const firstItem = payload[0];
+    if (firstItem && typeof firstItem === "object" && !Array.isArray(firstItem)) {
+      return firstItem as Record<string, unknown>;
+    }
+  }
+  throw new Error("Approval commit payload must be a JSON object.");
+}
+
 export async function POST(request: Request) {
   const context = createRequestLogContext("api.newsletters.commit", request);
 
@@ -39,9 +52,20 @@ export async function POST(request: Request) {
       throw new Error("N8N_WEBHOOK_JWT_SECRET is not defined in environment variables");
     }
 
+    let normalizedPayload: Record<string, unknown>;
+    try {
+      normalizedPayload = normalizeCommitPayload(payload);
+    } catch (err) {
+      return jsonWithRequestId(
+        context,
+        { success: false, error: err instanceof Error ? err.message : "Invalid payload." },
+        { status: 400 }
+      );
+    }
+
     const authClaims = {
       scope: "story-approval",
-      payloadType: Array.isArray(payload) ? "array" : typeof payload,
+      payloadType: "object",
       issuedFor: "n8n-story-approval-webhook",
     };
 
@@ -61,7 +85,7 @@ export async function POST(request: Request) {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(normalizedPayload),
     });
 
     if (!webhookResponse.ok) {
@@ -74,8 +98,8 @@ export async function POST(request: Request) {
     const webhookData = await webhookResponse.json();
 
     logRequestSuccess(context, {
-      hasPayload: payload !== null && payload !== undefined,
-      payloadType: Array.isArray(payload) ? "array" : typeof payload,
+      hasPayload: true,
+      payloadType: "object",
       webhookStatus: webhookResponse.status,
       webhookHostname,
       forwardedSuccessfully: true,
