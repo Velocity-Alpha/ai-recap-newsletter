@@ -820,8 +820,7 @@ function createSectionBlueprints(
       max: section.max,
       selected: section.selected.map(toOption),
       fill_ins: section.fill_ins.map(toOption),
-    }))
-    .filter((section) => section.selected.length || section.fill_ins.length);
+    }));
 }
 
 /**

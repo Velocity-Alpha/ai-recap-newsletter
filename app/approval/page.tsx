@@ -108,6 +108,7 @@ function ApprovalPageContent() {
 
   return (
     <ApprovalBoard
+      dateKey={dateKey}
       outlineDateLabel={formatOutlineDate(dateKey)}
       referenceStories={outlineData.reference_stories}
       candidateSections={outlineData.candidate_sections}
