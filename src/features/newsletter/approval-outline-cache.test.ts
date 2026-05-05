@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   APPROVAL_OUTLINE_CACHE_TTL_MS,
+  normalizeApprovalOutlineData,
   readApprovalOutlineCache,
   writeApprovalOutlineCache,
 } from "@/src/features/newsletter/approval-outline-cache";
@@ -62,5 +63,51 @@ describe("approval outline cache", () => {
       )
     ).toBeNull();
     expect(storage.removeItem).toHaveBeenCalledWith("approval_outline_2026-04-30");
+  });
+
+  it("backfills empty editorial sections when cached data omitted them", () => {
+    expect(
+      normalizeApprovalOutlineData({
+        ...outlineData,
+        candidate_sections: [
+          {
+            key: "headlines",
+            label: "Top Stories",
+            max: 3,
+            selected: [{ id: 1, headline: "Lead story", summary: "Summary" }],
+            fill_ins: [],
+          },
+        ],
+      }).candidate_sections
+    ).toEqual([
+      {
+        key: "headlines",
+        label: "Top Stories",
+        max: 3,
+        selected: [{ id: 1, headline: "Lead story", summary: "Summary" }],
+        fill_ins: [],
+      },
+      {
+        key: "research",
+        label: "Research & Analysis",
+        max: 4,
+        selected: [],
+        fill_ins: [],
+      },
+      {
+        key: "tools",
+        label: "Tools",
+        max: 3,
+        selected: [],
+        fill_ins: [],
+      },
+      {
+        key: "quickHits",
+        label: "Quick Hits",
+        max: 6,
+        selected: [],
+        fill_ins: [],
+      },
+    ]);
   });
 });
