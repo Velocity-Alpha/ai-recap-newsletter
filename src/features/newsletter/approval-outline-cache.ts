@@ -1,6 +1,12 @@
 export const APPROVAL_OUTLINE_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 const CACHE_KEY_PREFIX = "approval_outline_";
+const DEFAULT_CANDIDATE_SECTIONS = [
+  { key: "headlines", label: "Top Stories", max: 3 },
+  { key: "research", label: "Research & Analysis", max: 4 },
+  { key: "tools", label: "Tools", max: 3 },
+  { key: "quickHits", label: "Quick Hits", max: 6 },
+] as const;
 
 export type ApprovalOutlineData = {
   reference_stories: {
@@ -43,6 +49,25 @@ type CachedEntry = {
   cachedAt: number;
 };
 
+export function normalizeApprovalOutlineData(data: ApprovalOutlineData): ApprovalOutlineData {
+  const sectionsByKey = new Map(data.candidate_sections.map((section) => [section.key, section]));
+
+  return {
+    ...data,
+    candidate_sections: DEFAULT_CANDIDATE_SECTIONS.map((defaultSection) => {
+      const existingSection = sectionsByKey.get(defaultSection.key);
+
+      return {
+        key: defaultSection.key,
+        label: existingSection?.label ?? defaultSection.label,
+        max: existingSection?.max ?? defaultSection.max,
+        selected: existingSection?.selected ?? [],
+        fill_ins: existingSection?.fill_ins ?? [],
+      };
+    }),
+  };
+}
+
 function getApprovalOutlineCacheKey(dateKey: string): string {
   return `${CACHE_KEY_PREFIX}${dateKey}`;
 }
@@ -67,7 +92,7 @@ export function readApprovalOutlineCache(
       dateKey,
       cachedAt: new Date(entry.cachedAt).toISOString(),
     });
-    return entry.data;
+    return normalizeApprovalOutlineData(entry.data);
   } catch {
     return null;
   }
@@ -80,7 +105,10 @@ export function writeApprovalOutlineCache(
   now = Date.now()
 ): void {
   try {
-    const entry: CachedEntry = { data, cachedAt: now };
+    const entry: CachedEntry = {
+      data: normalizeApprovalOutlineData(data),
+      cachedAt: now,
+    };
     storage.setItem(getApprovalOutlineCacheKey(dateKey), JSON.stringify(entry));
     console.log("[approval:cache] stored", { dateKey });
   } catch {
