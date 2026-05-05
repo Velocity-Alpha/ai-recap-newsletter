@@ -6,6 +6,7 @@ import {
   readApprovalOutlineCache,
   writeApprovalOutlineCache,
 } from "@/src/features/newsletter/approval-outline-cache";
+import { CANDIDATE_SECTION_CONFIGS } from "@/src/features/newsletter/section-config";
 
 // Raw outline as the API might return it before normalization.
 const rawOutlineData = {
@@ -15,15 +16,16 @@ const rawOutlineData = {
   selected_story_ids: [],
 };
 
-// What the cache should always read back: all four sections present.
+// What readApprovalOutlineCache should always return: raw stored data normalized to all four sections.
 const normalizedOutlineData = {
   reference_stories: [],
-  candidate_sections: [
-    { key: "headlines", label: "Top Stories", max: 3, selected: [], fill_ins: [] },
-    { key: "research", label: "Research & Analysis", max: 4, selected: [], fill_ins: [] },
-    { key: "tools", label: "Tools", max: 3, selected: [], fill_ins: [] },
-    { key: "quickHits", label: "Quick Hits", max: 6, selected: [], fill_ins: [] },
-  ],
+  candidate_sections: CANDIDATE_SECTION_CONFIGS.map((s) => ({
+    key: s.key,
+    label: s.label,
+    max: s.max,
+    selected: [],
+    fill_ins: [],
+  })),
   candidate_map: {},
   selected_story_ids: [],
 };
