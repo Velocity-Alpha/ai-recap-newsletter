@@ -1,12 +1,8 @@
+import { CANDIDATE_SECTION_CONFIGS } from "@/src/features/newsletter/section-config";
+
 export const APPROVAL_OUTLINE_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 const CACHE_KEY_PREFIX = "approval_outline_";
-const DEFAULT_CANDIDATE_SECTIONS = [
-  { key: "headlines", label: "Top Stories", max: 3 },
-  { key: "research", label: "Research & Analysis", max: 4 },
-  { key: "tools", label: "Tools", max: 3 },
-  { key: "quickHits", label: "Quick Hits", max: 6 },
-] as const;
 
 export type ApprovalOutlineData = {
   reference_stories: {
@@ -54,7 +50,7 @@ export function normalizeApprovalOutlineData(data: ApprovalOutlineData): Approva
 
   return {
     ...data,
-    candidate_sections: DEFAULT_CANDIDATE_SECTIONS.map((defaultSection) => {
+    candidate_sections: CANDIDATE_SECTION_CONFIGS.map((defaultSection) => {
       const existingSection = sectionsByKey.get(defaultSection.key);
 
       return {
@@ -105,10 +101,10 @@ export function writeApprovalOutlineCache(
   now = Date.now()
 ): void {
   try {
-    const entry: CachedEntry = {
-      data: normalizeApprovalOutlineData(data),
-      cachedAt: now,
-    };
+    // Store the raw API response as-is. Normalization happens on read so that
+    // any future changes to section defaults are applied at the point of
+    // consumption, not silently baked into the stored bytes.
+    const entry: CachedEntry = { data, cachedAt: now };
     storage.setItem(getApprovalOutlineCacheKey(dateKey), JSON.stringify(entry));
     console.log("[approval:cache] stored", { dateKey });
   } catch {
