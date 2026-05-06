@@ -760,12 +760,25 @@ function groupStoriesByCategory(stories: ProcessedStory[]): {
  * Each section has primary `selected` stories plus extra `fill_ins` that can
  * be promoted manually by an editor if they reject or swap a selected story.
  */
+/**
+ * Story pool assignments are intentional domain logic: headlines and quickHits
+ * both draw from the general pool (with an offset between them), while research
+ * and tools each have their own pool. This cannot be purely derived from
+ * CANDIDATE_SECTION_CONFIGS, but keys are typed as SectionKey so adding a new
+ * section to the config produces a compile-time exhaustiveness error here.
+ */
 function createSectionBlueprints(
   research: ProcessedStory[],
   tools: ProcessedStory[],
   general: ProcessedStory[]
 ): CandidateSection[] {
-  const blueprints = [
+  const blueprints: Array<{
+    key: SectionKey;
+    label: string;
+    max: number;
+    selected: ProcessedStory[];
+    fill_ins: ProcessedStory[];
+  }> = [
     {
       key: "headlines",
       label: SECTION_LABELS.headlines,

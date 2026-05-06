@@ -47,20 +47,26 @@ type CachedEntry = {
 
 export function normalizeApprovalOutlineData(data: ApprovalOutlineData): ApprovalOutlineData {
   const sectionsByKey = new Map(data.candidate_sections.map((section) => [section.key, section]));
+  const knownKeys = new Set(CANDIDATE_SECTION_CONFIGS.map((s) => s.key));
+
+  const knownSections = CANDIDATE_SECTION_CONFIGS.map((defaultSection) => {
+    const existingSection = sectionsByKey.get(defaultSection.key);
+    return {
+      key: defaultSection.key,
+      label: existingSection?.label ?? defaultSection.label,
+      max: existingSection?.max ?? defaultSection.max,
+      selected: existingSection?.selected ?? [],
+      fill_ins: existingSection?.fill_ins ?? [],
+    };
+  });
+
+  // Preserve any sections the server sent that this client doesn't recognise yet
+  // (e.g. a new section deployed server-side before the next client build).
+  const unknownSections = data.candidate_sections.filter((s) => !knownKeys.has(s.key));
 
   return {
     ...data,
-    candidate_sections: CANDIDATE_SECTION_CONFIGS.map((defaultSection) => {
-      const existingSection = sectionsByKey.get(defaultSection.key);
-
-      return {
-        key: defaultSection.key,
-        label: existingSection?.label ?? defaultSection.label,
-        max: existingSection?.max ?? defaultSection.max,
-        selected: existingSection?.selected ?? [],
-        fill_ins: existingSection?.fill_ins ?? [],
-      };
-    }),
+    candidate_sections: [...knownSections, ...unknownSections],
   };
 }
 
