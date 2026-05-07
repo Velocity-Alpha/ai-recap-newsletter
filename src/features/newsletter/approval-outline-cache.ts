@@ -47,7 +47,7 @@ type CachedEntry = {
 
 export function normalizeApprovalOutlineData(data: ApprovalOutlineData): ApprovalOutlineData {
   const sectionsByKey = new Map(data.candidate_sections.map((section) => [section.key, section]));
-  const knownKeys = new Set(CANDIDATE_SECTION_CONFIGS.map((s) => s.key));
+  const knownKeys = new Set<string>(CANDIDATE_SECTION_CONFIGS.map((s) => s.key));
 
   const knownSections = CANDIDATE_SECTION_CONFIGS.map((defaultSection) => {
     const existingSection = sectionsByKey.get(defaultSection.key);
