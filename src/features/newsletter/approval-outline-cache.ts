@@ -52,7 +52,7 @@ export function normalizeApprovalOutlineData(data: ApprovalOutlineData): Approva
   const knownSections = CANDIDATE_SECTION_CONFIGS.map((defaultSection) => {
     const existingSection = sectionsByKey.get(defaultSection.key);
     return {
-      key: defaultSection.key,
+      key: defaultSection.key as string,
       label: existingSection?.label ?? defaultSection.label,
       max: existingSection?.max ?? defaultSection.max,
       selected: existingSection?.selected ?? [],
