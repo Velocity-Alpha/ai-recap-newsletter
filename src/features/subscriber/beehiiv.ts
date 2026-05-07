@@ -1,4 +1,5 @@
 import { logServerError, logServerInfo, logServerWarn, maskEmail } from "@/src/server/observability";
+import { sub } from "framer-motion/client";
 
 function getBeehiivApiKey() {
   const apiKey = process.env.BEEHIIV_API_KEY?.trim();
@@ -120,5 +121,88 @@ export async function submitSubscriberToBeehiiv(input: BeehiivSubscribeInput) {
     }
 
     throw new Error("Beehiiv subscribe request failed.");
+  }
+}
+
+interface BeehiivSubscription {
+  id: string;
+  email: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Checks Beehiiv for a subscriber by email.
+ * Returns the subscription status (e.g., "active", "unsubscribed") or null if not found.
+ */
+export async function getBeehiivSubscriberStatus(
+  email: string
+): Promise<{ status: string; id: string } | null> {
+  const apiKey = getBeehiivApiKey();
+  const publicationId = getBeehiivPublicationId();
+
+  logServerInfo("subscriber.beehiiv.status.check", {
+    email: maskEmail(email),
+  });
+
+  try {
+    const response = await fetch(
+      `https://api.beehiiv.com/v2/publications/${publicationId}/subscriptions?email=${encodeURIComponent(email)}`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        cache: "no-store",
+      },
+    );
+
+    if (!response.ok) {
+      logServerWarn("subscriber.beehiiv.status.fetch_failed", {
+        email: maskEmail(email),
+        status: response.status,
+      });
+      return null;
+    }
+
+    const data = (await response.json()) as { data?: BeehiivSubscription[] };
+
+    if (!data.data || data.data.length === 0) {
+      logServerInfo("subscriber.beehiiv.status.not_found", {
+        email: maskEmail(email),
+      });
+      return null;
+    }
+
+    const subscription = data.data[0];
+
+    logServerInfo("subscriber.beehiiv.status.found", {
+      email: maskEmail(email),
+      status: subscription.status,
+    });
+
+    if (subscription.status === "invalid" || subscription.status === "inactive") {
+      logServerWarn("subscriber.beehiiv.status.invalid", {
+        email: maskEmail(email),
+      });
+      return null;
+    }
+
+    return {
+      status: subscription.status,
+      id: subscription.id,
+    };
+  } catch (error) {
+    if (error instanceof Error && /not configured/i.test(error.message)) {
+      throw error;
+    }
+
+    logServerError("subscriber.beehiiv.status.error", error, {
+      email: maskEmail(email),
+    });
+
+    return null;
   }
 }

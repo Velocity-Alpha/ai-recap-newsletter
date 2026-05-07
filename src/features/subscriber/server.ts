@@ -4,6 +4,7 @@ import type { ResponseCookies } from "next/dist/compiled/@edge-runtime/cookies";
 
 import type { SubscriberRecord, SubscriberSessionPayload } from "@/src/features/subscriber/types";
 import { prisma } from "@/src/server/prisma";
+import { getBeehiivSubscriberStatus } from "@/src/features/subscriber/beehiiv";
 
 const COOKIE_NAME = "ai_recap_subscriber";
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
@@ -244,11 +245,24 @@ export async function hasActiveSubscriberSession(cookieStore?: CookieReader) {
 }
 
 export async function findSubscriberByEmail(email: string) {
+  const normalizedEmail = normalizeSubscriberEmail(email);
   const record = await prisma.subscriber.findUnique({
-    where: { email: normalizeSubscriberEmail(email) },
+    where: { email: normalizedEmail },
   });
 
-  return record ? mapSubscriberRecord(record) : null;
+  if (!record) {
+    return null;
+  }
+
+  const subscriber = mapSubscriberRecord(record);
+
+  // Verify status with Beehiiv — if not found there, return null (out of sync)
+  const beehiivStatus = await getBeehiivSubscriberStatus(normalizedEmail);
+  if (!beehiivStatus) {
+    return null;
+  }
+
+  return subscriber;
 }
 
 export async function findSubscriberById(id: number) {
