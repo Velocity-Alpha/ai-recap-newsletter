@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 
 import ApprovalBoard from "@/components/approval/ApprovalBoard";
 import {
+  normalizeApprovalOutlineData,
   type ApprovalOutlineData,
   readApprovalOutlineCache,
   writeApprovalOutlineCache,
@@ -94,7 +95,7 @@ function ApprovalPageContent() {
       })
       .then((data) => {
         writeApprovalOutlineCache(dateKey, data);
-        setOutlineData(data);
+        setOutlineData(normalizeApprovalOutlineData(data));
       })
       .catch((err: unknown) => {
         const message = err instanceof Error ? err.message : "Unknown error";

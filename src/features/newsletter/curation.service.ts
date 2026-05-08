@@ -3,6 +3,7 @@ import type { ChatMessages, ChatRequest } from "@openrouter/sdk/models";
 import { Prisma } from "@/src/generated/prisma";
 import { prisma } from "@/src/server/prisma";
 import { logServerError, logServerInfo, logServerWarn } from "@/src/server/observability";
+import { CANDIDATE_SECTION_CONFIGS, type SectionKey } from "@/src/features/newsletter/section-config";
 
 interface StoryRecord {
   id: number;
@@ -60,13 +61,13 @@ type RawStoryRow = {
   importance_score: number | null;
 };
 
-// Configuration
-const SECTION_LIMITS = {
-  headlines: 3,
-  research: 4,
-  tools: 3,
-  quickHits: 6,
-};
+// Configuration — derived from the shared section-config so keys/labels/limits stay in sync with the UI.
+const SECTION_LIMITS = Object.fromEntries(
+  CANDIDATE_SECTION_CONFIGS.map((s) => [s.key, s.max])
+) as Record<SectionKey, number>;
+const SECTION_LABELS = Object.fromEntries(
+  CANDIDATE_SECTION_CONFIGS.map((s) => [s.key, s.label])
+) as Record<SectionKey, string>;
 const FILL_IN_LIMIT = 3;
 const OPENROUTER_DEDUP_MODELS = [
   "deepseek/deepseek-v4-flash",
@@ -759,15 +760,28 @@ function groupStoriesByCategory(stories: ProcessedStory[]): {
  * Each section has primary `selected` stories plus extra `fill_ins` that can
  * be promoted manually by an editor if they reject or swap a selected story.
  */
+/**
+ * Story pool assignments are intentional domain logic: headlines and quickHits
+ * both draw from the general pool (with an offset between them), while research
+ * and tools each have their own pool. This cannot be purely derived from
+ * CANDIDATE_SECTION_CONFIGS, but keys are typed as SectionKey so adding a new
+ * section to the config produces a compile-time exhaustiveness error here.
+ */
 function createSectionBlueprints(
   research: ProcessedStory[],
   tools: ProcessedStory[],
   general: ProcessedStory[]
 ): CandidateSection[] {
-  const blueprints = [
+  const blueprints: Array<{
+    key: SectionKey;
+    label: string;
+    max: number;
+    selected: ProcessedStory[];
+    fill_ins: ProcessedStory[];
+  }> = [
     {
       key: "headlines",
-      label: "Top Stories",
+      label: SECTION_LABELS.headlines,
       max: SECTION_LIMITS.headlines,
       selected: general.slice(0, SECTION_LIMITS.headlines),
       fill_ins: general.slice(
@@ -777,7 +791,7 @@ function createSectionBlueprints(
     },
     {
       key: "research",
-      label: "Research & Analysis",
+      label: SECTION_LABELS.research,
       max: SECTION_LIMITS.research,
       selected: research.slice(0, SECTION_LIMITS.research),
       fill_ins: research.slice(
@@ -787,7 +801,7 @@ function createSectionBlueprints(
     },
     {
       key: "tools",
-      label: "Tools",
+      label: SECTION_LABELS.tools,
       max: SECTION_LIMITS.tools,
       selected: tools.slice(0, SECTION_LIMITS.tools),
       fill_ins: tools.slice(
@@ -797,7 +811,7 @@ function createSectionBlueprints(
     },
     {
       key: "quickHits",
-      label: "Quick Hits",
+      label: SECTION_LABELS.quickHits,
       max: SECTION_LIMITS.quickHits,
       selected: general.slice(
         SECTION_LIMITS.headlines + FILL_IN_LIMIT,

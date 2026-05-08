@@ -1,3 +1,5 @@
+import { CANDIDATE_SECTION_CONFIGS } from "@/src/features/newsletter/section-config";
+
 export const APPROVAL_OUTLINE_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 const CACHE_KEY_PREFIX = "approval_outline_";
@@ -43,6 +45,31 @@ type CachedEntry = {
   cachedAt: number;
 };
 
+export function normalizeApprovalOutlineData(data: ApprovalOutlineData): ApprovalOutlineData {
+  const sectionsByKey = new Map(data.candidate_sections.map((section) => [section.key, section]));
+  const knownKeys = new Set<string>(CANDIDATE_SECTION_CONFIGS.map((s) => s.key));
+
+  const knownSections = CANDIDATE_SECTION_CONFIGS.map((defaultSection) => {
+    const existingSection = sectionsByKey.get(defaultSection.key);
+    return {
+      key: defaultSection.key as string,
+      label: existingSection?.label ?? defaultSection.label,
+      max: existingSection?.max ?? defaultSection.max,
+      selected: existingSection?.selected ?? [],
+      fill_ins: existingSection?.fill_ins ?? [],
+    };
+  });
+
+  // Preserve any sections the server sent that this client doesn't recognise yet
+  // (e.g. a new section deployed server-side before the next client build).
+  const unknownSections = data.candidate_sections.filter((s) => !knownKeys.has(s.key));
+
+  return {
+    ...data,
+    candidate_sections: [...knownSections, ...unknownSections],
+  };
+}
+
 function getApprovalOutlineCacheKey(dateKey: string): string {
   return `${CACHE_KEY_PREFIX}${dateKey}`;
 }
@@ -67,7 +94,7 @@ export function readApprovalOutlineCache(
       dateKey,
       cachedAt: new Date(entry.cachedAt).toISOString(),
     });
-    return entry.data;
+    return normalizeApprovalOutlineData(entry.data);
   } catch {
     return null;
   }
@@ -80,6 +107,9 @@ export function writeApprovalOutlineCache(
   now = Date.now()
 ): void {
   try {
+    // Store the raw API response as-is. Normalization happens on read so that
+    // any future changes to section defaults are applied at the point of
+    // consumption, not silently baked into the stored bytes.
     const entry: CachedEntry = { data, cachedAt: now };
     storage.setItem(getApprovalOutlineCacheKey(dateKey), JSON.stringify(entry));
     console.log("[approval:cache] stored", { dateKey });
