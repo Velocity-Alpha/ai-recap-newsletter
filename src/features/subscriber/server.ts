@@ -256,9 +256,9 @@ export async function findSubscriberByEmail(email: string) {
 
   const subscriber = mapSubscriberRecord(record);
 
-  // Verify status with Beehiiv — if not found there, return null (out of sync)
+  // Verify status with Beehiiv — if not found there or inactive, return null (out of sync)
   const beehiivStatus = await getBeehiivSubscriberStatus(normalizedEmail);
-  if (!beehiivStatus) {
+  if (!beehiivStatus || beehiivStatus.status === "inactive") {
     return null;
   }
 

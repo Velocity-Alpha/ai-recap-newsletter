@@ -183,7 +183,7 @@ export async function getBeehiivSubscriberStatus(
       status: subscription.status,
     });
 
-    if (subscription.status === "invalid" || subscription.status === "inactive") {
+    if (subscription.status === "invalid") {
       logServerWarn("subscriber.beehiiv.status.invalid", {
         email: maskEmail(email),
       });
