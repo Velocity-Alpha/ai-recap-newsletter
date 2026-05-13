@@ -848,7 +848,8 @@ export default function ApprovalBoard({
                                     {status === "selected" ? "Mark as fill-in" : "Select for issue"}
                                   </button>
 
-                                  {/* Headline picker */}
+                                  {/* Headline picker — only for Top Stories */}
+                                  {section.key === "headlines" && (
                                   <button
                                     onClick={() => setHeadlineStoryId(isHeadline ? null : story.id)}
                                     className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition ${
@@ -860,6 +861,7 @@ export default function ApprovalBoard({
                                     <Star className={`h-3 w-3 ${ isHeadline ? "fill-current" : ""}`} />
                                     {isHeadline ? "Headline story" : "Set as headline"}
                                   </button>
+                                  )}
 
                                   {/* Exclude checkbox */}
                                   <label className="flex cursor-pointer items-center gap-2 text-xs text-[var(--text-secondary)] sm:hidden">

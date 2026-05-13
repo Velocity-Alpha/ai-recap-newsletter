@@ -91,17 +91,112 @@ function ApprovalPageContent() {
     fetch(`/api/approval/outline?${params}`)
       .then((res) => {
         if (!res.ok) throw new Error(`Server returned ${res.status}`);
-        return res.json() as Promise<ApprovalOutlineData>;
+        return res.json() as Promise<{
+          status: "pending" | "ready";
+          batch_job_id?: string;
+          outline: ApprovalOutlineData;
+        }>;
       })
       .then((data) => {
-        writeApprovalOutlineCache(dateKey, data);
-        setOutlineData(normalizeApprovalOutlineData(data));
+        // If dedup is still pending, start polling
+        if (data.status === "pending" && data.batch_job_id) {
+          console.log("[approval:polling] starting batch status polling", {
+            dateKey,
+            batchJobId: data.batch_job_id,
+          });
+          startPollingBatchStatus(data.batch_job_id, dateKey);
+        } else {
+          // Dedup already complete, use the outline
+          writeApprovalOutlineCache(dateKey, data.outline);
+          setOutlineData(normalizeApprovalOutlineData(data.outline));
+        }
       })
       .catch((err: unknown) => {
         const message = err instanceof Error ? err.message : "Unknown error";
         console.error("[approval:cache] outline fetch failed", { dateKey, message });
         setError(message);
       });
+
+    function startPollingBatchStatus(batchJobId: string, date: string) {
+      const poll = async () => {
+        try {
+          const statusParams = new URLSearchParams({
+            batch_job_id: batchJobId,
+            date: date,
+          });
+
+          console.log("[approval:polling] checking status", { 
+            batchJobId, 
+            date,
+            timestamp: new Date().toISOString(),
+          });
+
+          const res = await fetch(
+            `/api/approval/outline/status?${statusParams}`
+          );
+
+          if (!res.ok) {
+            throw new Error(`Status check returned ${res.status}`);
+          }
+
+          const statusData = (await res.json()) as {
+            status: "processing" | "completed" | "error";
+            outline?: ApprovalOutlineData;
+            error?: string;
+          };
+
+          console.log("[approval:polling] status response", {
+            status: statusData.status,
+            hasOutline: Boolean(statusData.outline),
+            error: statusData.error,
+            timestamp: new Date().toISOString(),
+          });
+
+          if (statusData.status === "completed" && statusData.outline) {
+            console.log("[approval:polling] ✅ dedup completed, updating outline", {
+              dateKey,
+              timestamp: new Date().toISOString(),
+            });
+            writeApprovalOutlineCache(dateKey, statusData.outline);
+            setOutlineData(normalizeApprovalOutlineData(statusData.outline));
+            return;
+          }
+
+          if (statusData.status === "error") {
+            console.error("[approval:polling] ❌ batch failed", {
+              dateKey,
+              error: statusData.error,
+              timestamp: new Date().toISOString(),
+            });
+            setError(statusData.error || "Deduplication failed");
+            return;
+          }
+
+          // Still processing, schedule next poll in 2000ms
+          console.log("[approval:polling] ⏳ still processing, next check in 2s", {
+            dateKey,
+            timestamp: new Date().toISOString(),
+          });
+          setTimeout(poll, 2000);
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : "Unknown error";
+          console.error("[approval:polling] ❌ status check failed", {
+            dateKey,
+            message,
+            timestamp: new Date().toISOString(),
+          });
+          setError(message);
+        }
+      };
+
+      // Start polling immediately
+      console.log("[approval:polling] 🚀 starting polling", {
+        batchJobId,
+        dateKey,
+        timestamp: new Date().toISOString(),
+      });
+      poll();
+    }
   }, [dateKey]);
 
   if (error) return <ErrorState message={error} />;

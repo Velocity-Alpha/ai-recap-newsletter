@@ -838,18 +838,23 @@ function createSectionBlueprints(
 }
 
 /**
- * Creates all data needed to render the newsletter outline approval screen.
+ * Creates all data needed to render the newsletter outline approval screen,
+ * WITHOUT AI deduplication. Used for fast initial load with pending status.
  *
  * Pipeline:
  * 1. Load recently published reference stories and unpublished candidates.
  * 2. Clean and rank candidates.
- * 3. Remove semantic duplicates with AI when configured.
- * 4. Group survivors into editorial sections and fill-in pools.
+ * 3. Skip AI deduplication (happens async via batch API).
+ * 4. Group stories into editorial sections and fill-in pools.
  * 5. Return section data, a full story lookup map, and initially selected IDs.
  */
-export async function createApprovalOutlineData(
+export async function createApprovalOutlineDataWithoutDedup(
   date: Date
-): Promise<ApprovalOutlineData> {
+): Promise<{
+  outline: ApprovalOutlineData;
+  referencedStories: StoryRecord[];
+  rankedCandidates: ProcessedStory[];
+}> {
   logServerInfo("approval.outline.create.start", { date: date.toISOString() });
 
   // Fetch stories
@@ -868,18 +873,11 @@ export async function createApprovalOutlineData(
 
   logServerInfo("approval.outline.rank.result", { rankedCount: rankedCandidates.length });
 
-  // AI deduplication
-  const keptStoryIds = await deduplicateWithAI(rankedCandidates, referencedStories);
+  // Skip AI deduplication — use all ranked stories
+  const dedupedStories = rankedCandidates;
 
-  // Filter to kept stories
-  const keptStoryIdSet = new Set<number>(keptStoryIds);
-  const dedupedStories = rankedCandidates.filter((story) =>
-    keptStoryIdSet.has(story.id)
-  );
-
-  logServerInfo("approval.outline.dedup.filtered", {
-    keptCount: keptStoryIds.length,
-    dedupedCount: dedupedStories.length,
+  logServerInfo("approval.outline.dedup.skipped", {
+    storyCount: dedupedStories.length,
   });
 
   // Group by category
@@ -922,15 +920,32 @@ export async function createApprovalOutlineData(
     }
   }
 
+  const outline: ApprovalOutlineData = {
+    reference_stories: referencedStories.map(toReferenceStory),
+    candidate_sections,
+    candidate_map,
+    selected_story_ids: Array.from(selected_story_ids),
+  };
+
   logServerInfo("approval.outline.final", {
     sectionCount: candidate_sections.length,
     selectedStoryCount: selected_story_ids.size,
   });
 
   return {
-    reference_stories: referencedStories.map(toReferenceStory),
-    candidate_sections,
-    candidate_map,
-    selected_story_ids: Array.from(selected_story_ids),
+    outline,
+    referencedStories,
+    rankedCandidates,
   };
+}
+
+/**
+ * Legacy function — kept for backwards compatibility.
+ * Now calls createApprovalOutlineDataWithoutDedup (skips blocking AI dedup).
+ */
+export async function createApprovalOutlineData(
+  date: Date
+): Promise<ApprovalOutlineData> {
+  const { outline } = await createApprovalOutlineDataWithoutDedup(date);
+  return outline;
 }
