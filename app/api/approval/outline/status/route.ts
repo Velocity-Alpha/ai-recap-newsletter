@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { 
   createApprovalOutlineDataWithoutDedup,
 } from "@/src/features/newsletter/curation.service";
-import { checkBatchStatus } from "@/src/features/newsletter/openai-batch";
+import { checkDeduplicationStatus } from "@/src/features/newsletter/openai-dedup";
 import { hasValidApprovalSession } from "@/src/server/approval-auth";
 import { logServerError, logServerInfo } from "@/src/server/observability";
 
@@ -19,54 +19,52 @@ export async function GET(request: Request) {
   }
 
   const { searchParams } = new URL(request.url);
-  const batchJobId = searchParams.get("batch_job_id");
+  const responseId = searchParams.get("response_id");
   const date = parseDateParam(searchParams.get("date"));
 
-  if (!batchJobId) {
+  if (!responseId) {
     return NextResponse.json(
-      { error: "Missing batch_job_id parameter." },
+      { error: "Missing response_id parameter." },
       { status: 400 }
     );
   }
 
-  logServerInfo("approval.outline.status.check", { batchJobId, date: date.toISOString() });
+  logServerInfo("approval.outline.status.check", { responseId, date: date.toISOString() });
 
   try {
-    const batchStatus = await checkBatchStatus(batchJobId);
+    const responseStatus = await checkDeduplicationStatus(responseId);
 
     // Handle processing states (queued, in_progress)
     if (
-      batchStatus.status === "queued" ||
-      batchStatus.status === "in_progress" ||
-      batchStatus.status === "processing"
+      responseStatus.status === "queued" ||
+      responseStatus.status === "in_progress"
     ) {
-      logServerInfo("approval.outline.status.processing", { batchJobId });
+      logServerInfo("approval.outline.status.processing", { responseId });
       return NextResponse.json({ status: "processing" });
     }
 
     // Handle failure states
     if (
-      batchStatus.status === "failed" ||
-      batchStatus.status === "expired" ||
-      batchStatus.error
+      responseStatus.status === "failed" ||
+      responseStatus.error
     ) {
-      logServerError("approval.outline.status.failed", batchStatus.error, { batchJobId });
+      logServerError("approval.outline.status.failed", responseStatus.error, { responseId });
       return NextResponse.json(
         { 
           status: "error", 
-          error: batchStatus.error || "Deduplication batch failed." 
+          error: responseStatus.error || "Deduplication response failed." 
         },
         { status: 500 }
       );
     }
 
     // Handle completion
-    if (batchStatus.status === "completed" && batchStatus.result) {
+    if (responseStatus.status === "completed" && responseStatus.result) {
       // Rebuild outline with deduped story IDs
       const { outline: baseOutline } = 
         await createApprovalOutlineDataWithoutDedup(date);
 
-      const keptStoryIds = new Set<number>(batchStatus.result.kept_story_ids || []);
+      const keptStoryIds = new Set<number>(responseStatus.result.kept_story_ids || []);
 
       // Filter candidate_sections to only include kept stories
       const deduped_sections = baseOutline.candidate_sections.map((section) => ({
@@ -89,7 +87,7 @@ export async function GET(request: Request) {
       );
 
       logServerInfo("approval.outline.status.completed", { 
-        batchJobId,
+        responseId,
         keptCount: keptStoryIds.size,
         totalCount: baseOutline.selected_story_ids.length,
       });
@@ -105,16 +103,16 @@ export async function GET(request: Request) {
       });
     }
 
-    logServerError("approval.outline.status.unknown_state", batchStatus, { batchJobId });
+    logServerError("approval.outline.status.unknown_state", responseStatus, { responseId });
     return NextResponse.json(
-      { error: "Unknown batch status." },
+      { error: "Unknown response status." },
       { status: 500 }
     );
   } catch (error) {
-    logServerError("approval.outline.status.error", error, { batchJobId });
+    logServerError("approval.outline.status.error", error, { responseId });
 
     return NextResponse.json(
-      { error: "Failed to check batch status." },
+      { error: "Failed to check response status." },
       { status: 500 }
     );
   }

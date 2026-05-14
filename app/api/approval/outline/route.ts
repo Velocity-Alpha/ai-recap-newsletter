@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { 
   createApprovalOutlineDataWithoutDedup 
 } from "@/src/features/newsletter/curation.service";
-import { submitDeduplicationBatch } from "@/src/features/newsletter/openai-batch";
+import { submitDeduplication } from "@/src/features/newsletter/openai-dedup";
 import { hasValidApprovalSession } from "@/src/server/approval-auth";
 import { logServerError, logServerInfo } from "@/src/server/observability";
 
@@ -38,41 +38,45 @@ export async function GET(request: Request) {
       storyCount: rankedCandidates.length,
     });
 
-    // Submit async dedup job to OpenAI
-    let batchJobId: string | null = null;
+    // Submit async dedup job to OpenAI Responses API
+    let responseId: string | null = null;
     try {
-      batchJobId = await submitDeduplicationBatch(
+      responseId = await submitDeduplication(
         {
-          incomingStories: rankedCandidates.map((s) => ({
-            id: s.id,
-            headline: s.headline,
-            summary: s.summary,
-            story_details: s.story_details,
-          })),
-          referencedStories: referencedStories.map((s) => ({
-            id: s.id,
-            headline: s.headline,
-            summary: s.summary,
-            story_details: s.story_details,
-          })),
+          incomingStories: rankedCandidates
+            .filter((s) => s.headline != null && s.summary != null)
+            .map((s) => ({
+              id: s.id,
+              headline: s.headline!,
+              summary: s.summary!,
+              story_details: s.story_details,
+            })),
+          referencedStories: referencedStories
+            .filter((s) => s.headline != null && s.summary != null)
+            .map((s) => ({
+              id: s.id,
+              headline: s.headline!,
+              summary: s.summary!,
+              story_details: s.story_details,
+            })),
         },
         dateKey
       );
 
-      logServerInfo("approval.outline.api.batch_submitted", { 
+      logServerInfo("approval.outline.api.response_submitted", { 
         date: dateKey,
-        batchJobId,
+        responseId,
       });
-    } catch (batchError) {
-      logServerError("approval.outline.api.batch_submit_failed", batchError, { 
+    } catch (submitError) {
+      logServerError("approval.outline.api.response_submit_failed", submitError, { 
         date: dateKey,
       });
-      // Continue without batch — outline is still valid, just not deduped
+      // Continue without dedup — outline is still valid, just not deduplicated
     }
 
     return NextResponse.json({
-      status: batchJobId ? "pending" : "ready",
-      batch_job_id: batchJobId,
+      status: responseId ? "pending" : "ready",
+      response_id: responseId,
       outline,
     });
   } catch (error) {

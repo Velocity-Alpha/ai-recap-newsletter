@@ -93,18 +93,18 @@ function ApprovalPageContent() {
         if (!res.ok) throw new Error(`Server returned ${res.status}`);
         return res.json() as Promise<{
           status: "pending" | "ready";
-          batch_job_id?: string;
+          response_id?: string;
           outline: ApprovalOutlineData;
         }>;
       })
       .then((data) => {
         // If dedup is still pending, start polling
-        if (data.status === "pending" && data.batch_job_id) {
-          console.log("[approval:polling] starting batch status polling", {
+        if (data.status === "pending" && data.response_id) {
+          console.log("[approval:polling] starting response status polling", {
             dateKey,
-            batchJobId: data.batch_job_id,
+            responseId: data.response_id,
           });
-          startPollingBatchStatus(data.batch_job_id, dateKey);
+          startPollingStatus(data.response_id, dateKey);
         } else {
           // Dedup already complete, use the outline
           writeApprovalOutlineCache(dateKey, data.outline);
@@ -117,16 +117,16 @@ function ApprovalPageContent() {
         setError(message);
       });
 
-    function startPollingBatchStatus(batchJobId: string, date: string) {
+    function startPollingStatus(responseId: string, date: string) {
       const poll = async () => {
         try {
           const statusParams = new URLSearchParams({
-            batch_job_id: batchJobId,
+            response_id: responseId,
             date: date,
           });
 
           console.log("[approval:polling] checking status", { 
-            batchJobId, 
+            responseId, 
             date,
             timestamp: new Date().toISOString(),
           });
@@ -163,7 +163,7 @@ function ApprovalPageContent() {
           }
 
           if (statusData.status === "error") {
-            console.error("[approval:polling] ❌ batch failed", {
+            console.error("[approval:polling] ❌ dedup failed", {
               dateKey,
               error: statusData.error,
               timestamp: new Date().toISOString(),
@@ -191,7 +191,7 @@ function ApprovalPageContent() {
 
       // Start polling immediately
       console.log("[approval:polling] 🚀 starting polling", {
-        batchJobId,
+        responseId,
         dateKey,
         timestamp: new Date().toISOString(),
       });
