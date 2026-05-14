@@ -81,7 +81,7 @@ export async function POST(request: Request) {
 
       return jsonWithRequestId(
         context,
-        { error: "Subscriber signup is not configured yet. Set DATABASE_URL, SESSION_SECRET, and BEEHIIV_SUBSCRIBE_WEBHOOK_URL." },
+        { error: "Could not subscribe right now." },
         { status: 500 },
       );
     }
