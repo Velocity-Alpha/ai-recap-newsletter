@@ -502,7 +502,7 @@ function createSectionBlueprints(
  * Pipeline:
  * 1. Load recently published reference stories and unpublished candidates.
  * 2. Clean and rank candidates.
- * 3. Skip AI deduplication (happens async via batch API).
+ * 3. Skip AI deduplication (happens async via OpenAI Responses API background job; caller receives a response_id to poll).
  * 4. Group stories into editorial sections and fill-in pools.
  * 5. Return section data, a full story lookup map, and initially selected IDs.
  */

@@ -73,20 +73,17 @@ describe("GET /api/approval/outline/status", () => {
     expect(json.error).toBe("Missing response_id parameter.");
   });
 
-  it.each(["queued", "in_progress"] as const)(
-    "returns processing when response status is '%s'",
-    async (responseStatus) => {
-      dedupFns.checkDeduplicationStatus.mockResolvedValue({ status: responseStatus });
-      const token = await createApprovalSessionToken("approval-secret");
+  it("returns processing when response status is pending", async () => {
+    dedupFns.checkDeduplicationStatus.mockResolvedValue({ status: "pending" });
+    const token = await createApprovalSessionToken("approval-secret");
 
-      const res = await GET(makeRequest({ response_id: RESPONSE_ID, date: DATE }, token));
-      const json = await res.json();
+    const res = await GET(makeRequest({ response_id: RESPONSE_ID, date: DATE }, token));
+    const json = await res.json();
 
-      expect(dedupFns.checkDeduplicationStatus).toHaveBeenCalledWith(RESPONSE_ID);
-      expect(res.status).toBe(200);
-      expect(json.status).toBe("processing");
-    }
-  );
+    expect(dedupFns.checkDeduplicationStatus).toHaveBeenCalledWith(RESPONSE_ID);
+    expect(res.status).toBe(200);
+    expect(json.status).toBe("processing");
+  });
 
   it("returns error when response status is failed", async () => {
     dedupFns.checkDeduplicationStatus.mockResolvedValue({

@@ -34,11 +34,8 @@ export async function GET(request: Request) {
   try {
     const responseStatus = await checkDeduplicationStatus(responseId);
 
-    // Handle processing states (queued, in_progress)
-    if (
-      responseStatus.status === "queued" ||
-      responseStatus.status === "in_progress"
-    ) {
+    // Handle in-progress state
+    if (responseStatus.status === "pending") {
       logServerInfo("approval.outline.status.processing", { responseId });
       return NextResponse.json({ status: "processing" });
     }

@@ -76,7 +76,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       status: responseId ? "pending" : "ready",
-      response_id: responseId,
+      response_id: responseId, // Always present: string if dedup submitted, null if submission failed
       outline,
     });
   } catch (error) {

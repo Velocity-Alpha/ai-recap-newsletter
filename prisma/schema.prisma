@@ -90,17 +90,3 @@ model Subscriber {
   @@map("subscribers")
   @@schema("newsletter")
 }
-
-/// Tracks submitted OpenAI batch deduplication jobs, keyed by date + input hash
-/// to avoid re-submitting duplicate jobs for the same story set.
-model DeduplicationJob {
-  id         Int      @id @default(autoincrement())
-  date       DateTime @db.Date
-  inputHash  String   @map("input_hash")
-  batchJobId String   @map("batch_job_id")
-  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-
-  @@unique([date, inputHash], map: "dedup_jobs_date_input_hash_unique")
-  @@map("deduplication_jobs")
-  @@schema("newsletter")
-}

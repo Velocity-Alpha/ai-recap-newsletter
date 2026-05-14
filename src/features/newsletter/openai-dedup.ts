@@ -134,7 +134,7 @@ ${JSON.stringify({
 export async function checkDeduplicationStatus(
   responseId: string
 ): Promise<{
-  status: "queued" | "in_progress" | "completed" | "failed" | "expired" | "processing";
+  status: "pending" | "completed" | "failed";
   result?: DeduplicationResult;
   error?: string;
 }> {
@@ -147,7 +147,7 @@ export async function checkDeduplicationStatus(
 
   // Handle in-progress states
   if (response.status === "queued" || response.status === "in_progress") {
-    return { status: response.status as "queued" | "in_progress" };
+    return { status: "pending" };
   }
 
   // Handle completion
@@ -183,9 +183,15 @@ export async function checkDeduplicationStatus(
   // Handle failure states
   if (response.status === "failed" || response.status === "cancelled") {
     const errorMsg = response.error || "Response generation failed";
-    logServerError("openai.response.status.failed", { error: errorMsg }, { responseId });
+    logServerError("openai.response.status.failed", new Error(errorMsg), { responseId, openaiError: response.error });
     return { status: "failed", error: errorMsg };
   }
 
-  return { status: "processing" };
+  if (response.status === "expired") {
+    logServerError("openai.response.status.expired", new Error("Deduplication response expired before completion."), { responseId });
+    return { status: "failed", error: "Deduplication response expired before completion." };
+  }
+
+  // Any other unknown status — treat as still pending
+  return { status: "pending" };
 }

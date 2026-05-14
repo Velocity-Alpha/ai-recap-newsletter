@@ -77,6 +77,9 @@ function ApprovalPageContent() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let active = true;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
     const cached = readApprovalOutlineCache(dateKey);
     if (cached) {
       queueMicrotask(() => {
@@ -93,11 +96,12 @@ function ApprovalPageContent() {
         if (!res.ok) throw new Error(`Server returned ${res.status}`);
         return res.json() as Promise<{
           status: "pending" | "ready";
-          response_id?: string;
+          response_id: string | null;
           outline: ApprovalOutlineData;
         }>;
       })
       .then((data) => {
+        if (!active) return;
         // If dedup is still pending, start polling
         if (data.status === "pending" && data.response_id) {
           console.log("[approval:polling] starting response status polling", {
@@ -112,6 +116,7 @@ function ApprovalPageContent() {
         }
       })
       .catch((err: unknown) => {
+        if (!active) return;
         const message = err instanceof Error ? err.message : "Unknown error";
         console.error("[approval:cache] outline fetch failed", { dateKey, message });
         setError(message);
@@ -119,6 +124,8 @@ function ApprovalPageContent() {
 
     function startPollingStatus(responseId: string, date: string) {
       const poll = async () => {
+        if (!active) return;
+
         try {
           const statusParams = new URLSearchParams({
             response_id: responseId,
@@ -135,6 +142,8 @@ function ApprovalPageContent() {
             `/api/approval/outline/status?${statusParams}`
           );
 
+          if (!active) return;
+
           if (!res.ok) {
             throw new Error(`Status check returned ${res.status}`);
           }
@@ -144,6 +153,8 @@ function ApprovalPageContent() {
             outline?: ApprovalOutlineData;
             error?: string;
           };
+
+          if (!active) return;
 
           console.log("[approval:polling] status response", {
             status: statusData.status,
@@ -177,8 +188,9 @@ function ApprovalPageContent() {
             dateKey,
             timestamp: new Date().toISOString(),
           });
-          setTimeout(poll, 2000);
+          timeoutId = setTimeout(poll, 2000);
         } catch (err: unknown) {
+          if (!active) return;
           const message = err instanceof Error ? err.message : "Unknown error";
           console.error("[approval:polling] ❌ status check failed", {
             dateKey,
@@ -197,6 +209,11 @@ function ApprovalPageContent() {
       });
       poll();
     }
+
+    return () => {
+      active = false;
+      clearTimeout(timeoutId);
+    };
   }, [dateKey]);
 
   if (error) return <ErrorState message={error} />;
