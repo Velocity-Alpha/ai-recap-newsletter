@@ -74,11 +74,7 @@ describe("approval outline cache", () => {
     writeApprovalOutlineCache("2026-04-30", rawOutlineData, storage, now);
 
     expect(
-      readApprovalOutlineCache(
-        "2026-04-30",
-        storage,
-        now + APPROVAL_OUTLINE_CACHE_TTL_MS + 1
-      )
+      readApprovalOutlineCache("2026-04-30", storage, now + APPROVAL_OUTLINE_CACHE_TTL_MS + 1)
     ).toBeNull();
     expect(storage.removeItem).toHaveBeenCalledWith("approval_outline_2026-04-30");
   });

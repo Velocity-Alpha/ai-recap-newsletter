@@ -32,7 +32,12 @@ const prismaMock = vi.hoisted(() => {
   };
 });
 
+const beehiivMock = vi.hoisted(() => ({
+  getBeehiivSubscriberStatus: vi.fn(),
+}));
+
 vi.mock("@/src/server/prisma", () => prismaMock);
+vi.mock("@/src/features/subscriber/beehiiv", () => beehiivMock);
 
 import {
   cleanupExpiredOneTimeCodes,
@@ -312,5 +317,87 @@ describe("subscriber server", () => {
 
   it("generates six-digit codes", () => {
     expect(createOneTimeCode()).toMatch(/^\d{6}$/);
+  });
+
+  describe("findSubscriberByEmail with Beehiiv verification", () => {
+    it("returns subscriber when found in DB and active in Beehiiv", async () => {
+      prismaMock.prisma.subscriber.findUnique.mockResolvedValueOnce({
+        id: 11n,
+        email: "reader@example.com",
+        firstName: "Reader",
+        status: "active",
+        source: "article_gate",
+        subscribedAt: new Date("2026-04-03T12:00:00.000Z"),
+        lastSeenAt: null,
+        createdAt: new Date("2026-04-03T12:00:00.000Z"),
+        updatedAt: new Date("2026-04-03T12:00:00.000Z"),
+      });
+
+      beehiivMock.getBeehiivSubscriberStatus.mockResolvedValueOnce({
+        status: "active",
+        id: "beehiiv-123",
+      });
+
+      const result = await findSubscriberByEmail("reader@example.com");
+
+      expect(result).toMatchObject({
+        id: 11,
+        email: "reader@example.com",
+        status: "active",
+      });
+      expect(beehiivMock.getBeehiivSubscriberStatus).toHaveBeenCalledWith("reader@example.com");
+    });
+
+    it("returns null when subscriber not found in DB", async () => {
+      prismaMock.prisma.subscriber.findUnique.mockResolvedValueOnce(null);
+
+      const result = await findSubscriberByEmail("missing@example.com");
+
+      expect(result).toBeNull();
+      expect(beehiivMock.getBeehiivSubscriberStatus).not.toHaveBeenCalled();
+    });
+
+    it("returns null when subscriber not found in Beehiiv", async () => {
+      prismaMock.prisma.subscriber.findUnique.mockResolvedValueOnce({
+        id: 11n,
+        email: "reader@example.com",
+        firstName: "Reader",
+        status: "active",
+        source: "article_gate",
+        subscribedAt: new Date("2026-04-03T12:00:00.000Z"),
+        lastSeenAt: null,
+        createdAt: new Date("2026-04-03T12:00:00.000Z"),
+        updatedAt: new Date("2026-04-03T12:00:00.000Z"),
+      });
+
+      beehiivMock.getBeehiivSubscriberStatus.mockResolvedValueOnce(null);
+
+      const result = await findSubscriberByEmail("reader@example.com");
+
+      expect(result).toBeNull();
+    });
+
+    it("returns null when subscriber is inactive in Beehiiv", async () => {
+      prismaMock.prisma.subscriber.findUnique.mockResolvedValueOnce({
+        id: 11n,
+        email: "reader@example.com",
+        firstName: "Reader",
+        status: "active",
+        source: "article_gate",
+        subscribedAt: new Date("2026-04-03T12:00:00.000Z"),
+        lastSeenAt: null,
+        createdAt: new Date("2026-04-03T12:00:00.000Z"),
+        updatedAt: new Date("2026-04-03T12:00:00.000Z"),
+      });
+
+      beehiivMock.getBeehiivSubscriberStatus.mockResolvedValueOnce({
+        status: "inactive",
+        id: "beehiiv-123",
+      });
+
+      const result = await findSubscriberByEmail("reader@example.com");
+
+      expect(result).toBeNull();
+    });
   });
 });
