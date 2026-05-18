@@ -25,7 +25,7 @@ export interface DeduplicationResult {
 }
 
 /**
- * Submits a deduplication request to OpenAI's Responses API in background mode.
+ * Submits a deduplication request to OpenAI's Responses API in background mode as true.
  * Returns the response ID for polling later.
  */
 export async function submitDeduplication(
