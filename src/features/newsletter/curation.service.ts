@@ -273,9 +273,11 @@ function toDateOnlyIso(value: Date): string {
  */
 async function getReferencedStories(date: Date): Promise<StoryRecord[]> {
   const dateOnly = toDateOnlyIso(date);
+  const lookbackDays = date.getUTCDay() === 1 ? 3 : 2;
   logServerInfo("approval.outline.fetch.referenced.query", {
     requestedDateIso: date.toISOString(),
     dateOnly,
+    lookbackDays,
   });
 
   const rows = await prisma.$queryRaw<RawStoryRow[]>(Prisma.sql`
@@ -293,7 +295,7 @@ async function getReferencedStories(date: Date): Promise<StoryRecord[]> {
     FROM newsletter.stories
     WHERE used_in_publication_date <= ${dateOnly}::date
       AND exclude_from_candidates IS FALSE
-      AND used_in_publication_date >= ${dateOnly}::date - INTERVAL '2 days'
+      AND used_in_publication_date >= ${dateOnly}::date - (${lookbackDays} * INTERVAL '1 day')
   `);
 
   logServerInfo("approval.outline.fetch.referenced.rows", { rowCount: rows.length });
