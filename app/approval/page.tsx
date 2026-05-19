@@ -77,6 +77,9 @@ function ApprovalPageContent() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let active = true;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
     const cached = readApprovalOutlineCache(dateKey);
     if (cached) {
       queueMicrotask(() => {
@@ -91,17 +94,126 @@ function ApprovalPageContent() {
     fetch(`/api/approval/outline?${params}`)
       .then((res) => {
         if (!res.ok) throw new Error(`Server returned ${res.status}`);
-        return res.json() as Promise<ApprovalOutlineData>;
+        return res.json() as Promise<{
+          status: "pending" | "ready";
+          response_id: string | null;
+          outline: ApprovalOutlineData;
+        }>;
       })
       .then((data) => {
-        writeApprovalOutlineCache(dateKey, data);
-        setOutlineData(normalizeApprovalOutlineData(data));
+        if (!active) return;
+        // If dedup is still pending, start polling
+        if (data.status === "pending" && data.response_id) {
+          console.log("[approval:polling] starting response status polling", {
+            dateKey,
+            responseId: data.response_id,
+          });
+          startPollingStatus(data.response_id, dateKey);
+        } else {
+          // Dedup already complete, use the outline
+          writeApprovalOutlineCache(dateKey, data.outline);
+          setOutlineData(normalizeApprovalOutlineData(data.outline));
+        }
       })
       .catch((err: unknown) => {
+        if (!active) return;
         const message = err instanceof Error ? err.message : "Unknown error";
         console.error("[approval:cache] outline fetch failed", { dateKey, message });
         setError(message);
       });
+
+    function startPollingStatus(responseId: string, date: string) {
+      const poll = async () => {
+        if (!active) return;
+
+        try {
+          const statusParams = new URLSearchParams({
+            response_id: responseId,
+            date: date,
+          });
+
+          console.log("[approval:polling] checking status", { 
+            responseId, 
+            date,
+            timestamp: new Date().toISOString(),
+          });
+
+          const res = await fetch(
+            `/api/approval/outline/status?${statusParams}`
+          );
+
+          if (!active) return;
+
+          if (!res.ok) {
+            throw new Error(`Status check returned ${res.status}`);
+          }
+
+          const statusData = (await res.json()) as {
+            status: "processing" | "completed" | "error";
+            outline?: ApprovalOutlineData;
+            error?: string;
+          };
+
+          if (!active) return;
+
+          console.log("[approval:polling] status response", {
+            status: statusData.status,
+            hasOutline: Boolean(statusData.outline),
+            error: statusData.error,
+            timestamp: new Date().toISOString(),
+          });
+
+          if (statusData.status === "completed" && statusData.outline) {
+            console.log("[approval:polling] ✅ dedup completed, updating outline", {
+              dateKey,
+              timestamp: new Date().toISOString(),
+            });
+            writeApprovalOutlineCache(dateKey, statusData.outline);
+            setOutlineData(normalizeApprovalOutlineData(statusData.outline));
+            return;
+          }
+
+          if (statusData.status === "error") {
+            console.error("[approval:polling] ❌ dedup failed", {
+              dateKey,
+              error: statusData.error,
+              timestamp: new Date().toISOString(),
+            });
+            setError(statusData.error || "Deduplication failed");
+            return;
+          }
+
+          // Still processing, schedule next poll in 2000ms
+          console.log("[approval:polling] ⏳ still processing, next check in 2s", {
+            dateKey,
+            timestamp: new Date().toISOString(),
+          });
+          timeoutId = setTimeout(poll, 2000);
+        } catch (err: unknown) {
+          if (!active) return;
+          const message = err instanceof Error ? err.message : "Unknown error";
+          console.error("[approval:polling] ❌ status check failed", {
+            dateKey,
+            message,
+            timestamp: new Date().toISOString(),
+          });
+          setError(message);
+        }
+      };
+
+      // Start polling immediately
+      console.log("[approval:polling] 🚀 starting polling", {
+        responseId,
+        dateKey,
+        timestamp: new Date().toISOString(),
+      });
+      poll();
+    }
+
+    return () => {
+      active = false;
+      clearTimeout(timeoutId);
+    };
   }, [dateKey]);
 
   if (error) return <ErrorState message={error} />;

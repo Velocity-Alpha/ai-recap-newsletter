@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 
-import { createApprovalOutlineData } from "@/src/features/newsletter/curation.service";
+import { 
+  createApprovalOutlineDataWithoutDedup 
+} from "@/src/features/newsletter/curation.service";
+import { submitDeduplication } from "@/src/features/newsletter/openai-dedup";
 import { hasValidApprovalSession } from "@/src/server/approval-auth";
 import { logServerError, logServerInfo } from "@/src/server/observability";
 
@@ -10,6 +13,10 @@ function parseDateParam(value: string | null): Date {
   return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
 }
 
+function toDateOnlyIso(value: Date): string {
+  return value.toISOString().slice(0, 10);
+}
+
 export async function GET(request: Request) {
   if (!(await hasValidApprovalSession(request))) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
@@ -17,15 +24,61 @@ export async function GET(request: Request) {
 
   const { searchParams } = new URL(request.url);
   const date = parseDateParam(searchParams.get("date"));
+  const dateKey = toDateOnlyIso(date);
 
   logServerInfo("approval.outline.api.request", { date: date.toISOString() });
 
   try {
-    const data = await createApprovalOutlineData(date);
+    // Get outline without AI dedup (fast)
+    const { outline, referencedStories, rankedCandidates } = 
+      await createApprovalOutlineDataWithoutDedup(date);
 
-    logServerInfo("approval.outline.api.ready", { date: date.toISOString() });
+    logServerInfo("approval.outline.api.outline_ready", { 
+      date: dateKey,
+      storyCount: rankedCandidates.length,
+    });
 
-    return NextResponse.json(data);
+    // Submit async dedup job to OpenAI Responses API
+    let responseId: string | null = null;
+    try {
+      responseId = await submitDeduplication(
+        {
+          incomingStories: rankedCandidates
+            .filter((s) => s.headline != null && s.summary != null)
+            .map((s) => ({
+              id: s.id,
+              headline: s.headline!,
+              summary: s.summary!,
+              story_details: s.story_details,
+            })),
+          referencedStories: referencedStories
+            .filter((s) => s.headline != null && s.summary != null)
+            .map((s) => ({
+              id: s.id,
+              headline: s.headline!,
+              summary: s.summary!,
+              story_details: s.story_details,
+            })),
+        },
+        dateKey
+      );
+
+      logServerInfo("approval.outline.api.response_submitted", { 
+        date: dateKey,
+        responseId,
+      });
+    } catch (submitError) {
+      logServerError("approval.outline.api.response_submit_failed", submitError, { 
+        date: dateKey,
+      });
+      // Continue without dedup — outline is still valid, just not deduplicated
+    }
+
+    return NextResponse.json({
+      status: responseId ? "pending" : "ready",
+      response_id: responseId, // Always present: string if dedup submitted, null if submission failed
+      outline,
+    });
   } catch (error) {
     logServerError("approval.outline.api.error", error, { date: date.toISOString() });
 

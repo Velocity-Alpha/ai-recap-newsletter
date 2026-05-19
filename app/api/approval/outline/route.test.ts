@@ -3,12 +3,24 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createApprovalSessionToken } from "@/src/server/approval-auth";
 
 const curationFns = vi.hoisted(() => ({
-  createApprovalOutlineData: vi.fn(),
+  createApprovalOutlineDataWithoutDedup: vi.fn(),
+}));
+
+const dedupFns = vi.hoisted(() => ({
+  submitDeduplication: vi.fn(),
 }));
 
 vi.mock("@/src/features/newsletter/curation.service", () => curationFns);
+vi.mock("@/src/features/newsletter/openai-dedup", () => dedupFns);
 
 import { GET } from "@/app/api/approval/outline/route";
+
+const BASE_OUTLINE = {
+  reference_stories: [],
+  candidate_sections: [],
+  candidate_map: {},
+  selected_story_ids: [],
+};
 
 describe("GET /api/approval/outline", () => {
   beforeEach(() => {
@@ -20,33 +32,72 @@ describe("GET /api/approval/outline", () => {
     const response = await GET(new Request("http://localhost/api/approval/outline"));
     const json = await response.json();
 
-    expect(curationFns.createApprovalOutlineData).not.toHaveBeenCalled();
+    expect(curationFns.createApprovalOutlineDataWithoutDedup).not.toHaveBeenCalled();
     expect(response.status).toBe(401);
     expect(json.error).toBe("Unauthorized.");
   });
 
-  it("returns approval outline data for authenticated requests", async () => {
-    curationFns.createApprovalOutlineData.mockResolvedValue({
-      reference_stories: [],
-      candidate_sections: [],
-      candidate_map: {},
-      selected_story_ids: [],
+  it("returns status=pending with response_id when dedup response is submitted", async () => {
+    curationFns.createApprovalOutlineDataWithoutDedup.mockResolvedValue({
+      outline: BASE_OUTLINE,
+      referencedStories: [],
+      rankedCandidates: [],
     });
+    dedupFns.submitDeduplication.mockResolvedValue("resp_abc123");
     const token = await createApprovalSessionToken("approval-secret");
 
     const response = await GET(
       new Request("http://localhost/api/approval/outline?date=2026-04-30", {
-        headers: {
-          Cookie: `approval_session=${token}`,
-        },
+        headers: { Cookie: `approval_session=${token}` },
       })
     );
     const json = await response.json();
 
-    expect(curationFns.createApprovalOutlineData).toHaveBeenCalledWith(
+    expect(curationFns.createApprovalOutlineDataWithoutDedup).toHaveBeenCalledWith(
       new Date("2026-04-30")
     );
     expect(response.status).toBe(200);
-    expect(json.candidate_sections).toEqual([]);
+    expect(json.status).toBe("pending");
+    expect(json.response_id).toBe("resp_abc123");
+    expect(json.outline).toEqual(BASE_OUTLINE);
+  });
+
+  it("returns status=ready when dedup submission fails", async () => {
+    curationFns.createApprovalOutlineDataWithoutDedup.mockResolvedValue({
+      outline: BASE_OUTLINE,
+      referencedStories: [],
+      rankedCandidates: [],
+    });
+    dedupFns.submitDeduplication.mockRejectedValue(new Error("OpenAI unavailable"));
+    const token = await createApprovalSessionToken("approval-secret");
+
+    const response = await GET(
+      new Request("http://localhost/api/approval/outline?date=2026-04-30", {
+        headers: { Cookie: `approval_session=${token}` },
+      })
+    );
+    const json = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(json.status).toBe("ready");
+    expect(json.response_id).toBeNull();
+    expect(json.outline).toEqual(BASE_OUTLINE);
+  });
+
+  it("returns 500 when outline fetch fails", async () => {
+    curationFns.createApprovalOutlineDataWithoutDedup.mockRejectedValue(
+      new Error("DB unreachable")
+    );
+    const token = await createApprovalSessionToken("approval-secret");
+
+    const response = await GET(
+      new Request("http://localhost/api/approval/outline?date=2026-04-30", {
+        headers: { Cookie: `approval_session=${token}` },
+      })
+    );
+    const json = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(json.error).toBe("Failed to load approval outline data.");
   });
 });
