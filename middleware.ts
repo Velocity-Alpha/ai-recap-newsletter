@@ -7,7 +7,7 @@ import {
 
 export async function middleware(request: NextRequest) {
   // Let the login page and login API through
-  const { pathname } = request.nextUrl;
+  const { pathname, search } = request.nextUrl;
   if (pathname === "/approval/login" || pathname.startsWith("/api/approval/login")) {
     return NextResponse.next();
   }
@@ -25,7 +25,7 @@ export async function middleware(request: NextRequest) {
   }
 
   const loginUrl = new URL("/approval/login", request.url);
-  loginUrl.searchParams.set("redirect", pathname);
+  loginUrl.searchParams.set("redirect", `${pathname}${search}`);
   return NextResponse.redirect(loginUrl);
 }
 
