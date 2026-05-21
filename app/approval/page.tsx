@@ -74,7 +74,63 @@ function ApprovalPageContent() {
   const searchParams = useSearchParams();
   const dateKey = parseDateKey(searchParams.get("date"));
   const [outlineData, setOutlineData] = useState<ApprovalOutlineData | null>(null);
+  const [publishStatus, setPublishStatus] = useState<{
+    target_date: string;
+    has_exact_match: boolean;
+    issue: {
+      id: string;
+      slug: string | null;
+      title: string;
+      issue_date: string | null;
+      published_at: string | null;
+    } | null;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    const params = new URLSearchParams({ date: dateKey });
+
+    fetch(`/api/newsletters/publish-status?${params}`)
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error(`Publish status returned ${res.status}`);
+        }
+
+        return res.json() as Promise<{
+          success: boolean;
+          target_date: string;
+          has_exact_match: boolean;
+          issue: {
+            id: string;
+            slug: string | null;
+            title: string;
+            issue_date: string | null;
+            published_at: string | null;
+          } | null;
+        }>;
+      })
+      .then((data) => {
+        if (!active) return;
+
+        setPublishStatus({
+          target_date: data.target_date,
+          has_exact_match: data.has_exact_match,
+          issue: data.issue,
+        });
+      })
+      .catch((err: unknown) => {
+        if (!active) return;
+
+        const message = err instanceof Error ? err.message : "Unknown error";
+        console.error("[approval:publish-status] failed", { dateKey, message });
+        setPublishStatus(null);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [dateKey]);
 
   useEffect(() => {
     let active = true;
@@ -226,6 +282,7 @@ function ApprovalPageContent() {
       referenceStories={outlineData.reference_stories}
       candidateSections={outlineData.candidate_sections}
       candidateMap={outlineData.candidate_map}
+      publishStatus={publishStatus}
     />
   );
 }

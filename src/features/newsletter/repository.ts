@@ -23,6 +23,20 @@ export interface PublishedNewsletterEntry {
   issue_date: string | null;
 }
 
+export interface PublishedIssueLookupIssue {
+  id: string;
+  slug: string | null;
+  title: string;
+  issue_date: string | null;
+  published_at: string | null;
+}
+
+export interface PublishedIssueLookupResult {
+  target_date: string;
+  has_exact_match: boolean;
+  issue: PublishedIssueLookupIssue | null;
+}
+
 export interface TickerStory {
   headline: string;
   day?: string;
@@ -58,6 +72,14 @@ type PublishedNewsletterRow = {
   slug: string | null;
   published_at: Date | string | null;
   issue_date: Date | string | null;
+};
+
+type PublishedIssueLookupRow = {
+  id: bigint | number | string;
+  slug: string | null;
+  title: string;
+  issue_date: Date | string | null;
+  published_at: Date | string | null;
 };
 
 type TickerStatsRow = {
@@ -217,6 +239,49 @@ export async function fetchPublishedNewsletterEntries(): Promise<PublishedNewsle
     published_at: serializeDateValue(row.published_at) ?? "",
     issue_date: serializeDateValue(row.issue_date),
   }));
+}
+
+export async function fetchPublishedIssueOnOrBeforeDate(
+  targetDate: string
+): Promise<PublishedIssueLookupResult> {
+  const rows = await prisma.$queryRaw<PublishedIssueLookupRow[]>`
+    SELECT
+      id,
+      slug,
+      title,
+      issue_date,
+      published_at
+    FROM newsletter.issues
+    WHERE published_at IS NOT NULL
+      AND issue_date IS NOT NULL
+      AND issue_date <= ${targetDate}::date
+    ORDER BY issue_date DESC, published_at DESC
+    LIMIT 1
+  `;
+
+  const row = rows[0];
+  if (!row) {
+    return {
+      target_date: targetDate,
+      has_exact_match: false,
+      issue: null,
+    };
+  }
+
+  const issueDate = serializeDateValue(row.issue_date);
+  const issueDateOnly = issueDate ? issueDate.slice(0, 10) : null;
+
+  return {
+    target_date: targetDate,
+    has_exact_match: issueDateOnly === targetDate,
+    issue: {
+      id: String(row.id),
+      slug: row.slug,
+      title: row.title,
+      issue_date: issueDate,
+      published_at: serializeDateValue(row.published_at),
+    },
+  };
 }
 
 export async function fetchNewsletterIssueApiResponseById(id: number): Promise<NewsletterIssueApiResponse | null> {

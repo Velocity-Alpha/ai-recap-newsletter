@@ -66,6 +66,17 @@ type ApprovalBoardProps = {
   referenceStories: ReferenceStory[];
   candidateSections: CandidateSection[];
   candidateMap: Record<string, CandidateMapEntry>;
+  publishStatus: {
+    target_date: string;
+    has_exact_match: boolean;
+    issue: {
+      id: string;
+      slug: string | null;
+      title: string;
+      issue_date: string | null;
+      published_at: string | null;
+    } | null;
+  } | null;
 };
 
 type PreviewStory = CandidateMapEntry & {
@@ -106,12 +117,28 @@ function initSections(candidateSections: CandidateSection[]): SectionState[] {
   }));
 }
 
+function formatLongDate(value: string | null | undefined): string {
+  if (!value) return "Unknown";
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "Unknown";
+
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(parsed);
+}
+
 export default function ApprovalBoard({
   dateKey,
   outlineDateLabel,
   referenceStories,
   candidateSections,
   candidateMap,
+  publishStatus,
 }: ApprovalBoardProps) {
   const router = useRouter();
   const [commitModalOpen, setCommitModalOpen] = useState(false);
@@ -313,6 +340,13 @@ export default function ApprovalBoard({
 
     return Array.from(new Set(errors));
   }, [excludeState, headlineStoryId, sections, totals.sections]);
+
+  const publishDateBlockError =
+    publishStatus?.has_exact_match === true
+      ? `An issue is already published for ${formatLongDate(publishStatus.target_date)}.`
+      : null;
+
+  const commitDisabled = validationErrors.length > 0 || Boolean(publishDateBlockError);
 
   const commitPayload = useMemo(() => {
     const candidateSections = sections.map((section) => {
@@ -537,14 +571,41 @@ export default function ApprovalBoard({
 
           <div className="ml-auto shrink-0 pl-2">
             <Button
-              className="bg-[var(--text-primary)] px-3 py-1.5 text-xs text-white hover:bg-[var(--watercolor-ink)] disabled:cursor-not-allowed disabled:opacity-50"
+              className={`px-3 py-1.5 text-xs font-medium text-white transition ${
+                publishDateBlockError
+                  ? "bg-red-600 hover:bg-red-700 disabled:bg-red-500 disabled:cursor-not-allowed disabled:opacity-75"
+                  : "bg-[var(--text-primary)] hover:bg-[var(--watercolor-ink)] disabled:cursor-not-allowed disabled:opacity-50"
+              }`}
               onClick={handleCommitOutline}
-              disabled={validationErrors.length > 0}
+              disabled={commitDisabled}
             >
               Commit
             </Button>
           </div>
         </div>
+        {publishStatus ? (
+          <div className={`border-t px-4 py-3 sm:px-6 ${
+            publishDateBlockError
+              ? "border-red-300 bg-red-50"
+              : "border-[var(--border-light)] bg-white/50"
+          }`}>
+            <p
+              className={`text-sm font-semibold ${
+                publishDateBlockError
+                  ? "text-red-700"
+                  : "text-[var(--text-secondary)]"
+              }`}
+            >
+              {publishDateBlockError
+                ? publishDateBlockError
+                : publishStatus.issue
+                  ? `Latest published before ${publishStatus.target_date}: ${
+                      formatLongDate(publishStatus.issue.issue_date)
+                    }.`
+                  : `No published issue found on or before ${formatLongDate(publishStatus.target_date)}.`}
+            </p>
+          </div>
+        ) : null}
       </header>
 
       <div className="flex flex-1">
