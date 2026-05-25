@@ -5,7 +5,7 @@ import {
   createApprovalSessionToken,
 } from "@/src/server/approval-auth";
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   // Let the login page and login API through
   const { pathname, search } = request.nextUrl;
   if (pathname === "/approval/login" || pathname.startsWith("/api/approval/login")) {

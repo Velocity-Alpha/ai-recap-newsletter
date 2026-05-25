@@ -387,30 +387,6 @@ async function getCandidateStories(date: Date): Promise<StoryRecord[]> {
             not: "",
           },
         },
-        {
-          url: {
-            not: {
-              contains: "tldr",
-              mode: "insensitive",
-            },
-          },
-        },
-        {
-          url: {
-            not: {
-              contains: "rundown",
-              mode: "insensitive",
-            },
-          },
-        },
-        {
-          url: {
-            not: {
-              contains: "beehive",
-              mode: "insensitive",
-            },
-          },
-        },
       ],
     },
     select: {
@@ -428,19 +404,23 @@ async function getCandidateStories(date: Date): Promise<StoryRecord[]> {
     orderBy: [{ day: "desc" }, { id: "desc" }],
   });
 
+  const blockedSourcePattern = /(tldr|rundown|beehive)/i;
+
   const candidateStoryRecords = dedupeStoriesByGuid(
-    candidateStories.map((story) => ({
-      id: Number(story.id),
-      guid: story.guid,
-      day: story.day,
-      headline: story.headline,
-      summary: story.summary,
-      story_details: story.storyDetails,
-      category: story.category,
-      source: story.source,
-      url: story.url,
-      importance_score: story.importanceScore,
-    }))
+    candidateStories
+      .filter((story) => !blockedSourcePattern.test(story.url ?? ""))
+      .map((story) => ({
+        id: Number(story.id),
+        guid: story.guid,
+        day: story.day,
+        headline: story.headline,
+        summary: story.summary,
+        story_details: story.storyDetails,
+        category: story.category,
+        source: story.source,
+        url: story.url,
+        importance_score: story.importanceScore,
+      }))
   );
 
   logServerInfo("approval.outline.fetch.candidates.rows", {
