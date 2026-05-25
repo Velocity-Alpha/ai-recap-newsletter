@@ -74,6 +74,7 @@ function ApprovalPageContent() {
   const searchParams = useSearchParams();
   const dateKey = parseDateKey(searchParams.get("date"));
   const [outlineData, setOutlineData] = useState<ApprovalOutlineData | null>(null);
+  const [isDedupPending, setIsDedupPending] = useState(false);
   const [dedupFailureReason, setDedupFailureReason] = useState<string | null>(null);
   const [publishStatus, setPublishStatus] = useState<{
     target_date: string;
@@ -136,7 +137,10 @@ function ApprovalPageContent() {
   useEffect(() => {
     let active = true;
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    setIsDedupPending(false);
     setDedupFailureReason(null);
+    setError(null);
+    setOutlineData(null);
 
     const cached = readApprovalOutlineCache(dateKey);
     if (cached) {
@@ -150,31 +154,33 @@ function ApprovalPageContent() {
 
     const params = new URLSearchParams({ date: dateKey });
     fetch(`/api/approval/outline?${params}`)
-      .then((res) => {
-        if (!res.ok) throw new Error(`Server returned ${res.status}`);
-        return res.json() as Promise<{
+      .then((outlineResponse) => {
+        if (!outlineResponse.ok) throw new Error(`Server returned ${outlineResponse.status}`);
+        return outlineResponse.json() as Promise<{
           status: "pending" | "ready";
           response_id: string | null;
           outline: ApprovalOutlineData;
         }>;
       })
-      .then((data) => {
+      .then((outlinePayload) => {
         if (!active) return;
         setDedupFailureReason(null);
 
-        // Always render the initial outline quickly, even while dedup is pending.
-        setOutlineData(normalizeApprovalOutlineData(data.outline));
+        const fallbackOutline = normalizeApprovalOutlineData(outlinePayload.outline);
 
         // If dedup is still pending, start polling
-        if (data.status === "pending" && data.response_id) {
+        if (outlinePayload.status === "pending" && outlinePayload.response_id) {
+          setIsDedupPending(true);
           console.log("[approval:polling] starting response status polling", {
             dateKey,
-            responseId: data.response_id,
+            responseId: outlinePayload.response_id,
           });
-          startPollingStatus(data.response_id, dateKey);
+          startPollingStatus(outlinePayload.response_id, dateKey, fallbackOutline);
         } else {
           // Dedup already complete, use the outline
-          writeApprovalOutlineCache(dateKey, data.outline);
+          setIsDedupPending(false);
+          writeApprovalOutlineCache(dateKey, outlinePayload.outline);
+          setOutlineData(fallbackOutline);
         }
       })
       .catch((err: unknown) => {
@@ -184,7 +190,11 @@ function ApprovalPageContent() {
         setError(message);
       });
 
-    function startPollingStatus(responseId: string, date: string) {
+    function startPollingStatus(
+      responseId: string,
+      date: string,
+      fallbackOutline: ApprovalOutlineData
+    ) {
       const poll = async () => {
         if (!active) return;
 
@@ -223,12 +233,16 @@ function ApprovalPageContent() {
               responseStatus: statusResponse.status,
               timestamp: new Date().toISOString(),
             });
+            setIsDedupPending(false);
             setDedupFailureReason(failedReason);
+            setOutlineData(fallbackOutline);
             return;
           }
 
           if (!statusPayload) {
+            setIsDedupPending(false);
             setDedupFailureReason("Status check returned an empty response.");
+            setOutlineData(fallbackOutline);
             return;
           }
 
@@ -246,6 +260,7 @@ function ApprovalPageContent() {
               dateKey,
               timestamp: new Date().toISOString(),
             });
+            setIsDedupPending(false);
             writeApprovalOutlineCache(dateKey, statusPayload.outline);
             setOutlineData(normalizeApprovalOutlineData(statusPayload.outline));
             setDedupFailureReason(null);
@@ -258,7 +273,9 @@ function ApprovalPageContent() {
               error: statusPayload.error,
               timestamp: new Date().toISOString(),
             });
+            setIsDedupPending(false);
             setDedupFailureReason(statusPayload.error || "Deduplication failed");
+            setOutlineData(fallbackOutline);
             return;
           }
 
@@ -276,7 +293,9 @@ function ApprovalPageContent() {
             message,
             timestamp: new Date().toISOString(),
           });
+          setIsDedupPending(false);
           setDedupFailureReason(message);
+          setOutlineData(fallbackOutline);
         }
       };
 
@@ -296,7 +315,7 @@ function ApprovalPageContent() {
   }, [dateKey]);
 
   if (error) return <ErrorState message={error} />;
-  if (!outlineData) return <LoadingState />;
+  if (!outlineData || isDedupPending) return <LoadingState />;
 
   return (
     <ApprovalBoard
