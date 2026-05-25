@@ -81,11 +81,13 @@ ${JSON.stringify({
     id: s.id,
     headline: s.headline,
     summary: s.summary,
+    story_details: s.story_details,
   })),
   previously_used_stories: input.referencedStories.map((s) => ({
     id: s.id,
     headline: s.headline,
     summary: s.summary,
+    story_details: s.story_details,
   })),
 })}`;
 

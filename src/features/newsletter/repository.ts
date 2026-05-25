@@ -23,6 +23,20 @@ export interface PublishedNewsletterEntry {
   issue_date: string | null;
 }
 
+export interface PublishedIssueLookupIssue {
+  id: string;
+  slug: string | null;
+  title: string;
+  issue_date: string | null;
+  published_at: string | null;
+}
+
+export interface PublishedIssueLookupResult {
+  target_date: string;
+  has_exact_match: boolean;
+  issue: PublishedIssueLookupIssue | null;
+}
+
 export interface TickerStory {
   headline: string;
   day?: string;
@@ -58,6 +72,14 @@ type PublishedNewsletterRow = {
   slug: string | null;
   published_at: Date | string | null;
   issue_date: Date | string | null;
+};
+
+type PublishedIssueLookupRow = {
+  id: bigint | number | string;
+  slug: string | null;
+  title: string;
+  issue_date: Date | string | null;
+  published_at: Date | string | null;
 };
 
 type TickerStatsRow = {
@@ -217,6 +239,63 @@ export async function fetchPublishedNewsletterEntries(): Promise<PublishedNewsle
     published_at: serializeDateValue(row.published_at) ?? "",
     issue_date: serializeDateValue(row.issue_date),
   }));
+}
+
+export async function fetchLastPublishedIssueDateOnOrBefore(
+  targetDate: string
+): Promise<PublishedIssueLookupResult> {
+  const targetDateValue = new Date(`${targetDate}T00:00:00.000Z`);
+
+  if (Number.isNaN(targetDateValue.getTime())) {
+    return {
+      target_date: targetDate,
+      has_exact_match: false,
+      issue: null,
+    };
+  }
+
+  const issueRecord = await prisma.issue.findFirst({
+    where: {
+      publishedAt: {
+        not: null,
+      },
+      issueDate: {
+        not: null,
+        lte: targetDateValue,
+      },
+    },
+    select: {
+      id: true,
+      slug: true,
+      title: true,
+      issueDate: true,
+      publishedAt: true,
+    },
+    orderBy: [{ issueDate: "desc" }, { publishedAt: "desc" }],
+  });
+
+  if (!issueRecord) {
+    return {
+      target_date: targetDate,
+      has_exact_match: false,
+      issue: null,
+    };
+  }
+
+  const issueDate = serializeDateValue(issueRecord.issueDate);
+  const issueDateOnly = issueDate ? issueDate.slice(0, 10) : null;
+
+  return {
+    target_date: targetDate,
+    has_exact_match: issueDateOnly === targetDate,
+    issue: {
+      id: String(issueRecord.id),
+      slug: issueRecord.slug,
+      title: issueRecord.title,
+      issue_date: issueDate,
+      published_at: serializeDateValue(issueRecord.publishedAt),
+    },
+  };
 }
 
 export async function fetchNewsletterIssueApiResponseById(id: number): Promise<NewsletterIssueApiResponse | null> {
