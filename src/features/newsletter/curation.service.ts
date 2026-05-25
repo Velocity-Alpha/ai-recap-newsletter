@@ -388,6 +388,13 @@ async function getCandidateStories(date: Date): Promise<StoryRecord[]> {
           },
         },
       ],
+      NOT: {
+        OR: [
+          { url: { contains: "tldr" } },
+          { url: { contains: "rundown" } },
+          { url: { contains: "beehive" } },
+        ],
+      },
     },
     select: {
       id: true,
@@ -404,12 +411,8 @@ async function getCandidateStories(date: Date): Promise<StoryRecord[]> {
     orderBy: [{ day: "desc" }, { id: "desc" }],
   });
 
-  const blockedSourcePattern = /(tldr|rundown|beehive)/i;
-
   const candidateStoryRecords = dedupeStoriesByGuid(
-    candidateStories
-      .filter((story) => !blockedSourcePattern.test(story.url ?? ""))
-      .map((story) => ({
+    candidateStories.map((story) => ({
         id: Number(story.id),
         guid: story.guid,
         day: story.day,
