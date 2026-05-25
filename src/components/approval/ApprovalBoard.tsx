@@ -66,6 +66,7 @@ type ApprovalBoardProps = {
   referenceStories: ReferenceStory[];
   candidateSections: CandidateSection[];
   candidateMap: Record<string, CandidateMapEntry>;
+  dedupFailureReason: string | null;
   publishStatus: {
     target_date: string;
     has_exact_match: boolean;
@@ -138,6 +139,7 @@ export default function ApprovalBoard({
   referenceStories,
   candidateSections,
   candidateMap,
+  dedupFailureReason,
   publishStatus,
 }: ApprovalBoardProps) {
   const router = useRouter();
@@ -496,13 +498,23 @@ export default function ApprovalBoard({
         body: JSON.stringify(commitPayload),
       });
 
-      const result = (await response.json()) as { success?: boolean; message?: string; error?: string };
+      const commitResponseBody = (await response.json()) as {
+        success?: boolean;
+        message?: string;
+        error?: string;
+      };
 
-      if (!response.ok || !result.success) {
-        throw new Error(result.error || result.message || "Outline commit request failed.");
+      if (!response.ok || !commitResponseBody.success) {
+        throw new Error(
+          commitResponseBody.error ||
+            commitResponseBody.message ||
+            "Outline commit request failed."
+        );
       }
 
-      setCommitResponseMessage(result.message || "Outline committed for generation.");
+      setCommitResponseMessage(
+        commitResponseBody.message || "Outline committed for generation."
+      );
       setCommitModalOpen(false);
       router.push("/approval/submitted");
     } catch (error) {
@@ -603,6 +615,13 @@ export default function ApprovalBoard({
                       formatLongDate(publishStatus.issue.issue_date)
                     }.`
                   : `No published issue found on or before ${formatLongDate(publishStatus.target_date)}.`}
+            </p>
+          </div>
+        ) : null}
+        {dedupFailureReason ? (
+          <div className="border-t border-red-300 bg-red-50 px-4 py-3 sm:px-6">
+            <p className="text-sm font-semibold text-red-700">
+              Deduplication failed. Using original candidate set. Reason: {dedupFailureReason}
             </p>
           </div>
         ) : null}

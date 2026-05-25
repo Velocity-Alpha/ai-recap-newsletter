@@ -74,6 +74,7 @@ function ApprovalPageContent() {
   const searchParams = useSearchParams();
   const dateKey = parseDateKey(searchParams.get("date"));
   const [outlineData, setOutlineData] = useState<ApprovalOutlineData | null>(null);
+  const [dedupFailureReason, setDedupFailureReason] = useState<string | null>(null);
   const [publishStatus, setPublishStatus] = useState<{
     target_date: string;
     has_exact_match: boolean;
@@ -135,6 +136,7 @@ function ApprovalPageContent() {
   useEffect(() => {
     let active = true;
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    setDedupFailureReason(null);
 
     const cached = readApprovalOutlineCache(dateKey);
     if (cached) {
@@ -158,6 +160,11 @@ function ApprovalPageContent() {
       })
       .then((data) => {
         if (!active) return;
+        setDedupFailureReason(null);
+
+        // Always render the initial outline quickly, even while dedup is pending.
+        setOutlineData(normalizeApprovalOutlineData(data.outline));
+
         // If dedup is still pending, start polling
         if (data.status === "pending" && data.response_id) {
           console.log("[approval:polling] starting response status polling", {
@@ -168,7 +175,6 @@ function ApprovalPageContent() {
         } else {
           // Dedup already complete, use the outline
           writeApprovalOutlineCache(dateKey, data.outline);
-          setOutlineData(normalizeApprovalOutlineData(data.outline));
         }
       })
       .catch((err: unknown) => {
@@ -194,48 +200,65 @@ function ApprovalPageContent() {
             timestamp: new Date().toISOString(),
           });
 
-          const res = await fetch(
+          const statusResponse = await fetch(
             `/api/approval/outline/status?${statusParams}`
           );
 
           if (!active) return;
 
-          if (!res.ok) {
-            throw new Error(`Status check returned ${res.status}`);
-          }
-
-          const statusData = (await res.json()) as {
+          const statusPayload = (await statusResponse
+            .json()
+            .catch(() => null)) as {
             status: "processing" | "completed" | "error";
             outline?: ApprovalOutlineData;
             error?: string;
-          };
+          } | null;
+
+          if (!statusResponse.ok) {
+            const failedReason =
+              statusPayload?.error || `Status check returned ${statusResponse.status}`;
+            console.error("[approval:polling] ❌ status check returned error", {
+              dateKey,
+              failedReason,
+              responseStatus: statusResponse.status,
+              timestamp: new Date().toISOString(),
+            });
+            setDedupFailureReason(failedReason);
+            return;
+          }
+
+          if (!statusPayload) {
+            setDedupFailureReason("Status check returned an empty response.");
+            return;
+          }
 
           if (!active) return;
 
           console.log("[approval:polling] status response", {
-            status: statusData.status,
-            hasOutline: Boolean(statusData.outline),
-            error: statusData.error,
+            status: statusPayload.status,
+            hasOutline: Boolean(statusPayload.outline),
+            error: statusPayload.error,
             timestamp: new Date().toISOString(),
           });
 
-          if (statusData.status === "completed" && statusData.outline) {
+          if (statusPayload.status === "completed" && statusPayload.outline) {
             console.log("[approval:polling] ✅ dedup completed, updating outline", {
               dateKey,
               timestamp: new Date().toISOString(),
             });
-            writeApprovalOutlineCache(dateKey, statusData.outline);
-            setOutlineData(normalizeApprovalOutlineData(statusData.outline));
+            writeApprovalOutlineCache(dateKey, statusPayload.outline);
+            setOutlineData(normalizeApprovalOutlineData(statusPayload.outline));
+            setDedupFailureReason(null);
             return;
           }
 
-          if (statusData.status === "error") {
+          if (statusPayload.status === "error") {
             console.error("[approval:polling] ❌ dedup failed", {
               dateKey,
-              error: statusData.error,
+              error: statusPayload.error,
               timestamp: new Date().toISOString(),
             });
-            setError(statusData.error || "Deduplication failed");
+            setDedupFailureReason(statusPayload.error || "Deduplication failed");
             return;
           }
 
@@ -253,7 +276,7 @@ function ApprovalPageContent() {
             message,
             timestamp: new Date().toISOString(),
           });
-          setError(message);
+          setDedupFailureReason(message);
         }
       };
 
@@ -283,6 +306,7 @@ function ApprovalPageContent() {
       candidateSections={outlineData.candidate_sections}
       candidateMap={outlineData.candidate_map}
       publishStatus={publishStatus}
+      dedupFailureReason={dedupFailureReason}
     />
   );
 }
