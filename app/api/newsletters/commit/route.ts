@@ -6,7 +6,7 @@ import {
   logRequestSuccess,
 } from "@/src/server/observability";
 import { hasValidApprovalSession } from "@/src/server/approval-auth";
-import { fetchPublishedIssueOnOrBeforeDate } from "@/src/features/newsletter/repository";
+import { fetchLastPublishedIssueDateOnOrBefore } from "@/src/features/newsletter/repository";
 import jwt from "jsonwebtoken";
 
 export const runtime = "nodejs";
@@ -86,7 +86,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const publishStatus = await fetchPublishedIssueOnOrBeforeDate(targetDate);
+    const publishStatus = await fetchLastPublishedIssueDateOnOrBefore(targetDate);
     if (publishStatus.has_exact_match) {
       return jsonWithRequestId(
         context,

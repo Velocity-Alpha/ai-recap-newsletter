@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const prismaMock = vi.hoisted(() => ({
   $queryRaw: vi.fn(),
   issue: {
+    findFirst: vi.fn(),
     findUnique: vi.fn(),
   },
 }));
@@ -12,6 +13,7 @@ vi.mock("@/src/server/prisma", () => ({
 }));
 
 import {
+  fetchLastPublishedIssueDateOnOrBefore,
   fetchNewsletterIssueApiResponseById,
   fetchNewsletterIssueApiResponseBySlug,
   fetchNewsletterListPage,
@@ -82,6 +84,60 @@ describe("newsletter repository", () => {
         issue_date: "2026-04-02T00:00:00.000Z",
       },
     ]);
+  });
+
+  it("returns no issue when no published issue exists on or before the target date", async () => {
+    prismaMock.issue.findFirst.mockResolvedValueOnce(null);
+
+    await expect(fetchLastPublishedIssueDateOnOrBefore("2026-05-21")).resolves.toEqual({
+      target_date: "2026-05-21",
+      has_exact_match: false,
+      issue: null,
+    });
+  });
+
+  it("returns exact match when published issue exists on target date", async () => {
+    prismaMock.issue.findFirst.mockResolvedValueOnce({
+      id: 42n,
+      slug: "issue-42",
+      title: "Issue 42",
+      issueDate: new Date("2026-05-21T00:00:00.000Z"),
+      publishedAt: new Date("2026-05-21T12:30:00.000Z"),
+    });
+
+    await expect(fetchLastPublishedIssueDateOnOrBefore("2026-05-21")).resolves.toEqual({
+      target_date: "2026-05-21",
+      has_exact_match: true,
+      issue: {
+        id: "42",
+        slug: "issue-42",
+        title: "Issue 42",
+        issue_date: "2026-05-21T00:00:00.000Z",
+        published_at: "2026-05-21T12:30:00.000Z",
+      },
+    });
+  });
+
+  it("returns latest prior issue when target date has no exact match", async () => {
+    prismaMock.issue.findFirst.mockResolvedValueOnce({
+      id: 41n,
+      slug: "issue-41",
+      title: "Issue 41",
+      issueDate: new Date("2026-05-20T00:00:00.000Z"),
+      publishedAt: new Date("2026-05-20T11:00:00.000Z"),
+    });
+
+    await expect(fetchLastPublishedIssueDateOnOrBefore("2026-05-21")).resolves.toEqual({
+      target_date: "2026-05-21",
+      has_exact_match: false,
+      issue: {
+        id: "41",
+        slug: "issue-41",
+        title: "Issue 41",
+        issue_date: "2026-05-20T00:00:00.000Z",
+        published_at: "2026-05-20T11:00:00.000Z",
+      },
+    });
   });
 
   it("returns null when a newsletter issue lookup misses", async () => {

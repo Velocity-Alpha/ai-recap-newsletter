@@ -6,7 +6,7 @@ import {
   logRequestSuccess,
 } from "@/src/server/observability";
 import { hasValidApprovalSession } from "@/src/server/approval-auth";
-import { fetchPublishedIssueOnOrBeforeDate } from "@/src/features/newsletter/repository";
+import { fetchLastPublishedIssueDateOnOrBefore } from "@/src/features/newsletter/repository";
 
 export const runtime = "nodejs";
 
@@ -27,7 +27,7 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url);
     const targetDate = parseDateOnly(searchParams.get("date"));
-    const result = await fetchPublishedIssueOnOrBeforeDate(targetDate);
+    const result = await fetchLastPublishedIssueDateOnOrBefore(targetDate);
 
     logRequestSuccess(context, {
       targetDate,

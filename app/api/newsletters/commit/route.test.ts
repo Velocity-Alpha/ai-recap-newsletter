@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createApprovalSessionToken } from "@/src/server/approval-auth";
 
 const repositoryFns = vi.hoisted(() => ({
-  fetchPublishedIssueOnOrBeforeDate: vi.fn(),
+  fetchLastPublishedIssueDateOnOrBefore: vi.fn(),
 }));
 
 vi.mock("@/src/features/newsletter/repository", () => repositoryFns);
@@ -16,7 +16,7 @@ describe("POST /api/newsletters/commit", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubGlobal("fetch", fetchMock);
-    repositoryFns.fetchPublishedIssueOnOrBeforeDate.mockResolvedValue({
+    repositoryFns.fetchLastPublishedIssueDateOnOrBefore.mockResolvedValue({
       target_date: "2026-05-21",
       has_exact_match: false,
       issue: null,
@@ -62,7 +62,7 @@ describe("POST /api/newsletters/commit", () => {
     );
     const json = await response.json();
 
-    expect(repositoryFns.fetchPublishedIssueOnOrBeforeDate).toHaveBeenCalledWith("2026-05-21");
+    expect(repositoryFns.fetchLastPublishedIssueDateOnOrBefore).toHaveBeenCalledWith("2026-05-21");
 
     expect(fetchMock).toHaveBeenCalledWith(
       "https://n8n.velocityalpha.com/webhook/story/approval",
@@ -77,7 +77,7 @@ describe("POST /api/newsletters/commit", () => {
 
   it("blocks commit when an issue already exists for the same date", async () => {
     const token = await createApprovalSessionToken("approval-secret");
-    repositoryFns.fetchPublishedIssueOnOrBeforeDate.mockResolvedValue({
+    repositoryFns.fetchLastPublishedIssueDateOnOrBefore.mockResolvedValue({
       target_date: "2026-05-21",
       has_exact_match: true,
       issue: {
@@ -105,5 +105,49 @@ describe("POST /api/newsletters/commit", () => {
     expect(response.status).toBe(409);
     expect(json.success).toBe(false);
     expect(json.error).toContain("already published");
+  });
+
+  it("returns 400 when commit payload is missing a date", async () => {
+    const token = await createApprovalSessionToken("approval-secret");
+
+    const response = await POST(
+      new Request("http://localhost/api/newsletters/commit", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Cookie: `approval_session=${token}`,
+        },
+        body: JSON.stringify({ selected_story_ids: [1] }),
+      })
+    );
+    const json = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(json.success).toBe(false);
+    expect(json.error).toContain("missing a valid date");
+    expect(repositoryFns.fetchLastPublishedIssueDateOnOrBefore).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 when commit payload contains an invalid date", async () => {
+    const token = await createApprovalSessionToken("approval-secret");
+
+    const response = await POST(
+      new Request("http://localhost/api/newsletters/commit", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Cookie: `approval_session=${token}`,
+        },
+        body: JSON.stringify({ date: "not-a-date", selected_story_ids: [1] }),
+      })
+    );
+    const json = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(json.success).toBe(false);
+    expect(json.error).toContain("missing a valid date");
+    expect(repositoryFns.fetchLastPublishedIssueDateOnOrBefore).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

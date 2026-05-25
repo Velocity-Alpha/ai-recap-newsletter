@@ -241,26 +241,12 @@ export async function fetchPublishedNewsletterEntries(): Promise<PublishedNewsle
   }));
 }
 
-export async function fetchPublishedIssueOnOrBeforeDate(
+export async function fetchLastPublishedIssueDateOnOrBefore(
   targetDate: string
 ): Promise<PublishedIssueLookupResult> {
-  const rows = await prisma.$queryRaw<PublishedIssueLookupRow[]>`
-    SELECT
-      id,
-      slug,
-      title,
-      issue_date,
-      published_at
-    FROM newsletter.issues
-    WHERE published_at IS NOT NULL
-      AND issue_date IS NOT NULL
-      AND issue_date <= ${targetDate}::date
-    ORDER BY issue_date DESC, published_at DESC
-    LIMIT 1
-  `;
+  const targetDateValue = new Date(`${targetDate}T00:00:00.000Z`);
 
-  const row = rows[0];
-  if (!row) {
+  if (Number.isNaN(targetDateValue.getTime())) {
     return {
       target_date: targetDate,
       has_exact_match: false,
@@ -268,18 +254,46 @@ export async function fetchPublishedIssueOnOrBeforeDate(
     };
   }
 
-  const issueDate = serializeDateValue(row.issue_date);
+  const issueRecord = await prisma.issue.findFirst({
+    where: {
+      publishedAt: {
+        not: null,
+      },
+      issueDate: {
+        not: null,
+        lte: targetDateValue,
+      },
+    },
+    select: {
+      id: true,
+      slug: true,
+      title: true,
+      issueDate: true,
+      publishedAt: true,
+    },
+    orderBy: [{ issueDate: "desc" }, { publishedAt: "desc" }],
+  });
+
+  if (!issueRecord) {
+    return {
+      target_date: targetDate,
+      has_exact_match: false,
+      issue: null,
+    };
+  }
+
+  const issueDate = serializeDateValue(issueRecord.issueDate);
   const issueDateOnly = issueDate ? issueDate.slice(0, 10) : null;
 
   return {
     target_date: targetDate,
     has_exact_match: issueDateOnly === targetDate,
     issue: {
-      id: String(row.id),
-      slug: row.slug,
-      title: row.title,
+      id: String(issueRecord.id),
+      slug: issueRecord.slug,
+      title: issueRecord.title,
       issue_date: issueDate,
-      published_at: serializeDateValue(row.published_at),
+      published_at: serializeDateValue(issueRecord.publishedAt),
     },
   };
 }

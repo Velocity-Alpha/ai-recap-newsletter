@@ -1,4 +1,3 @@
-import { Prisma } from "@/src/generated/prisma";
 import { prisma } from "@/src/server/prisma";
 import { logServerError, logServerInfo } from "@/src/server/observability";
 import { CANDIDATE_SECTION_CONFIGS, type SectionKey } from "@/src/features/newsletter/section-config";
@@ -264,6 +263,25 @@ function toDateOnlyIso(value: Date): string {
   return value.toISOString().slice(0, 10);
 }
 
+function toUtcDateFromDateOnly(dateOnly: string): Date {
+  return new Date(`${dateOnly}T00:00:00.000Z`);
+}
+
+function dedupeStoriesByGuid(stories: StoryRecord[]): StoryRecord[] {
+  const seenKeys = new Set<string>();
+  const dedupedStories: StoryRecord[] = [];
+
+  for (const story of stories) {
+    const dedupeKey = story.guid ?? String(story.id);
+    if (seenKeys.has(dedupeKey)) continue;
+
+    seenKeys.add(dedupeKey);
+    dedupedStories.push(story);
+  }
+
+  return dedupedStories;
+}
+
 /**
  * Loads recently used stories for the requested publication date.
  *
@@ -273,34 +291,60 @@ function toDateOnlyIso(value: Date): string {
  */
 async function getReferencedStories(date: Date): Promise<StoryRecord[]> {
   const dateOnly = toDateOnlyIso(date);
+  const targetDate = toUtcDateFromDateOnly(dateOnly);
   const lookbackDays = date.getUTCDay() === 1 ? 3 : 2;
+  const lookbackStartDate = new Date(targetDate);
+  lookbackStartDate.setUTCDate(lookbackStartDate.getUTCDate() - lookbackDays);
+
   logServerInfo("approval.outline.fetch.referenced.query", {
     requestedDateIso: date.toISOString(),
     dateOnly,
     lookbackDays,
   });
 
-  const rows = await prisma.$queryRaw<RawStoryRow[]>(Prisma.sql`
-    SELECT DISTINCT ON (COALESCE(guid, id::text))
-      id,
-      guid,
-      day,
-      headline,
-      url,
-      summary,
-      category,
-      source,
-      story_details,
-      importance_score
-    FROM newsletter.stories
-    WHERE used_in_publication_date <= ${dateOnly}::date
-      AND exclude_from_candidates IS FALSE
-      AND used_in_publication_date >= ${dateOnly}::date - (${lookbackDays} * INTERVAL '1 day')
-  `);
+  const referencedStories = await prisma.story.findMany({
+    where: {
+      usedInPublicationDate: {
+        lte: targetDate,
+        gte: lookbackStartDate,
+      },
+      excludeFromCandidates: false,
+    },
+    select: {
+      id: true,
+      guid: true,
+      day: true,
+      headline: true,
+      url: true,
+      summary: true,
+      category: true,
+      source: true,
+      storyDetails: true,
+      importanceScore: true,
+    },
+    orderBy: [{ usedInPublicationDate: "desc" }, { id: "desc" }],
+  });
 
-  logServerInfo("approval.outline.fetch.referenced.rows", { rowCount: rows.length });
+  const referencedStoryRecords = dedupeStoriesByGuid(
+    referencedStories.map((story) => ({
+      id: Number(story.id),
+      guid: story.guid,
+      day: story.day,
+      headline: story.headline,
+      summary: story.summary,
+      story_details: story.storyDetails,
+      category: story.category,
+      source: story.source,
+      url: story.url,
+      importance_score: story.importanceScore,
+    }))
+  );
 
-  return rows.map(toStoryRecord);
+  logServerInfo("approval.outline.fetch.referenced.rows", {
+    rowCount: referencedStoryRecords.length,
+  });
+
+  return referencedStoryRecords;
 }
 
 /**
@@ -311,40 +355,99 @@ async function getReferencedStories(date: Date): Promise<StoryRecord[]> {
  */
 async function getCandidateStories(date: Date): Promise<StoryRecord[]> {
   const dateOnly = toDateOnlyIso(date);
+  const targetDate = toUtcDateFromDateOnly(dateOnly);
+  const candidateWindowStartDate = new Date(targetDate);
+  candidateWindowStartDate.setUTCDate(candidateWindowStartDate.getUTCDate() - 3);
+
   logServerInfo("approval.outline.fetch.candidates.query", {
     requestedDateIso: date.toISOString(),
     dateOnly,
   });
 
-  const rows = await prisma.$queryRaw<RawStoryRow[]>(Prisma.sql`
-    SELECT DISTINCT ON (COALESCE(guid, id::text))
-      id,
-      guid,
-      day,
-      headline,
-      url,
-      summary,
-      category,
-      source,
-      story_details,
-      importance_score
-    FROM newsletter.stories
-    WHERE importance_score >= 2
-      AND day IS NOT NULL
-      AND day <= ${dateOnly}::date
-      AND day >= (${dateOnly}::date - INTERVAL '3 days')
-      AND url NOT ILIKE '%tldr%'
-      AND url NOT ILIKE '%rundown%'
-      AND url NOT ILIKE '%beehive%'
-      AND url IS NOT NULL
-      AND url != ''
-      AND used_in_publication_date IS NULL
-      AND exclude_from_candidates IS FALSE
-  `);
+  const candidateStories = await prisma.story.findMany({
+    where: {
+      importanceScore: {
+        gte: 2,
+      },
+      day: {
+        not: null,
+        lte: targetDate,
+        gte: candidateWindowStartDate,
+      },
+      usedInPublicationDate: null,
+      excludeFromCandidates: false,
+      AND: [
+        {
+          url: {
+            not: null,
+          },
+        },
+        {
+          url: {
+            not: "",
+          },
+        },
+        {
+          url: {
+            not: {
+              contains: "tldr",
+              mode: "insensitive",
+            },
+          },
+        },
+        {
+          url: {
+            not: {
+              contains: "rundown",
+              mode: "insensitive",
+            },
+          },
+        },
+        {
+          url: {
+            not: {
+              contains: "beehive",
+              mode: "insensitive",
+            },
+          },
+        },
+      ],
+    },
+    select: {
+      id: true,
+      guid: true,
+      day: true,
+      headline: true,
+      url: true,
+      summary: true,
+      category: true,
+      source: true,
+      storyDetails: true,
+      importanceScore: true,
+    },
+    orderBy: [{ day: "desc" }, { id: "desc" }],
+  });
 
-  logServerInfo("approval.outline.fetch.candidates.rows", { rowCount: rows.length });
+  const candidateStoryRecords = dedupeStoriesByGuid(
+    candidateStories.map((story) => ({
+      id: Number(story.id),
+      guid: story.guid,
+      day: story.day,
+      headline: story.headline,
+      summary: story.summary,
+      story_details: story.storyDetails,
+      category: story.category,
+      source: story.source,
+      url: story.url,
+      importance_score: story.importanceScore,
+    }))
+  );
 
-  return rows.map(toStoryRecord);
+  logServerInfo("approval.outline.fetch.candidates.rows", {
+    rowCount: candidateStoryRecords.length,
+  });
+
+  return candidateStoryRecords;
 }
 
 /**
