@@ -30,7 +30,7 @@ interface CandidateSection {
 
 interface ReferenceStory {
   id: number;
-  day: string | null;
+  usedInPublicationDate: string | null;
   headline: string;
   summary: string;
 }
@@ -222,9 +222,9 @@ function toOption(story: StoryRecord & { keyword_score: number }) {
  * Converts previously published stories into the reference format returned to
  * the approval screen and supplied to AI deduplication.
  */
-function toReferenceStory(story: StoryRecord): ReferenceStory {
-  const raw = story.day;
-  const dayStr =
+function toReferenceStory(story: StoryRecord & { usedInPublicationDate: Date | string | null }): ReferenceStory {
+  const raw = story.usedInPublicationDate;
+  const publicationDateStr =
     raw instanceof Date
       ? raw.toISOString().slice(0, 10)
       : typeof raw === "string"
@@ -232,7 +232,7 @@ function toReferenceStory(story: StoryRecord): ReferenceStory {
         : null;
   return {
     id: story.id,
-    day: dayStr,
+    usedInPublicationDate: publicationDateStr,
     headline: cleanText(story.headline) || "Untitled story",
     summary: cleanText(story.summary),
   };
@@ -314,6 +314,7 @@ async function getReferencedStories(date: Date): Promise<StoryRecord[]> {
       id: true,
       guid: true,
       day: true,
+      usedInPublicationDate: true,
       headline: true,
       url: true,
       summary: true,
@@ -330,6 +331,7 @@ async function getReferencedStories(date: Date): Promise<StoryRecord[]> {
       id: Number(story.id),
       guid: story.guid,
       day: story.day,
+      usedInPublicationDate: story.usedInPublicationDate,
       headline: story.headline,
       summary: story.summary,
       story_details: story.storyDetails,
@@ -390,9 +392,9 @@ async function getCandidateStories(date: Date): Promise<StoryRecord[]> {
       ],
       NOT: {
         OR: [
-          { url: { contains: "tldr" } },
-          { url: { contains: "rundown" } },
-          { url: { contains: "beehive" } },
+          { url: { contains: "tldr", mode: "insensitive" } },
+          { url: { contains: "rundown", mode: "insensitive" } },
+          { url: { contains: "beehive", mode: "insensitive" } },
         ],
       },
     },

@@ -74,14 +74,6 @@ type PublishedNewsletterRow = {
   issue_date: Date | string | null;
 };
 
-type PublishedIssueLookupRow = {
-  id: bigint | number | string;
-  slug: string | null;
-  title: string;
-  issue_date: Date | string | null;
-  published_at: Date | string | null;
-};
-
 type TickerStatsRow = {
   stories: number | bigint | string | null;
   tools: number | bigint | string | null;

@@ -55,7 +55,7 @@ type CandidateMapEntry = {
 
 type ReferenceStory = {
   id: number;
-  day: string | null;
+  usedInPublicationDate: string | null;
   headline: string;
   summary: string;
 };
@@ -648,7 +648,7 @@ export default function ApprovalBoard({
                 (() => {
                   const grouped = referenceStories.reduce<Record<string, ReferenceStory[]>>(
                     (acc, story) => {
-                      const key = story.day ?? "Unknown date";
+                      const key = story.usedInPublicationDate ?? "Unknown date";
                       (acc[key] ??= []).push(story);
                       return acc;
                     },

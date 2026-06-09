@@ -7,7 +7,7 @@ const CACHE_KEY_PREFIX = "approval_outline_";
 export type ApprovalOutlineData = {
   reference_stories: {
     id: number;
-    day: string | null;
+    usedInPublicationDate: string | null;
     headline: string;
     summary: string;
   }[];
