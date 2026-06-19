@@ -13,6 +13,7 @@ interface StoryRecord {
   source: string | null;
   url: string | null;
   importance_score: number | null;
+  used_in_publication_date?: Date | string | null;
 }
 
 interface ProcessedStory extends StoryRecord {
@@ -222,8 +223,8 @@ function toOption(story: StoryRecord & { keyword_score: number }) {
  * Converts previously published stories into the reference format returned to
  * the approval screen and supplied to AI deduplication.
  */
-function toReferenceStory(story: StoryRecord & { usedInPublicationDate: Date | string | null }): ReferenceStory {
-  const raw = story.usedInPublicationDate;
+function toReferenceStory(story: StoryRecord): ReferenceStory {
+  const raw = story.used_in_publication_date;
   const publicationDateStr =
     raw instanceof Date
       ? raw.toISOString().slice(0, 10)
@@ -331,7 +332,7 @@ async function getReferencedStories(date: Date): Promise<StoryRecord[]> {
       id: Number(story.id),
       guid: story.guid,
       day: story.day,
-      usedInPublicationDate: story.usedInPublicationDate,
+      used_in_publication_date: story.usedInPublicationDate,
       headline: story.headline,
       summary: story.summary,
       story_details: story.storyDetails,
@@ -394,7 +395,7 @@ async function getCandidateStories(date: Date): Promise<StoryRecord[]> {
         OR: [
           { url: { contains: "tldr", mode: "insensitive" } },
           { url: { contains: "rundown", mode: "insensitive" } },
-          { url: { contains: "beehive", mode: "insensitive" } },
+          { url: { contains: "beehiiv", mode: "insensitive" } },
         ],
       },
     },
