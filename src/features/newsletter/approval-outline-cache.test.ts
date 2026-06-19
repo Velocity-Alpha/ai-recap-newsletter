@@ -157,7 +157,14 @@ describe("normalizeApprovalOutlineData", () => {
   });
 
   it("passes non-section fields through unchanged", () => {
-    const referenceStories = [{ id: 99, day: "2026-05-01", headline: "Ref", summary: "Ref summary" }];
+    const referenceStories = [
+      {
+        id: 99,
+        usedInPublicationDate: "2026-05-01",
+        headline: "Ref",
+        summary: "Ref summary",
+      },
+    ];
     const candidateMap = { "1": { id: 1, guid: null, day: null, headline: "X", summary: null, story_details: null, category: null, source: null, url: null, importance_score: null, keyword_score: 0, combined_score: 0 } };
 
     const result = normalizeApprovalOutlineData({
