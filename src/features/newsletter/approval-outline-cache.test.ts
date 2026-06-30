@@ -161,6 +161,7 @@ describe("normalizeApprovalOutlineData", () => {
       {
         id: 99,
         usedInPublicationDate: "2026-05-01",
+        paywall_detected: "unknown" as const,
         headline: "Ref",
         summary: "Ref summary",
       },

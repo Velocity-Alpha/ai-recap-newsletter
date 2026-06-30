@@ -17,7 +17,7 @@ vi.mock("@/src/server/observability", () => ({
 
 import {
   cleanText,
-  createApprovalOutlineDataWithoutDedup,
+  createOutlineCandidateStories,
 } from "@/src/features/newsletter/curation.service";
 
 describe("newsletter curation", () => {
@@ -41,6 +41,7 @@ describe("newsletter curation", () => {
           guid: "guid-101",
           day: new Date("2026-06-05T00:00:00.000Z"),
           usedInPublicationDate: new Date("2026-06-08T00:00:00.000Z"),
+          paywallDetected: "yes",
           headline: "Published story",
           url: "https://example.com/published",
           summary: "Summary",
@@ -52,7 +53,7 @@ describe("newsletter curation", () => {
       ])
       .mockResolvedValueOnce([]);
 
-    const { outline } = await createApprovalOutlineDataWithoutDedup(
+    const { outline } = await createOutlineCandidateStories(
       new Date("2026-06-09T00:00:00.000Z")
     );
 
@@ -60,6 +61,7 @@ describe("newsletter curation", () => {
     expect(outline.reference_stories[0]).toMatchObject({
       id: 101,
       usedInPublicationDate: "2026-06-08",
+      paywall_detected: "yes",
       headline: "Published story",
       summary: "Summary",
     });
@@ -73,6 +75,7 @@ describe("newsletter curation", () => {
           guid: "guid-202",
           day: new Date("2026-06-04T00:00:00.000Z"),
           usedInPublicationDate: null,
+          paywallDetected: null,
           headline: "Story without publication date",
           url: "https://example.com/no-date",
           summary: "Summary",
@@ -84,7 +87,7 @@ describe("newsletter curation", () => {
       ])
       .mockResolvedValueOnce([]);
 
-    const { outline } = await createApprovalOutlineDataWithoutDedup(
+    const { outline } = await createOutlineCandidateStories(
       new Date("2026-06-09T00:00:00.000Z")
     );
 
@@ -92,6 +95,7 @@ describe("newsletter curation", () => {
     expect(outline.reference_stories[0]).toMatchObject({
       id: 202,
       usedInPublicationDate: null,
+      paywall_detected: "unknown",
       headline: "Story without publication date",
       summary: "Summary",
     });

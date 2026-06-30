@@ -14,6 +14,10 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   BookOpen,
+  AlertCircle,
+  Lock,
+  LockOpen,
+  MinusCircle,
   Pencil,
   Sparkles,
   Star,
@@ -49,6 +53,8 @@ type CandidateMapEntry = {
   source: string | null;
   url: string | null;
   importance_score: number | null;
+  paywall_detected?: "yes" | "no" | "unknown" | "error";
+  error?: string | null;
   keyword_score: number;
   combined_score: number;
 };
@@ -56,6 +62,8 @@ type CandidateMapEntry = {
 type ReferenceStory = {
   id: number;
   usedInPublicationDate: string | null;
+  paywall_detected: "yes" | "no" | "unknown" | "error";
+  error?: string | null;
   headline: string;
   summary: string;
 };
@@ -131,6 +139,37 @@ function formatLongDate(value: string | null | undefined): string {
     year: "numeric",
     timeZone: "UTC",
   }).format(parsed);
+}
+
+function renderPaywallIcon(paywallDetected: "yes" | "no" | "unknown" | "error" | null | undefined, errorMessage?: string | null) {
+  if (paywallDetected === "yes") {
+    return (
+      <span title="Paywalled story" className="inline-flex shrink-0 cursor-default" aria-label="Paywalled story">
+        <Lock className="h-3.5 w-3.5 text-red-500" />
+      </span>
+    );
+  }
+  if (paywallDetected === "no") {
+    return (
+      <span title="Free story" className="inline-flex shrink-0 cursor-default" aria-label="Free story">
+        <LockOpen className="h-3.5 w-3.5 text-green-500" />
+      </span>
+    );
+  }
+  if (paywallDetected === "error") {
+    const label = errorMessage ?? "Paywall detection error";
+    return (
+      <span title={label} className="inline-flex shrink-0 cursor-default" aria-label={label}>
+        <AlertCircle className="h-3.5 w-3.5 text-orange-500" />
+      </span>
+    );
+  }
+
+  return (
+    <span title="Unknown paywall status" className="inline-flex shrink-0 cursor-default" aria-label="Unknown paywall status">
+      <MinusCircle className="h-3.5 w-3.5 text-gray-400" />
+    </span>
+  );
 }
 
 export default function ApprovalBoard({
@@ -675,7 +714,8 @@ export default function ApprovalBoard({
                         {grouped[date].map((story) => (
                           <div key={story.id} className="flex items-start gap-3 px-5 py-3">
                             <div className="min-w-0">
-                              <p className="text-sm font-medium leading-snug text-[var(--text-primary)] line-clamp-2">
+                              <p className="flex items-center gap-1.5 text-sm font-medium leading-snug text-[var(--text-primary)] line-clamp-2">
+                                {renderPaywallIcon(story.paywall_detected, story.error)}
                                 {story.headline}
                               </p>
                               {story.summary ? (
@@ -813,7 +853,7 @@ export default function ApprovalBoard({
 
                               {/* Text */}
                               <div className="min-w-0 flex-1">
-                                <p className={`truncate text-sm font-medium ${
+                                <p className={`flex items-center gap-1.5 truncate text-sm font-medium ${
                                   hasHeadlineValidationError
                                     ? "text-[var(--accent-warm)]"
                                     : isExcluded
@@ -822,6 +862,7 @@ export default function ApprovalBoard({
                                     ? "text-[var(--text-secondary)]"
                                     : "text-[var(--text-primary)]"
                                 }`}>
+                                  {renderPaywallIcon(candidateMap[String(story.id)]?.paywall_detected, candidateMap[String(story.id)]?.error)}
                                   {story.headline}
                                 </p>
                                 {hasHeadlineValidationError ? (
@@ -1141,6 +1182,9 @@ export default function ApprovalBoard({
                 ) : null}
               </div>
               <h3 className="mt-4 font-serif text-[clamp(22px,3.5vw,32px)] leading-[1.22] text-[var(--text-primary)]">
+                <span className="mr-2 inline-flex align-middle">
+                  {renderPaywallIcon(previewStory.paywall_detected, previewStory.error)}
+                </span>
                 {previewStory.headline || "Untitled story"}
               </h3>
               {previewStory.summary ? (

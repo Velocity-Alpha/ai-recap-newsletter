@@ -8,6 +8,8 @@ export type ApprovalOutlineData = {
   reference_stories: {
     id: number;
     usedInPublicationDate: string | null;
+    paywall_detected: "yes" | "no" | "unknown" | "error";
+    error?: string | null;
     headline: string;
     summary: string;
   }[];
@@ -31,6 +33,8 @@ export type ApprovalOutlineData = {
       source: string | null;
       url: string | null;
       importance_score: number | null;
+      paywall_detected?: "yes" | "no" | "unknown" | "error";
+      error?: string | null;
       keyword_score: number;
       combined_score: number;
     }

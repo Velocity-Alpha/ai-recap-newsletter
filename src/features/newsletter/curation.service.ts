@@ -13,6 +13,8 @@ interface StoryRecord {
   source: string | null;
   url: string | null;
   importance_score: number | null;
+  paywall_detected?: "yes" | "no" | "unknown" | "error";
+  error?: string | null;
   used_in_publication_date?: Date | string | null;
 }
 
@@ -32,6 +34,8 @@ interface CandidateSection {
 interface ReferenceStory {
   id: number;
   usedInPublicationDate: string | null;
+  paywall_detected: "yes" | "no" | "unknown" | "error";
+  error?: string | null;
   headline: string;
   summary: string;
 }
@@ -57,7 +61,16 @@ type RawStoryRow = {
   source: string | null;
   story_details: string | null;
   importance_score: number | null;
+  paywall_detedted: string | null;
 };
+
+function normalizePaywallDetected(value: string | null | undefined): "yes" | "no" | "unknown" | "error" {
+  const normalized = String(value ?? "").toLowerCase().trim();
+  if (normalized === "yes") return "yes";
+  if (normalized === "no") return "no";
+  if (normalized === "error") return "error";
+  return "unknown";
+}
 
 // Configuration — derived from the shared section-config so keys/labels/limits stay in sync with the UI.
 const SECTION_LIMITS = Object.fromEntries(
@@ -234,6 +247,8 @@ function toReferenceStory(story: StoryRecord): ReferenceStory {
   return {
     id: story.id,
     usedInPublicationDate: publicationDateStr,
+    paywall_detected: normalizePaywallDetected(story.paywall_detected),
+    error: story.error,
     headline: cleanText(story.headline) || "Untitled story",
     summary: cleanText(story.summary),
   };
@@ -254,6 +269,7 @@ function toStoryRecord(row: RawStoryRow): StoryRecord {
     source: row.source,
     url: row.url,
     importance_score: row.importance_score,
+    paywall_detected: normalizePaywallDetected(row.paywall_detedted),
   };
 }
 
@@ -316,6 +332,8 @@ async function getReferencedStories(date: Date): Promise<StoryRecord[]> {
       guid: true,
       day: true,
       usedInPublicationDate: true,
+      paywallDetected: true,
+      error: true,
       headline: true,
       url: true,
       summary: true,
@@ -333,6 +351,8 @@ async function getReferencedStories(date: Date): Promise<StoryRecord[]> {
       guid: story.guid,
       day: story.day,
       used_in_publication_date: story.usedInPublicationDate,
+      paywall_detected: normalizePaywallDetected(story.paywallDetected),
+      error: story.error,
       headline: story.headline,
       summary: story.summary,
       story_details: story.storyDetails,
@@ -403,6 +423,8 @@ async function getCandidateStories(date: Date): Promise<StoryRecord[]> {
       id: true,
       guid: true,
       day: true,
+      paywallDetected: true,
+      error: true,
       headline: true,
       url: true,
       summary: true,
@@ -419,6 +441,8 @@ async function getCandidateStories(date: Date): Promise<StoryRecord[]> {
         id: Number(story.id),
         guid: story.guid,
         day: story.day,
+        paywall_detected: normalizePaywallDetected(story.paywallDetected),
+        error: story.error,
         headline: story.headline,
         summary: story.summary,
         story_details: story.storyDetails,
@@ -597,7 +621,7 @@ function createSectionBlueprints(
  * 4. Group stories into editorial sections and fill-in pools.
  * 5. Return section data, a full story lookup map, and initially selected IDs.
  */
-export async function createApprovalOutlineDataWithoutDedup(
+export async function createOutlineCandidateStories(
   date: Date
 ): Promise<{
   outline: ApprovalOutlineData;
@@ -690,11 +714,11 @@ export async function createApprovalOutlineDataWithoutDedup(
 
 /**
  * Legacy function — kept for backwards compatibility.
- * Now calls createApprovalOutlineDataWithoutDedup (skips blocking AI dedup).
+ * Now calls createOutlineCandidateStories (skips blocking AI dedup).
  */
 export async function createApprovalOutlineData(
   date: Date
 ): Promise<ApprovalOutlineData> {
-  const { outline } = await createApprovalOutlineDataWithoutDedup(date);
+  const { outline } = await createOutlineCandidateStories(date);
   return outline;
 }

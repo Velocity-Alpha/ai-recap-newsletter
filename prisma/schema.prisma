@@ -9,15 +9,15 @@ datasource db {
 }
 
 model AuthCode {
-  id                BigInt    @id @default(autoincrement())
-  email             String
-  codeHash          String    @map("code_hash")
-  purpose           String    @default("sign_in")
-  expiresAt         DateTime  @map("expires_at") @db.Timestamptz(6)
-  consumedAt        DateTime? @map("consumed_at") @db.Timestamptz(6)
-  requestIp         String?   @map("request_ip")
-  requestUserAgent  String?   @map("request_user_agent")
-  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  id               BigInt    @id @default(autoincrement())
+  email            String
+  codeHash         String    @map("code_hash")
+  purpose          String    @default("sign_in")
+  expiresAt        DateTime  @map("expires_at") @db.Timestamptz(6)
+  consumedAt       DateTime? @map("consumed_at") @db.Timestamptz(6)
+  requestIp        String?   @map("request_ip")
+  requestUserAgent String?   @map("request_user_agent")
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@index([email, expiresAt(sort: Desc)], map: "auth_codes_email_expires_idx")
   @@map("auth_codes")
@@ -36,6 +36,7 @@ model Issue {
   issueDate           DateTime? @map("issue_date") @db.Date
   promptFeaturedImage String?   @map("prompt_featured_image")
   slug                String?   @unique @default(dbgenerated("COALESCE(newsletter.slugify_issue_title(title), (id)::text)"))
+  note                String?
 
   @@unique([title, publishedAt], map: "issues_title_published_unique")
   @@index([createdAt(sort: Desc)])
@@ -68,6 +69,9 @@ model Story {
   usedInPublicationDate    DateTime? @map("used_in_publication_date") @db.Date
   queuedForPublicationDate DateTime? @map("queued_for_publication_date") @db.Date
   excludeFromCandidates    Boolean?  @default(false) @map("exclude_from_candidates")
+  note                     String?
+  paywallDetected          String?   @map("paywall_detected")
+  error                    String?
 
   @@index([queuedForPublicationDate], map: "queued_for_publication_date_idx")
   @@map("stories")
@@ -89,4 +93,11 @@ model Subscriber {
   @@index([status])
   @@map("subscribers")
   @@schema("newsletter")
+}
+
+model schema_migrations {
+  filename   String   @id
+  applied_at DateTime @default(now()) @db.Timestamptz(6)
+
+  @@schema("public")
 }

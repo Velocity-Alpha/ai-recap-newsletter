@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { 
-  createApprovalOutlineDataWithoutDedup,
+  createOutlineCandidateStories,
 } from "@/src/features/newsletter/curation.service";
 import { checkDeduplicationStatus } from "@/src/features/newsletter/openai-dedup";
 import { hasValidApprovalSession } from "@/src/server/approval-auth";
@@ -59,7 +59,7 @@ export async function GET(request: Request) {
     if (responseStatus.status === "completed" && responseStatus.result) {
       // Rebuild outline with deduped story IDs
       const { outline: baseOutline } = 
-        await createApprovalOutlineDataWithoutDedup(date);
+        await createOutlineCandidateStories(date);
 
       const keptStoryIds = new Set<number>(responseStatus.result.kept_story_ids || []);
 
