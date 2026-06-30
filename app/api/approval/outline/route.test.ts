@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createApprovalSessionToken } from "@/src/server/approval-auth";
 
 const curationFns = vi.hoisted(() => ({
-  createApprovalOutlineDataWithoutDedup: vi.fn(),
+  createOutlineCandidateStories: vi.fn(),
 }));
 
 const dedupFns = vi.hoisted(() => ({
@@ -32,13 +32,13 @@ describe("GET /api/approval/outline", () => {
     const response = await GET(new Request("http://localhost/api/approval/outline"));
     const json = await response.json();
 
-    expect(curationFns.createApprovalOutlineDataWithoutDedup).not.toHaveBeenCalled();
+    expect(curationFns.createOutlineCandidateStories).not.toHaveBeenCalled();
     expect(response.status).toBe(401);
     expect(json.error).toBe("Unauthorized.");
   });
 
   it("returns status=pending with response_id when dedup response is submitted", async () => {
-    curationFns.createApprovalOutlineDataWithoutDedup.mockResolvedValue({
+    curationFns.createOutlineCandidateStories.mockResolvedValue({
       outline: BASE_OUTLINE,
       referencedStories: [],
       rankedCandidates: [],
@@ -53,7 +53,7 @@ describe("GET /api/approval/outline", () => {
     );
     const json = await response.json();
 
-    expect(curationFns.createApprovalOutlineDataWithoutDedup).toHaveBeenCalledWith(
+    expect(curationFns.createOutlineCandidateStories).toHaveBeenCalledWith(
       new Date("2026-04-30")
     );
     expect(response.status).toBe(200);
@@ -63,7 +63,7 @@ describe("GET /api/approval/outline", () => {
   });
 
   it("returns status=ready when dedup submission fails", async () => {
-    curationFns.createApprovalOutlineDataWithoutDedup.mockResolvedValue({
+    curationFns.createOutlineCandidateStories.mockResolvedValue({
       outline: BASE_OUTLINE,
       referencedStories: [],
       rankedCandidates: [],
@@ -85,7 +85,7 @@ describe("GET /api/approval/outline", () => {
   });
 
   it("returns 500 when outline fetch fails", async () => {
-    curationFns.createApprovalOutlineDataWithoutDedup.mockRejectedValue(
+    curationFns.createOutlineCandidateStories.mockRejectedValue(
       new Error("DB unreachable")
     );
     const token = await createApprovalSessionToken("approval-secret");

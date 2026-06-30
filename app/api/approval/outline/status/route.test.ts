@@ -7,7 +7,7 @@ const dedupFns = vi.hoisted(() => ({
 }));
 
 const curationFns = vi.hoisted(() => ({
-  createApprovalOutlineDataWithoutDedup: vi.fn(),
+  createOutlineCandidateStories: vi.fn(),
 }));
 
 vi.mock("@/src/features/newsletter/openai-dedup", () => dedupFns);
@@ -117,7 +117,7 @@ describe("GET /api/approval/outline/status", () => {
       status: "completed",
       result: { kept_story_ids: [1, 3] },
     });
-    curationFns.createApprovalOutlineDataWithoutDedup.mockResolvedValue({
+    curationFns.createOutlineCandidateStories.mockResolvedValue({
       outline: BASE_OUTLINE,
     });
     const token = await createApprovalSessionToken("approval-secret");
@@ -140,7 +140,7 @@ describe("GET /api/approval/outline/status", () => {
 
   it("returns 500 for unknown response status", async () => {
     dedupFns.checkDeduplicationStatus.mockResolvedValue({ status: "completed" }); // completed but no result
-    curationFns.createApprovalOutlineDataWithoutDedup.mockResolvedValue({
+    curationFns.createOutlineCandidateStories.mockResolvedValue({
       outline: BASE_OUTLINE,
     });
     const token = await createApprovalSessionToken("approval-secret");

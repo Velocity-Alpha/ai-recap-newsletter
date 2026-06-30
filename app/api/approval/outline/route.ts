@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { 
-  createApprovalOutlineDataWithoutDedup 
+  createOutlineCandidateStories 
 } from "@/src/features/newsletter/curation.service";
 import { submitDeduplication } from "@/src/features/newsletter/openai-dedup";
 import { hasValidApprovalSession } from "@/src/server/approval-auth";
@@ -31,7 +31,7 @@ export async function GET(request: Request) {
   try {
     // Get outline without AI dedup (fast)
     const { outline, referencedStories, rankedCandidates } = 
-      await createApprovalOutlineDataWithoutDedup(date);
+      await createOutlineCandidateStories(date);
 
     logServerInfo("approval.outline.api.outline_ready", { 
       date: dateKey,
