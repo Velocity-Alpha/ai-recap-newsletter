@@ -61,7 +61,7 @@ type RawStoryRow = {
   source: string | null;
   story_details: string | null;
   importance_score: number | null;
-  paywall_detedted: string | null;
+  paywall_detected: string | null;
 };
 
 function normalizePaywallDetected(value: string | null | undefined): "yes" | "no" | "unknown" | "error" {
@@ -269,7 +269,7 @@ function toStoryRecord(row: RawStoryRow): StoryRecord {
     source: row.source,
     url: row.url,
     importance_score: row.importance_score,
-    paywall_detected: normalizePaywallDetected(row.paywall_detedted),
+    paywall_detected: normalizePaywallDetected(row.paywall_detected),
   };
 }
 
