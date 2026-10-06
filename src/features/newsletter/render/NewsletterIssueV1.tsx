@@ -157,6 +157,7 @@ export function NewsletterIssueV1({ issue }: { issue: ParsedNewsletterIssueV1 })
         <header className="space-y-4 text-center">
           <div className="space-y-2">
             <div
+              data-publication-date={displayDate ? true : undefined}
               className="inline-flex items-center gap-2 font-medium uppercase tracking-[0.1em] text-[var(--text-muted)]"
               style={{ fontSize: "calc(var(--text-small) * 0.95)" }}
             >

@@ -172,7 +172,7 @@ function TickerItem({ time, headline, tag, tagType }: {
 
   return (
     <div className="flex gap-4 px-5 py-4 min-h-[80px] border-b border-[var(--border-light)]">
-      <span className="text-[11px] font-medium text-[var(--text-muted)] whitespace-nowrap min-w-[48px] pt-0.5">{time}</span>
+      <span data-publication-date className="text-[11px] font-medium text-[var(--text-muted)] whitespace-nowrap min-w-[48px] pt-0.5">{time}</span>
       <div className="flex-1">
         <div className="font-serif text-[15px] text-[var(--text-primary)] leading-[1.4] mb-1.5">{headline}</div>
         <div className="flex items-center gap-2 text-[12px] text-[var(--text-muted)]">

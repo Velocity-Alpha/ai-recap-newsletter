@@ -220,6 +220,7 @@ export function NewsletterIssueV2({ issue }: { issue: ParsedNewsletterIssueV2 })
           <div className="space-y-2">
             {subtitleDate && (
               <div
+                data-publication-date
                 className="inline-flex items-center gap-2 font-medium uppercase tracking-[0.1em] text-[var(--text-muted)]"
                 style={{ fontSize: "calc(var(--text-small) * 0.95)" }}
               >
@@ -228,6 +229,7 @@ export function NewsletterIssueV2({ issue }: { issue: ParsedNewsletterIssueV2 })
             )}
             {!subtitleDate && shortDate && (
               <div
+                data-publication-date
                 className="inline-flex items-center gap-2 font-medium uppercase tracking-[0.1em] text-[var(--text-muted)]"
                 style={{ fontSize: "calc(var(--text-small) * 0.95)" }}
               >

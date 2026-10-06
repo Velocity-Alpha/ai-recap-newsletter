@@ -52,7 +52,7 @@ const NewsletterCard: React.FC<Props> = ({ item }) => {
           )}
           
           {/* Date badge */}
-          <div className="absolute top-4 left-4 rounded border border-[rgba(212,221,227,0.9)] bg-[rgba(247,246,243,0.94)] px-2.5 py-1 text-[11px] font-medium text-[var(--text-secondary)] shadow-[0_1px_2px_rgba(61,79,95,0.06)]">
+          <div data-publication-date className="absolute top-4 left-4 rounded border border-[rgba(212,221,227,0.9)] bg-[rgba(247,246,243,0.94)] px-2.5 py-1 text-[11px] font-medium text-[var(--text-secondary)] shadow-[0_1px_2px_rgba(61,79,95,0.06)]">
             {formatNewsletterDate(item.issue_date ?? item.published_at)}
           </div>
         </div>
