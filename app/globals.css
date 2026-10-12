@@ -2,7 +2,7 @@
 
 /* Temporarily hide publication dates during maintenance. Remove to restore them. */
 [data-publication-date] {
-  display: none;
+ 
 }
 
 /* ==================== EDITORIAL DESIGN SYSTEM ==================== */
