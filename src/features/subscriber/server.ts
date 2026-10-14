@@ -5,6 +5,7 @@ import type { ResponseCookies } from "next/dist/compiled/@edge-runtime/cookies";
 import type { SubscriberRecord, SubscriberSessionPayload } from "@/src/features/subscriber/types";
 import { prisma } from "@/src/server/prisma";
 import { getBeehiivSubscriberStatus } from "@/src/features/subscriber/beehiiv";
+import { getSubscriberProvider } from "@/src/features/subscriber/provider";
 
 const COOKIE_NAME = "ai_recap_subscriber";
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
@@ -255,6 +256,11 @@ export async function findSubscriberByEmail(email: string) {
   }
 
   const subscriber = mapSubscriberRecord(record);
+
+  // GHL has no status lookup; its unsubscribes reach the local record via the unsubscribe webhook.
+  if (getSubscriberProvider() !== "beehiiv") {
+    return subscriber;
+  }
 
   // Verify status with Beehiiv — if not found there or inactive, return null (out of sync)
   const beehiivStatus = await getBeehiivSubscriberStatus(normalizedEmail);

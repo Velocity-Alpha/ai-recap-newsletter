@@ -24,8 +24,16 @@ const serverFns = vi.hoisted(() => ({
   verifySubscriberUnsubscribeToken: vi.fn(),
 }));
 
-const ghlFns = vi.hoisted(() => ({
+const beehiivFns = vi.hoisted(() => ({
   submitSubscriberToBeehiiv: vi.fn(),
+}));
+
+const ghlFns = vi.hoisted(() => ({
+  submitSubscriberToGhl: vi.fn(),
+}));
+
+const providerFns = vi.hoisted(() => ({
+  getSubscriberProvider: vi.fn(),
 }));
 
 const emailFns = vi.hoisted(() => ({
@@ -34,7 +42,9 @@ const emailFns = vi.hoisted(() => ({
 }));
 
 vi.mock("@/src/features/subscriber/server", () => serverFns);
-vi.mock("@/src/features/subscriber/beehiiv", () => ghlFns);
+vi.mock("@/src/features/subscriber/beehiiv", () => beehiivFns);
+vi.mock("@/src/features/subscriber/ghl", () => ghlFns);
+vi.mock("@/src/features/subscriber/provider", () => providerFns);
 vi.mock("@/src/features/subscriber/email", () => emailFns);
 
 describe("subscriber service", () => {
@@ -43,6 +53,7 @@ describe("subscriber service", () => {
     serverFns.isValidSubscriberEmail.mockReturnValue(true);
     serverFns.normalizeSubscriberEmail.mockImplementation((email: string) => email.trim().toLowerCase());
     serverFns.createOneTimeCode.mockReturnValue("123456");
+    providerFns.getSubscriberProvider.mockReturnValue("beehiiv");
   });
 
   it("treats an active subscriber as an idempotent subscribe success", async () => {
@@ -70,7 +81,8 @@ describe("subscriber service", () => {
       statusCode: 409,
       code: "already_subscribed",
     });
-    expect(ghlFns.submitSubscriberToBeehiiv).not.toHaveBeenCalled();
+    expect(beehiivFns.submitSubscriberToBeehiiv).not.toHaveBeenCalled();
+    expect(ghlFns.submitSubscriberToGhl).not.toHaveBeenCalled();
     expect(serverFns.touchSubscriberSeenAt).not.toHaveBeenCalled();
   });
 
@@ -85,12 +97,13 @@ describe("subscriber service", () => {
       path: "/issue/test",
     });
 
-    expect(ghlFns.submitSubscriberToBeehiiv).toHaveBeenCalledWith({
+    expect(beehiivFns.submitSubscriberToBeehiiv).toHaveBeenCalledWith({
       firstName: "Reader",
       email: "reader@example.com",
       source: "article_gate",
       path: "/issue/test",
     });
+    expect(ghlFns.submitSubscriberToGhl).not.toHaveBeenCalled();
     expect(serverFns.upsertSubscriber).toHaveBeenCalledWith({
       email: "reader@example.com",
       firstName: "Reader",
@@ -101,6 +114,46 @@ describe("subscriber service", () => {
       email: "reader@example.com",
     });
     expect(result.newlySubscribed).toBe(true);
+  });
+
+  it("subscribes a new reader through GHL only when GHL is the provider", async () => {
+    providerFns.getSubscriberProvider.mockReturnValue("ghl");
+    serverFns.findSubscriberByEmail.mockResolvedValue(null);
+    serverFns.upsertSubscriber.mockResolvedValue({ id: 3, email: "reader@example.com", firstName: "Reader", status: "active" });
+
+    const result = await subscribeAndUpsertSubscriber({
+      firstName: "Reader",
+      email: "reader@example.com",
+      source: "article_gate",
+      path: "/issue/test",
+    });
+
+    expect(ghlFns.submitSubscriberToGhl).toHaveBeenCalledWith({
+      firstName: "Reader",
+      email: "reader@example.com",
+      source: "article_gate",
+      path: "/issue/test",
+    });
+    expect(beehiivFns.submitSubscriberToBeehiiv).not.toHaveBeenCalled();
+    expect(serverFns.upsertSubscriber).toHaveBeenCalled();
+    expect(result.newlySubscribed).toBe(true);
+  });
+
+  it("does not create local access when the provider subscribe fails", async () => {
+    providerFns.getSubscriberProvider.mockReturnValue("ghl");
+    serverFns.findSubscriberByEmail.mockResolvedValue(null);
+    ghlFns.submitSubscriberToGhl.mockRejectedValue(new Error("GHL subscribe request failed."));
+
+    await expect(
+      subscribeAndUpsertSubscriber({
+        firstName: "Reader",
+        email: "reader@example.com",
+        source: "article_gate",
+        path: "/issue/test",
+      }),
+    ).rejects.toThrow("GHL subscribe request failed.");
+    expect(serverFns.upsertSubscriber).not.toHaveBeenCalled();
+    expect(emailFns.sendSubscriberWelcomeEmail).not.toHaveBeenCalled();
   });
 
   it("rejects OTP requests for unknown subscribers", async () => {

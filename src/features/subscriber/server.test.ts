@@ -58,7 +58,12 @@ import {
 describe("subscriber server", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // clearAllMocks keeps queued *Once values, which otherwise leak between tests.
+    prismaMock.prisma.subscriber.findUnique.mockReset();
+    beehiivMock.getBeehiivSubscriberStatus.mockReset();
+    beehiivMock.getBeehiivSubscriberStatus.mockResolvedValue({ status: "active", id: "beehiiv-default" });
     vi.stubEnv("SESSION_SECRET", "test-session-secret");
+    vi.stubEnv("SUBSCRIBER_PROVIDER", "");
   });
 
   afterEach(() => {
@@ -398,6 +403,32 @@ describe("subscriber server", () => {
       const result = await findSubscriberByEmail("reader@example.com");
 
       expect(result).toBeNull();
+    });
+  });
+
+  describe("findSubscriberByEmail with GHL as the provider", () => {
+    it("trusts the local record without calling Beehiiv", async () => {
+      vi.stubEnv("SUBSCRIBER_PROVIDER", "ghl");
+      prismaMock.prisma.subscriber.findUnique.mockResolvedValueOnce({
+        id: 12n,
+        email: "reader@example.com",
+        firstName: "Reader",
+        status: "active",
+        source: "article_gate",
+        subscribedAt: new Date("2026-04-03T12:00:00.000Z"),
+        lastSeenAt: null,
+        createdAt: new Date("2026-04-03T12:00:00.000Z"),
+        updatedAt: new Date("2026-04-03T12:00:00.000Z"),
+      });
+
+      const result = await findSubscriberByEmail("reader@example.com");
+
+      expect(result).toMatchObject({
+        id: 12,
+        email: "reader@example.com",
+        status: "active",
+      });
+      expect(beehiivMock.getBeehiivSubscriberStatus).not.toHaveBeenCalled();
     });
   });
 });
