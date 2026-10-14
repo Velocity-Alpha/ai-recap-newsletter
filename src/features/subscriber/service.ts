@@ -17,6 +17,8 @@ import {
   sendSubscriberWelcomeEmail,
 } from "@/src/features/subscriber/email";
 import { submitSubscriberToBeehiiv } from "@/src/features/subscriber/beehiiv";
+import { submitSubscriberToGhl } from "@/src/features/subscriber/ghl";
+import { getSubscriberProvider } from "@/src/features/subscriber/provider";
 import type { SubscriberRecord } from "@/src/features/subscriber/types";
 
 export class SubscriberError extends Error {
@@ -76,7 +78,11 @@ export async function subscribeAndUpsertSubscriber(input: {
     );
   }
 
-  await submitSubscriberToBeehiiv({
+  const submitToProvider = getSubscriberProvider() === "ghl"
+    ? submitSubscriberToGhl
+    : submitSubscriberToBeehiiv;
+
+  await submitToProvider({
     firstName: normalizedFirstName,
     email: normalizedEmail,
     source: input.source,

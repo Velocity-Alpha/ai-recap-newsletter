@@ -29,8 +29,9 @@ The app runs directly on Next.js in local development. No `netlify dev` proxy or
    - `SESSION_SECRET`
    - `RESEND_API_KEY`
    - `RESEND_FROM_EMAIL`
-   - `BEEHIIV_API_KEY`
-   - `BEEHIIV_PUBLICATION_ID`
+   - `SUBSCRIBER_PROVIDER` (`beehiiv` or `ghl`; defaults to `beehiiv`)
+   - `BEEHIIV_API_KEY` and `BEEHIIV_PUBLICATION_ID` when the provider is `beehiiv`
+   - `GHL_SUBSCRIBE_WEBHOOK_URL` when the provider is `ghl`
    - `GHL_UNSUBSCRIBE_WEBHOOK_SECRET`
    - `APPROVAL_PASSWORD`
    - `N8N_WEBHOOK_JWT_SECRET`
@@ -174,8 +175,9 @@ Required environment variables:
 - `RESEND_API_KEY`
 - `RESEND_FROM_NAME`
 - `RESEND_FROM_EMAIL`
-- `BEEHIIV_API_KEY`
-- `BEEHIIV_PUBLICATION_ID`
+- `SUBSCRIBER_PROVIDER` — `beehiiv` (default) or `ghl`. Picks which list the subscribe form writes to; in `beehiiv` mode, sign-in also checks the reader is still active in Beehiiv
+- `BEEHIIV_API_KEY` and `BEEHIIV_PUBLICATION_ID` when the provider is `beehiiv`
+- `GHL_SUBSCRIBE_WEBHOOK_URL` when the provider is `ghl`
 - `GHL_UNSUBSCRIBE_WEBHOOK_SECRET`
 - `APPROVAL_PASSWORD`
 - `N8N_WEBHOOK_JWT_SECRET`
