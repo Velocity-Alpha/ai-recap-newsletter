@@ -78,7 +78,8 @@ export async function subscribeAndUpsertSubscriber(input: {
     );
   }
 
-  const submitToProvider = getSubscriberProvider() === "ghl"
+  const provider = getSubscriberProvider();
+  const submitToProvider = provider === "ghl"
     ? submitSubscriberToGhl
     : submitSubscriberToBeehiiv;
 
@@ -96,9 +97,12 @@ export async function subscribeAndUpsertSubscriber(input: {
     status: "active",
   });
 
-  Promise.resolve(sendSubscriberWelcomeEmail({ email: normalizedEmail })).catch((err) => {
-    console.error("[subscriber] welcome_email.failed", { email: normalizedEmail, err });
-  });
+  // In GHL mode the GHL workflow sends the welcome email, so skip ours to avoid a duplicate.
+  if (provider !== "ghl") {
+    Promise.resolve(sendSubscriberWelcomeEmail({ email: normalizedEmail })).catch((err) => {
+      console.error("[subscriber] welcome_email.failed", { email: normalizedEmail, err });
+    });
+  }
 
   return {
     subscriber,

@@ -175,7 +175,7 @@ Required environment variables:
 - `RESEND_API_KEY`
 - `RESEND_FROM_NAME`
 - `RESEND_FROM_EMAIL`
-- `SUBSCRIBER_PROVIDER` — `beehiiv` (default) or `ghl`. Picks which list the subscribe form writes to; in `beehiiv` mode, sign-in also checks the reader is still active in Beehiiv
+- `SUBSCRIBER_PROVIDER` — `beehiiv` (default) or `ghl`. Picks which list the subscribe form writes to; in `beehiiv` mode, sign-in also checks the reader is still active in Beehiiv; in `ghl` mode the welcome email is left to the GHL workflow (sign-in codes still go through Resend)
 - `BEEHIIV_API_KEY` and `BEEHIIV_PUBLICATION_ID` when the provider is `beehiiv`
 - `GHL_SUBSCRIBE_WEBHOOK_URL` when the provider is `ghl`
 - `GHL_UNSUBSCRIBE_WEBHOOK_SECRET`
