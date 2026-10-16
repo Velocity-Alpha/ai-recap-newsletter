@@ -139,6 +139,21 @@ describe("subscriber service", () => {
     expect(result.newlySubscribed).toBe(true);
   });
 
+  it("leaves the welcome email to GHL when GHL is the provider", async () => {
+    providerFns.getSubscriberProvider.mockReturnValue("ghl");
+    serverFns.findSubscriberByEmail.mockResolvedValue(null);
+    serverFns.upsertSubscriber.mockResolvedValue({ id: 4, email: "reader@example.com", firstName: "Reader", status: "active" });
+
+    await subscribeAndUpsertSubscriber({
+      firstName: "Reader",
+      email: "reader@example.com",
+      source: "article_gate",
+      path: "/issue/test",
+    });
+
+    expect(emailFns.sendSubscriberWelcomeEmail).not.toHaveBeenCalled();
+  });
+
   it("does not create local access when the provider subscribe fails", async () => {
     providerFns.getSubscriberProvider.mockReturnValue("ghl");
     serverFns.findSubscriberByEmail.mockResolvedValue(null);
