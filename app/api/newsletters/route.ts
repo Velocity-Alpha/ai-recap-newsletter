@@ -1,4 +1,4 @@
-import { getCachedNewsletterListPage } from "@/src/features/newsletter/server";
+import { fetchNewsletterListPage } from "@/src/features/newsletter/repository";
 import {
   createRequestLogContext,
   jsonWithRequestId,
@@ -27,7 +27,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const page = parsePageParam(searchParams.get("page"));
     const limit = parseLimitParam(searchParams.get("limit"));
-    const { data, pagination } = await getCachedNewsletterListPage(page, limit);
+    const { data, pagination } = await fetchNewsletterListPage(page, limit);
 
     logRequestSuccess(requestContext, {
       page,
@@ -47,7 +47,7 @@ export async function GET(request: Request) {
       },
       {
         headers: {
-          "Cache-Control": "public, max-age=3600, stale-while-revalidate=300",
+          "Cache-Control": "no-store",
         },
       },
     );

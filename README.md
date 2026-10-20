@@ -164,6 +164,8 @@ Public unsubscribe page:
 - The repository layer mixes Prisma model queries with Prisma-backed raw SQL for the complex ticker and archive queries.
 - Route handlers under `app/api` provide the public JSON interface.
 
+The homepage, archive, and `GET /api/newsletters` read fresh issue lists on every request so new publications appear on the next page load. The list API sends `Cache-Control: no-store`. Individual issue lookups and sitemap entries retain their one-hour data caches, and the ticker retains its five-minute data cache.
+
 ## Deploying to Netlify
 
 This repository stays on Netlify, but it no longer uses hand-written Netlify Functions. Netlify deploys the Next.js app and its App Router route handlers directly.

@@ -4,14 +4,14 @@ import Features from '@/src/components/Features'
 import RecentNewslettersPreview from '@/src/components/RecentNewslettersPreview'
 import SubscribeNewsletter from '@/src/components/SubscribeNewsletter'
 import Footer from '@/src/components/Footer'
-import { getSafeCachedNewsletterListPage, getSafeCachedTickerFeed } from '@/src/features/newsletter/server'
+import { getSafeNewsletterListPage, getSafeCachedTickerFeed } from '@/src/features/newsletter/server'
 import { hasActiveSubscriberSession } from '@/src/features/subscriber/server'
 import React from 'react'
 
 export default async function HomePage() {
   const [isSignedIn, newsletterPage, tickerFeed] = await Promise.all([
     hasActiveSubscriberSession(),
-    getSafeCachedNewsletterListPage(1, 6),
+    getSafeNewsletterListPage(1, 6),
     getSafeCachedTickerFeed(),
   ])
   const showSubscribe = !isSignedIn

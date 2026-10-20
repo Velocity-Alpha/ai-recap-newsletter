@@ -25,12 +25,6 @@ export const getCachedNewsletterIssueApiResponseBySlug = unstable_cache(
   { revalidate: 3600 },
 );
 
-export const getCachedNewsletterListPage = unstable_cache(
-  async (page: number, limit: number) => fetchNewsletterListPage(page, limit),
-  ["newsletter-list-page"],
-  { revalidate: 3600 },
-);
-
 export const getCachedPublishedNewsletterEntries = unstable_cache(
   async () => fetchPublishedNewsletterEntries(),
   ["newsletter-published-entries"],
@@ -43,9 +37,9 @@ export const getCachedTickerFeed = unstable_cache(
   { revalidate: 300 },
 );
 
-export async function getSafeCachedNewsletterListPage(page: number, limit: number): Promise<NewsletterListPage> {
+export async function getSafeNewsletterListPage(page: number, limit: number): Promise<NewsletterListPage> {
   try {
-    return await getCachedNewsletterListPage(page, limit);
+    return await fetchNewsletterListPage(page, limit);
   } catch {
     return {
       data: [],
