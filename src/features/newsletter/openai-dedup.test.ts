@@ -145,7 +145,7 @@ describe("openai-dedup", () => {
     it("returns failed status when response status is failed", async () => {
       clientMock.responses.retrieve.mockResolvedValue({
         status: "failed",
-        error: "Model error: timeout",
+        error: { code: "server_error", message: "Model error: timeout" },
       });
 
       const result = await checkDeduplicationStatus("resp_123");
@@ -157,7 +157,7 @@ describe("openai-dedup", () => {
       expect(logMock.logServerError).toHaveBeenCalledWith(
         "openai.response.status.failed",
         expect.any(Error),
-        expect.objectContaining({ openaiError: "Model error: timeout" })
+        expect.objectContaining({ openaiError: { code: "server_error", message: "Model error: timeout" } })
       );
     });
 
@@ -175,7 +175,7 @@ describe("openai-dedup", () => {
     it("returns failed status when response status is cancelled", async () => {
       clientMock.responses.retrieve.mockResolvedValue({
         status: "cancelled",
-        error: "User cancelled",
+        error: { code: "server_error", message: "User cancelled" },
       });
 
       const result = await checkDeduplicationStatus("resp_123");
@@ -184,21 +184,22 @@ describe("openai-dedup", () => {
       expect(result.error).toBe("User cancelled");
     });
 
-    it("returns failed status when response is expired", async () => {
+    it("stops polling when the response is incomplete", async () => {
       clientMock.responses.retrieve.mockResolvedValue({
-        status: "expired",
+        status: "incomplete",
+        incomplete_details: { reason: "max_output_tokens" },
       });
 
       const result = await checkDeduplicationStatus("resp_123");
 
       expect(result).toEqual({
         status: "failed",
-        error: "Deduplication response expired before completion.",
+        error: "Deduplication returned an incomplete response.",
       });
       expect(logMock.logServerError).toHaveBeenCalledWith(
-        "openai.response.status.expired",
+        "openai.response.status.incomplete",
         expect.any(Error),
-        expect.any(Object)
+        expect.objectContaining({ reason: "max_output_tokens" })
       );
     });
 

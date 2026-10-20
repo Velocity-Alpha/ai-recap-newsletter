@@ -92,7 +92,7 @@ ${JSON.stringify({
 })}`;
 
   // Submit to Responses API in background mode for async processing
-  const response = await (client.responses as any).create({
+  const response = await client.responses.create({
     model: "gpt-4o-mini",
     instructions:
       "You identify duplicate news stories by comparing the underlying event being reported. Return only valid JSON.",
@@ -140,7 +140,7 @@ export async function checkDeduplicationStatus(
   result?: DeduplicationResult;
   error?: string;
 }> {
-  const response = await (client.responses as any).retrieve(responseId);
+  const response = await client.responses.retrieve(responseId);
 
   logServerInfo("openai.response.status.check", {
     responseId,
@@ -184,14 +184,18 @@ export async function checkDeduplicationStatus(
 
   // Handle failure states
   if (response.status === "failed" || response.status === "cancelled") {
-    const errorMsg = response.error || "Response generation failed";
+    const errorMsg = response.error?.message || "Response generation failed";
     logServerError("openai.response.status.failed", new Error(errorMsg), { responseId, openaiError: response.error });
     return { status: "failed", error: errorMsg };
   }
 
-  if (response.status === "expired") {
-    logServerError("openai.response.status.expired", new Error("Deduplication response expired before completion."), { responseId });
-    return { status: "failed", error: "Deduplication response expired before completion." };
+  if (response.status === "incomplete") {
+    const errorMsg = "Deduplication returned an incomplete response.";
+    logServerError("openai.response.status.incomplete", new Error(errorMsg), {
+      responseId,
+      reason: response.incomplete_details?.reason,
+    });
+    return { status: "failed", error: errorMsg };
   }
 
   // Any other unknown status — treat as still pending

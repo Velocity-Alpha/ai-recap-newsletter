@@ -73,6 +73,11 @@ function ErrorState({ message }: { message: string }) {
 function ApprovalPageContent() {
   const searchParams = useSearchParams();
   const dateKey = parseDateKey(searchParams.get("date"));
+
+  return <ApprovalPageForDate key={dateKey} dateKey={dateKey} />;
+}
+
+function ApprovalPageForDate({ dateKey }: { dateKey: string }) {
   const [outlineData, setOutlineData] = useState<ApprovalOutlineData | null>(null);
   const [isDedupPending, setIsDedupPending] = useState(false);
   const [dedupFailureReason, setDedupFailureReason] = useState<string | null>(null);
@@ -137,17 +142,15 @@ function ApprovalPageContent() {
   useEffect(() => {
     let active = true;
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
-    setIsDedupPending(false);
-    setDedupFailureReason(null);
-    setError(null);
-    setOutlineData(null);
 
     const cached = readApprovalOutlineCache(dateKey);
     if (cached) {
       queueMicrotask(() => {
-        setOutlineData(cached);
+        if (active) setOutlineData(cached);
       });
-      return;
+      return () => {
+        active = false;
+      };
     }
 
     console.log("[approval:cache] miss - fetching outline from API", { dateKey });

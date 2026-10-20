@@ -1,5 +1,5 @@
 import { prisma } from "@/src/server/prisma";
-import { logServerError, logServerInfo } from "@/src/server/observability";
+import { logServerInfo } from "@/src/server/observability";
 import { CANDIDATE_SECTION_CONFIGS, type SectionKey } from "@/src/features/newsletter/section-config";
 
 interface StoryRecord {
@@ -49,20 +49,6 @@ interface ApprovalOutlineData {
   >;
   selected_story_ids: number[];
 }
-
-type RawStoryRow = {
-  id: number;
-  guid: string | null;
-  day: Date | string | null;
-  headline: string | null;
-  url: string | null;
-  summary: string | null;
-  category: string | null;
-  source: string | null;
-  story_details: string | null;
-  importance_score: number | null;
-  paywall_detected: string | null;
-};
 
 function normalizePaywallDetected(value: string | null | undefined): "yes" | "no" | "unknown" | "error" {
   const normalized = String(value ?? "").toLowerCase().trim();
@@ -251,25 +237,6 @@ function toReferenceStory(story: StoryRecord): ReferenceStory {
     error: story.error,
     headline: cleanText(story.headline) || "Untitled story",
     summary: cleanText(story.summary),
-  };
-}
-
-/**
- * Normalizes raw Prisma SQL rows into the service's internal story type.
- */
-function toStoryRecord(row: RawStoryRow): StoryRecord {
-  return {
-    id: Number(row.id),
-    guid: row.guid,
-    day: row.day,
-    headline: row.headline,
-    summary: row.summary,
-    story_details: row.story_details,
-    category: row.category,
-    source: row.source,
-    url: row.url,
-    importance_score: row.importance_score,
-    paywall_detected: normalizePaywallDetected(row.paywall_detected),
   };
 }
 
