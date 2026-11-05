@@ -13,3 +13,5 @@ netlify/
 netlify/deno.lock
 # Developer-local MCP config
 .mcp.json
+# Trigger.dev local build output
+.trigger
