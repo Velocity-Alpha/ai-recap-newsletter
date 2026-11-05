@@ -27,6 +27,7 @@
     "@prisma/adapter-pg": "^7.6.0",
     "@prisma/client": "^7.6.0",
     "@radix-ui/react-slot": "^1.2.3",
+    "@trigger.dev/sdk": "^4.8.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "framer-motion": "^12.35.2",
@@ -41,6 +42,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@trigger.dev/build": "^4.8.3",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^18",
     "@types/pg": "^8.20.0",
