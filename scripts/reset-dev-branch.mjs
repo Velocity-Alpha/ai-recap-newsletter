@@ -54,6 +54,12 @@ export function buildScrubStatements(fakeSubscribers) {
   ];
 }
 
+// Neon connection strings use sslmode=require. Asking for verify-full keeps today's pg behaviour
+// (full certificate checks) and avoids pg's warning that require will get weaker in pg v9.
+export function withVerifiedTls(connectionString) {
+  return connectionString.replace(/([?&])sslmode=require(?=&|$)/, "$1sslmode=verify-full");
+}
+
 export const SCRUB_CHECK_SQL = `
   SELECT
     (SELECT count(*) FROM newsletter.auth_codes)::int AS auth_codes,
@@ -104,7 +110,7 @@ async function main() {
   if (role) connectionArgs.push("--role-name", role);
   if (database) connectionArgs.push("--database-name", database);
   // The connection string holds a password. It is used here and never printed.
-  const connectionString = neonctl(connectionArgs).trim();
+  const connectionString = withVerifiedTls(neonctl(connectionArgs).trim());
 
   const client = new pg.Client({ connectionString });
   await client.connect();

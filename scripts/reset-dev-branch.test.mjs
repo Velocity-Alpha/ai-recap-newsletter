@@ -5,6 +5,7 @@ import {
   assertSafeReset,
   buildScrubStatements,
   checkScrubResult,
+  withVerifiedTls,
 } from "./reset-dev-branch.mjs";
 
 const production = { id: "br-prod", name: "production", default: true, protected: false, parent_id: null };
@@ -75,6 +76,20 @@ describe("FAKE_SUBSCRIBERS", () => {
       expect(subscriber.email).toMatch(/@example\.com$/);
       expect(["active", "unsubscribed"]).toContain(subscriber.status);
     }
+  });
+});
+
+describe("withVerifiedTls", () => {
+  it("asks for full certificate checks instead of sslmode=require", () => {
+    expect(withVerifiedTls("postgresql://u:p@host/db?sslmode=require&channel_binding=require")).toBe(
+      "postgresql://u:p@host/db?sslmode=verify-full&channel_binding=require",
+    );
+  });
+
+  it("leaves other connection strings unchanged", () => {
+    expect(withVerifiedTls("postgresql://u:p@host/db?sslmode=verify-full")).toBe(
+      "postgresql://u:p@host/db?sslmode=verify-full",
+    );
   });
 });
 
