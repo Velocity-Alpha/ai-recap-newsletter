@@ -6,6 +6,17 @@ first for how the system works today.
 This doc is the design reference. **The work queue lives in GitHub issues**: one parent issue per phase,
 with sub-issues for each task. Each sub-issue has acceptance criteria and a rollback.
 
+| Phase | Parent issue |
+|---|---|
+| 0. First security fix | #35 |
+| 1. Foundation | #36 |
+| 2. Better approval board proposals | #37 |
+| 3. Native publish detection | #38 |
+| 4. Native newsletter ingestion | #39 |
+| 5. Native drafting | #40 |
+| 6. Retire n8n | #41 |
+| Later (unscheduled) | #42 |
+
 The plan moves the AI Recap backend out of n8n one piece at a time. The newsletter keeps going out every
 weekday during the whole migration. There is no big-bang launch. At every step, one system owns each
 stage in production, the old path stays ready as a fallback, and a switch moves ownership back in minutes.
