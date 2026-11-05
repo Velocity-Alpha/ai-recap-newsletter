@@ -290,9 +290,17 @@ export async function fetchLastPublishedIssueDateOnOrBefore(
   };
 }
 
+// Public issue lookups return published issues only. The query filters on published_at, and this
+// check backs it up so a future query change cannot expose an unpublished issue.
+function toPublishedIssueApiResponse(
+  record: Parameters<typeof mapIssueRecord>[0] | null,
+): NewsletterIssueApiResponse | null {
+  return record?.publishedAt ? mapIssueRecord(record) : null;
+}
+
 export async function fetchNewsletterIssueApiResponseById(id: number): Promise<NewsletterIssueApiResponse | null> {
   const record = await prisma.issue.findUnique({
-    where: { id: BigInt(id) },
+    where: { id: BigInt(id), publishedAt: { not: null } },
     select: {
       id: true,
       slug: true,
@@ -305,12 +313,12 @@ export async function fetchNewsletterIssueApiResponseById(id: number): Promise<N
     },
   });
 
-  return record ? mapIssueRecord(record) : null;
+  return toPublishedIssueApiResponse(record);
 }
 
 export async function fetchNewsletterIssueApiResponseBySlug(slug: string): Promise<NewsletterIssueApiResponse | null> {
   const record = await prisma.issue.findUnique({
-    where: { slug },
+    where: { slug, publishedAt: { not: null } },
     select: {
       id: true,
       slug: true,
@@ -323,7 +331,7 @@ export async function fetchNewsletterIssueApiResponseBySlug(slug: string): Promi
     },
   });
 
-  return record ? mapIssueRecord(record) : null;
+  return toPublishedIssueApiResponse(record);
 }
 
 export async function fetchTickerFeed(): Promise<TickerFeed> {

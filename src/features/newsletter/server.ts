@@ -13,15 +13,17 @@ import {
   fetchTickerFeed,
 } from "@/src/features/newsletter/repository";
 
+// The "published-" key prefix keeps entries cached before lookups were limited to published issues
+// from being reused.
 export const getCachedNewsletterIssueApiResponseById = unstable_cache(
   async (id: number) => fetchNewsletterIssueApiResponseById(id),
-  ["newsletter-issue-by-id"],
+  ["published-newsletter-issue-by-id"],
   { revalidate: 3600 },
 );
 
 export const getCachedNewsletterIssueApiResponseBySlug = unstable_cache(
   async (slug: string) => fetchNewsletterIssueApiResponseBySlug(slug),
-  ["newsletter-issue-by-slug"],
+  ["published-newsletter-issue-by-slug"],
   { revalidate: 3600 },
 );
 

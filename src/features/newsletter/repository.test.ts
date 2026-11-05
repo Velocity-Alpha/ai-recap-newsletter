@@ -147,6 +147,38 @@ describe("newsletter repository", () => {
     await expect(fetchNewsletterIssueApiResponseBySlug("missing-issue")).resolves.toBeNull();
   });
 
+  it("asks the database for published issues only", async () => {
+    prismaMock.issue.findUnique.mockResolvedValue(null);
+
+    await fetchNewsletterIssueApiResponseById(7);
+    await fetchNewsletterIssueApiResponseBySlug("issue-7");
+
+    expect(prismaMock.issue.findUnique).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ where: { id: 7n, publishedAt: { not: null } } }),
+    );
+    expect(prismaMock.issue.findUnique).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ where: { slug: "issue-7", publishedAt: { not: null } } }),
+    );
+  });
+
+  it("returns null for an unpublished issue even if the database returns one", async () => {
+    prismaMock.issue.findUnique.mockResolvedValue({
+      id: 8n,
+      slug: "issue-8",
+      title: "Issue 8",
+      excerpt: null,
+      featureImageUrl: null,
+      contentJson: null,
+      issueDate: null,
+      publishedAt: null,
+    });
+
+    await expect(fetchNewsletterIssueApiResponseById(8)).resolves.toBeNull();
+    await expect(fetchNewsletterIssueApiResponseBySlug("issue-8")).resolves.toBeNull();
+  });
+
   it("maps issue lookups by id and slug", async () => {
     prismaMock.issue.findUnique
       .mockResolvedValueOnce({
