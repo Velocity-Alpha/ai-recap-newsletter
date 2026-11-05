@@ -1,0 +1,13 @@
+{
+  "extraKnownMarketplaces": {
+    "neon": {
+      "source": {
+        "source": "github",
+        "repo": "neondatabase/agent-skills"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "neon-postgres@neon": true
+  }
+}
