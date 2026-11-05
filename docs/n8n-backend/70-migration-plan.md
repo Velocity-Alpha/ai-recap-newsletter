@@ -160,7 +160,7 @@ src/pipeline/
   notify/             # Telegram ops bot + email, dedup, severity routing
   side-effects/       # GHL, S3, review group; dry-run outside production
   settings.ts         # stage owners + thresholds from pipeline_settings
-trigger/              # Trigger.dev task definitions; thin wrappers around src/pipeline
+src/trigger/          # Trigger.dev task definitions; thin wrappers around src/pipeline
 app/admin/...         # admin pages
 ```
 
