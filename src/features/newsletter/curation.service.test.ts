@@ -17,8 +17,49 @@ vi.mock("@/src/server/observability", () => ({
 
 import {
   cleanText,
+  createDedupedOutline,
   createOutlineCandidateStories,
 } from "@/src/features/newsletter/curation.service";
+
+const OUTLINE_DATE = new Date("2026-06-09T00:00:00.000Z");
+
+// Text has no ranking keywords, so importance alone sets the order: lower id ranks higher.
+function candidateRow(id: number, category: string) {
+  return {
+    id,
+    guid: `guid-${id}`,
+    day: new Date("2026-06-08T00:00:00.000Z"),
+    paywallDetected: null,
+    error: null,
+    headline: `Item ${id}`,
+    url: `https://example.com/${id}`,
+    summary: `Text ${id}`,
+    category,
+    source: "source",
+    storyDetails: null,
+    importanceScore: 100 - id,
+  };
+}
+
+function range(from: number, to: number): number[] {
+  return Array.from({ length: to - from + 1 }, (_, i) => from + i);
+}
+
+// 14 general (1–14), 7 research (21–27), 6 tools (31–36).
+const POOL_ROWS = [
+  ...range(1, 14).map((id) => candidateRow(id, "general")),
+  ...range(21, 27).map((id) => candidateRow(id, "research")),
+  ...range(31, 36).map((id) => candidateRow(id, "tools")),
+];
+const POOL_IDS = POOL_ROWS.map((row) => row.id);
+
+function selectedIds(
+  outline: Awaited<ReturnType<typeof createDedupedOutline>>,
+  key: string
+): number[] {
+  const section = outline.candidate_sections.find((s) => s.key === key);
+  return section ? section.selected.map((story) => story.id) : [];
+}
 
 describe("newsletter curation", () => {
   beforeEach(() => {
@@ -98,6 +139,85 @@ describe("newsletter curation", () => {
       paywall_detected: "unknown",
       headline: "Story without publication date",
       summary: "Summary",
+    });
+  });
+
+  describe("createDedupedOutline", () => {
+    it("refills slots the duplicate check empties with the next-ranked kept stories", async () => {
+      findManyMock.mockResolvedValueOnce([]).mockResolvedValueOnce(POOL_ROWS);
+      const removed = new Set([1, 2, 21, 31]);
+
+      const outline = await createDedupedOutline(
+        OUTLINE_DATE,
+        POOL_IDS.filter((id) => !removed.has(id))
+      );
+
+      expect(selectedIds(outline, "headlines")).toEqual([3, 4, 5]);
+      expect(selectedIds(outline, "research")).toEqual([22, 23, 24, 25]);
+      expect(selectedIds(outline, "tools")).toEqual([32, 33, 34]);
+      expect(selectedIds(outline, "quickHits")).toEqual([9, 10, 11, 12, 13, 14]);
+      expect(outline.selected_story_ids).toHaveLength(16);
+    });
+
+    it("never shows a story the duplicate check removed", async () => {
+      findManyMock.mockResolvedValueOnce([]).mockResolvedValueOnce(POOL_ROWS);
+      const removed = [1, 2, 21, 31];
+
+      const outline = await createDedupedOutline(
+        OUTLINE_DATE,
+        POOL_IDS.filter((id) => !removed.includes(id))
+      );
+
+      const shownIds = outline.candidate_sections.flatMap((section) =>
+        [...section.selected, ...section.fill_ins].map((story) => story.id)
+      );
+      for (const id of removed) {
+        expect(shownIds).not.toContain(id);
+        expect(outline.candidate_map).not.toHaveProperty(String(id));
+        expect(outline.selected_story_ids).not.toContain(id);
+      }
+    });
+
+    it("fills Quick Hits before Top Story fill-ins when general stories run short", async () => {
+      findManyMock.mockResolvedValueOnce([]).mockResolvedValueOnce(POOL_ROWS);
+      const keptGeneral = range(1, 10);
+
+      const outline = await createDedupedOutline(OUTLINE_DATE, [
+        ...keptGeneral,
+        ...range(21, 27),
+        ...range(31, 36),
+      ]);
+      const headlines = outline.candidate_sections.find((s) => s.key === "headlines")!;
+
+      expect(selectedIds(outline, "headlines")).toEqual([1, 2, 3]);
+      expect(headlines.fill_ins.map((story) => story.id)).toEqual([4]);
+      expect(selectedIds(outline, "quickHits")).toEqual([5, 6, 7, 8, 9, 10]);
+    });
+
+    it("keeps today's layout when there are enough general stories", async () => {
+      findManyMock.mockResolvedValueOnce([]).mockResolvedValueOnce(POOL_ROWS);
+
+      const outline = await createDedupedOutline(OUTLINE_DATE, POOL_IDS);
+      const headlines = outline.candidate_sections.find((s) => s.key === "headlines")!;
+      const quickHits = outline.candidate_sections.find((s) => s.key === "quickHits")!;
+
+      expect(selectedIds(outline, "headlines")).toEqual([1, 2, 3]);
+      expect(headlines.fill_ins.map((story) => story.id)).toEqual([4, 5, 6]);
+      expect(selectedIds(outline, "quickHits")).toEqual([7, 8, 9, 10, 11, 12]);
+      expect(quickHits.fill_ins.map((story) => story.id)).toEqual([13, 14]);
+    });
+
+    it("leaves a section short only when its kept pool runs out", async () => {
+      findManyMock.mockResolvedValueOnce([]).mockResolvedValueOnce(POOL_ROWS);
+      const removedResearch = [21, 22, 23, 24, 25];
+
+      const outline = await createDedupedOutline(
+        OUTLINE_DATE,
+        POOL_IDS.filter((id) => !removedResearch.includes(id))
+      );
+
+      expect(selectedIds(outline, "research")).toEqual([26, 27]);
+      expect(selectedIds(outline, "headlines")).toEqual([1, 2, 3]);
     });
   });
 });

@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { 
-  createOutlineCandidateStories,
-} from "@/src/features/newsletter/curation.service";
+import { createDedupedOutline } from "@/src/features/newsletter/curation.service";
 import { checkDeduplicationStatus } from "@/src/features/newsletter/openai-dedup";
 import { hasValidApprovalSession } from "@/src/server/approval-auth";
 import { logServerError, logServerInfo } from "@/src/server/observability";
@@ -55,49 +53,18 @@ export async function GET(request: Request) {
       );
     }
 
-    // Handle completion
+    // Handle completion: rebuild the board from kept stories so emptied slots refill.
     if (responseStatus.status === "completed" && responseStatus.result) {
-      // Rebuild outline with deduped story IDs
-      const { outline: baseOutline } = 
-        await createOutlineCandidateStories(date);
+      const keptStoryIds = responseStatus.result.kept_story_ids || [];
+      const outline = await createDedupedOutline(date, keptStoryIds);
 
-      const keptStoryIds = new Set<number>(responseStatus.result.kept_story_ids || []);
-
-      // Filter candidate_sections to only include kept stories
-      const deduped_sections = baseOutline.candidate_sections.map((section) => ({
-        ...section,
-        selected: section.selected.filter((s) => keptStoryIds.has(s.id)),
-        fill_ins: section.fill_ins.filter((s) => keptStoryIds.has(s.id)),
-      }));
-
-      // Remove any stories from candidate_map that were deduped
-      const deduped_map: Record<string, typeof baseOutline.candidate_map[string]> = {};
-      for (const [key, story] of Object.entries(baseOutline.candidate_map)) {
-        const id = parseInt(key, 10);
-        if (keptStoryIds.has(id)) {
-          deduped_map[key] = story;
-        }
-      }
-
-      const deduped_selected_ids = baseOutline.selected_story_ids.filter((id) =>
-        keptStoryIds.has(id)
-      );
-
-      logServerInfo("approval.outline.status.completed", { 
+      logServerInfo("approval.outline.status.completed", {
         responseId,
-        keptCount: keptStoryIds.size,
-        totalCount: baseOutline.selected_story_ids.length,
+        keptCount: keptStoryIds.length,
+        selectedCount: outline.selected_story_ids.length,
       });
 
-      return NextResponse.json({
-        status: "completed",
-        outline: {
-          reference_stories: baseOutline.reference_stories,
-          candidate_sections: deduped_sections,
-          candidate_map: deduped_map,
-          selected_story_ids: deduped_selected_ids,
-        },
-      });
+      return NextResponse.json({ status: "completed", outline });
     }
 
     logServerError("approval.outline.status.unknown_state", responseStatus, { responseId });
