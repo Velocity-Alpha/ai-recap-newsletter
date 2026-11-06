@@ -68,8 +68,11 @@ The app runs directly on Next.js in local development. No `netlify dev` proxy or
    ```bash
    npm run verify
    ```
+   `npm install` turns on a git pre-push hook (`.githooks/pre-push`) that runs it for you and stops the push if it fails. Skip it once with `git push --no-verify`.
 
 `npm run verify` runs lint, tests, and a production build in sequence.
+
+Netlify bills the team in credits (Free plan: 300 a month). Deploy previews and failed builds use none. Each merge to `main` starts a production deploy, which uses 15 credits, so merge in batches when you can. When the credits run out, Netlify pauses the site until the next billing cycle.
 
 ## Prisma workflow
 

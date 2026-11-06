@@ -1,0 +1,22 @@
+#!/bin/sh
+# Runs the checks Netlify's build would run (lint, tests, build) before a push leaves
+# this machine, so a broken branch fails here instead of in a Netlify build.
+# Skip once, only when you know why: git push --no-verify
+set -eu
+
+# Git sends one line per ref: <local ref> <local sha> <remote ref> <remote sha>.
+# An all-zero local sha means the ref is being deleted, so there is nothing to check.
+needs_check=false
+while read -r _local_ref local_sha _remote_ref _remote_sha; do
+  case "$local_sha" in
+    *[!0]*) needs_check=true ;;
+  esac
+done
+
+if [ "$needs_check" = false ]; then
+  exit 0
+fi
+
+echo "pre-push: running npm run verify (lint, tests, build). Skip once with --no-verify."
+# Build as a deploy preview does. A value that is already set wins.
+APP_ENV="${APP_ENV:-preview}" npm run verify
