@@ -9,6 +9,7 @@
     "lint": "eslint",
     "test": "vitest run",
     "verify": "npm run lint && npm test && npm run build",
+    "prepare": "git config core.hooksPath .githooks || true",
     "postinstall": "prisma generate",
     "prisma:generate": "prisma generate",
     "prisma:pull": "prisma db pull",
