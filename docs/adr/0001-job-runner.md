@@ -20,7 +20,7 @@ The plan picked Trigger.dev Free, with Inngest Free inside the Netlify app as th
 |---|---|
 | Prisma 7 read and write on the Neon `dev` branch, Trigger.dev Dev | **Pass.** `db-smoke` read 187 issues and the latest published issue, and upserted `scraper_bookmarks.trigger_smoke_test` on `dev`. 450 ms compute. The row exists on `dev` and not on production. No Prisma build extension needed: the generated Prisma 7 client embeds its query compiler as WebAssembly and bundles as-is. |
 | `wait.for` of 3 minutes or more | **Pass in Dev.** `wait-probe` waited 181.7 s. The run took 182.6 s of wall clock but 189 ms of compute, under a 60 s `maxDuration` cap. A wait does not count as compute. Production billing (`costInCents`) is still unchecked because of the deploy block. |
-| Schedule in `America/New_York` | **Pending.** `ny-schedule-probe` runs at 11:45 New York (16:45 UTC in winter). |
+| Schedule in `America/New_York` | **Pass in Dev.** `ny-schedule-probe` (`45 11 * * *`, `window: "0m"`) was due at 16:45:00 UTC, which is 11:45 New York (GMT-5). It started 17 s later and ran for 18 ms. The next fires it listed are 11:45 New York on Nov 7 and Nov 8. A daylight-saving change was not tested; the next one is 2027-03-14. |
 | Same task deployed to Production, reading production | **Blocked.** `trigger.dev deploy --env prod` uploads, then fails: "Deployments are not available for this organization." The dashboard gives no reason. |
 
 ## Findings that change the design
@@ -31,13 +31,13 @@ The plan picked Trigger.dev Free, with Inngest Free inside the Netlify app as th
 ## Decision (proposed)
 
 Keep Trigger.dev Free, provided Production deploys are unblocked by 2026-11-09. Then:
-- Finish the production half of this test: production read, New York schedule, wait billing.
+- Finish the production half of this test: production read, one New York schedule fire, wait billing.
 - Give the pipeline its own least-privilege Postgres role.
 - Set `window: "0m"` on every schedule.
 
 If deploys are still blocked on 2026-11-09, switch to Inngest Free inside the Netlify app. That follows the plan's rollback. Its known costs:
 - every AI call must go through `step.ai.infer` or `step.fetch` to get around Netlify's 60 s limit;
-- runs use the website's Netlify credits.
+- runs use the website's Netlify credits (Free plan: 300 a month, shared with production deploys at 15 each and the site's own compute).
 
 ## Open
 
