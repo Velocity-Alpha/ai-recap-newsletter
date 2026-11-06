@@ -30,12 +30,12 @@ The plan picked Trigger.dev Free, with Inngest Free inside the Netlify app as th
 
 ## Decision (proposed)
 
-Keep Trigger.dev Free, provided Production deploys are unblocked by 2026-11-09. Then:
+Keep Trigger.dev Free. On 2026-11-06 the owner chose to keep it while support looks at the deploy block, with no fixed switch date. Once deploys work:
 - Finish the production half of this test: production read, one New York schedule fire, wait billing.
 - Give the pipeline its own least-privilege Postgres role.
 - Set `window: "0m"` on every schedule.
 
-If deploys are still blocked on 2026-11-09, switch to Inngest Free inside the Netlify app. That follows the plan's rollback. Its known costs:
+Inngest Free inside the Netlify app stays the fallback, but only if the owner decides to switch. Until then, work that does not need Production tasks goes first. Inngest's known costs:
 - every AI call must go through `step.ai.infer` or `step.fetch` to get around Netlify's 60 s limit;
 - runs use the website's Netlify credits (Free plan: 300 a month, shared with production deploys at 15 each and the site's own compute).
 
