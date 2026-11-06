@@ -1,6 +1,7 @@
 import { prisma } from "@/src/server/prisma";
 import { logServerInfo } from "@/src/server/observability";
 import { CANDIDATE_SECTION_CONFIGS, type SectionKey } from "@/src/features/newsletter/section-config";
+import { storyUrlKey } from "@/src/features/newsletter/story-url";
 
 export interface StoryRecord {
   id: number;
@@ -640,6 +641,75 @@ export function buildApprovalOutline(
 }
 
 /**
+ * Loads the cleaned URLs of candidates that already ran in a published issue,
+ * in an issue before the requested date.
+ */
+async function getPublishedUrlKeys(
+  date: Date,
+  candidates: ProcessedStory[]
+): Promise<Set<string>> {
+  // Stored URLs are already cleaned, but a few keep a trailing slash or a
+  // query, so look up the raw and slash forms too.
+  const lookups = new Set<string>();
+  for (const story of candidates) {
+    const key = storyUrlKey(story.url);
+    if (!key || !story.url) continue;
+    lookups.add(key);
+    lookups.add(`${key}/`);
+    lookups.add(story.url);
+  }
+  if (lookups.size === 0) return new Set();
+
+  const published = await prisma.story.findMany({
+    where: {
+      usedInPublicationDate: {
+        not: null,
+        lt: toUtcDateFromDateOnly(toDateOnlyIso(date)),
+      },
+      url: { in: Array.from(lookups) },
+    },
+    select: { url: true },
+  });
+
+  return new Set(
+    published
+      .map((story) => storyUrlKey(story.url))
+      .filter((key): key is string => key !== null)
+  );
+}
+
+/**
+ * Removes candidates that repeat a URL: a copy of a higher-ranked candidate,
+ * or a URL that already ran in a published issue. Pages that hold many
+ * stories (homepages, index pages) are left to the AI duplicate check.
+ */
+function removeUrlDuplicates(
+  rankedCandidates: ProcessedStory[],
+  publishedUrlKeys: ReadonlySet<string>
+): { kept: ProcessedStory[]; sameUrlCount: number; publishedUrlCount: number } {
+  const seen = new Set<string>();
+  const kept: ProcessedStory[] = [];
+  let sameUrlCount = 0;
+  let publishedUrlCount = 0;
+
+  for (const story of rankedCandidates) {
+    const key = storyUrlKey(story.url);
+    if (key && publishedUrlKeys.has(key)) {
+      publishedUrlCount += 1;
+      continue;
+    }
+    if (key && seen.has(key)) {
+      sameUrlCount += 1;
+      continue;
+    }
+    if (key) seen.add(key);
+    kept.push(story);
+  }
+
+  return { kept, sameUrlCount, publishedUrlCount };
+}
+
+/**
  * Loads the reference stories and the ranked candidate pool for a date.
  */
 async function loadRankedCandidates(date: Date): Promise<{
@@ -658,9 +728,18 @@ async function loadRankedCandidates(date: Date): Promise<{
     candidateCount: candidateStories.length,
   });
 
-  const rankedCandidates = processAndRankStories(candidateStories);
+  const ranked = processAndRankStories(candidateStories);
+  const publishedUrlKeys = await getPublishedUrlKeys(date, ranked);
+  const { kept: rankedCandidates, sameUrlCount, publishedUrlCount } = removeUrlDuplicates(
+    ranked,
+    publishedUrlKeys
+  );
 
-  logServerInfo("approval.outline.rank.result", { rankedCount: rankedCandidates.length });
+  logServerInfo("approval.outline.rank.result", {
+    rankedCount: rankedCandidates.length,
+    sameUrlCount,
+    publishedUrlCount,
+  });
 
   return { referencedStories, rankedCandidates };
 }

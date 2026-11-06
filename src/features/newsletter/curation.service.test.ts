@@ -61,9 +61,70 @@ function selectedIds(
   return section ? section.selected.map((story) => story.id) : [];
 }
 
+function rankedIds(result: Awaited<ReturnType<typeof createOutlineCandidateStories>>): number[] {
+  return result.rankedCandidates.map((story) => story.id);
+}
+
 describe("newsletter curation", () => {
   beforeEach(() => {
     findManyMock.mockReset();
+    // Calls in order: recently used stories, candidates, published URL lookup.
+    findManyMock.mockResolvedValue([]);
+  });
+
+  describe("same-URL duplicates", () => {
+    it("keeps only the highest-ranked story when candidates share a cleaned URL", async () => {
+      findManyMock.mockResolvedValueOnce([]).mockResolvedValueOnce([
+        { ...candidateRow(1, "general"), url: "https://blog.google/models/gemini-4-carbon" },
+        { ...candidateRow(2, "general"), url: "https://blog.google/models/gemini-4-carbon/?utm_source=x" },
+        { ...candidateRow(3, "general"), url: "https://openai.com/index/gpt-6-for-everyone" },
+      ]);
+
+      const result = await createOutlineCandidateStories(OUTLINE_DATE);
+
+      expect(rankedIds(result)).toEqual([1, 3]);
+      expect(result.outline.candidate_map).not.toHaveProperty("2");
+    });
+
+    it("drops a candidate whose URL is already in a published issue", async () => {
+      findManyMock
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([candidateRow(1, "general"), candidateRow(2, "general")])
+        .mockResolvedValueOnce([{ url: "https://example.com/2/" }]);
+
+      const result = await createOutlineCandidateStories(OUTLINE_DATE);
+
+      expect(rankedIds(result)).toEqual([1]);
+      const lookup = findManyMock.mock.calls[2][0];
+      expect(lookup.where.usedInPublicationDate).toEqual({ not: null, lt: OUTLINE_DATE });
+      expect(lookup.where.url.in).toEqual(
+        expect.arrayContaining(["https://example.com/1", "https://example.com/2"])
+      );
+    });
+
+    it("keeps different stories that share a homepage or index URL", async () => {
+      findManyMock.mockResolvedValueOnce([]).mockResolvedValueOnce([
+        { ...candidateRow(1, "general"), url: "https://qwen.ai/blog" },
+        { ...candidateRow(2, "general"), url: "https://qwen.ai/blog" },
+        { ...candidateRow(3, "tools"), url: "https://www.producthunt.com/products/claude" },
+        { ...candidateRow(4, "tools"), url: "https://www.producthunt.com/products/claude" },
+      ]);
+
+      const result = await createOutlineCandidateStories(OUTLINE_DATE);
+
+      expect(rankedIds(result)).toEqual([1, 2, 3, 4]);
+    });
+
+    it("leaves same-URL copies off the board after the AI duplicate check too", async () => {
+      findManyMock.mockResolvedValueOnce([]).mockResolvedValueOnce([
+        candidateRow(1, "general"),
+        { ...candidateRow(2, "general"), url: "https://example.com/1" },
+      ]);
+
+      const outline = await createDedupedOutline(OUTLINE_DATE, [1, 2]);
+
+      expect(outline.selected_story_ids).toEqual([1]);
+    });
   });
 
   it("cleans markdown and URLs without injecting replacement placeholders", () => {
