@@ -93,7 +93,9 @@ ${JSON.stringify({
 
   // Submit to Responses API in background mode for async processing
   const response = await client.responses.create({
-    model: "gpt-4o-mini",
+    // OpenAI's model for fast, high-volume tasks; low effort keeps the board quick.
+    model: "gpt-6-luna",
+    reasoning: { effort: "low" },
     instructions:
       "You identify duplicate news stories by comparing the underlying event being reported. Return only valid JSON.",
     input: userMessage,
