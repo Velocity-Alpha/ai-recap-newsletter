@@ -7,7 +7,7 @@ const dedupFns = vi.hoisted(() => ({
 }));
 
 const curationFns = vi.hoisted(() => ({
-  createOutlineCandidateStories: vi.fn(),
+  createDedupedOutline: vi.fn(),
 }));
 
 vi.mock("@/src/features/newsletter/openai-dedup", () => dedupFns);
@@ -112,14 +112,12 @@ describe("GET /api/approval/outline/status", () => {
     expect(json.error).toBe("Deduplication response failed.");
   });
 
-  it("returns completed outline filtered to kept story IDs", async () => {
+  it("returns the board rebuilt from the kept story IDs", async () => {
     dedupFns.checkDeduplicationStatus.mockResolvedValue({
       status: "completed",
       result: { kept_story_ids: [1, 3] },
     });
-    curationFns.createOutlineCandidateStories.mockResolvedValue({
-      outline: BASE_OUTLINE,
-    });
+    curationFns.createDedupedOutline.mockResolvedValue(BASE_OUTLINE);
     const token = await createApprovalSessionToken("approval-secret");
 
     const res = await GET(makeRequest({ response_id: RESPONSE_ID, date: DATE }, token));
@@ -127,22 +125,13 @@ describe("GET /api/approval/outline/status", () => {
 
     expect(res.status).toBe(200);
     expect(json.status).toBe("completed");
-
-    const outline = json.outline;
-    expect(outline.selected_story_ids).toEqual([1, 3]);
-    // story 2 should be filtered out
-    expect(outline.candidate_sections[0].selected).toHaveLength(1);
-    expect(outline.candidate_sections[0].selected[0].id).toBe(1);
-    expect(outline.candidate_sections[0].fill_ins).toHaveLength(1);
-    expect(outline.candidate_sections[0].fill_ins[0].id).toBe(3);
-    expect(Object.keys(outline.candidate_map)).toEqual(["1", "3"]);
+    expect(curationFns.createDedupedOutline).toHaveBeenCalledWith(new Date(DATE), [1, 3]);
+    expect(json.outline).toEqual(BASE_OUTLINE);
   });
 
   it("returns 500 for unknown response status", async () => {
     dedupFns.checkDeduplicationStatus.mockResolvedValue({ status: "completed" }); // completed but no result
-    curationFns.createOutlineCandidateStories.mockResolvedValue({
-      outline: BASE_OUTLINE,
-    });
+    curationFns.createDedupedOutline.mockResolvedValue(BASE_OUTLINE);
     const token = await createApprovalSessionToken("approval-secret");
 
     const res = await GET(makeRequest({ response_id: RESPONSE_ID, date: DATE }, token));

@@ -1,8 +1,9 @@
 import { prisma } from "@/src/server/prisma";
 import { logServerInfo } from "@/src/server/observability";
 import { CANDIDATE_SECTION_CONFIGS, type SectionKey } from "@/src/features/newsletter/section-config";
+import { storyUrlKey } from "@/src/features/newsletter/story-url";
 
-interface StoryRecord {
+export interface StoryRecord {
   id: number;
   guid: string | null;
   day: Date | string | null;
@@ -18,7 +19,7 @@ interface StoryRecord {
   used_in_publication_date?: Date | string | null;
 }
 
-interface ProcessedStory extends StoryRecord {
+export interface ProcessedStory extends StoryRecord {
   keyword_score: number;
   combined_score: number;
 }
@@ -40,7 +41,7 @@ interface ReferenceStory {
   summary: string;
 }
 
-interface ApprovalOutlineData {
+export interface ApprovalOutlineData {
   reference_stories: ReferenceStory[];
   candidate_sections: CandidateSection[];
   candidate_map: Record<
@@ -200,7 +201,7 @@ function calculateKeywordScore(story: {
 /**
  * Collapses source category labels into the buckets used by the approval UI.
  */
-function normalizeCategory(category: string | null | undefined): string {
+export function normalizeCategory(category: string | null | undefined): string {
   const normalized = String(category ?? "").toLowerCase().trim();
   if (normalized === "research" || normalized === "analysis") return "research";
   if (normalized === "tools" || normalized === "tool") return "tools";
@@ -512,6 +513,17 @@ function createSectionBlueprints(
   tools: ProcessedStory[],
   general: ProcessedStory[]
 ): CandidateSection[] {
+  // Headlines and Quick Hits share the general pool in rank order: Top Story
+  // picks, Top Story fill-ins, Quick Hit picks, Quick Hit fill-ins. When the
+  // pool is short, Top Story fill-ins shrink first so selected Quick Hit
+  // slots are never left empty while a general story sits in a fill-in.
+  const headlineFillInCount = Math.min(
+    FILL_IN_LIMIT,
+    Math.max(0, general.length - SECTION_LIMITS.headlines - SECTION_LIMITS.quickHits)
+  );
+  const quickHitsStart = SECTION_LIMITS.headlines + headlineFillInCount;
+  const quickHitsEnd = quickHitsStart + SECTION_LIMITS.quickHits;
+
   const blueprints: Array<{
     key: SectionKey;
     label: string;
@@ -524,10 +536,7 @@ function createSectionBlueprints(
       label: SECTION_LABELS.headlines,
       max: SECTION_LIMITS.headlines,
       selected: general.slice(0, SECTION_LIMITS.headlines),
-      fill_ins: general.slice(
-        SECTION_LIMITS.headlines,
-        SECTION_LIMITS.headlines + FILL_IN_LIMIT
-      ),
+      fill_ins: general.slice(SECTION_LIMITS.headlines, quickHitsStart),
     },
     {
       key: "research",
@@ -553,17 +562,8 @@ function createSectionBlueprints(
       key: "quickHits",
       label: SECTION_LABELS.quickHits,
       max: SECTION_LIMITS.quickHits,
-      selected: general.slice(
-        SECTION_LIMITS.headlines + FILL_IN_LIMIT,
-        SECTION_LIMITS.headlines + FILL_IN_LIMIT + SECTION_LIMITS.quickHits
-      ),
-      fill_ins: general.slice(
-        SECTION_LIMITS.headlines + FILL_IN_LIMIT + SECTION_LIMITS.quickHits,
-        SECTION_LIMITS.headlines +
-          FILL_IN_LIMIT +
-          SECTION_LIMITS.quickHits +
-          FILL_IN_LIMIT
-      ),
+      selected: general.slice(quickHitsStart, quickHitsEnd),
+      fill_ins: general.slice(quickHitsEnd, quickHitsEnd + FILL_IN_LIMIT),
     },
   ];
 
@@ -578,50 +578,17 @@ function createSectionBlueprints(
 }
 
 /**
- * Creates all data needed to render the newsletter outline approval screen,
- * WITHOUT AI deduplication. Used for fast initial load with pending status.
+ * Builds the approval board from stories that are already ranked.
  *
- * Pipeline:
- * 1. Load recently published reference stories and unpublished candidates.
- * 2. Clean and rank candidates.
- * 3. Skip AI deduplication (happens async via OpenAI Responses API background job; caller receives a response_id to poll).
- * 4. Group stories into editorial sections and fill-in pools.
- * 5. Return section data, a full story lookup map, and initially selected IDs.
+ * Slots are filled in rank order from whatever is passed in. Pass only the
+ * stories the duplicate check kept, so each slot it empties is refilled with
+ * the next-ranked kept story instead of staying empty.
  */
-export async function createOutlineCandidateStories(
-  date: Date
-): Promise<{
-  outline: ApprovalOutlineData;
-  referencedStories: StoryRecord[];
-  rankedCandidates: ProcessedStory[];
-}> {
-  logServerInfo("approval.outline.create.start", { date: date.toISOString() });
-
-  // Fetch stories
-  const [referencedStories, candidateStories] = await Promise.all([
-    getReferencedStories(date),
-    getCandidateStories(date),
-  ]);
-
-  logServerInfo("approval.outline.fetch.result", {
-    referencedCount: referencedStories.length,
-    candidateCount: candidateStories.length,
-  });
-
-  // Process and rank candidates
-  const rankedCandidates = processAndRankStories(candidateStories);
-
-  logServerInfo("approval.outline.rank.result", { rankedCount: rankedCandidates.length });
-
-  // Skip AI deduplication — use all ranked stories
-  const dedupedStories = rankedCandidates;
-
-  logServerInfo("approval.outline.dedup.skipped", {
-    storyCount: dedupedStories.length,
-  });
-
-  // Group by category
-  const grouped = groupStoriesByCategory(dedupedStories);
+export function buildApprovalOutline(
+  rankedStories: ProcessedStory[],
+  referencedStories: StoryRecord[]
+): ApprovalOutlineData {
+  const grouped = groupStoriesByCategory(rankedStories);
 
   logServerInfo("approval.outline.grouped", {
     researchCount: grouped.research.length,
@@ -639,13 +606,13 @@ export async function createOutlineCandidateStories(
   // Build candidate map and selected IDs
   const candidate_map: Record<string, ProcessedStory> = {};
   const selected_story_ids = new Set<number>();
-  const dedupedStoryMap = new Map<number, ProcessedStory>(
-    dedupedStories.map((story) => [story.id, story])
+  const storyById = new Map<number, ProcessedStory>(
+    rankedStories.map((story) => [story.id, story])
   );
 
   for (const section of candidate_sections) {
     for (const story of section.selected) {
-      const fullStory = dedupedStoryMap.get(story.id);
+      const fullStory = storyById.get(story.id);
       if (fullStory) {
         candidate_map[String(story.id)] = fullStory;
         selected_story_ids.add(story.id);
@@ -653,19 +620,12 @@ export async function createOutlineCandidateStories(
     }
 
     for (const story of section.fill_ins) {
-      const fullStory = dedupedStoryMap.get(story.id);
+      const fullStory = storyById.get(story.id);
       if (fullStory) {
         candidate_map[String(story.id)] = fullStory;
       }
     }
   }
-
-  const outline: ApprovalOutlineData = {
-    reference_stories: referencedStories.map(toReferenceStory),
-    candidate_sections,
-    candidate_map,
-    selected_story_ids: Array.from(selected_story_ids),
-  };
 
   logServerInfo("approval.outline.final", {
     sectionCount: candidate_sections.length,
@@ -673,10 +633,160 @@ export async function createOutlineCandidateStories(
   });
 
   return {
-    outline,
+    reference_stories: referencedStories.map(toReferenceStory),
+    candidate_sections,
+    candidate_map,
+    selected_story_ids: Array.from(selected_story_ids),
+  };
+}
+
+/**
+ * Loads the cleaned URLs of candidates that already ran in a published issue,
+ * in an issue before the requested date.
+ */
+async function getPublishedUrlKeys(
+  date: Date,
+  candidates: ProcessedStory[]
+): Promise<Set<string>> {
+  // Stored URLs are already cleaned, but a few keep a trailing slash or a
+  // query, so look up the raw and slash forms too.
+  const lookups = new Set<string>();
+  for (const story of candidates) {
+    const key = storyUrlKey(story.url);
+    if (!key || !story.url) continue;
+    lookups.add(key);
+    lookups.add(`${key}/`);
+    lookups.add(story.url);
+  }
+  if (lookups.size === 0) return new Set();
+
+  const published = await prisma.story.findMany({
+    where: {
+      usedInPublicationDate: {
+        not: null,
+        lt: toUtcDateFromDateOnly(toDateOnlyIso(date)),
+      },
+      url: { in: Array.from(lookups) },
+    },
+    select: { url: true },
+  });
+
+  return new Set(
+    published
+      .map((story) => storyUrlKey(story.url))
+      .filter((key): key is string => key !== null)
+  );
+}
+
+/**
+ * Removes candidates that repeat a URL: a copy of a higher-ranked candidate,
+ * or a URL that already ran in a published issue. Pages that hold many
+ * stories (homepages, index pages) are left to the AI duplicate check.
+ */
+function removeUrlDuplicates(
+  rankedCandidates: ProcessedStory[],
+  publishedUrlKeys: ReadonlySet<string>
+): { kept: ProcessedStory[]; sameUrlCount: number; publishedUrlCount: number } {
+  const seen = new Set<string>();
+  const kept: ProcessedStory[] = [];
+  let sameUrlCount = 0;
+  let publishedUrlCount = 0;
+
+  for (const story of rankedCandidates) {
+    const key = storyUrlKey(story.url);
+    if (key && publishedUrlKeys.has(key)) {
+      publishedUrlCount += 1;
+      continue;
+    }
+    if (key && seen.has(key)) {
+      sameUrlCount += 1;
+      continue;
+    }
+    if (key) seen.add(key);
+    kept.push(story);
+  }
+
+  return { kept, sameUrlCount, publishedUrlCount };
+}
+
+/**
+ * Loads the reference stories and the ranked candidate pool for a date.
+ */
+async function loadRankedCandidates(date: Date): Promise<{
+  referencedStories: StoryRecord[];
+  rankedCandidates: ProcessedStory[];
+}> {
+  logServerInfo("approval.outline.create.start", { date: date.toISOString() });
+
+  const [referencedStories, candidateStories] = await Promise.all([
+    getReferencedStories(date),
+    getCandidateStories(date),
+  ]);
+
+  logServerInfo("approval.outline.fetch.result", {
+    referencedCount: referencedStories.length,
+    candidateCount: candidateStories.length,
+  });
+
+  const ranked = processAndRankStories(candidateStories);
+  const publishedUrlKeys = await getPublishedUrlKeys(date, ranked);
+  const { kept: rankedCandidates, sameUrlCount, publishedUrlCount } = removeUrlDuplicates(
+    ranked,
+    publishedUrlKeys
+  );
+
+  logServerInfo("approval.outline.rank.result", {
+    rankedCount: rankedCandidates.length,
+    sameUrlCount,
+    publishedUrlCount,
+  });
+
+  return { referencedStories, rankedCandidates };
+}
+
+/**
+ * Creates the approval board WITHOUT AI deduplication, for the fast first load.
+ *
+ * The caller submits the AI duplicate check in the background (OpenAI
+ * Responses API) and then polls for it; `createDedupedOutline` builds the
+ * final board once the check is done.
+ */
+export async function createOutlineCandidateStories(
+  date: Date
+): Promise<{
+  outline: ApprovalOutlineData;
+  referencedStories: StoryRecord[];
+  rankedCandidates: ProcessedStory[];
+}> {
+  const { referencedStories, rankedCandidates } = await loadRankedCandidates(date);
+
+  return {
+    outline: buildApprovalOutline(rankedCandidates, referencedStories),
     referencedStories,
     rankedCandidates,
   };
+}
+
+/**
+ * Builds the final approval board after the AI duplicate check.
+ *
+ * The duplicate check covers the whole ranked pool, so removing its rejects
+ * before slotting lets the next-ranked kept story fill each emptied slot.
+ */
+export async function createDedupedOutline(
+  date: Date,
+  keptStoryIds: Iterable<number>
+): Promise<ApprovalOutlineData> {
+  const { referencedStories, rankedCandidates } = await loadRankedCandidates(date);
+  const kept = new Set(keptStoryIds);
+  const keptCandidates = rankedCandidates.filter((story) => kept.has(story.id));
+
+  logServerInfo("approval.outline.dedup.applied", {
+    rankedCount: rankedCandidates.length,
+    keptCount: keptCandidates.length,
+  });
+
+  return buildApprovalOutline(keptCandidates, referencedStories);
 }
 
 /**

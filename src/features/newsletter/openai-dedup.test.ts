@@ -45,7 +45,8 @@ describe("openai-dedup", () => {
       const callArgs = clientMock.responses.create.mock.calls[0][0];
 
       // Verify request structure
-      expect(callArgs.model).toBe("gpt-4o-mini");
+      expect(callArgs.model).toBe("gpt-6-luna");
+      expect(callArgs.reasoning).toEqual({ effort: "low" });
       expect(callArgs.background).toBe(true);
       expect(callArgs.store).toBe(true);
       expect(callArgs.instructions).toContain("duplicate news stories");
