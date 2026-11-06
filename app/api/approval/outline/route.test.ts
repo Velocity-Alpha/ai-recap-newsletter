@@ -54,12 +54,35 @@ describe("GET /api/approval/outline", () => {
     const json = await response.json();
 
     expect(curationFns.createOutlineCandidateStories).toHaveBeenCalledWith(
-      new Date("2026-04-30")
+      new Date("2026-04-30"),
+      { reuseDraftDates: [] }
     );
     expect(response.status).toBe(200);
     expect(json.status).toBe("pending");
     expect(json.response_id).toBe("resp_abc123");
     expect(json.outline).toEqual(BASE_OUTLINE);
+  });
+
+  it("passes the unsent drafts to reuse from the reuse parameter", async () => {
+    curationFns.createOutlineCandidateStories.mockResolvedValue({
+      outline: BASE_OUTLINE,
+      referencedStories: [],
+      rankedCandidates: [],
+    });
+    dedupFns.submitDeduplication.mockResolvedValue("resp_abc123");
+    const token = await createApprovalSessionToken("approval-secret");
+
+    await GET(
+      new Request(
+        "http://localhost/api/approval/outline?date=2026-04-30&reuse=2026-04-29,bad,2026-04-28",
+        { headers: { Cookie: `approval_session=${token}` } }
+      )
+    );
+
+    expect(curationFns.createOutlineCandidateStories).toHaveBeenCalledWith(
+      new Date("2026-04-30"),
+      { reuseDraftDates: ["2026-04-28", "2026-04-29"] }
+    );
   });
 
   it("returns status=ready when dedup submission fails", async () => {

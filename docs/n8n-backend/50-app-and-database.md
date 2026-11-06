@@ -140,7 +140,7 @@ Prod and dev were diffed on `information_schema.columns`, `pg_constraint`, `pg_i
 | 11 | `story_details` | text | yes | - | LLM-extracted detail. Average 399 chars, max 1,852 |
 | 12 | `importance_score` | int2 | yes | - | LLM score from 1 to 5 |
 | 13 | `used_in_publication_date` | date | yes | - | Set by *3. Gmail Listen - Publish* to `CURRENT_TIMESTAMP`, cast to a UTC date |
-| 14 | `queued_for_publication_date` | date | yes | - | Set by *2. Public approval page* to the approval `date`. Index `queued_for_publication_date_idx`. The app never reads it |
+| 14 | `queued_for_publication_date` | date | yes | - | Set by *2. Public approval page* to the approval `date`. Index `queued_for_publication_date_idx`. The app did not read it until #57, which uses it to hold back stories in unsent drafts |
 | 15 | `exclude_from_candidates` | bool | yes | `false` | Set to true for editor-excluded stories. 114 rows are true and none are null |
 | 16 | `note` | text | yes | - | Editor note from the approval board. *Create Issue Draft* writes `''` when there is no note: 1,679 rows are empty and 3 have real text |
 | 17 | `paywall_detected` | text | yes | - | Values `yes`, `no`, `unknown` or `error`, enforced by n8n only. Populated from 2026-06 onward |

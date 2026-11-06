@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   APPROVAL_OUTLINE_CACHE_TTL_MS,
+  approvalOutlineCacheId,
   normalizeApprovalOutlineData,
   readApprovalOutlineCache,
   writeApprovalOutlineCache,
@@ -28,6 +29,7 @@ const normalizedOutlineData = {
   })),
   candidate_map: {},
   selected_story_ids: [],
+  unsent_drafts: [],
 };
 
 function createStorage() {
@@ -178,5 +180,29 @@ describe("normalizeApprovalOutlineData", () => {
     expect(result.reference_stories).toEqual(referenceStories);
     expect(result.candidate_map).toEqual(candidateMap);
     expect(result.selected_story_ids).toEqual([1]);
+  });
+
+  it("treats a board cached before unsent drafts existed as having none", () => {
+    expect(normalizeApprovalOutlineData(rawOutlineData).unsent_drafts).toEqual([]);
+  });
+
+  it("keeps the unsent drafts the server sent", () => {
+    const unsentDrafts = [{ date: "2026-10-22", story_count: 11, reused: false }];
+
+    const result = normalizeApprovalOutlineData({ ...rawOutlineData, unsent_drafts: unsentDrafts });
+
+    expect(result.unsent_drafts).toEqual(unsentDrafts);
+  });
+});
+
+describe("approvalOutlineCacheId", () => {
+  it("uses the date alone when no unsent draft is reused", () => {
+    expect(approvalOutlineCacheId("2026-10-23", [])).toBe("2026-10-23");
+  });
+
+  it("caches a board that reuses a draft separately", () => {
+    expect(approvalOutlineCacheId("2026-10-23", ["2026-10-22"])).toBe(
+      "2026-10-23_reuse_2026-10-22"
+    );
   });
 });

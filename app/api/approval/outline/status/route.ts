@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { createDedupedOutline } from "@/src/features/newsletter/curation.service";
 import { checkDeduplicationStatus } from "@/src/features/newsletter/openai-dedup";
+import { parseReuseDraftDates } from "@/src/features/newsletter/reuse-drafts-param";
 import { hasValidApprovalSession } from "@/src/server/approval-auth";
 import { logServerError, logServerInfo } from "@/src/server/observability";
 
@@ -19,6 +20,7 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const responseId = searchParams.get("response_id");
   const date = parseDateParam(searchParams.get("date"));
+  const reuseDraftDates = parseReuseDraftDates(searchParams.get("reuse"));
 
   if (!responseId) {
     return NextResponse.json(
@@ -56,7 +58,7 @@ export async function GET(request: Request) {
     // Handle completion: rebuild the board from kept stories so emptied slots refill.
     if (responseStatus.status === "completed" && responseStatus.result) {
       const keptStoryIds = responseStatus.result.kept_story_ids || [];
-      const outline = await createDedupedOutline(date, keptStoryIds);
+      const outline = await createDedupedOutline(date, keptStoryIds, { reuseDraftDates });
 
       logServerInfo("approval.outline.status.completed", {
         responseId,

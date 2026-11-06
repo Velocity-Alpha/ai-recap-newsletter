@@ -2,6 +2,7 @@ import { prisma } from "@/src/server/prisma";
 import { logServerInfo } from "@/src/server/observability";
 import { CANDIDATE_SECTION_CONFIGS, type SectionKey } from "@/src/features/newsletter/section-config";
 import { storyUrlKey } from "@/src/features/newsletter/story-url";
+import { findUnsentDrafts } from "@/src/features/newsletter/unsent-drafts";
 
 export interface StoryRecord {
   id: number;
@@ -17,6 +18,8 @@ export interface StoryRecord {
   paywall_detected?: "yes" | "no" | "unknown" | "error";
   error?: string | null;
   used_in_publication_date?: Date | string | null;
+  /** Set while the story waits in an unsent draft for this issue date. */
+  held_for_date?: string | null;
 }
 
 export interface ProcessedStory extends StoryRecord {
@@ -35,6 +38,8 @@ interface CandidateSection {
 interface ReferenceStory {
   id: number;
   usedInPublicationDate: string | null;
+  /** Issue date of the unsent draft that holds this story, if any. */
+  heldForDate: string | null;
   paywall_detected: "yes" | "no" | "unknown" | "error";
   error?: string | null;
   headline: string;
@@ -49,6 +54,19 @@ export interface ApprovalOutlineData {
     StoryRecord & { keyword_score: number; combined_score: number }
   >;
   selected_story_ids: number[];
+  /** Earlier drafts that were never sent, and whether their stories are back in this board's pool. */
+  unsent_drafts: UnsentDraftNotice[];
+}
+
+export interface UnsentDraftNotice {
+  date: string;
+  story_count: number;
+  reused: boolean;
+}
+
+export interface OutlineOptions {
+  /** Unsent draft dates whose stories go back into the pool instead of being held. */
+  reuseDraftDates?: Iterable<string>;
 }
 
 function normalizePaywallDetected(value: string | null | undefined): "yes" | "no" | "unknown" | "error" {
@@ -234,6 +252,7 @@ function toReferenceStory(story: StoryRecord): ReferenceStory {
   return {
     id: story.id,
     usedInPublicationDate: publicationDateStr,
+    heldForDate: story.held_for_date ?? null,
     paywall_detected: normalizePaywallDetected(story.paywall_detected),
     error: story.error,
     headline: cleanText(story.headline) || "Untitled story",
@@ -586,7 +605,8 @@ function createSectionBlueprints(
  */
 export function buildApprovalOutline(
   rankedStories: ProcessedStory[],
-  referencedStories: StoryRecord[]
+  referencedStories: StoryRecord[],
+  unsentDrafts: UnsentDraftNotice[] = []
 ): ApprovalOutlineData {
   const grouped = groupStoriesByCategory(rankedStories);
 
@@ -637,6 +657,7 @@ export function buildApprovalOutline(
     candidate_sections,
     candidate_map,
     selected_story_ids: Array.from(selected_story_ids),
+    unsent_drafts: unsentDrafts,
   };
 }
 
@@ -711,25 +732,61 @@ function removeUrlDuplicates(
 
 /**
  * Loads the reference stories and the ranked candidate pool for a date.
+ *
+ * Stories in an earlier, unsent draft are held for that draft unless the
+ * caller reuses it. Held stories leave the pool and count as references, so
+ * the duplicate checks also keep their repeats off this board.
  */
-async function loadRankedCandidates(date: Date): Promise<{
+async function loadRankedCandidates(
+  date: Date,
+  options: OutlineOptions = {}
+): Promise<{
   referencedStories: StoryRecord[];
   rankedCandidates: ProcessedStory[];
+  unsentDrafts: UnsentDraftNotice[];
 }> {
   logServerInfo("approval.outline.create.start", { date: date.toISOString() });
 
-  const [referencedStories, candidateStories] = await Promise.all([
+  const [publishedReferences, candidateStories, drafts] = await Promise.all([
     getReferencedStories(date),
     getCandidateStories(date),
+    findUnsentDrafts(toDateOnlyIso(date)),
   ]);
 
-  logServerInfo("approval.outline.fetch.result", {
-    referencedCount: referencedStories.length,
-    candidateCount: candidateStories.length,
+  const reused = new Set(options.reuseDraftDates ?? []);
+  const heldForDate = new Map<number, string>();
+  for (const draft of drafts) {
+    if (reused.has(draft.date)) continue;
+    for (const id of draft.storyIds) heldForDate.set(id, draft.date);
+  }
+  const heldStories = candidateStories
+    .filter((story) => heldForDate.has(story.id))
+    .map((story) => ({ ...story, held_for_date: heldForDate.get(story.id) }));
+  const pool = candidateStories.filter((story) => !heldForDate.has(story.id));
+  const referencedStories = [...publishedReferences, ...heldStories];
+  // Count only draft stories this board could show. Older or excluded ones
+  // are not candidates either way, so a draft with none of them needs no notice.
+  const candidateIds = new Set(candidateStories.map((story) => story.id));
+  const unsentDrafts = drafts.flatMap((draft) => {
+    const storyCount = draft.storyIds.filter((id) => candidateIds.has(id)).length;
+    return storyCount > 0
+      ? [{ date: draft.date, story_count: storyCount, reused: reused.has(draft.date) }]
+      : [];
   });
 
-  const ranked = processAndRankStories(candidateStories);
+  logServerInfo("approval.outline.fetch.result", {
+    referencedCount: publishedReferences.length,
+    candidateCount: candidateStories.length,
+    heldCount: heldStories.length,
+    unsentDraftDates: unsentDrafts.map((draft) => draft.date),
+  });
+
+  const ranked = processAndRankStories(pool);
   const publishedUrlKeys = await getPublishedUrlKeys(date, ranked);
+  for (const story of heldStories) {
+    const key = storyUrlKey(story.url);
+    if (key) publishedUrlKeys.add(key);
+  }
   const { kept: rankedCandidates, sameUrlCount, publishedUrlCount } = removeUrlDuplicates(
     ranked,
     publishedUrlKeys
@@ -741,7 +798,7 @@ async function loadRankedCandidates(date: Date): Promise<{
     publishedUrlCount,
   });
 
-  return { referencedStories, rankedCandidates };
+  return { referencedStories, rankedCandidates, unsentDrafts };
 }
 
 /**
@@ -752,16 +809,20 @@ async function loadRankedCandidates(date: Date): Promise<{
  * final board once the check is done.
  */
 export async function createOutlineCandidateStories(
-  date: Date
+  date: Date,
+  options: OutlineOptions = {}
 ): Promise<{
   outline: ApprovalOutlineData;
   referencedStories: StoryRecord[];
   rankedCandidates: ProcessedStory[];
 }> {
-  const { referencedStories, rankedCandidates } = await loadRankedCandidates(date);
+  const { referencedStories, rankedCandidates, unsentDrafts } = await loadRankedCandidates(
+    date,
+    options
+  );
 
   return {
-    outline: buildApprovalOutline(rankedCandidates, referencedStories),
+    outline: buildApprovalOutline(rankedCandidates, referencedStories, unsentDrafts),
     referencedStories,
     rankedCandidates,
   };
@@ -775,9 +836,13 @@ export async function createOutlineCandidateStories(
  */
 export async function createDedupedOutline(
   date: Date,
-  keptStoryIds: Iterable<number>
+  keptStoryIds: Iterable<number>,
+  options: OutlineOptions = {}
 ): Promise<ApprovalOutlineData> {
-  const { referencedStories, rankedCandidates } = await loadRankedCandidates(date);
+  const { referencedStories, rankedCandidates, unsentDrafts } = await loadRankedCandidates(
+    date,
+    options
+  );
   const kept = new Set(keptStoryIds);
   const keptCandidates = rankedCandidates.filter((story) => kept.has(story.id));
 
@@ -786,7 +851,7 @@ export async function createDedupedOutline(
     keptCount: keptCandidates.length,
   });
 
-  return buildApprovalOutline(keptCandidates, referencedStories);
+  return buildApprovalOutline(keptCandidates, referencedStories, unsentDrafts);
 }
 
 /**

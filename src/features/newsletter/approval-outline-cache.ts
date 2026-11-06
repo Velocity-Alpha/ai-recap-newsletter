@@ -8,6 +8,7 @@ export type ApprovalOutlineData = {
   reference_stories: {
     id: number;
     usedInPublicationDate: string | null;
+    heldForDate?: string | null;
     paywall_detected: "yes" | "no" | "unknown" | "error";
     error?: string | null;
     headline: string;
@@ -40,6 +41,14 @@ export type ApprovalOutlineData = {
     }
   >;
   selected_story_ids: number[];
+  // Optional: boards cached before this field existed do not have it.
+  unsent_drafts?: UnsentDraftNotice[];
+};
+
+export type UnsentDraftNotice = {
+  date: string;
+  story_count: number;
+  reused: boolean;
 };
 
 type CacheStorage = Pick<Storage, "getItem" | "removeItem" | "setItem">;
@@ -71,7 +80,13 @@ export function normalizeApprovalOutlineData(data: ApprovalOutlineData): Approva
   return {
     ...data,
     candidate_sections: [...knownSections, ...unknownSections],
+    unsent_drafts: data.unsent_drafts ?? [],
   };
+}
+
+/** Cache id for a board: the date, plus any unsent drafts it reuses. */
+export function approvalOutlineCacheId(dateKey: string, reuseDraftDates: readonly string[]): string {
+  return reuseDraftDates.length > 0 ? `${dateKey}_reuse_${reuseDraftDates.join(",")}` : dateKey;
 }
 
 function getApprovalOutlineCacheKey(dateKey: string): string {
