@@ -25,7 +25,8 @@ The app runs directly on Next.js in local development. No `netlify dev` proxy or
    cp .env.local.example .env.local
    ```
 3. Fill in the required values in `.env.local`:
-   - `DATABASE_URL`
+   - `APP_ENV=development` (the template already sets it; `npm run dev` stops without it)
+   - `DATABASE_URL` (the Neon `dev` branch, not production)
    - `SESSION_SECRET`
    - `RESEND_API_KEY`
    - `RESEND_FROM_EMAIL`
@@ -172,7 +173,8 @@ This repository stays on Netlify, but it no longer uses hand-written Netlify Fun
 
 Required environment variables:
 
-- `DATABASE_URL`
+- `APP_ENV` — `development`, `preview`, or `production`. Set per deploy context in `netlify.toml` (`production` for production, `preview` for deploy previews and branch deploys). `next build` fails without it.
+- `DATABASE_URL` — production in the production context; the Neon `dev` branch for deploy previews and branch deploys
 - `SESSION_SECRET`
 - `RESEND_API_KEY`
 - `RESEND_FROM_NAME`
@@ -193,4 +195,4 @@ Optional:
 - `OUTLINE_COMMIT_WEBHOOK_URL` to override the approval outline commit webhook destination. Defaults to the production n8n story approval webhook.
 - `NEWSLETTER_RUNTIME_DB_ROLE` to override the runtime role name used by the bootstrap scripts. Defaults to `newsletter_web`.
 
-Google Analytics IDs remain configured per deploy context in `netlify.toml`.
+Google Analytics IDs and `APP_ENV` are configured per deploy context in `netlify.toml`.
