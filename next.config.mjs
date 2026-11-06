@@ -1,10 +1,19 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { parseAppEnv } from "./src/config/app-env.mjs";
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// Fail fast: `next dev` and `next build` stop here when APP_ENV is missing or invalid.
+const appEnv = parseAppEnv(process.env.APP_ENV);
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Inlined at build time, so server code sees the same value the build was checked with.
+  env: {
+    APP_ENV: appEnv,
+  },
   images: {
     formats: ["image/avif", "image/webp"],
     remotePatterns: [

@@ -101,3 +101,69 @@ model schema_migrations {
 
   @@schema("public")
 }
+
+// Pipeline tables (#47). Additive only: n8n never reads them.
+
+model PipelineSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("pipeline_settings")
+  @@schema("newsletter")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model PipelineRun {
+  id         BigInt          @id @default(autoincrement())
+  job        String
+  trigger    String
+  status     String          @default("running")
+  startedAt  DateTime        @default(now()) @map("started_at") @db.Timestamptz(6)
+  finishedAt DateTime?       @map("finished_at") @db.Timestamptz(6)
+  stats      Json?
+  error      String?
+  events     PipelineEvent[]
+
+  @@index([job, startedAt(sort: Desc)])
+  @@map("pipeline_runs")
+  @@schema("newsletter")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model PipelineEvent {
+  id        BigInt      @id @default(autoincrement())
+  runId     BigInt      @map("run_id")
+  level     String
+  step      String
+  message   String
+  data      Json?
+  createdAt DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  run       PipelineRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([runId, createdAt])
+  @@map("pipeline_events")
+  @@schema("newsletter")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// open_incident_key equals incident_key while the alert is open and is NULL once resolved,
+/// so the unique index allows one open alert per incident and any number of resolved ones.
+model Alert {
+  id              BigInt    @id @default(autoincrement())
+  incidentKey     String    @map("incident_key")
+  openIncidentKey String?   @unique @map("open_incident_key")
+  severity        String
+  status          String    @default("open")
+  firstSeen       DateTime  @default(now()) @map("first_seen") @db.Timestamptz(6)
+  lastSeen        DateTime  @default(now()) @map("last_seen") @db.Timestamptz(6)
+  notifiedAt      DateTime? @map("notified_at") @db.Timestamptz(6)
+  resolvedAt      DateTime? @map("resolved_at") @db.Timestamptz(6)
+  message         String
+  context         Json?
+
+  @@index([incidentKey, firstSeen(sort: Desc)])
+  @@index([status, firstSeen])
+  @@map("alerts")
+  @@schema("newsletter")
+}
