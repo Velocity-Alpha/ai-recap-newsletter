@@ -15,6 +15,12 @@ vi.mock("@/src/server/observability", () => ({
   logServerError: vi.fn(),
 }));
 
+const findUnsentDraftsMock = vi.hoisted(() => vi.fn());
+
+vi.mock("@/src/features/newsletter/unsent-drafts", () => ({
+  findUnsentDrafts: findUnsentDraftsMock,
+}));
+
 import {
   cleanText,
   createDedupedOutline,
@@ -70,6 +76,106 @@ describe("newsletter curation", () => {
     findManyMock.mockReset();
     // Calls in order: recently used stories, candidates, published URL lookup.
     findManyMock.mockResolvedValue([]);
+    findUnsentDraftsMock.mockReset();
+    findUnsentDraftsMock.mockResolvedValue([]);
+  });
+
+  describe("stories in an unsent draft", () => {
+    const UNSENT = { date: "2026-06-08", storyIds: [1, 2] };
+
+    function shownIds(outline: Awaited<ReturnType<typeof createDedupedOutline>>): number[] {
+      return outline.candidate_sections.flatMap((section) =>
+        [...section.selected, ...section.fill_ins].map((story) => story.id)
+      );
+    }
+
+    it("holds them back by default and lists them as reference stories", async () => {
+      findUnsentDraftsMock.mockResolvedValue([UNSENT]);
+      findManyMock.mockResolvedValueOnce([]).mockResolvedValueOnce(POOL_ROWS);
+
+      const { outline, rankedCandidates, referencedStories } =
+        await createOutlineCandidateStories(OUTLINE_DATE);
+
+      expect(findUnsentDraftsMock).toHaveBeenCalledWith("2026-06-09");
+      expect(rankedCandidates.map((story) => story.id)).not.toContain(1);
+      expect(rankedCandidates.map((story) => story.id)).not.toContain(2);
+      expect(shownIds(outline)).not.toContain(1);
+      // The AI duplicate check treats them as already covered.
+      expect(referencedStories.map((story) => story.id)).toEqual([1, 2]);
+      expect(outline.reference_stories).toEqual([
+        expect.objectContaining({ id: 1, heldForDate: "2026-06-08", usedInPublicationDate: null }),
+        expect.objectContaining({ id: 2, heldForDate: "2026-06-08", usedInPublicationDate: null }),
+      ]);
+      expect(outline.unsent_drafts).toEqual([
+        { date: "2026-06-08", story_count: 2, reused: false },
+      ]);
+    });
+
+    it("returns them to the pool when that draft is reused", async () => {
+      findUnsentDraftsMock.mockResolvedValue([UNSENT]);
+      findManyMock.mockResolvedValueOnce([]).mockResolvedValueOnce(POOL_ROWS);
+
+      const { outline, referencedStories } = await createOutlineCandidateStories(OUTLINE_DATE, {
+        reuseDraftDates: ["2026-06-08"],
+      });
+
+      expect(selectedIds(outline, "headlines")).toEqual([1, 2, 3]);
+      expect(referencedStories).toEqual([]);
+      expect(outline.unsent_drafts).toEqual([
+        { date: "2026-06-08", story_count: 2, reused: true },
+      ]);
+    });
+
+    it("drops another candidate that shares a held story's link", async () => {
+      findUnsentDraftsMock.mockResolvedValue([{ date: "2026-06-08", storyIds: [1] }]);
+      findManyMock.mockResolvedValueOnce([]).mockResolvedValueOnce([
+        { ...candidateRow(1, "general"), url: "https://openai.com/index/gpt-6-for-everyone" },
+        { ...candidateRow(2, "general"), url: "https://openai.com/index/gpt-6-for-everyone/" },
+        candidateRow(3, "general"),
+      ]);
+
+      const result = await createOutlineCandidateStories(OUTLINE_DATE);
+
+      expect(rankedIds(result)).toEqual([3]);
+    });
+
+    it("keeps holding them on the final board after the AI check", async () => {
+      findUnsentDraftsMock.mockResolvedValue([UNSENT]);
+      findManyMock.mockResolvedValueOnce([]).mockResolvedValueOnce(POOL_ROWS);
+
+      const held = await createDedupedOutline(OUTLINE_DATE, POOL_IDS);
+      expect(shownIds(held)).not.toContain(1);
+      expect(held.unsent_drafts).toEqual([{ date: "2026-06-08", story_count: 2, reused: false }]);
+
+      findManyMock.mockResolvedValueOnce([]).mockResolvedValueOnce(POOL_ROWS);
+      const reused = await createDedupedOutline(OUTLINE_DATE, POOL_IDS, {
+        reuseDraftDates: ["2026-06-08"],
+      });
+      expect(selectedIds(reused, "headlines")).toEqual([1, 2, 3]);
+    });
+
+    it("counts only draft stories that this board could show", async () => {
+      // 98 and 99 are queued for the draft but are not candidates for this date.
+      findUnsentDraftsMock.mockResolvedValue([
+        { date: "2026-06-08", storyIds: [1, 2, 99] },
+        { date: "2026-06-07", storyIds: [98] },
+      ]);
+      findManyMock.mockResolvedValueOnce([]).mockResolvedValueOnce(POOL_ROWS);
+
+      const { outline } = await createOutlineCandidateStories(OUTLINE_DATE);
+
+      expect(outline.unsent_drafts).toEqual([
+        { date: "2026-06-08", story_count: 2, reused: false },
+      ]);
+    });
+
+    it("shows no notice when every earlier draft was sent", async () => {
+      findManyMock.mockResolvedValueOnce([]).mockResolvedValueOnce(POOL_ROWS);
+
+      const { outline } = await createOutlineCandidateStories(OUTLINE_DATE);
+
+      expect(outline.unsent_drafts).toEqual([]);
+    });
   });
 
   describe("same-URL duplicates", () => {

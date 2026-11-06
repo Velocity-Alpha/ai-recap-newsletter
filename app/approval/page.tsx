@@ -1,15 +1,20 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import ApprovalBoard from "@/components/approval/ApprovalBoard";
 import {
+  approvalOutlineCacheId,
   normalizeApprovalOutlineData,
   type ApprovalOutlineData,
   readApprovalOutlineCache,
   writeApprovalOutlineCache,
 } from "@/features/newsletter/approval-outline-cache";
+import {
+  parseReuseDraftDates,
+  toggleReuseDraftDate,
+} from "@/features/newsletter/reuse-drafts-param";
 
 function parseDateKey(value: string | null): string {
   const candidate = value ? new Date(value) : new Date();
@@ -73,11 +78,17 @@ function ErrorState({ message }: { message: string }) {
 function ApprovalPageContent() {
   const searchParams = useSearchParams();
   const dateKey = parseDateKey(searchParams.get("date"));
+  // Comma-separated dates of unsent drafts whose stories go back into the pool.
+  const reuseKey = parseReuseDraftDates(searchParams.get("reuse")).join(",");
 
-  return <ApprovalPageForDate key={dateKey} dateKey={dateKey} />;
+  return (
+    <ApprovalPageForDate key={`${dateKey}|${reuseKey}`} dateKey={dateKey} reuseKey={reuseKey} />
+  );
 }
 
-function ApprovalPageForDate({ dateKey }: { dateKey: string }) {
+function ApprovalPageForDate({ dateKey, reuseKey }: { dateKey: string; reuseKey: string }) {
+  const router = useRouter();
+  const cacheId = approvalOutlineCacheId(dateKey, reuseKey ? reuseKey.split(",") : []);
   const [outlineData, setOutlineData] = useState<ApprovalOutlineData | null>(null);
   const [isDedupPending, setIsDedupPending] = useState(false);
   const [dedupFailureReason, setDedupFailureReason] = useState<string | null>(null);
@@ -143,7 +154,7 @@ function ApprovalPageForDate({ dateKey }: { dateKey: string }) {
     let active = true;
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
-    const cached = readApprovalOutlineCache(dateKey);
+    const cached = readApprovalOutlineCache(cacheId);
     if (cached) {
       queueMicrotask(() => {
         if (active) setOutlineData(cached);
@@ -156,6 +167,7 @@ function ApprovalPageForDate({ dateKey }: { dateKey: string }) {
     console.log("[approval:cache] miss - fetching outline from API", { dateKey });
 
     const params = new URLSearchParams({ date: dateKey });
+    if (reuseKey) params.set("reuse", reuseKey);
     fetch(`/api/approval/outline?${params}`)
       .then((outlineResponse) => {
         if (!outlineResponse.ok) throw new Error(`Server returned ${outlineResponse.status}`);
@@ -182,7 +194,7 @@ function ApprovalPageForDate({ dateKey }: { dateKey: string }) {
         } else {
           // Dedup already complete, use the outline
           setIsDedupPending(false);
-          writeApprovalOutlineCache(dateKey, outlinePayload.outline);
+          writeApprovalOutlineCache(cacheId, outlinePayload.outline);
           setOutlineData(fallbackOutline);
         }
       })
@@ -206,6 +218,7 @@ function ApprovalPageForDate({ dateKey }: { dateKey: string }) {
             response_id: responseId,
             date: date,
           });
+          if (reuseKey) statusParams.set("reuse", reuseKey);
 
           console.log("[approval:polling] checking status", { 
             responseId, 
@@ -264,7 +277,7 @@ function ApprovalPageForDate({ dateKey }: { dateKey: string }) {
               timestamp: new Date().toISOString(),
             });
             setIsDedupPending(false);
-            writeApprovalOutlineCache(dateKey, statusPayload.outline);
+            writeApprovalOutlineCache(cacheId, statusPayload.outline);
             setOutlineData(normalizeApprovalOutlineData(statusPayload.outline));
             setDedupFailureReason(null);
             return;
@@ -315,7 +328,14 @@ function ApprovalPageForDate({ dateKey }: { dateKey: string }) {
       active = false;
       clearTimeout(timeoutId);
     };
-  }, [dateKey]);
+  }, [dateKey, reuseKey, cacheId]);
+
+  const handleToggleDraftReuse = (draftDate: string) => {
+    const reuse = toggleReuseDraftDate(reuseKey ? reuseKey.split(",") : [], draftDate);
+    const params = new URLSearchParams({ date: dateKey });
+    if (reuse) params.set("reuse", reuse);
+    router.replace(`/approval?${params}`);
+  };
 
   if (error) return <ErrorState message={error} />;
   if (!outlineData || isDedupPending) return <LoadingState />;
@@ -323,6 +343,8 @@ function ApprovalPageForDate({ dateKey }: { dateKey: string }) {
   return (
     <ApprovalBoard
       dateKey={dateKey}
+      unsentDrafts={outlineData.unsent_drafts ?? []}
+      onToggleDraftReuse={handleToggleDraftReuse}
       outlineDateLabel={formatOutlineDate(dateKey)}
       referenceStories={outlineData.reference_stories}
       candidateSections={outlineData.candidate_sections}

@@ -4,6 +4,7 @@ import {
   createOutlineCandidateStories 
 } from "@/src/features/newsletter/curation.service";
 import { submitDeduplication } from "@/src/features/newsletter/openai-dedup";
+import { parseReuseDraftDates } from "@/src/features/newsletter/reuse-drafts-param";
 import { hasValidApprovalSession } from "@/src/server/approval-auth";
 import { logServerError, logServerInfo } from "@/src/server/observability";
 
@@ -25,13 +26,14 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const date = parseDateParam(searchParams.get("date"));
   const dateKey = toDateOnlyIso(date);
+  const reuseDraftDates = parseReuseDraftDates(searchParams.get("reuse"));
 
-  logServerInfo("approval.outline.api.request", { date: date.toISOString() });
+  logServerInfo("approval.outline.api.request", { date: date.toISOString(), reuseDraftDates });
 
   try {
     // Get outline without AI dedup (fast)
     const { outline, referencedStories, rankedCandidates } = 
-      await createOutlineCandidateStories(date);
+      await createOutlineCandidateStories(date, { reuseDraftDates });
 
     logServerInfo("approval.outline.api.outline_ready", { 
       date: dateKey,

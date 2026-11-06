@@ -62,14 +62,23 @@ type CandidateMapEntry = {
 type ReferenceStory = {
   id: number;
   usedInPublicationDate: string | null;
+  heldForDate?: string | null;
   paywall_detected: "yes" | "no" | "unknown" | "error";
   error?: string | null;
   headline: string;
   summary: string;
 };
 
+type UnsentDraft = {
+  date: string;
+  story_count: number;
+  reused: boolean;
+};
+
 type ApprovalBoardProps = {
   dateKey: string;
+  unsentDrafts: UnsentDraft[];
+  onToggleDraftReuse: (draftDate: string) => void;
   outlineDateLabel: string;
   referenceStories: ReferenceStory[];
   candidateSections: CandidateSection[];
@@ -126,6 +135,23 @@ function initSections(candidateSections: CandidateSection[]): SectionState[] {
   }));
 }
 
+function formatShortDate(dateOnly: string): string {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(dateOnly + "T00:00:00Z"));
+}
+
+function describeUnsentDraft(draft: UnsentDraft): string {
+  const stories = draft.story_count === 1 ? "story is" : "stories are";
+  const issue = `The ${formatLongDate(draft.date)} issue was not sent.`;
+  return draft.reused
+    ? `${issue} Its ${draft.story_count} approved ${stories} back in the pool for this issue.`
+    : `${issue} Its ${draft.story_count} approved ${stories} held for it and listed under Reference stories.`;
+}
+
 function formatLongDate(value: string | null | undefined): string {
   if (!value) return "Unknown";
 
@@ -174,6 +200,8 @@ function renderPaywallIcon(paywallDetected: "yes" | "no" | "unknown" | "error" |
 
 export default function ApprovalBoard({
   dateKey,
+  unsentDrafts,
+  onToggleDraftReuse,
   outlineDateLabel,
   referenceStories,
   candidateSections,
@@ -657,6 +685,21 @@ export default function ApprovalBoard({
             </p>
           </div>
         ) : null}
+        {unsentDrafts.map((draft) => (
+          <div
+            key={draft.date}
+            className="flex flex-wrap items-center justify-between gap-3 border-t border-[rgba(184,133,110,0.36)] bg-[rgba(255,244,236,0.85)] px-4 py-3 sm:px-6"
+          >
+            <p className="text-sm font-semibold text-[var(--accent-warm)]">{describeUnsentDraft(draft)}</p>
+            <button
+              type="button"
+              onClick={() => onToggleDraftReuse(draft.date)}
+              className="shrink-0 rounded-md border border-[rgba(184,133,110,0.5)] bg-white/80 px-3 py-1.5 text-xs font-medium text-[var(--accent-warm)] transition hover:bg-white"
+            >
+              {draft.reused ? `Hold them for ${formatShortDate(draft.date)}` : "Use them in this issue"}
+            </button>
+          </div>
+        ))}
         {dedupFailureReason ? (
           <div className="border-t border-red-300 bg-red-50 px-4 py-3 sm:px-6">
             <p className="text-sm font-semibold text-red-700">
@@ -687,7 +730,10 @@ export default function ApprovalBoard({
                 (() => {
                   const grouped = referenceStories.reduce<Record<string, ReferenceStory[]>>(
                     (acc, story) => {
-                      const key = story.usedInPublicationDate ?? "Unknown date";
+                      // Held stories sort first: "held:" sorts after any date in descending order.
+                      const key = story.heldForDate
+                        ? `held:${story.heldForDate}`
+                        : (story.usedInPublicationDate ?? "Unknown date");
                       (acc[key] ??= []).push(story);
                       return acc;
                     },
@@ -702,12 +748,9 @@ export default function ApprovalBoard({
                         <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-secondary)]">
                           {date === "Unknown date"
                             ? "Unknown date"
-                            : new Intl.DateTimeFormat("en-US", {
-                                month: "short",
-                                day: "numeric",
-                                year: "numeric",
-                                timeZone: "UTC",
-                              }).format(new Date(date + "T00:00:00Z"))}
+                            : date.startsWith("held:")
+                              ? `${formatShortDate(date.slice("held:".length))} · not sent yet`
+                              : formatShortDate(date)}
                         </p>
                       </div>
                       <div className="divide-y divide-[var(--border-light)]">

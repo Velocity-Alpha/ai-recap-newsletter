@@ -125,8 +125,25 @@ describe("GET /api/approval/outline/status", () => {
 
     expect(res.status).toBe(200);
     expect(json.status).toBe("completed");
-    expect(curationFns.createDedupedOutline).toHaveBeenCalledWith(new Date(DATE), [1, 3]);
+    expect(curationFns.createDedupedOutline).toHaveBeenCalledWith(new Date(DATE), [1, 3], {
+      reuseDraftDates: [],
+    });
     expect(json.outline).toEqual(BASE_OUTLINE);
+  });
+
+  it("rebuilds the board with the unsent drafts chosen for reuse", async () => {
+    dedupFns.checkDeduplicationStatus.mockResolvedValue({
+      status: "completed",
+      result: { kept_story_ids: [1, 3] },
+    });
+    curationFns.createDedupedOutline.mockResolvedValue(BASE_OUTLINE);
+    const token = await createApprovalSessionToken("approval-secret");
+
+    await GET(makeRequest({ response_id: RESPONSE_ID, date: DATE, reuse: "2026-04-23" }, token));
+
+    expect(curationFns.createDedupedOutline).toHaveBeenCalledWith(new Date(DATE), [1, 3], {
+      reuseDraftDates: ["2026-04-23"],
+    });
   });
 
   it("returns 500 for unknown response status", async () => {

@@ -259,8 +259,10 @@ curation code; none needs n8n.
    2 of 10 commits.
 4. **Prefer a free link** when the chosen link is paywalled, using another source's link for the same story.
    All 4 link edits in the archive did this by hand.
-5. **Hide stories already in a pending, unsent draft** from the next day's board. Today
-   `queued_for_publication_date` is written but never read.
+5. **Hold back stories already in a pending, unsent draft** from the next day's board, by default. A
+   banner per unsent draft lets the approver put them back in the pool for this issue (skip the missed
+   day) or keep holding them (catch up the missed issue). Held stories count as reference stories in the
+   duplicate check. Done in #57.
 
 Exit: for 2 weeks, fewer edits per commit than the archive baseline in doc 80. **Rollback:** revert the
 pull request.
@@ -356,7 +358,7 @@ Goal: commit → draft runs natively, with real status in the UI, one draft per 
    `ghl_template_id`, and on re-commit update the same GHL template.
 4. **Write `content_json` at draft time** from the structured LLM output. Publish detection then only confirms
    what was sent, and still records any edits made in GHL.
-5. **New GHL token** for native code, in env vars. Once native drafting is live, revoke the old tokens.
+5. **Reuse the existing GHL token** (the one n8n uses for the live templates) in env vars. No rotation.
 6. **Commit route switch:** `draft.owner = n8n` posts to the webhook as today. `draft.owner = native` starts
    the task and returns a run id. The approval page shows live progress, real failures, and a retry button.
 7. **Shadow:** with `draft.owner = n8n`, every commit also runs the native draft in preview mode. It skips
