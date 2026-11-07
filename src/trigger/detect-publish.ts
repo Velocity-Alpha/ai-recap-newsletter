@@ -5,9 +5,15 @@ import { runDetectPublish } from "@/src/pipeline/publish/run-detect-publish";
 // Publish detection (#63). Every 5 minutes in sending hours on weekdays. While `publish.owner` is `n8n`
 // (the default), each run reads one setting and stops; n8n's "3. Gmail Listen - Publish" keeps publishing.
 // The Dev environment gets no schedule: run it by hand from the dashboard.
+// window "0m": SDK 4.8 otherwise delays each scheduled run by up to 60 minutes.
 export const detectPublishTask = schedules.task({
   id: "detect-publish",
-  cron: { pattern: "*/5 10-19 * * 1-5", timezone: "America/New_York", environments: ["PRODUCTION"] },
+  cron: {
+    pattern: "*/5 10-19 * * 1-5",
+    timezone: "America/New_York",
+    window: "0m",
+    environments: ["PRODUCTION"],
+  },
   maxDuration: 120,
   run: async () => {
     const result = await runDetectPublish();
