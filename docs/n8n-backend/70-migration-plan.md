@@ -161,7 +161,7 @@ src/pipeline/
   side-effects/       # GHL, S3, review group; dry-run outside production
   settings.ts         # stage owners + thresholds from pipeline_settings
 src/trigger/          # Trigger.dev task definitions; thin wrappers around src/pipeline
-app/admin/...         # admin pages
+app/approval/...      # admin pages, for now under /approval so the existing login covers them
 ```
 
 ## 4. Environments
@@ -276,22 +276,36 @@ Goal: remove the most fragile step. Today an LLM re-reads the sent email, and if
 misses it the issue never appears. Sending stays manual in GHL.
 
 1. **Gmail client** with its own Google Cloud OAuth client and `gmail.readonly` scope. The refresh token is
-   stored in Trigger.dev env vars.
+   stored in Trigger.dev env vars. Built: `src/pipeline/publish/gmail-client.ts`.
 2. **Deterministic parser** that turns the sent email HTML into `content_json` v2. It reads the
-   `data-issue-id`, `data-story-id`, and `data-src-url` attributes the draft HTML already carries, and takes
-   the title from the subject line. There is no LLM in this path. It is built test-first against the
-   archived Gmail Listen runs.
-3. **`detect-publish` task.** Hourly runs from 10:00 to 20:00 ET on weekdays. Each run checks Gmail every
-   3–5 minutes, **filtered on the GHL sending address**, and touches the database only when a matching email
-   arrives. It processes each Gmail message id once. In one transaction it sets `published_at`,
-   `content_json`, `html`, `title`, and `stories.used_in_publication_date`. Then it calls an authenticated
-   revalidate route on the site, and runs the site check.
-4. **"Mark as published" button** in `/admin/issues`. It publishes a chosen draft from its stored HTML, as the
-   manual fallback.
+   `data-issue-id`, `data-story-id`, and `data-src-url` attributes the draft HTML already carries. It takes
+   the title from the email header, not the subject line, because the website title comes from there
+   (the subject has an extra emoji and sometimes other words). There is no LLM in this path. Built
+   test-first: `src/pipeline/publish/sent-email-parser.ts`. It matches n8n's AI parse on all 20 archived
+   issue emails, apart from quote style and spacing.
+3. **`detect-publish` task.** Runs every 5 minutes from 10:00 to 19:55 ET on weekdays (a run takes about
+   5 seconds, so no `wait.for` loop is needed). It searches Gmail for mail **from the GHL sending address**
+   (plus the seed recipients, if `PUBLISH_SEED_RECIPIENTS` is set) in the last 3 days, and writes to the
+   database only for a new message. It handles each Gmail message id once per mode. In one transaction it
+   sets `published_at`, `content_json`, `title`, and `stories.used_in_publication_date`, and only if the
+   issue is still unpublished. It does **not** overwrite `html` with the received copy, which holds a
+   subscriber's name and unsubscribe link. An email with parse problems is held as `needs_review`. Built:
+   `src/pipeline/publish/` and `src/trigger/detect-publish.ts`. The revalidate call and site check come
+   with item 5.
+4. **"Mark as published" button** in `/approval/issues` (behind the existing approval login). It publishes
+   a chosen draft from its stored HTML through the same store as the task, after an inline confirm. It sends
+   no email. Each use is a `manual` row in `publish_events`. Built and tested on dev.
 5. **Cache the site lists again.** The home page and archive lists use a tagged cache. The publish step
-   refreshes it, with a 1-hour safety expiry. Issue pages are refreshed the same way.
-6. **Shadow:** with owner `shadow`, the task writes only to `shadow_publish_events`, and is compared with
-   what Gmail Listen wrote (section 6).
+   refreshes it, with a 1-hour safety expiry. Issue pages are refreshed the same way. **Not started on
+   purpose:** n8n does not refresh caches, so list caching before the cutover would delay n8n publishes
+   on the site (#62).
+6. **Shadow:** with owner `shadow`, the task writes only to `publish_events` (mode `shadow`) and compares
+   its content with what Gmail Listen wrote. One table holds shadow, native, and manual rows. On dev, a
+   shadow run over 14 real seed emails (issues 264–270) found 0 differences.
+
+The owner key is `publish.owner` in `pipeline_settings` (`n8n`, `shadow`, or `native`). A missing or
+unknown value means `n8n`, so the task does nothing until the key is set. Shadow mode needs the
+Trigger.dev production deploy (blocked on 2026-11-06, waiting on Trigger.dev support).
 
 Cutover: after 5 matching sends, right after a successful publish (R7), set `publish.owner = native` and
 deactivate `3. Gmail Listen - Publish` in the same minute. **Rollback:** reactivate Gmail Listen and set

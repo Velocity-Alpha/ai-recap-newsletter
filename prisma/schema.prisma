@@ -147,6 +147,31 @@ model PipelineEvent {
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// One row per sent issue email that native publish detection looked at, and per manual "Mark as published".
+/// mode: shadow (records what it would do), native (published), manual (admin button).
+/// No foreign key to issues: issues are still deleted by hand while n8n drafts.
+model PublishEvent {
+  id             BigInt   @id @default(autoincrement())
+  mode           String
+  outcome        String
+  gmailMessageId String?  @map("gmail_message_id")
+  receivedAt     DateTime? @map("received_at") @db.Timestamptz(6)
+  issueId        BigInt?  @map("issue_id")
+  subject        String?
+  title          String?
+  storyIds       Int[]    @default([]) @map("story_ids")
+  contentJson    Json?    @map("content_json")
+  problems       String[] @default([])
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([mode, gmailMessageId])
+  @@index([issueId])
+  @@index([createdAt(sort: Desc)])
+  @@map("publish_events")
+  @@schema("newsletter")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 /// open_incident_key equals incident_key while the alert is open and is NULL once resolved,
 /// so the unique index allows one open alert per incident and any number of resolved ones.
 model Alert {

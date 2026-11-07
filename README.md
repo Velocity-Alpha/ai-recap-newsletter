@@ -145,6 +145,7 @@ Read routes:
 - `GET /api/ticker`
 - `GET /api/approval/outline?date=` for the password-protected approval board outline
 - `GET /api/newsletters/outline?date=` for the authenticated newsletter outline API
+- `GET /api/approval/issues/[id]/publish` previews what "Mark as published" would publish (approval session)
 
 Mutation routes:
 
@@ -156,6 +157,7 @@ Mutation routes:
 - `GET|POST /api/subscriber/unsubscribe` with a signed `token`
 - `POST /api/subscriber/unsubscribe/webhook` with `Authorization: Bearer <GHL_UNSUBSCRIBE_WEBHOOK_SECRET>` or `x-webhook-secret`
 - `POST /api/newsletters/commit` to commit an approved outline to the generation webhook
+- `POST /api/approval/issues/[id]/publish` publishes an unpublished draft from its stored email HTML (approval session). Used by the "Mark as published" button on `/approval/issues`. It sends no email.
 
 Public unsubscribe page:
 
@@ -169,6 +171,12 @@ Public unsubscribe page:
 - Route handlers under `app/api` provide the public JSON interface.
 
 The homepage, archive, and `GET /api/newsletters` read fresh issue lists on every request so new publications appear on the next page load. The list API sends `Cache-Control: no-store`. Individual issue lookups and sitemap entries retain their one-hour data caches, and the ticker retains its five-minute data cache.
+
+## Background jobs (Trigger.dev)
+
+Task definitions live in `src/trigger/` and stay thin; the logic lives in `src/pipeline/`. The migration plan is in `docs/n8n-backend/70-migration-plan.md`.
+
+- `detect-publish` reads the seed inbox (read-only) every 5 minutes on weekdays and publishes an issue when its email arrives. The `publish.owner` key in `newsletter.pipeline_settings` decides what it does: `n8n` (the default) does nothing, `shadow` only records `publish_events` rows, and `native` publishes. It needs `DATABASE_URL`, `GMAIL_OAUTH_CLIENT_ID`, `GMAIL_OAUTH_CLIENT_SECRET`, and `GMAIL_OAUTH_REFRESH_TOKEN`, plus `PUBLISH_SEED_RECIPIENTS` optionally.
 
 ## Deploying to Netlify
 
