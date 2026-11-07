@@ -12,3 +12,10 @@
 [context.staging.environment]
   APP_ENV = "preview"
   NEXT_PUBLIC_GA_MEASUREMENT_ID = "G-8GQC9DS1S7"
+
+# Pipeline jobs (ADR 0001). Netlify's bundler leaves the generated Prisma
+# client's require("@prisma/client-runtime-utils") external, but cannot copy
+# that package (its exports map hides package.json), so the function fails
+# with "Cannot find module". Ship it explicitly.
+[functions."detect-publish*"]
+  included_files = ["node_modules/@prisma/client-runtime-utils/**"]

@@ -178,6 +178,7 @@ Jobs run as Netlify functions in `netlify/functions/` (see `docs/adr/0001-job-ru
 
 - `detect-publish` reads the seed inbox (read-only) every 5 minutes on weekdays, 09:00–20:59 New York time, and `detect-publish-catch-up` looks back 3 days once a day. Each run checks Gmail first and opens the database only when an issue email arrived. The `publish.owner` key decides what happens next: `n8n` (the default) does nothing, `shadow` only records `publish_events` rows, and `native` publishes. The functions need `DATABASE_URL`, `GMAIL_OAUTH_CLIENT_ID`, `GMAIL_OAUTH_CLIENT_SECRET`, and `GMAIL_OAUTH_REFRESH_TOKEN` as secret Netlify env vars, plus `PUBLISH_SEED_RECIPIENTS` optionally. Secret vars use the scopes builds, functions, and runtime; the Free plan cannot narrow them further.
 - Scheduled functions fire only on the production deploy. To try one on a deploy preview (Neon `dev`), use "Run now" on the preview's function page in the Netlify UI.
+- Do this before merging a new job. A local bundle can still load packages from the repo's `node_modules`, so it can pass while the Netlify bundle fails. `netlify.toml` ships `@prisma/client-runtime-utils` with the jobs for this reason.
 
 ## Deploying to Netlify
 
