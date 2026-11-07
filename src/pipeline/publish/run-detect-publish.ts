@@ -1,18 +1,30 @@
 import type { Prisma } from "@/src/generated/prisma";
-import {
-  buildPublishQuery,
-  detectPublish,
-  type DetectPublishSummary,
-  type PublishStore,
-} from "@/src/pipeline/publish/detect-publish";
+import { detectPublish, buildPublishQuery, type DetectPublishSummary, type PublishStore } from "@/src/pipeline/publish/detect-publish";
 import { createGmailReader, readGmailCredentials, type GmailReader } from "@/src/pipeline/publish/gmail-client";
+import {
+  CATCH_UP_LOOKBACK_MINUTES,
+  isPublishPollTime,
+  POLL_LOOKBACK_MINUTES,
+} from "@/src/pipeline/publish/publish-schedule";
 import { createPrismaPublishStore } from "@/src/pipeline/publish/publish-store";
 import { finishRun, logEvent, startRun } from "@/src/pipeline/runs";
 import { readSetting } from "@/src/pipeline/settings";
 
+/**
+ * Publish detection, independent of the job runner. Netlify and Trigger.dev each call it through a thin
+ * adapter (`netlify/functions/`, `src/trigger/`).
+ *
+ * Gmail first (plan §3.2): a run reads Gmail and opens the database only when an issue email arrived in the
+ * lookback window, so the polls keep Neon asleep on most runs.
+ */
+
 /** Rule R1: one owner for publish detection. `n8n` (the default) means this job does nothing. */
 export const PUBLISH_OWNER_KEY = "publish.owner";
 export type PublishOwner = "n8n" | "shadow" | "native";
+
+/** Which job runner acts. The other one stops after its Gmail check. Missing means `netlify`. */
+export const PIPELINE_RUNNER_KEY = "pipeline.runner";
+export type PipelineRunner = "netlify" | "trigger";
 
 const JOB = "detect-publish";
 // A send is 2 seed copies. 20 covers several days of sends plus unrelated mail.
@@ -23,33 +35,63 @@ export async function readPublishOwner(): Promise<PublishOwner> {
   return value === "shadow" || value === "native" ? value : "n8n";
 }
 
-export interface RunDetectPublishResult {
-  owner: PublishOwner;
-  summary?: DetectPublishSummary;
-  /** Set when the run was recorded in `pipeline_runs` (only when there was new mail or an error). */
-  runId?: string;
+export async function readPipelineRunner(): Promise<PipelineRunner> {
+  return (await readSetting(PIPELINE_RUNNER_KEY)) === "trigger" ? "trigger" : "netlify";
+}
+
+export type RunDetectPublishResult =
+  | { status: "outside_window" }
+  | { status: "not_configured"; reason: string }
+  | { status: "no_mail" }
+  | { status: "off" }
+  | { status: "other_runner"; runner: PipelineRunner }
+  | {
+      status: "ran";
+      owner: Exclude<PublishOwner, "n8n">;
+      summary: DetectPublishSummary;
+      /** Set when the run was recorded in `pipeline_runs` (only when there was new mail or an error). */
+      runId?: string;
+    };
+
+export interface RunDetectPublishOptions {
+  gmail?: GmailReader;
+  store?: PublishStore;
+  env?: Record<string, string | undefined>;
+  now?: () => Date;
 }
 
 export async function runDetectPublish(
-  options: {
-    gmail?: GmailReader;
-    store?: PublishStore;
-    env?: Record<string, string | undefined>;
-    now?: () => Date;
-  } = {},
+  runner: PipelineRunner,
+  lookbackMinutes: number,
+  options: RunDetectPublishOptions = {},
 ): Promise<RunDetectPublishResult> {
-  const owner = await readPublishOwner();
-  if (owner === "n8n") return { owner };
-
   const env = options.env ?? process.env;
   const now = options.now ?? (() => new Date());
-  const gmail = options.gmail ?? createGmailReader(readGmailCredentials(env));
-  const store = options.store ?? createPrismaPublishStore();
-  const query = buildPublishQuery({ recipients: env.PUBLISH_SEED_RECIPIENTS?.split(","), lookbackDays: 3 });
 
-  const summary = await detectPublish({ gmail, store }, { mode: owner, query, limit: MESSAGE_LIMIT });
-  // Most polls find nothing new. Record a run only when something happened, to keep pipeline_runs readable.
-  if (summary.results.length === 0 && summary.errors.length === 0) return { owner, summary };
+  let gmail = options.gmail;
+  if (!gmail) {
+    try {
+      gmail = createGmailReader(readGmailCredentials(env));
+    } catch (error) {
+      return { status: "not_configured", reason: error instanceof Error ? error.message : String(error) };
+    }
+  }
+
+  const since = new Date(now().getTime() - lookbackMinutes * 60_000);
+  const query = buildPublishQuery({ recipients: env.PUBLISH_SEED_RECIPIENTS?.split(","), since });
+  const messageIds = await gmail.listMessageIds(query, MESSAGE_LIMIT);
+  if (messageIds.length === 0) return { status: "no_mail" };
+
+  // From here on the database is awake anyway.
+  const owner = await readPublishOwner();
+  if (owner === "n8n") return { status: "off" };
+  const selected = await readPipelineRunner();
+  if (selected !== runner) return { status: "other_runner", runner: selected };
+
+  const store = options.store ?? createPrismaPublishStore();
+  const summary = await detectPublish({ gmail, store }, { mode: owner, messageIds });
+  // Most polls see mail they already handled. Record a run only when something happened.
+  if (summary.results.length === 0 && summary.errors.length === 0) return { status: "ran", owner, summary };
 
   const runId = await startRun({ job: JOB, trigger: "schedule" }, now());
   for (const result of summary.results) {
@@ -71,6 +113,8 @@ export async function runDetectPublish(
 
   const stats = {
     owner,
+    runner,
+    lookbackMinutes,
     listed: summary.listed,
     skipped: summary.skipped,
     handled: summary.results.length,
@@ -83,5 +127,49 @@ export async function runDetectPublish(
       : { status: "succeeded", stats },
     now(),
   );
-  return { owner, summary, runId: runId.toString() };
+  return { status: "ran", owner, summary, runId: runId.toString() };
+}
+
+/** The frequent check: every 5 minutes, weekdays 09:00–20:59 New York. Outside that it does nothing. */
+export async function runPublishPoll(
+  runner: PipelineRunner,
+  options: RunDetectPublishOptions = {},
+): Promise<RunDetectPublishResult> {
+  const now = options.now ?? (() => new Date());
+  if (!isPublishPollTime(now())) return { status: "outside_window" };
+  return runDetectPublish(runner, POLL_LOOKBACK_MINUTES, { ...options, now });
+}
+
+/** Once a day: catches emails the poll missed (runner down, or sent outside the poll hours). */
+export function runPublishCatchUp(
+  runner: PipelineRunner,
+  options: RunDetectPublishOptions = {},
+): Promise<RunDetectPublishResult> {
+  return runDetectPublish(runner, CATCH_UP_LOOKBACK_MINUTES, options);
+}
+
+export function describePublishRun(result: RunDetectPublishResult): string {
+  switch (result.status) {
+    case "outside_window":
+      return "Outside the publish poll hours. Nothing to do.";
+    case "not_configured":
+      return `${result.reason} Nothing to do.`;
+    case "no_mail":
+      return "No new issue email. The database was not touched.";
+    case "off":
+      return "n8n owns publishing (publish.owner). Nothing to do.";
+    case "other_runner":
+      return `pipeline.runner is ${result.runner}. This runner does nothing.`;
+    case "ran": {
+      const { listed, skipped, results, errors } = result.summary;
+      const run = result.runId ? ` Pipeline run ${result.runId}.` : "";
+      return `${result.owner}: listed ${listed}, skipped ${skipped}, handled ${results.length}, failed ${errors.length}.${run}`;
+    }
+  }
+}
+
+/** Throws when a message failed, so the runner marks the run failed. Handled messages are skipped next time. */
+export function throwIfPublishRunFailed(result: RunDetectPublishResult): void {
+  if (result.status !== "ran" || result.summary.errors.length === 0) return;
+  throw new Error(`${result.summary.errors.length} message(s) failed. See pipeline run ${result.runId}.`);
 }
