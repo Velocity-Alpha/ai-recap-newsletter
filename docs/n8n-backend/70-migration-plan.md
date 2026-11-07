@@ -290,8 +290,10 @@ misses it the issue never appears. Sending stays manual in GHL.
    sets `published_at`, `content_json`, `title`, and `stories.used_in_publication_date`, and only if the
    issue is still unpublished. It does **not** overwrite `html` with the received copy, which holds a
    subscriber's name and unsubscribe link. An email with parse problems is held as `needs_review`. Built:
-   `src/pipeline/publish/` and `src/trigger/detect-publish.ts`. The revalidate call and site check come
-   with item 5.
+   `src/pipeline/publish/`. The revalidate call and site check come with item 5. **No schedule yet.** The
+   first Trigger.dev task was removed before merge: Trigger.dev Free rejects schedules that fire more than
+   once an hour, and the job read the database on every run, which breaks §3.2. The next pull request
+   checks Gmail first and runs it from a Netlify scheduled function.
 4. **"Mark as published" button** in `/approval/issues` (behind the existing approval login). It publishes
    a chosen draft from its stored HTML through the same store as the task, after an inline confirm. It sends
    no email. Each use is a `manual` row in `publish_events`. Built and tested on dev.
@@ -304,8 +306,7 @@ misses it the issue never appears. Sending stays manual in GHL.
    shadow run over 14 real seed emails (issues 264–270) found 0 differences.
 
 The owner key is `publish.owner` in `pipeline_settings` (`n8n`, `shadow`, or `native`). A missing or
-unknown value means `n8n`, so the task does nothing until the key is set. Shadow mode needs the
-Trigger.dev production deploy (blocked on 2026-11-06, waiting on Trigger.dev support).
+unknown value means `n8n`, so the task does nothing until the key is set. Shadow mode needs that schedule.
 
 Cutover: after 5 matching sends, right after a successful publish (R7), set `publish.owner = native` and
 deactivate `3. Gmail Listen - Publish` in the same minute. **Rollback:** reactivate Gmail Listen and set

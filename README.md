@@ -176,7 +176,7 @@ The homepage, archive, and `GET /api/newsletters` read fresh issue lists on ever
 
 Task definitions live in `src/trigger/` and stay thin; the logic lives in `src/pipeline/`. The migration plan is in `docs/n8n-backend/70-migration-plan.md`.
 
-- `detect-publish` reads the seed inbox (read-only) every 5 minutes on weekdays and publishes an issue when its email arrives. The `publish.owner` key in `newsletter.pipeline_settings` decides what it does: `n8n` (the default) does nothing, `shadow` only records `publish_events` rows, and `native` publishes. It needs `DATABASE_URL`, `GMAIL_OAUTH_CLIENT_ID`, `GMAIL_OAUTH_CLIENT_SECRET`, and `GMAIL_OAUTH_REFRESH_TOKEN`, plus `PUBLISH_SEED_RECIPIENTS` optionally.
+- `detect-publish` (`src/pipeline/publish/run-detect-publish.ts`) reads the seed inbox (read-only) and publishes an issue when its email arrives. No schedule runs it yet. The `publish.owner` key in `newsletter.pipeline_settings` decides what it does: `n8n` (the default) does nothing, `shadow` only records `publish_events` rows, and `native` publishes. It needs `DATABASE_URL`, `GMAIL_OAUTH_CLIENT_ID`, `GMAIL_OAUTH_CLIENT_SECRET`, and `GMAIL_OAUTH_REFRESH_TOKEN`, plus `PUBLISH_SEED_RECIPIENTS` optionally.
 
 ## Deploying to Netlify
 
