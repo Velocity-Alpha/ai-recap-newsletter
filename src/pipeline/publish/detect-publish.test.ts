@@ -59,14 +59,19 @@ const message = (id: string, html = ISSUE_HTML, sentAt = SENT_AT): GmailMessage 
   html,
 });
 
+// Gmail lists newest first.
+const newestFirst = (gmail: GmailReader) => gmail.listMessageIds("q", 10);
+
 describe("buildPublishQuery", () => {
-  it("filters on the sending address and a lookback window", () => {
-    expect(buildPublishQuery({})).toBe("from:newsletter@airecap.news newer_than:3d");
+  const since = new Date("2026-11-09T15:40:00.000Z");
+
+  it("filters on the sending address and mail received after a time, in epoch seconds", () => {
+    expect(buildPublishQuery({ since })).toBe("from:newsletter@airecap.news after:1794238800");
   });
 
   it("adds the seed recipients when they are configured", () => {
-    expect(buildPublishQuery({ recipients: ["a@example.test", " b@example.test "], lookbackDays: 2 })).toBe(
-      "from:newsletter@airecap.news (to:a@example.test OR to:b@example.test) newer_than:2d",
+    expect(buildPublishQuery({ recipients: ["a@example.test", " b@example.test "], since })).toBe(
+      "from:newsletter@airecap.news (to:a@example.test OR to:b@example.test) after:1794238800",
     );
   });
 });
@@ -78,10 +83,8 @@ describe("detectPublish", () => {
       { id: 268, publishedAt: SENT_AT, contentJson: { ...stored, title: "Different Title" } },
     ]);
 
-    const summary = await detectPublish(
-      { gmail: fakeGmail([message("m1")]), store },
-      { mode: "shadow", query: "q", limit: 10 },
-    );
+    const gmail = fakeGmail([message("m1")]);
+    const summary = await detectPublish({ gmail, store }, { mode: "shadow", messageIds: await newestFirst(gmail) });
 
     expect(published).toEqual([]);
     expect(events).toEqual([
@@ -112,10 +115,8 @@ describe("detectPublish", () => {
     const { store, events, published } = fakeStore([{ id: 268, publishedAt: null, contentJson: null }]);
     const later = new Date(SENT_AT.getTime() + 1000);
 
-    const summary = await detectPublish(
-      { gmail: fakeGmail([message("first"), message("second", ISSUE_HTML, later)]), store },
-      { mode: "native", query: "q", limit: 10 },
-    );
+    const gmail = fakeGmail([message("first"), message("second", ISSUE_HTML, later)]);
+    const summary = await detectPublish({ gmail, store }, { mode: "native", messageIds: await newestFirst(gmail) });
 
     expect(published).toEqual([268]);
     expect(events.map((e) => [e.gmailMessageId, e.outcome])).toEqual([
@@ -129,7 +130,7 @@ describe("detectPublish", () => {
     const gmail = fakeGmail([message("seen"), message("promo", "<p>Upgrade your plan</p>")]);
     const { store, events } = fakeStore([], ["seen"]);
 
-    const summary = await detectPublish({ gmail, store }, { mode: "shadow", query: "q", limit: 10 });
+    const summary = await detectPublish({ gmail, store }, { mode: "shadow", messageIds: await newestFirst(gmail) });
 
     expect(gmail.reads).toEqual(["promo"]);
     expect(summary.skipped).toBe(1);
@@ -138,13 +139,9 @@ describe("detectPublish", () => {
 
   it("keeps going after one message fails, and reports the failure", async () => {
     const gmail = fakeGmail([message("ok")]);
-    const listed: GmailReader = {
-      listMessageIds: async () => ["broken", "ok"],
-      getMessage: (id) => gmail.getMessage(id),
-    };
     const { store } = fakeStore([{ id: 268, publishedAt: null, contentJson: null }]);
 
-    const summary = await detectPublish({ gmail: listed, store }, { mode: "native", query: "q", limit: 10 });
+    const summary = await detectPublish({ gmail, store }, { mode: "native", messageIds: ["broken", "ok"] });
 
     expect(summary.results.map((r) => r.gmailMessageId)).toEqual(["ok"]);
     expect(summary.errors).toEqual([{ gmailMessageId: "broken", message: "no message broken" }]);

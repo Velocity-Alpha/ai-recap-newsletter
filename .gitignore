@@ -9,7 +9,9 @@ deno.lock
 src/generated/prisma
 # Local Netlify folder
 .netlify
-netlify/
+netlify/*
+# Pipeline jobs (ADR 0001)
+!netlify/functions/
 netlify/deno.lock
 # Developer-local MCP config
 .mcp.json

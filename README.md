@@ -172,11 +172,12 @@ Public unsubscribe page:
 
 The homepage, archive, and `GET /api/newsletters` read fresh issue lists on every request so new publications appear on the next page load. The list API sends `Cache-Control: no-store`. Individual issue lookups and sitemap entries retain their one-hour data caches, and the ticker retains its five-minute data cache.
 
-## Background jobs (Trigger.dev)
+## Background jobs (Netlify functions)
 
-Task definitions live in `src/trigger/` and stay thin; the logic lives in `src/pipeline/`. The migration plan is in `docs/n8n-backend/70-migration-plan.md`.
+Jobs run as Netlify functions in `netlify/functions/` (see `docs/adr/0001-job-runner.md`). The adapters stay thin; the logic lives in `src/pipeline/`. `src/trigger/` holds dormant Trigger.dev adapters for the same jobs. The `pipeline.runner` key in `newsletter.pipeline_settings` picks the runner that acts: `netlify` (the default) or `trigger`. The migration plan is in `docs/n8n-backend/70-migration-plan.md`.
 
-- `detect-publish` (`src/pipeline/publish/run-detect-publish.ts`) reads the seed inbox (read-only) and publishes an issue when its email arrives. No schedule runs it yet. The `publish.owner` key in `newsletter.pipeline_settings` decides what it does: `n8n` (the default) does nothing, `shadow` only records `publish_events` rows, and `native` publishes. It needs `DATABASE_URL`, `GMAIL_OAUTH_CLIENT_ID`, `GMAIL_OAUTH_CLIENT_SECRET`, and `GMAIL_OAUTH_REFRESH_TOKEN`, plus `PUBLISH_SEED_RECIPIENTS` optionally.
+- `detect-publish` reads the seed inbox (read-only) every 5 minutes on weekdays, 09:00–20:59 New York time, and `detect-publish-catch-up` looks back 3 days once a day. Each run checks Gmail first and opens the database only when an issue email arrived. The `publish.owner` key decides what happens next: `n8n` (the default) does nothing, `shadow` only records `publish_events` rows, and `native` publishes. The functions need `DATABASE_URL`, `GMAIL_OAUTH_CLIENT_ID`, `GMAIL_OAUTH_CLIENT_SECRET`, and `GMAIL_OAUTH_REFRESH_TOKEN` as secret Netlify env vars, plus `PUBLISH_SEED_RECIPIENTS` optionally. Secret vars use the scopes builds, functions, and runtime; the Free plan cannot narrow them further.
+- Scheduled functions fire only on the production deploy. To try one on a deploy preview (Neon `dev`), use "Run now" on the preview's function page in the Netlify UI.
 
 ## Deploying to Netlify
 

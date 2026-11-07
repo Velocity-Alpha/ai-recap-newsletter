@@ -62,21 +62,23 @@ export interface DetectPublishSummary {
   errors: Array<{ gmailMessageId: string; message: string }>;
 }
 
-export function buildPublishQuery(options: { recipients?: string[]; lookbackDays?: number }): string {
+/** Gmail search for issue emails received after `since` (Gmail takes epoch seconds in `after:`). */
+export function buildPublishQuery(options: { recipients?: string[]; since: Date }): string {
   const recipients = (options.recipients ?? []).map((value) => value.trim()).filter(Boolean);
   const to = recipients.length > 0 ? ` (${recipients.map((value) => `to:${value}`).join(" OR ")})` : "";
-  return `from:${NEWSLETTER_SENDER}${to} newer_than:${options.lookbackDays ?? 3}d`;
+  return `from:${NEWSLETTER_SENDER}${to} after:${Math.floor(options.since.getTime() / 1000)}`;
 }
 
 export async function detectPublish(
   deps: { gmail: GmailReader; store: PublishStore },
-  options: { mode: Exclude<PublishMode, "manual">; query: string; limit: number },
+  /** `messageIds` as Gmail lists them, newest first. The caller lists them, so it can stop before the database. */
+  options: { mode: Exclude<PublishMode, "manual">; messageIds: string[] },
 ): Promise<DetectPublishSummary> {
   const { gmail, store } = deps;
   const { mode } = options;
 
-  // Gmail lists newest first. Handle the oldest first, so the first copy of a send is the one that publishes.
-  const listed = (await gmail.listMessageIds(options.query, options.limit)).reverse();
+  // Handle the oldest first, so the first copy of a send is the one that publishes.
+  const listed = [...options.messageIds].reverse();
   const known = await store.knownMessageIds(mode, listed);
   const summary: DetectPublishSummary = { listed: listed.length, skipped: 0, results: [], errors: [] };
 

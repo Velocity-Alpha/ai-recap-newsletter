@@ -34,7 +34,7 @@ From the owner:
 4. **Development and production are separate.** Production is the only hosted environment. Non-production is
    the owner's laptop plus Netlify pull-request previews, all on the Neon `dev` branch.
 5. **The migration is piecewise.** The current system keeps running while each piece moves.
-6. **It costs close to nothing.** Free plans only: Trigger.dev Free, Neon Free, Healthchecks.io Free.
+6. **It costs close to nothing.** Free plans only: the existing Netlify plan, Neon Free, Healthchecks.io Free.
 
 Daily schedule (weekdays, Eastern time), unchanged from today:
 
@@ -88,10 +88,10 @@ flowchart LR
     APPROVAL["/approval board"]
     API["API routes (incl. revalidate)"]
   end
-  subgraph JOBS["Trigger.dev Free tasks (this repo, /trigger)"]
+  subgraph JOBS["Netlify functions (this repo, netlify/functions)"]
     ING["ingest (hourly 06:00-12:00 ET)"]
     DRAFT["draft-issue (on commit)"]
-    PUB["detect-publish (hourly runs that poll every 3-5 min)"]
+    PUB["detect-publish (every 5 min, Gmail first)"]
     CHECK["outcome checks (10:05, 12:00, 18:00, after commit, after publish)"]
   end
   subgraph CORE["src/pipeline (shared TypeScript modules)"]
@@ -109,23 +109,23 @@ flowchart LR
   CHECK --> HB
 ```
 
-### 3.1 Job runner: Trigger.dev Free
+### 3.1 Job runner: Netlify functions
 
-Tasks are TypeScript in this repo, so Claude Code builds and tests them like the rest of the app. Facts that
-shape the design (from [the job-runner research](../research/free-job-runners.md), checked 2026-11-04):
+Decided in [ADR 0001](../adr/0001-job-runner.md) (2026-11-07). Jobs are TypeScript in this repo, so Claude
+Code builds and tests them like the rest of the app.
 
-- **Cost:** $0. Estimated use is $1.90–3.20 a month against the $5 monthly credit. If the credit runs out,
-  tasks pause. There is no bill.
-- **Schedules run at most hourly.** A task that needs to poll more often runs hourly and loops "check, then
-  `wait.for` 3–5 minutes". Waits longer than 5 seconds are not billed.
-- **Long AI calls work.** Today's longest steps take 50–160 s, and one image-prompt call hit 300 s. Netlify
-  cannot run these: synchronous functions stop at 60 s and scheduled functions at 30 s.
-- **No hosted staging.** The Dev environment runs tasks on the owner's laptop through the CLI.
-- **Run history lasts 1 day.** Our own `pipeline_runs` table keeps the long history.
-- **Prisma 7 support is in beta.** Phase 1 starts with a one-day test. If it fails, the fallback is
-  **Inngest Free** inside the Netlify app.
+- **Scheduled functions** run short checks. Netlify stops them at 30 s, and their cron is UTC only, so each
+  job checks New York time in code.
+- **Background functions** run long work (up to 15 minutes; on all credit-based plans, including Free).
+  Today's longest AI steps take 50–160 s, and one image-prompt call hit 300 s. They come with ingestion.
+- **Cost:** Netlify credits shared with the site. Estimate 35–55 a month for all jobs, out of 300.
+- **Runner-neutral logic.** Jobs live in `src/pipeline/`. `netlify/functions/` and `src/trigger/` are thin
+  adapters, and `pipeline.runner` in `pipeline_settings` says which one acts (`netlify` by default).
+- **Trigger.dev Free** passed its test in Dev, but Production deploys are blocked by the vendor. Its adapters
+  stay in `src/trigger/`, dormant, so it can take over if the block lifts (ADR 0001 lists the steps).
 
-Self-hosting on the Oracle VM is ruled out: self-hosted Trigger.dev needs about 7 vCPU and 14 GB.
+Self-hosting on the Oracle VM is ruled out: it would share a box with n8n, and self-hosted Trigger.dev needs
+about 7 vCPU and 14 GB.
 
 ### 3.2 Database: Neon Free
 
@@ -160,7 +160,8 @@ src/pipeline/
   notify/             # Telegram ops bot + email, dedup, severity routing
   side-effects/       # GHL, S3, review group; dry-run outside production
   settings.ts         # stage owners + thresholds from pipeline_settings
-src/trigger/          # Trigger.dev task definitions; thin wrappers around src/pipeline
+netlify/functions/    # Netlify scheduled and background functions; thin wrappers around src/pipeline
+src/trigger/          # dormant Trigger.dev adapters for the same jobs (ADR 0001)
 app/approval/...      # admin pages, for now under /approval so the existing login covers them
 ```
 
@@ -170,7 +171,7 @@ app/approval/...      # admin pages, for now under /approval so the existing log
 |---|---|---|
 | Database | Neon `dev` branch. Reset from production on demand, then a script replaces `subscribers` and `auth_codes` with fake rows. | Neon production branch |
 | Website | `next dev` on the laptop, and Netlify deploy previews for pull requests. Both point at the Neon `dev` branch. No separate staging site; the old `staging` branch is not revived. | Netlify production (`main`) |
-| Jobs | Trigger.dev Dev environment (`npx trigger.dev dev`). Manual runs only, no schedules. | Trigger.dev Production, deployed from `main` |
+| Jobs | No schedules. "Run now" on a deploy preview (which uses `dev`), or bundle a function with esbuild and run it locally. | Netlify functions on the production deploy of `main` |
 | Gmail | Same mailbox, **read-only** scope (`gmail.readonly`). Nothing is labelled, moved, or marked read. | Same |
 | LLM keys | Separate OpenAI project and key with a low budget cap | Production OpenAI project and key |
 | Image storage | S3 prefix `newsletter-dev/` | S3 prefix `newsletter/` |
@@ -210,8 +211,8 @@ Goal: environments, the job runner, alerts, and outcome checks exist and are pro
    clean on `dev` and production.
 2. **Environments** as in section 4: reset and scrub the `dev` branch, point Netlify deploy previews at it,
    and require `APP_ENV` everywhere.
-3. **Trigger.dev Free project**, with a one-day test: a task reads and writes the `dev` branch through
-   Prisma 7, runs in Dev and Production, and logs a run. If it fails, switch to Inngest Free.
+3. **Job runner.** Trigger.dev Free passed its test in Dev, but Production deploys are blocked by the
+   vendor. Jobs run as Netlify functions instead (ADR 0001).
 4. **Base tables** (additive):
    - `pipeline_settings` (key, value json, updated_at): stage owners, deadlines, and thresholds.
    - `pipeline_runs` (id, job, trigger, status, started_at, finished_at, stats json, error).
@@ -235,7 +236,7 @@ Goal: environments, the job runner, alerts, and outcome checks exist and are pro
 
    From Phase 3 the site check also runs right after each publish.
 8. **Healthchecks.io heartbeat** (free plan). It emails the owner if the daily digest does not check in.
-   That catches the job runner itself being down. Trigger.dev's built-in failure emails are a second channel.
+   That catches the job runner itself being down.
 9. **Website login fixes** tracked in private GitHub security advisories.
 10. **Admin shell:** `/admin` behind the approval login, with read-only pages for runs, alerts, and settings.
 
@@ -276,24 +277,24 @@ Goal: remove the most fragile step. Today an LLM re-reads the sent email, and if
 misses it the issue never appears. Sending stays manual in GHL.
 
 1. **Gmail client** with its own Google Cloud OAuth client and `gmail.readonly` scope. The refresh token is
-   stored in Trigger.dev env vars. Built: `src/pipeline/publish/gmail-client.ts`.
+   stored in secret Netlify env vars. Built: `src/pipeline/publish/gmail-client.ts`.
 2. **Deterministic parser** that turns the sent email HTML into `content_json` v2. It reads the
    `data-issue-id`, `data-story-id`, and `data-src-url` attributes the draft HTML already carries. It takes
    the title from the email header, not the subject line, because the website title comes from there
    (the subject has an extra emoji and sometimes other words). There is no LLM in this path. Built
    test-first: `src/pipeline/publish/sent-email-parser.ts`. It matches n8n's AI parse on all 20 archived
    issue emails, apart from quote style and spacing.
-3. **`detect-publish` task.** Runs every 5 minutes from 10:00 to 19:55 ET on weekdays (a run takes about
-   5 seconds, so no `wait.for` loop is needed). It searches Gmail for mail **from the GHL sending address**
-   (plus the seed recipients, if `PUBLISH_SEED_RECIPIENTS` is set) in the last 3 days, and writes to the
-   database only for a new message. It handles each Gmail message id once per mode. In one transaction it
+3. **`detect-publish` job.** A Netlify scheduled function runs it every 5 minutes from 09:00 to 20:59 ET on
+   weekdays (past sends went out 10:00–17:40), and a daily catch-up run at 22:00 ET looks back 3 days. It
+   searches Gmail first for mail **from the GHL sending address** (plus the seed recipients, if
+   `PUBLISH_SEED_RECIPIENTS` is set) received in the last 20 minutes. Only when there is such mail does it
+   open the database (§3.2). It handles each Gmail message id once per mode. In one transaction it
    sets `published_at`, `content_json`, `title`, and `stories.used_in_publication_date`, and only if the
    issue is still unpublished. It does **not** overwrite `html` with the received copy, which holds a
    subscriber's name and unsubscribe link. An email with parse problems is held as `needs_review`. Built:
-   `src/pipeline/publish/`. The revalidate call and site check come with item 5. **No schedule yet.** The
-   first Trigger.dev task was removed before merge: Trigger.dev Free rejects schedules that fire more than
-   once an hour, and the job read the database on every run, which breaks §3.2. The next pull request
-   checks Gmail first and runs it from a Netlify scheduled function.
+   `src/pipeline/publish/` (logic), `netlify/functions/detect-publish*.mts` (active), and
+   `src/trigger/detect-publish.ts` (dormant, see ADR 0001). The revalidate call and site check come with
+   item 5.
 4. **"Mark as published" button** in `/approval/issues` (behind the existing approval login). It publishes
    a chosen draft from its stored HTML through the same store as the task, after an inline confirm. It sends
    no email. Each use is a `manual` row in `publish_events`. Built and tested on dev.
@@ -306,7 +307,8 @@ misses it the issue never appears. Sending stays manual in GHL.
    shadow run over 14 real seed emails (issues 264–270) found 0 differences.
 
 The owner key is `publish.owner` in `pipeline_settings` (`n8n`, `shadow`, or `native`). A missing or
-unknown value means `n8n`, so the task does nothing until the key is set. Shadow mode needs that schedule.
+unknown value means `n8n`, so the job does nothing until the key is set. Shadow mode needs the Gmail env
+vars in Netlify (set 2026-11-07) and `publish.owner = shadow` on production.
 
 Cutover: after 5 matching sends, right after a successful publish (R7), set `publish.owner = native` and
 deactivate `3. Gmail Listen - Publish` in the same minute. **Rollback:** reactivate Gmail Listen and set
@@ -440,7 +442,7 @@ Exit: 2 weeks native-only with no duplicate drafts and no silent draft failures.
   repeating failure does not spam. The system posts "resolved" when the check passes again.
 - **Every alert says what to do.** Each message names the failing thing, the evidence, and a link to the run
   or admin page and the runbook entry in `docs/pipeline/runbook.md`.
-- **Backstops.** Trigger.dev's own run-failure emails, and Healthchecks.io if the digest does not arrive.
+- **Backstop.** Healthchecks.io, if the digest does not arrive.
 - **Outcomes matter most.** n8n runs report "success" while losing data, so the checks judge results
   (stories, drafts, publishes, site pages), not job status.
 
@@ -448,7 +450,6 @@ Exit: 2 weeks native-only with no duplicate drafts and no silent draft failures.
 
 | When | Action |
 |---|---|
-| Before Phase 1 | Create a Trigger.dev account (Free) and a project. |
 | Before Phase 1 | Create the "AI Recap Ops" bot with BotFather, create two private chats (prod ops, dev ops), add the bot, and share the token and chat ids. |
 | Before Phase 1 | Approve resetting the Neon `dev` branch from production. Its June data is lost. |
 | Before Phase 1 | Create a Healthchecks.io account (Free) and one check. |
