@@ -286,8 +286,9 @@ misses it the issue never appears. Sending stays manual in GHL.
    issue emails, apart from quote style and spacing.
 3. **`detect-publish` job.** A Netlify scheduled function runs it every 5 minutes from 09:00 to 20:59 ET on
    weekdays (past sends went out 10:00–17:40), and a daily catch-up run at 22:00 ET looks back 3 days. It
-   searches Gmail first for mail **from the GHL sending address** (plus the seed recipients, if
-   `PUBLISH_SEED_RECIPIENTS` is set) received in the last 20 minutes. Only when there is such mail does it
+   searches Gmail first for mail **from the GHL sending address** to the one monitor seed address
+   (`PUBLISH_SEED_RECIPIENTS`) received in the last 20 minutes. Each send also reaches the owner's `+`
+   alias in the same inbox; the job ignores that copy (n8n reads both). Only when there is such mail does it
    open the database (§3.2). It handles each Gmail message id once per mode. In one transaction it
    sets `published_at`, `content_json`, `title`, and `stories.used_in_publication_date`, and only if the
    issue is still unpublished. It does **not** overwrite `html` with the received copy, which holds a
@@ -305,10 +306,13 @@ misses it the issue never appears. Sending stays manual in GHL.
 6. **Shadow:** with owner `shadow`, the task writes only to `publish_events` (mode `shadow`) and compares
    its content with what Gmail Listen wrote. One table holds shadow, native, and manual rows. On dev, a
    shadow run over 14 real seed emails (issues 264–270) found 0 differences.
+7. **Later: a Resend listener.** The owner plans to replace the Gmail seed-inbox check with a Resend
+   listener. Only the email source changes: `detectPublish` takes message ids and a reader, so a Resend
+   source can feed the same parser, decision, and store.
 
 The owner key is `publish.owner` in `pipeline_settings` (`n8n`, `shadow`, or `native`). A missing or
-unknown value means `n8n`, so the job does nothing until the key is set. Shadow mode needs the Gmail env
-vars in Netlify (set 2026-11-07) and `publish.owner = shadow` on production.
+unknown value means `n8n`, so the job does nothing until the key is set. Shadow mode has run on production
+since 2026-11-07 (Gmail env vars set in Netlify, `publish.owner = shadow`).
 
 Cutover: after 5 matching sends, right after a successful publish (R7), set `publish.owner = native` and
 deactivate `3. Gmail Listen - Publish` in the same minute. **Rollback:** reactivate Gmail Listen and set
