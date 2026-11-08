@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { refreshPublishedIssues } from "@/src/features/newsletter/cache";
 import { manualPublish, previewManualPublish } from "@/src/pipeline/publish/manual-publish";
 import { hasValidApprovalSession } from "@/src/server/approval-auth";
 import { logServerError, logServerInfo } from "@/src/server/observability";
@@ -51,9 +52,19 @@ export async function POST(request: Request, context: Context) {
   try {
     const result = await manualPublish(issueId, new Date());
     logServerInfo("approval.issues.publish", { issueId, outcome: result.outcome });
+    if (result.outcome === "published") refreshSite(issueId);
     return NextResponse.json(result, { status: STATUS_CODES[result.outcome] ?? 500 });
   } catch (error) {
     logServerError("approval.issues.publish.failed", error, { issueId });
     return NextResponse.json({ error: "Could not publish the issue." }, { status: 500 });
+  }
+}
+
+/** The issue is published either way. Without the refresh, the lists catch up within the hour. */
+function refreshSite(issueId: number) {
+  try {
+    refreshPublishedIssues();
+  } catch (error) {
+    logServerError("approval.issues.publish.refresh_failed", error, { issueId });
   }
 }

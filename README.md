@@ -158,6 +158,7 @@ Mutation routes:
 - `POST /api/subscriber/unsubscribe/webhook` with `Authorization: Bearer <GHL_UNSUBSCRIBE_WEBHOOK_SECRET>` or `x-webhook-secret`
 - `POST /api/newsletters/commit` to commit an approved outline to the generation webhook
 - `POST /api/approval/issues/[id]/publish` publishes an unpublished draft from its stored email HTML (approval session). Used by the "Mark as published" button on `/approval/issues`. It sends no email.
+- `POST /api/revalidate` refreshes the cached issue lists, issue pages, and sitemap. It needs `Authorization: Bearer <token>`, a 5-minute token signed with a key derived from `SESSION_SECRET` (`src/server/cache-refresh-auth.ts`). The publish job calls it after it publishes an issue.
 
 Public unsubscribe page:
 
@@ -170,7 +171,7 @@ Public unsubscribe page:
 - The repository layer mixes Prisma model queries with Prisma-backed raw SQL for the complex ticker and archive queries.
 - Route handlers under `app/api` provide the public JSON interface.
 
-The homepage, archive, and `GET /api/newsletters` read fresh issue lists on every request so new publications appear on the next page load. The list API sends `Cache-Control: no-store`. Individual issue lookups and sitemap entries retain their one-hour data caches, and the ticker retains its five-minute data cache.
+The homepage and archive lists, individual issue lookups, and sitemap entries share one data cache tag (`published-issues`, `src/features/newsletter/cache.ts`) and expire after one hour. Publishing refreshes the tag at once: "Mark as published" does it in the route, and the publish job calls `POST /api/revalidate`. n8n does not refresh it, so while n8n publishes, a new issue can take up to an hour to appear in the lists. `GET /api/newsletters` stays uncached and sends `Cache-Control: no-store`. The ticker keeps its five-minute data cache.
 
 ## Background jobs (Netlify functions)
 
@@ -188,7 +189,7 @@ Required environment variables:
 
 - `APP_ENV` — `development`, `preview`, or `production`. Set per deploy context in `netlify.toml` (`production` for production, `preview` for deploy previews and branch deploys). `next build` fails without it.
 - `DATABASE_URL` — production in the production context; the Neon `dev` branch for deploy previews and branch deploys
-- `SESSION_SECRET`
+- `SESSION_SECRET` — signs subscriber sessions and, through a derived key, the cache refresh tokens of the publish job
 - `RESEND_API_KEY`
 - `RESEND_FROM_NAME`
 - `RESEND_FROM_EMAIL`

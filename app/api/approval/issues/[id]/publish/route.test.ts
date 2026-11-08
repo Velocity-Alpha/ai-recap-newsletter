@@ -9,6 +9,9 @@ const fns = vi.hoisted(() => ({
 
 vi.mock("@/src/pipeline/publish/manual-publish", () => fns);
 
+const cache = vi.hoisted(() => ({ refreshPublishedIssues: vi.fn() }));
+vi.mock("@/src/features/newsletter/cache", () => cache);
+
 import { GET, POST } from "@/app/api/approval/issues/[id]/publish/route";
 
 const PREVIEW = { issueId: 260, status: "ready", title: "T", date: "2026-10-22", storyCount: 12, problems: [] };
@@ -62,6 +65,19 @@ describe("/api/approval/issues/[id]/publish", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ outcome: "published", preview: PREVIEW });
     expect(fns.manualPublish).toHaveBeenCalledWith(260, expect.any(Date));
+    expect(cache.refreshPublishedIssues).toHaveBeenCalledTimes(1);
+  });
+
+  it("still reports the publish when the site refresh fails; the lists catch up within the hour", async () => {
+    fns.manualPublish.mockResolvedValueOnce({ outcome: "published", preview: PREVIEW });
+    cache.refreshPublishedIssues.mockImplementationOnce(() => {
+      throw new Error("cache unavailable");
+    });
+
+    const response = await POST(await request("POST"), params("260"));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ outcome: "published", preview: PREVIEW });
   });
 
   it("answers with a conflict when the issue is already published, and 404 when it does not exist", async () => {
@@ -71,6 +87,7 @@ describe("/api/approval/issues/[id]/publish", () => {
 
     expect((await POST(await request("POST"), params("260"))).status).toBe(409);
     expect((await POST(await request("POST"), params("260"))).status).toBe(404);
+    expect(cache.refreshPublishedIssues).not.toHaveBeenCalled();
   });
 
   it("returns a 500 without details when publishing throws", async () => {

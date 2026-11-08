@@ -1,5 +1,6 @@
 import { unstable_cache } from "next/cache";
 
+import { PUBLISHED_ISSUES_MAX_AGE_SECONDS, PUBLISHED_ISSUES_TAG } from "@/src/features/newsletter/cache";
 import { parseNewsletterIssue } from "@/src/features/newsletter/parsers";
 import type { NewsletterIssueApiResponse, ParsedNewsletterIssue } from "@/src/features/newsletter/types";
 import {
@@ -13,24 +14,33 @@ import {
   fetchTickerFeed,
 } from "@/src/features/newsletter/repository";
 
-// The "published-" key prefix keeps entries cached before lookups were limited to published issues
-// from being reused.
+// Published-issue data is cached for up to an hour and refreshed at once when an issue publishes
+// (refreshPublishedIssues). The "published-" key prefix keeps entries cached before lookups were limited to
+// published issues from being reused.
+const publishedIssuesCache = { revalidate: PUBLISHED_ISSUES_MAX_AGE_SECONDS, tags: [PUBLISHED_ISSUES_TAG] };
+
 export const getCachedNewsletterIssueApiResponseById = unstable_cache(
   async (id: number) => fetchNewsletterIssueApiResponseById(id),
   ["published-newsletter-issue-by-id"],
-  { revalidate: 3600 },
+  publishedIssuesCache,
 );
 
 export const getCachedNewsletterIssueApiResponseBySlug = unstable_cache(
   async (slug: string) => fetchNewsletterIssueApiResponseBySlug(slug),
   ["published-newsletter-issue-by-slug"],
-  { revalidate: 3600 },
+  publishedIssuesCache,
 );
 
 export const getCachedPublishedNewsletterEntries = unstable_cache(
   async () => fetchPublishedNewsletterEntries(),
   ["newsletter-published-entries"],
-  { revalidate: 3600 },
+  publishedIssuesCache,
+);
+
+const getCachedNewsletterListPage = unstable_cache(
+  async (page: number, limit: number) => fetchNewsletterListPage(page, limit),
+  ["published-newsletter-list-page"],
+  publishedIssuesCache,
 );
 
 export const getCachedTickerFeed = unstable_cache(
@@ -41,7 +51,7 @@ export const getCachedTickerFeed = unstable_cache(
 
 export async function getSafeNewsletterListPage(page: number, limit: number): Promise<NewsletterListPage> {
   try {
-    return await fetchNewsletterListPage(page, limit);
+    return await getCachedNewsletterListPage(page, limit);
   } catch {
     return {
       data: [],

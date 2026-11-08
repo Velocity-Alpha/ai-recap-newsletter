@@ -39,6 +39,9 @@ export async function readPipelineRunner(): Promise<PipelineRunner> {
   return (await readSetting(PIPELINE_RUNNER_KEY)) === "trigger" ? "trigger" : "netlify";
 }
 
+/** Whether the site's cached lists were refreshed after a publish. */
+export type SiteRefreshStatus = "refreshed" | "failed" | "not_configured";
+
 export type RunDetectPublishResult =
   | { status: "outside_window" }
   | { status: "not_configured"; reason: string }
@@ -51,6 +54,8 @@ export type RunDetectPublishResult =
       summary: DetectPublishSummary;
       /** Set when the run was recorded in `pipeline_runs` (only when there was new mail or an error). */
       runId?: string;
+      /** Set when an issue was published. */
+      siteRefresh?: SiteRefreshStatus;
     };
 
 export interface RunDetectPublishOptions {
@@ -58,6 +63,8 @@ export interface RunDetectPublishOptions {
   store?: PublishStore;
   env?: Record<string, string | undefined>;
   now?: () => Date;
+  /** Asks the site to refresh its cached lists. The runner adapter builds it (see site-refresh). */
+  refreshSite?: () => Promise<void>;
 }
 
 export async function runDetectPublish(
@@ -110,6 +117,8 @@ export async function runDetectPublish(
       data: { gmailMessageId: error.gmailMessageId },
     });
   }
+  const published = summary.results.some((result) => result.outcome === "published");
+  const siteRefresh = published ? await refreshSiteAfterPublish(runId, options.refreshSite) : undefined;
 
   const stats = {
     owner,
@@ -127,7 +136,35 @@ export async function runDetectPublish(
       : { status: "succeeded", stats },
     now(),
   );
-  return { status: "ran", owner, summary, runId: runId.toString() };
+  return { status: "ran", owner, summary, runId: runId.toString(), ...(siteRefresh && { siteRefresh }) };
+}
+
+/** A failed refresh only delays the lists by up to an hour, so it is a warning, not a failed run. */
+async function refreshSiteAfterPublish(
+  runId: bigint,
+  refreshSite: (() => Promise<void>) | undefined,
+): Promise<SiteRefreshStatus> {
+  if (!refreshSite) {
+    await logEvent(runId, {
+      level: "warn",
+      step: "site_refresh",
+      message: "No site refresh is configured. The lists catch up within the hour.",
+    });
+    return "not_configured";
+  }
+  try {
+    await refreshSite();
+    await logEvent(runId, { level: "info", step: "site_refresh", message: "Refreshed the site lists and issue pages." });
+    return "refreshed";
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    await logEvent(runId, {
+      level: "warn",
+      step: "site_refresh",
+      message: `${reason} The lists catch up within the hour.`,
+    });
+    return "failed";
+  }
 }
 
 /** The frequent check: every 5 minutes, weekdays 09:00–20:59 New York. Outside that it does nothing. */
@@ -162,8 +199,9 @@ export function describePublishRun(result: RunDetectPublishResult): string {
       return `pipeline.runner is ${result.runner}. This runner does nothing.`;
     case "ran": {
       const { listed, skipped, results, errors } = result.summary;
+      const refresh = result.siteRefresh ? ` Site refresh: ${result.siteRefresh}.` : "";
       const run = result.runId ? ` Pipeline run ${result.runId}.` : "";
-      return `${result.owner}: listed ${listed}, skipped ${skipped}, handled ${results.length}, failed ${errors.length}.${run}`;
+      return `${result.owner}: listed ${listed}, skipped ${skipped}, handled ${results.length}, failed ${errors.length}.${refresh}${run}`;
     }
   }
 }

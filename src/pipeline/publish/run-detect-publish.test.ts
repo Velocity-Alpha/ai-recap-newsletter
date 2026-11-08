@@ -17,6 +17,7 @@ vi.mock("@/src/server/prisma", () => ({ prisma: {} }));
 
 import type { GmailReader } from "@/src/pipeline/publish/gmail-client";
 import type { PublishStore } from "@/src/pipeline/publish/detect-publish";
+import { PLACEHOLDER_ISSUE, renderIssueEmail } from "@/src/pipeline/publish/sent-email.fixture";
 import {
   describePublishRun,
   readPipelineRunner,
@@ -193,6 +194,110 @@ describe("runDetectPublish", () => {
   });
 });
 
+describe("site refresh after a native publish", () => {
+  const ISSUE_HTML = renderIssueEmail(PLACEHOLDER_ISSUE, { received: true });
+
+  /** Two seed copies of one issue email. The first publishes, the second is already published. */
+  function issueMail(): GmailReader {
+    return {
+      listMessageIds: vi.fn(async () => ["second", "first"]),
+      getMessage: vi.fn(async (id: string) => ({
+        id,
+        subject: "Issue",
+        sentAt: new Date(NOW.getTime() - (id === "first" ? 2000 : 1000)),
+        html: ISSUE_HTML,
+      })),
+    };
+  }
+
+  function draftStore(): PublishStore {
+    let publishedAt: Date | null = null;
+    return {
+      knownMessageIds: vi.fn(async () => new Set<string>()),
+      findIssue: vi.fn(async (id: number) => ({ id, publishedAt, contentJson: null })),
+      recordEvent: vi.fn(async () => {}),
+      publish: vi.fn(async ({ publishedAt: at }) => {
+        if (publishedAt) return "already_published" as const;
+        publishedAt = at;
+        return "published" as const;
+      }),
+    };
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.startRun.mockResolvedValue(42n);
+  });
+
+  it("refreshes the site once when an issue was published", async () => {
+    settings("native");
+    const refreshSite = vi.fn(async () => {});
+
+    const result = await runDetectPublish("netlify", 20, {
+      gmail: issueMail(),
+      store: draftStore(),
+      now: () => NOW,
+      refreshSite,
+    });
+
+    expect(refreshSite).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({ status: "ran", owner: "native", siteRefresh: "refreshed" });
+    expect(mocks.logEvent).toHaveBeenCalledWith(42n, {
+      level: "info",
+      step: "site_refresh",
+      message: "Refreshed the site lists and issue pages.",
+    });
+  });
+
+  it("logs a warning but does not fail the run when the refresh fails", async () => {
+    settings("native");
+    const refreshSite = vi.fn(async () => {
+      throw new Error("Site refresh failed with HTTP 503.");
+    });
+
+    const result = await runDetectPublish("netlify", 20, {
+      gmail: issueMail(),
+      store: draftStore(),
+      now: () => NOW,
+      refreshSite,
+    });
+
+    expect(result).toMatchObject({ status: "ran", siteRefresh: "failed" });
+    expect(mocks.logEvent).toHaveBeenCalledWith(42n, {
+      level: "warn",
+      step: "site_refresh",
+      message: "Site refresh failed with HTTP 503. The lists catch up within the hour.",
+    });
+    expect(mocks.finishRun).toHaveBeenCalledWith(42n, expect.objectContaining({ status: "succeeded" }), NOW);
+    expect(() => throwIfPublishRunFailed(result)).not.toThrow();
+  });
+
+  it("logs a warning when no refresh is configured", async () => {
+    settings("native");
+
+    const result = await runDetectPublish("netlify", 20, { gmail: issueMail(), store: draftStore(), now: () => NOW });
+
+    expect(result).toMatchObject({ status: "ran", siteRefresh: "not_configured" });
+    expect(mocks.logEvent).toHaveBeenCalledWith(42n, {
+      level: "warn",
+      step: "site_refresh",
+      message: "No site refresh is configured. The lists catch up within the hour.",
+    });
+  });
+
+  it("does not refresh the site in shadow mode", async () => {
+    settings("shadow");
+    const refreshSite = vi.fn(async () => {});
+    const db = draftStore();
+    vi.mocked(db.findIssue).mockResolvedValue({ id: 268, publishedAt: NOW, contentJson: null });
+
+    const result = await runDetectPublish("netlify", 20, { gmail: issueMail(), store: db, now: () => NOW, refreshSite });
+
+    expect(refreshSite).not.toHaveBeenCalled();
+    expect(result).not.toHaveProperty("siteRefresh");
+  });
+});
+
 describe("runPublishPoll and runPublishCatchUp", () => {
   beforeEach(() => vi.clearAllMocks());
 
@@ -231,6 +336,9 @@ describe("describePublishRun and throwIfPublishRunFailed", () => {
     );
     expect(describePublishRun({ status: "ran", owner: "shadow", summary, runId: "7" })).toBe(
       "shadow: listed 2, skipped 1, handled 0, failed 1. Pipeline run 7.",
+    );
+    expect(describePublishRun({ status: "ran", owner: "native", summary, runId: "7", siteRefresh: "failed" })).toBe(
+      "native: listed 2, skipped 1, handled 0, failed 1. Site refresh: failed. Pipeline run 7.",
     );
   });
 
