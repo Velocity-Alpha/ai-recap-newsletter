@@ -323,6 +323,10 @@ Cutover (revised 2026-11-08; the 5-send soak is dropped):
 
 1. Before: compare the shadow content with n8n's for the latest sends (issues 270, 271, and the next send),
    and rehearse a native publish and the rollback on dev. #62 is ready to merge.
+   Done 2026-11-08 except the next send: on the #62 deploy preview (Neon `dev`, owner `native`), the
+   catch-up published a draft of issue 271 from the real seed email, set `published_at` 2 s before n8n's,
+   and refreshed the preview's lists. Its content had 0 differences from n8n's production 271. The lists
+   stayed cached on a later database change. Owner set back to `shadow` afterwards.
 2. Right after the next successful n8n publish (R7): merge #62, set `publish.owner = native`, and deactivate
    `3. Gmail Listen - Publish` in the same window. Target: the first send after #62 is ready.
 3. After: check the next send appears on the site within 10 minutes. If an email is held as
