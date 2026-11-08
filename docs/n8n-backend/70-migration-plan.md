@@ -197,6 +197,9 @@ migration may do.
 
 Sizes are rough working effort with Claude Code. Soak means calendar time spent watching, not working.
 
+Pace (owner, 2026-11-08): a missed day is low stakes, so soaks are short and a phase's soak does not block
+building the next phase. A missed publish is fixed by hand ("Mark as published"), not prevented by long soaks.
+
 ### Phase 0: One security fix (size: S, first pull request)
 
 A small website fix, tracked in a private GitHub security advisory. It ships before anything else, with
@@ -271,7 +274,7 @@ pull request.
 Target for later: the board proposes a finished issue that the owner accepts as is, or after swapping a
 few stories.
 
-### Phase 3: Native publish detection (size: S–M, soak: 5 sends)
+### Phase 3: Native publish detection (size: S–M, soak: 1 send, shortened 2026-11-08)
 
 Goal: remove the most fragile step. Today an LLM re-reads the sent email, and if `3. Gmail Listen - Publish`
 misses it the issue never appears. Sending stays manual in GHL.
@@ -294,15 +297,17 @@ misses it the issue never appears. Sending stays manual in GHL.
    issue is still unpublished. It does **not** overwrite `html` with the received copy, which holds a
    subscriber's name and unsubscribe link. An email with parse problems is held as `needs_review`. Built:
    `src/pipeline/publish/` (logic), `netlify/functions/detect-publish*.mts` (active), and
-   `src/trigger/detect-publish.ts` (dormant, see ADR 0001). The revalidate call and site check come with
-   item 5.
+   `src/trigger/detect-publish.ts` (dormant, see ADR 0001). After a native publish the job calls the
+   revalidate route (item 5); a failed call is a warning, not a failed run.
 4. **"Mark as published" button** in `/approval/issues` (behind the existing approval login). It publishes
    a chosen draft from its stored HTML through the same store as the task, after an inline confirm. It sends
    no email. Each use is a `manual` row in `publish_events`. Built and tested on dev.
 5. **Cache the site lists again.** The home page and archive lists use a tagged cache. The publish step
-   refreshes it, with a 1-hour safety expiry. Issue pages are refreshed the same way. **Not started on
-   purpose:** n8n does not refresh caches, so list caching before the cutover would delay n8n publishes
-   on the site (#62).
+   refreshes it, with a 1-hour safety expiry. Issue pages are refreshed the same way. n8n does not refresh
+   caches, so list caching ships in the cutover window, not before (#62). Built 2026-11-08: one
+   `published-issues` tag, `POST /api/revalidate` with a 5-minute token signed from `SESSION_SECRET` (no new
+   credential), and a refresh after "Mark as published". Checked on dev with `next start`: the list stays
+   cached after a database change and shows it right after the refresh.
 6. **Shadow:** with owner `shadow`, the task writes only to `publish_events` (mode `shadow`) and compares
    its content with what Gmail Listen wrote. One table holds shadow, native, and manual rows. On dev, a
    shadow run over 14 real seed emails (issues 264–270) found 0 differences.
@@ -314,11 +319,19 @@ The owner key is `publish.owner` in `pipeline_settings` (`n8n`, `shadow`, or `na
 unknown value means `n8n`, so the job does nothing until the key is set. Shadow mode has run on production
 since 2026-11-07 (Gmail env vars set in Netlify, `publish.owner = shadow`).
 
-Cutover: after 5 matching sends, right after a successful publish (R7), set `publish.owner = native` and
-deactivate `3. Gmail Listen - Publish` in the same minute. **Rollback:** reactivate Gmail Listen and set
-`publish.owner = n8n`.
+Cutover (revised 2026-11-08; the 5-send soak is dropped):
 
-Exit: 2 weeks native-only, with every send published within 10 minutes.
+1. Before: compare the shadow content with n8n's for the latest sends (issues 270, 271, and the next send),
+   and rehearse a native publish and the rollback on dev. #62 is ready to merge.
+2. Right after the next successful n8n publish (R7): merge #62, set `publish.owner = native`, and deactivate
+   `3. Gmail Listen - Publish` in the same window. Target: the first send after #62 is ready.
+3. After: check the next send appears on the site within 10 minutes. If an email is held as
+   `needs_review` or missed, publish it with "Mark as published" in `/approval/issues`.
+
+**Rollback:** reactivate Gmail Listen and set `publish.owner = n8n`. With list caching on, an n8n publish
+then reaches the lists within the 1-hour expiry, or at once through the revalidate route.
+
+Exit: 1 week native-only, with every send published within 10 minutes. Phases 4 and 5 do not wait for it.
 
 ### Phase 4: Native newsletter ingestion, one source at a time (size: L)
 
@@ -365,7 +378,7 @@ pull request, try it on the preview, and merge. `docs/pipeline/adding-a-source.m
 
 Exit: all sources native for 2 weeks, with story volume and board quality equal to or better than n8n.
 
-### Phase 5: Native drafting (size: L, soak: 5 issues in shadow)
+### Phase 5: Native drafting (size: L, soak: 2 issues in shadow, shortened 2026-11-08)
 
 Goal: commit → draft runs natively, with real status in the UI, one draft per date, and no duplicates.
 
@@ -385,11 +398,11 @@ Goal: commit → draft runs natively, with real status in the UI, one draft per 
 7. **Shadow:** with `draft.owner = n8n`, every commit also runs the native draft in preview mode. It skips
    GHL, writes to `draft_previews`, and is shown next to the n8n draft in `/admin/issues`.
 
-Cutover: after 5 good previews, set `draft.owner = native`, then deactivate `2. Public approval page`,
+Cutover: after 2 good previews, set `draft.owner = native`, then deactivate `2. Public approval page`,
 `2. Create Issue Draft`, `2.2.1`, `2.2.2`, and `Agent: Change Featured Image`. **Rollback:** set
 `draft.owner = n8n` and reactivate them.
 
-Exit: 2 weeks native-only with no duplicate drafts and no silent draft failures.
+Exit: 1 week native-only with no duplicate drafts and no silent draft failures.
 
 ### Phase 6: Retire n8n (size: S–M)
 
