@@ -316,8 +316,9 @@ misses it the issue never appears. Sending stays manual in GHL.
    source can feed the same parser, decision, and store.
 
 The owner key is `publish.owner` in `pipeline_settings` (`n8n`, `shadow`, or `native`). A missing or
-unknown value means `n8n`, so the job does nothing until the key is set. Shadow mode has run on production
-since 2026-11-07 (Gmail env vars set in Netlify, `publish.owner = shadow`).
+unknown value means `n8n`, so the job does nothing until the key is set. Shadow mode ran on production
+from 2026-11-07 (Gmail env vars set in Netlify, `publish.owner = shadow`). **Since 2026-11-08 22:47 UTC
+production is `native`** and `3. Gmail Listen - Publish` is deactivated.
 
 Cutover (revised 2026-11-08; the 5-send soak is dropped):
 
@@ -329,6 +330,10 @@ Cutover (revised 2026-11-08; the 5-send soak is dropped):
    stayed cached on a later database change. Owner set back to `shadow` afterwards.
 2. Right after the next successful n8n publish (R7): merge #62, set `publish.owner = native`, and deactivate
    `3. Gmail Listen - Publish` in the same window. Target: the first send after #62 is ready.
+   Done Sunday 2026-11-08, 22:47 UTC, after the owner asked for an aggressive pace: #108 merged (production
+   deploy `6af0fbb3`), owner `native`, Gmail Listen off. Its last run (issue 271, 2026-11-06) succeeded. The
+   workflow only parsed the email and updated the issue and its stories; the native job does both. The
+   "next send" comparison in step 1 is replaced by step 3 on Monday 2026-11-09.
 3. After: check the next send appears on the site within 10 minutes. If an email is held as
    `needs_review` or missed, publish it with "Mark as published" in `/approval/issues`.
 
