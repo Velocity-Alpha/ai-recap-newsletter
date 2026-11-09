@@ -37,7 +37,7 @@ describe.skipIf(!enabled)("story changes on a real database", () => {
     const rows = await prisma.$queryRaw<
       { id: number; queued: string | null; excluded: boolean | null; url: string | null; note: string | null }[]
     >`SELECT id, queued_for_publication_date::text AS queued, exclude_from_candidates AS excluded, url, note
-      FROM stories WHERE guid LIKE ${`${tag}-%`}`;
+      FROM newsletter.stories WHERE guid LIKE ${`${tag}-%`}`;
     const byId = new Map(rows.map((row) => [Number(row.id), row]));
     return ids.map((id) => byId.get(id));
   }
