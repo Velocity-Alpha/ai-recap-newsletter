@@ -9,7 +9,7 @@ import { hasValidApprovalSession } from "@/src/server/approval-auth";
 import { fetchLastPublishedIssueDateOnOrBefore } from "@/src/features/newsletter/repository";
 import { parseCommitDate, resolveCommitWebhook } from "@/src/pipeline/side-effects/commit-webhook";
 import { normalizeOutline, type ApprovalOutline } from "@/src/pipeline/draft/outline";
-import { readDraftOwner, saveOutline } from "@/src/pipeline/draft/outline-store";
+import { markOutlineForwarded, readDraftOwner, saveOutline } from "@/src/pipeline/draft/outline-store";
 import jwt from "jsonwebtoken";
 
 export const runtime = "nodejs";
@@ -119,7 +119,17 @@ export async function POST(request: Request) {
         { status: 503 },
       );
     }
-    const savedOutline = await saveOutline(outline, draftOwner);
+    // n8n drafts from the forwarded body, not the saved row, so in n8n mode a failed save is logged and the
+    // commit still goes through. The owner commits every weekday; a missing table must not stop that.
+    let savedOutline: { id: bigint; hash: string } | null = null;
+    try {
+      savedOutline = await saveOutline(outline, draftOwner);
+    } catch (error) {
+      logRequestError(context, "Outline save failed; forwarding to n8n anyway", error, {
+        date: targetDate,
+        draftOwner,
+      });
+    }
 
     const authClaims = {
       scope: "story-approval",
@@ -154,14 +164,27 @@ export async function POST(request: Request) {
 
     const webhookData = await webhookResponse.json();
 
+    if (savedOutline) {
+      try {
+        await markOutlineForwarded(savedOutline.id);
+      } catch (error) {
+        // n8n is already drafting. Failing now would invite a second commit, so log it and carry on.
+        logRequestError(context, "Could not record that n8n accepted the outline", error, {
+          date: targetDate,
+          outlineId: savedOutline.id.toString(),
+        });
+      }
+    }
+
     logRequestSuccess(context, {
       hasPayload: true,
       payloadType: "object",
       webhookStatus: webhookResponse.status,
       webhookHostname,
       forwardedSuccessfully: true,
-      outlineId: savedOutline.id.toString(),
-      outlineHash: savedOutline.hash,
+      outlineSaved: savedOutline !== null,
+      outlineId: savedOutline?.id.toString() ?? null,
+      outlineHash: savedOutline?.hash ?? null,
     });
 
     return jsonWithRequestId(context, {

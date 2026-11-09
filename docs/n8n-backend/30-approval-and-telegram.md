@@ -10,7 +10,7 @@ Sources: n8n workflow exports (draft `nodes` and published `activeVersion`), exe
 
 - **Today the only live Telegram touchpoint is one plain-text ping.** `1. Fetch Stories` sends it at the end of its weekday 09:55 run. It goes to the configured chat id via the bot credential **"AI Recap Review Telegram Bot"** and carries a link to `https://airecap.news/approval?date=YYYY-MM-DD`. There are no buttons and no wait. The workflow ends right after sending.
 - **Approval happens on the website, not in Telegram.** `/approval` is protected by one shared password (`APPROVAL_PASSWORD`). The reviewer can select or demote stories, move them between sections, exclude them (with an optional reason), pick the headline, edit the URL and add notes. Then they hit **Commit**.
-- **Commit is `POST /api/newsletters/commit`.** It checks the session, blocks with 409 if a *published* issue already exists for that date, signs an **HS256 JWT** (`{scope:"story-approval", payloadType:"object", issuedFor:"n8n-story-approval-webhook", iat, exp=iat+1h}`) with `N8N_WEBHOOK_JWT_SECRET`, and forwards the client JSON **unchanged** to `POST https://n8n.velocityalpha.com/webhook/story/approval`.
+- **Commit is `POST /api/newsletters/commit`.** It checks the session, normalises `date` to `YYYY-MM-DD`, blocks with 409 if a *published* issue already exists for that date, saves the normalised outline to `approval_outlines` (#75), signs an **HS256 JWT** (`{scope:"story-approval", payloadType:"object", issuedFor:"n8n-story-approval-webhook", iat, exp=iat+1h}`) with `N8N_WEBHOOK_JWT_SECRET`, and forwards the client JSON to `POST https://n8n.velocityalpha.com/webhook/story/approval`. The forwarded body is unchanged except for the normalised `date`. In n8n mode a failed outline save is logged and the commit still goes to n8n.
 - **`2.  Public approval page` (RB9M8RWAYozoWapB) handles the webhook.** n8n checks the JWT using credential **"AI Recap JWT Secret"** (signature and expiry only; the custom claims are never checked) and replies `200` right away. It then sets `exclude_from_candidates=true` on excluded stories and `queued_for_publication_date=<date>` on approved stories. It re-validates the section limits and calls `2. Create Issue Draft` with `from_telegram: true`. That flag is a legacy name: it now means "approval already done".
 - **Story state lives in three columns:** `exclude_from_candidates`, `queued_for_publication_date` (set at commit) and `used_in_publication_date` (set by `3. Gmail Listen - Publish` when the GHL email arrives). `queued_for_publication_date` is **write-only**: nothing reads it, so queued-but-unpublished stories stay candidates.
 - **The Telegram `sendAndWait` form approval is dead code.** That is `2.1.1 Request Approval`, reached via `2.1 Sub: Compile Draft Stories`. No active caller reaches it, and it has zero runs in the export. The `waiting` Fetch Stories execution (12947, 2026-03-26, manual) is a zombie: its child execution 12954 was pruned (HTTP 404) and its `waitTill` is `3000-01-01`.
@@ -18,7 +18,7 @@ Sources: n8n workflow exports (draft `nodes` and published `activeVersion`), exe
 - **The single error run of `2. Public approval page` (21269, 2026-10-30) was not an approval bug.** The nested `2.2.1 Sub: Create Image Prompt` OpenAI call (`gpt-5.4-pro`) hit `ECONNABORTED` after 300,014 ms. The operator switched the model and re-ran the workflow by hand from pinned webhook data (execution 21275, `mode: manual`).
 - **Reliability weaknesses:**
   - The webhook has no idempotency, so duplicate drafts have happened.
-  - The webhook URL is hard-coded as the default, so a preview or dev deploy would post to **prod** n8n.
+  - The webhook URL was hard-coded as the default, so a preview or dev deploy would post to **prod** n8n. Fixed in #49: outside production the route refuses the prod webhook.
   - Security findings for this area are kept in private notes and private GitHub security advisories, because this repo is public.
 - **`Telegram MCP` (2IA2fRXEZx6Nr1ye) has nothing to do with AI Recap.** It is a July-2025 demo bot (`borna_va_test_bot`, Groq Kimi-K2, "business jargon" persona) that calls the instance's MCP server, which exposes a KAI Airtable tool. It was still **active** at the time of research; it was deactivated on 2026-11-04, together with the `MCP` server workflow. `My workflow 3` is an inactive "Yo!" connectivity test for the review chat.
 
@@ -465,19 +465,19 @@ ORDER BY issue_date DESC, published_at DESC LIMIT 1;
 2. **JSON body.** Invalid → `400 {success:false, error:"Request body must be valid JSON."}`.
 3. **Secret.** `N8N_WEBHOOK_JWT_SECRET` must be set. Missing → **500**, because it throws.
 4. **Normalize the payload.** An object is accepted; a single-element array of an object is unwrapped. Anything else → 400.
-5. **Date check.** `parseDateOnly(payload.date)` uses `new Date(str).toISOString().slice(0,10)`. Invalid → `400 "Commit payload is missing a valid date."`
+5. **Date check.** `parseCommitDate(payload.date)` takes the calendar date as written (`YYYY-MM-DD`, optionally followed by a time). Invalid → `400 "Commit payload is missing a valid date."` (Before #49 it used `new Date(str).toISOString().slice(0,10)`, which could shift the day.)
 6. **Publish guard.** `fetchLastPublishedIssueDateOnOrBefore(targetDate)`. On `has_exact_match` → `409 {success:false, error:"An issue is already published for this day - D.", target_date}`.
 7. **Sign the JWT.** `jwt.sign({scope:"story-approval", payloadType:"object", issuedFor:"n8n-story-approval-webhook"}, N8N_WEBHOOK_JWT_SECRET, {algorithm:"HS256", expiresIn:"1h"})`, using the `jsonwebtoken` package.
    - Header: `{"alg":"HS256","typ":"JWT"}`.
    - Claims: the three above plus `iat` and `exp = iat + 3600`. Confirmed in the n8n `jwtPayload` of the received request.
 8. **POST to n8n.**
-   - URL: `OUTLINE_COMMIT_WEBHOOK_URL ?? "https://n8n.velocityalpha.com/webhook/story/approval"`. **The prod URL is hard-coded as the default.**
+   - URL: `OUTLINE_COMMIT_WEBHOOK_URL`, or the prod webhook as the default in production only. Outside production the route needs `OUTLINE_COMMIT_WEBHOOK_URL` and refuses the prod webhook (503) (#49).
    - Headers: `Content-Type: application/json`, `Authorization: Bearer <jwt>`.
-   - Body: **`JSON.stringify(normalizedPayload)`, i.e. the client's object forwarded verbatim, including the original raw `date` string**.
+   - Body: the client's object, with `date` replaced by its `YYYY-MM-DD` form. Nothing else changes.
 9. **Response handling.** Non-2xx from n8n → 500 with `"Webhook returned <status>: <text>"`. Otherwise `{success:true, message:"Outline committed to generation webhook.", receivedAt, webhookResponse:<n8n JSON>}`, where the n8n JSON is `{"message":"Workflow was started"}` because the webhook uses the default `onReceived` mode.
 10. **UI.** Navigates to `/approval/submitted` ("Successfully submitted."). **There is no generation status after this point.** The reviewer never learns whether the draft was created.
 
-The website writes nothing to the DB on commit, and there is no audit record of who committed or what.
+Before n8n, the route saves one `approval_outlines` row: the normalised outline, its hash, and the draft owner (#75). `forwarded_at` is set when n8n answers 2xx. There is still no record of who committed.
 
 **Commit payload schema** (built in `ApprovalBoard.commitPayload`; observed size about 45–52 KB):
 

@@ -195,13 +195,16 @@ model Alert {
 
 /// One row per board commit (#75): the normalised outline, its sha256, and who drafted it.
 /// draft_owner is 'n8n' or 'native' (CHECK constraint in the migration).
+/// forwarded_at is when n8n answered 2xx to the forwarded commit. It stays null under native drafting
+/// (issue_drafts tracks that) and when n8n never accepted the commit.
 model ApprovalOutline {
-  id          BigInt   @id @default(autoincrement())
-  issueDate   DateTime @map("issue_date") @db.Date
+  id          BigInt    @id @default(autoincrement())
+  issueDate   DateTime  @map("issue_date") @db.Date
   payload     Json
-  payloadHash String   @map("payload_hash")
-  draftOwner  String   @map("draft_owner")
-  committedAt DateTime @default(now()) @map("committed_at") @db.Timestamptz(6)
+  payloadHash String    @map("payload_hash")
+  draftOwner  String    @map("draft_owner")
+  committedAt DateTime  @default(now()) @map("committed_at") @db.Timestamptz(6)
+  forwardedAt DateTime? @map("forwarded_at") @db.Timestamptz(6)
 
   @@index([issueDate, committedAt(sort: Desc)])
   @@map("approval_outlines")

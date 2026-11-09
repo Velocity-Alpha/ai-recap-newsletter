@@ -12,6 +12,7 @@ vi.mock("@/src/features/newsletter/repository", () => repositoryFns);
 const outlineStore = vi.hoisted(() => ({
   readDraftOwner: vi.fn(),
   saveOutline: vi.fn(),
+  markOutlineForwarded: vi.fn(),
 }));
 
 vi.mock("@/src/pipeline/draft/outline-store", () => outlineStore);
@@ -173,6 +174,7 @@ describe("POST /api/newsletters/commit", () => {
     });
     outlineStore.readDraftOwner.mockResolvedValue("n8n");
     outlineStore.saveOutline.mockResolvedValue({ id: BigInt(5), hash: "a".repeat(64) });
+    outlineStore.markOutlineForwarded.mockResolvedValue(undefined);
     process.env.APPROVAL_PASSWORD = "approval-secret";
     process.env.N8N_WEBHOOK_JWT_SECRET = "n8n-webhook-jwt-secret";
     process.env.APP_ENV = "production";
@@ -464,6 +466,68 @@ describe("POST /api/newsletters/commit", () => {
     expect(outlineStore.saveOutline.mock.invocationCallOrder[0]).toBeLessThan(fetchMock.mock.invocationCallOrder[0]);
     // n8n still receives the board's body (with the normalised date).
     expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual(body);
+  });
+
+  it("still forwards to n8n when saving the outline fails in n8n mode, and logs the failure", async () => {
+    webhookAccepts();
+    outlineStore.saveOutline.mockRejectedValue(new Error('relation "approval_outlines" does not exist'));
+    const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
+    const payload = boardCommitPayload();
+
+    const { response, json } = await commit(payload);
+
+    expect(response.status).toBe(200);
+    expect(json.success).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][1].body).toBe(JSON.stringify(payload));
+    expect(errorLog).toHaveBeenCalledWith(
+      "[observability] request.error",
+      expect.objectContaining({
+        route: "api.newsletters.commit",
+        date: "2026-05-21",
+        error: expect.objectContaining({ message: 'relation "approval_outlines" does not exist' }),
+      }),
+    );
+    expect(outlineStore.markOutlineForwarded).not.toHaveBeenCalled();
+    errorLog.mockRestore();
+  });
+
+  it("marks the saved outline forwarded after n8n answers 2xx", async () => {
+    webhookAccepts();
+
+    const { response } = await commit(boardCommitPayload());
+
+    expect(response.status).toBe(200);
+    expect(outlineStore.markOutlineForwarded).toHaveBeenCalledWith(BigInt(5));
+    expect(fetchMock.mock.invocationCallOrder[0]).toBeLessThan(
+      outlineStore.markOutlineForwarded.mock.invocationCallOrder[0],
+    );
+  });
+
+  it("does not mark the outline forwarded when n8n fails", async () => {
+    fetchMock.mockResolvedValue({ ok: false, status: 500, text: vi.fn().mockResolvedValue("boom") });
+
+    const { response } = await commit(boardCommitPayload());
+
+    expect(response.status).toBe(500);
+    expect(outlineStore.markOutlineForwarded).not.toHaveBeenCalled();
+  });
+
+  it("still reports success when n8n accepted but marking the outline forwarded fails", async () => {
+    // n8n is already drafting. A 500 here would invite a second commit and a second draft.
+    webhookAccepts();
+    outlineStore.markOutlineForwarded.mockRejectedValue(new Error("db down"));
+    const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const { response, json } = await commit(boardCommitPayload());
+
+    expect(response.status).toBe(200);
+    expect(json.success).toBe(true);
+    expect(errorLog).toHaveBeenCalledWith(
+      "[observability] request.error",
+      expect.objectContaining({ outlineId: "5", error: expect.objectContaining({ message: "db down" }) }),
+    );
+    errorLog.mockRestore();
   });
 
   it("refuses a commit while draft.owner is native, without saving or calling n8n", async () => {

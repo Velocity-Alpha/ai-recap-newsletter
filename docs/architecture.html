@@ -53,7 +53,7 @@
   <tr><td>Ingest stories from newsletters and feeds</td><td><span class="now">native</span> since 2026-11-09 04:05 UTC</td><td>native, hourly runs and more sources later</td><td><code>ingest.owner</code> = <code>"native"</code></td><td>#39, extras #111</td></tr>
   <tr><td>"Board is ready" Telegram ping to the review group</td><td><span class="now">native</span> (end of the ingest run)</td><td>native</td><td>same as ingest</td><td>#39</td></tr>
   <tr><td>Approval board proposal (sections, dedup)</td><td><span class="now">native</span> (app)</td><td>native; later "accept or swap"</td><td>none</td><td>#37, #56, #58, #59, #89</td></tr>
-  <tr><td>Draft issue, featured image, GHL template</td><td><span class="n8n">n8n</span></td><td>native <code>draft-issue</code> background job; a new draft and GHL template per commit (ADR 0002)</td><td><code>draft.owner</code> <span class="plan">planned</span> (not in code)</td><td>#40, #74–#80, #115, #116, #120</td></tr>
+  <tr><td>Draft issue, featured image, GHL template</td><td><span class="n8n">n8n</span></td><td>native <code>draft-issue</code> background job; a new draft and GHL template per commit (ADR 0002)</td><td><code>draft.owner</code> = <code>"n8n"</code> (default); the commit route reads it. <code>"native"</code> is refused until #79</td><td>#40, #74–#80, #115, #116, #120</td></tr>
   <tr><td>Send the campaign</td><td>owner, by hand in GHL</td><td>owner (optional: schedule through the GHL API)</td><td>none</td><td>#91</td></tr>
   <tr><td>Publish detection (mark issue published on the site)</td><td><span class="now">native</span> since 2026-11-08 22:47 UTC</td><td>native; later a Resend listener instead of Gmail</td><td><code>publish.owner</code> = <code>"native"</code> (also <code>"shadow"</code>, <code>"n8n"</code>)</td><td>#38, #107</td></tr>
   <tr><td>Job runner</td><td><span class="now">Netlify functions</span></td><td>Netlify functions</td><td><code>pipeline.runner</code> = <code>"netlify"</code> (default) or <code>"trigger"</code></td><td>ADR 0001</td></tr>
@@ -100,7 +100,9 @@ Terms: GLOSSARY.md. One issue per date; each commit makes a new draft with its o
 09:55  ingest (later: hourly 06:00-12:00 ET, raw items stored, per-source modules)     same as now
 10:05  run-checks: an ingest run happened, story count vs 8-week median, per source       <span class="plan">planned</span> #50
        Owner commits on /approval  ("No issue today" marks a skipped date instead)       <span class="plan">planned</span> #52
-         -> approval_outlines row (normalised outline + hash), for either draft.owner    <span class="plan">planned</span> #75
+         -> approval_outlines row (normalised outline + hash), for either draft.owner    #75 (built)
+            n8n mode: a failed save is logged and the commit still goes to n8n;
+            forwarded_at is set when n8n answers 2xx
          -> draft.owner = native: story changes in one transaction, start draft-issue    <span class="plan">planned</span> #79
             find or create the issue for the date; new issue_drafts row, version n+1     #76
             read articles of feature-section stories (saved per story; methods from #115) #120
@@ -177,10 +179,11 @@ Later: pre-send review in the app before the GHL template (#117)
   <tr><td><code>pipeline_settings</code></td><td>Owner switches and thresholds</td><td>owner, by SQL</td></tr>
   <tr><td><code>pipeline_runs</code>, <code>pipeline_events</code></td><td>Job runs and their step logs</td><td>native jobs</td></tr>
   <tr><td><code>publish_events</code></td><td>Each seed email seen by publish detection and the decision</td><td>native publish</td></tr>
+  <tr><td><code>approval_outlines</code></td><td>Each board commit: the normalised outline, its hash, the draft owner, and when n8n accepted it (<code>forwarded_at</code>)</td><td>commit route (migration not applied yet)</td></tr>
   <tr><td><code>alerts</code></td><td>Open and resolved incidents, one open row per <code>incident_key</code></td><td><code>raiseAlert()</code> (no callers yet)</td></tr>
   <tr><td><code>public.schema_migrations</code></td><td>Legacy migration record</td><td>none</td></tr>
 </table>
-<p><span class="plan">Planned:</span> <code>approval_outlines</code> (#75), <code>issue_drafts</code> (#76), saved article text per story (#120), and skipped dates (#52). After n8n is off (#82): an issue <code>status</code> (draft or published), a unique issue date, and an index on <code>stories(day)</code>. Later: the issue-to-story link and a stable story key (#118), and raw items for ingestion (#111). The runtime DB role is <code>newsletter_web</code> (<code>prisma/bootstrap/001_grant_newsletter_web.sql</code>).</p>
+<p><span class="plan">Planned:</span> <code>issue_drafts</code> (#76), saved article text per story (#120), and skipped dates (#52). After n8n is off (#82): an issue <code>status</code> (draft or published), a unique issue date, and an index on <code>stories(day)</code>. Later: the issue-to-story link and a stable story key (#118), and raw items for ingestion (#111). The runtime DB role is <code>newsletter_web</code> (<code>prisma/bootstrap/001_grant_newsletter_web.sql</code>).</p>
 
 <h2 id="code">9. Code map</h2>
 <pre>
@@ -210,14 +213,15 @@ scripts/                     reset-dev-branch.mjs, run-prisma-prod.mjs, import-s
 <h2 id="envs">10. Environments</h2>
 <table>
   <tr><th>Part</th><th>Local and deploy previews</th><th>Production</th></tr>
-  <tr><td><code>APP_ENV</code></td><td><code>development</code> (local) / <code>preview</code> (set in <code>netlify.toml</code>)</td><td><code>production</code></td></tr>
+  <tr><td><code>APP_ENV</code></td><td><code>development</code> (local) / <code>preview</code></td><td><code>production</code></td></tr>
   <tr><td>Database</td><td>Neon <code>dev</code> branch, fake subscribers (<code>npm run db:reset-dev</code>)</td><td>Neon production branch</td></tr>
   <tr><td>Jobs</td><td>No schedules act. Use "Run now" on the deploy preview.</td><td>Scheduled on the <code>main</code> deploy</td></tr>
   <tr><td>Gmail</td><td colspan="2">Same mailbox, read-only scope in both</td></tr>
   <tr><td>Telegram</td><td>Not sent; the text is recorded in the run</td><td>Review group</td></tr>
-  <tr><td>n8n</td><td colspan="2">One production instance. The commit route still defaults to the production n8n webhook in every environment.</td></tr>
+  <tr><td>n8n</td><td>The commit route needs <code>OUTLINE_COMMIT_WEBHOOK_URL</code> and refuses the production webhook</td><td>One production instance; the commit route defaults to its webhook</td></tr>
 </table>
-<p><span class="plan">Planned guards:</span> <code>src/pipeline/side-effects/</code> is the only caller of GHL, S3, and the review group, with dry-run outside production; the commit route refuses to call production n8n outside production.</p>
+<p><code>APP_ENV</code> is set in <code>netlify.toml</code> and also as a Netlify env var with the same value per context, because functions cannot read <code>netlify.toml</code> values at runtime. Next routes get the build's value inlined (<code>next.config.mjs</code> <code>env</code>), so they must read <code>process.env.APP_ENV</code> by name, never <code>process.env</code> whole.</p>
+<p>Guards (#49): <code>src/pipeline/side-effects/</code> gates GHL, S3, and the review group (record-only outside production; S3 only under <code>newsletter-dev/</code>). The commit route refuses production n8n outside production.</p>
 
 <h2 id="vars">11. Env var names (values live in Netlify and <code>.env.local</code>, never in git)</h2>
 <table>
