@@ -4,9 +4,10 @@ What each incident means and what the owner does about it. Read [GLOSSARY.md](..
 words (incident, alert, check, skipped date) and [docs/architecture.html](../architecture.html) for the
 stages.
 
-Some keys below come from code that is still in review. Each entry says which job raises it and which PR
-adds it. This page is accurate once those PRs are merged: #123 (ops alerts), #129 (run checks), #132 (draft
-job), #133 (native commit), #134 (article reader).
+Each entry says which job raises it and which PR added it. All of those PRs are merged and in production
+since 2026-11-09: #123 (ops alerts), #129 (run checks), #132 (draft job), #133 (native commit), #134
+(article reader). `draft.failed` can only appear once `draft.owner` is `native`; production still drafts in
+n8n until the owner switches it.
 
 ## How incidents work
 
@@ -119,13 +120,13 @@ Eight keys. The date in each key is the issue date in New York time.
 
 - **Raised by:** the `draft-issue` job, in `src/pipeline/draft/run-draft.ts` (PR #132, carried by #133
   and #134).
-- **Severity:** critical.
+- **Severity:** critical. A failed "New image" draft is a warning: its ready source draft is still there.
 - **Meaning:** A draft failed at one step: loading the outline, reading articles, writing, checking the
   writing, making the image, building the email, creating the GHL template, or saving. The alert names the
   step. If the draft has no issue date, the key ends in `issue-<id>` instead of a date. A duplicate issue
   title is one known cause; the message then says so.
-- **Do (check, fix, retry):** The incident message links to the approval board for the date
-  (`/approval?date=<date>`), not to the drafts page. Steps (from PR #133):
+- **Do (check, fix, retry):** The incident message links to the drafts page for the date
+  (`/approval/drafts?date=<date>`). Steps (from PR #133):
   1. Open `/approval/drafts?date=<YYYY-MM-DD>`. It lists every draft for the date.
   2. Read the failed step and the error on the failed draft. Fix the cause if it is outside the code, for
      example an API key or a quota.
