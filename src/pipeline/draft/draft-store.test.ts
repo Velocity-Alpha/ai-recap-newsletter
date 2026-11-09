@@ -1,15 +1,31 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const runLog = vi.hoisted(() => ({ started: [] as unknown[], events: [] as unknown[], finished: [] as unknown[] }));
+
 vi.mock("@/src/server/prisma", async () => {
   const { fakeDb } = await import("@/src/pipeline/draft/fake-db.fixture");
   return { prisma: fakeDb.client };
 });
+vi.mock("@/src/pipeline/runs", () => ({
+  startRun: vi.fn(async (input: unknown) => {
+    runLog.started.push(input);
+    return BigInt(9);
+  }),
+  logEvent: vi.fn(async (_runId: bigint, event: unknown) => {
+    runLog.events.push(event);
+  }),
+  finishRun: vi.fn(async (_runId: bigint, result: unknown) => {
+    runLog.finished.push(result);
+  }),
+}));
 
 import {
   createDraft,
   DraftNotRetryableError,
+  DraftOwnerError,
   getDraftHtml,
   getDraftStatus,
+  isStuckDraft,
   IssuePublishedError,
   listDraftsForDate,
   retryDraft,
@@ -33,7 +49,12 @@ async function issue(data: Record<string, unknown> = {}): Promise<bigint> {
   return (row as { id: bigint }).id;
 }
 
-beforeEach(() => fakeDb.reset());
+beforeEach(() => {
+  fakeDb.reset();
+  runLog.started.length = 0;
+  runLog.events.length = 0;
+  runLog.finished.length = 0;
+});
 
 describe("createDraft", () => {
   it("creates the issue for a new date and draft v1, running, under a per-date lock", async () => {
@@ -82,6 +103,32 @@ describe("createDraft", () => {
   it("names an outline that does not exist", async () => {
     await expect(createDraft(42)).rejects.toThrow("Outline 42 does not exist.");
   });
+
+  it("refuses while n8n owns drafting, and creates nothing", async () => {
+    fakeDb.state.settings.rows[0].value = "n8n";
+
+    const attempt = createDraft(await outline());
+
+    await expect(attempt).rejects.toBeInstanceOf(DraftOwnerError);
+    await expect(attempt).rejects.toThrow("draft.owner is n8n, so native drafting is off.");
+    expect(fakeDb.state.issues.rows).toHaveLength(0);
+    expect(fakeDb.state.drafts.rows).toHaveLength(0);
+  });
+});
+
+describe("isStuckDraft", () => {
+  const queuedAt = new Date(NOW.getTime() - 6 * 60_000);
+
+  it("is true for a running draft whose job died, or never started", () => {
+    expect(isStuckDraft({ status: "running", queuedAt, startedAt: new Date(NOW.getTime() - 21 * 60_000) }, NOW)).toBe(true);
+    expect(isStuckDraft({ status: "running", queuedAt, startedAt: null }, NOW)).toBe(true);
+  });
+
+  it("is false for a job still within its time, a fresh draft, and a finished draft", () => {
+    expect(isStuckDraft({ status: "running", queuedAt, startedAt: new Date(NOW.getTime() - 60_000) }, NOW)).toBe(false);
+    expect(isStuckDraft({ status: "running", queuedAt: new Date(NOW.getTime() - 4 * 60_000), startedAt: null }, NOW)).toBe(false);
+    expect(isStuckDraft({ status: "failed", queuedAt, startedAt: null }, NOW)).toBe(false);
+  });
 });
 
 describe("retryDraft", () => {
@@ -107,9 +154,40 @@ describe("retryDraft", () => {
       failedStep: null,
       error: null,
       content: null,
+      queuedAt: NOW,
       startedAt: null,
       finishedAt: null,
     });
+    expect(runLog.started).toEqual([]);
+  });
+
+  it("logs the old GHL template id before clearing it, since the retry makes a new template", async () => {
+    const created = await failedDraft();
+    await fakeDb.client.issueDraft.update({
+      where: { id: BigInt(created.draftId) },
+      data: { failedStep: "save", ghlTemplateId: "tpl-old", ghlPreviewUrl: "https://preview.example.test/tpl-old" },
+    });
+
+    await retryDraft(created.draftId, { now: () => NOW });
+
+    expect(runLog.started).toEqual([{ job: "draft-retry", trigger: "manual" }]);
+    expect(runLog.events).toEqual([
+      expect.objectContaining({
+        step: "retry",
+        message: expect.stringContaining("tpl-old"),
+        data: expect.objectContaining({ draftId: created.draftId, ghlTemplateId: "tpl-old" }),
+      }),
+    ]);
+    expect(runLog.finished).toEqual([expect.objectContaining({ status: "succeeded" })]);
+    expect(fakeDb.state.drafts.rows[0]).toMatchObject({ ghlTemplateId: null, ghlPreviewUrl: null });
+  });
+
+  it("refuses when another issue row for the date is published", async () => {
+    const created = await failedDraft();
+    const other = await issue({ title: "An n8n copy", publishedAt: NOW });
+
+    await expect(retryDraft(created.draftId, { now: () => NOW })).rejects.toThrow(`(id ${other}) is already published`);
+    expect(fakeDb.state.drafts.rows[0]).toMatchObject({ status: "failed" });
   });
 
   it("refuses a ready draft, a draft that is running now, and a published issue", async () => {
@@ -135,6 +213,18 @@ describe("retryDraft", () => {
     });
 
     await expect(retryDraft(created.draftId, { now: () => NOW })).resolves.toEqual(created);
+  });
+
+  it("retries a draft whose job never started, once it has waited 5 minutes", async () => {
+    const created = await createDraft(await outline());
+    const id = BigInt(created.draftId);
+
+    await fakeDb.client.issueDraft.update({ where: { id }, data: { queuedAt: new Date(NOW.getTime() - 4 * 60_000) } });
+    await expect(retryDraft(created.draftId, { now: () => NOW })).rejects.toThrow("is running now");
+
+    await fakeDb.client.issueDraft.update({ where: { id }, data: { queuedAt: new Date(NOW.getTime() - 6 * 60_000) } });
+    await expect(retryDraft(created.draftId, { now: () => NOW })).resolves.toEqual(created);
+    expect(fakeDb.state.drafts.rows[0]).toMatchObject({ status: "running", queuedAt: NOW, startedAt: null });
   });
 });
 

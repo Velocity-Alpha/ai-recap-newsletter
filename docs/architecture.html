@@ -132,7 +132,7 @@ Later: pre-send review in the app before the GHL template (#117)
   <tr><td><code>ingest-stories-background</code></td><td>none (called by the above)</td><td>valid token</td><td><code>runIngest()</code> in <code>src/pipeline/ingest/run-ingest.ts</code></td></tr>
   <tr><td><code>detect-publish</code></td><td><code>*/5 0,1,13-23 * * *</code></td><td>weekdays 09:00–21:00 New York</td><td>Reads the seed inbox, 20-minute lookback, publishes</td></tr>
   <tr><td><code>detect-publish-catch-up</code></td><td><code>0 3 * * *</code></td><td>daily</td><td>Same, 3-day lookback</td></tr>
-  <tr><td><code>draft-issue-background</code></td><td>none (on commit)</td><td>valid token; the draft is waiting to run</td><td><code>runDraftJob()</code> in <code>src/pipeline/draft/run-draft.ts</code>. Built (#76); nothing starts it until the commit route calls <code>startDraftJob()</code> (#79)</td></tr>
+  <tr><td><code>draft-issue-background</code></td><td>none (on commit)</td><td>valid token signed for the draft; the draft is waiting to run</td><td><code>runDraftJob()</code> in <code>src/pipeline/draft/run-draft.ts</code>; gives up at 13 min. Built (#76); nothing starts it until the commit route calls <code>startDraftJob()</code> (#79)</td></tr>
   <tr><td>outcome checks, digest</td><td>fixed times</td><td colspan="2"><span class="plan">planned</span> Phase 1 (#50–#52)</td></tr>
 </table>
 <p>Each run writes <code>pipeline_runs</code> (job, trigger, status, stats) and <code>pipeline_events</code> (step log). Job tokens: <code>src/server/job-token.ts</code>, format <code>&lt;expiresAtMs&gt;.&lt;sig&gt;</code>, HMAC key derived from <code>SESSION_SECRET</code> per purpose.</p>
@@ -174,7 +174,7 @@ Later: pre-send review in the app before the GHL template (#117)
   <tr><th>Table</th><th>Holds</th><th>Written by</th></tr>
   <tr><td><code>stories</code></td><td>Extracted stories per day and source (snake_case columns, but <code>"createdAt"</code> is camelCase)</td><td>native ingest</td></tr>
   <tr><td><code>scraper_bookmarks</code></td><td>Last-read time per source (keys such as <code>the_signal</code>; <code>tldr_ai</code> and <code>aloa_ai</code> are unused)</td><td>native ingest</td></tr>
-  <tr><td><code>issues</code></td><td>Drafts and published issues: <code>html</code>, <code>content_json</code>, <code>published_at</code> (NULL = draft), <code>slug</code> (generated)</td><td>n8n (insert), native publish (update), owner ("Mark as published")</td></tr>
+  <tr><td><code>issues</code></td><td>Drafts and published issues: <code>html</code>, <code>content_json</code>, <code>published_at</code> (NULL = draft), <code>slug</code> (generated)</td><td>n8n (insert), native draft (insert, update), native publish (update; a native email's draft is copied over), owner ("Mark as published")</td></tr>
   <tr><td><code>subscribers</code>, <code>auth_codes</code></td><td>Site subscriber records and one-time codes</td><td>app</td></tr>
   <tr><td><code>pipeline_settings</code></td><td>Owner switches and thresholds</td><td>owner, by SQL</td></tr>
   <tr><td><code>pipeline_runs</code>, <code>pipeline_events</code></td><td>Job runs and their step logs</td><td>native jobs</td></tr>

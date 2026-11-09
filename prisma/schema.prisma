@@ -236,6 +236,9 @@ model IssueDraft {
   ghlPreviewUrl    String?   @map("ghl_preview_url")
   unreadStoryIds   Int[]     @default([]) @map("unread_story_ids")
   createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  /// When the draft last waited for its job: set on create and on retry. A draft whose job never starts is
+  /// stuck after 5 minutes (draft-store.ts isStuckDraft).
+  queuedAt         DateTime  @default(now()) @map("queued_at") @db.Timestamptz(6)
   startedAt        DateTime? @map("started_at") @db.Timestamptz(6)
   finishedAt       DateTime? @map("finished_at") @db.Timestamptz(6)
 

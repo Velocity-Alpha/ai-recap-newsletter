@@ -3,8 +3,8 @@ import { bearerToken, createJobToken, isValidJobToken } from "@/src/server/job-t
 
 /**
  * A draft takes about a minute, more than a route may run. So the commit route (#79) only starts the background
- * function (15 minutes), which runs the draft. The call carries a short-lived `draft-issue` job token, so nobody
- * else can start a run, and the draft id in the body.
+ * function (15 minutes), which runs the draft. The call carries the draft id in the body and a short-lived
+ * `draft-issue` job token signed for that id, so nobody else can start a run, or reuse the token for another draft.
  */
 
 export const DRAFT_BACKGROUND_PATH = "/.netlify/functions/draft-issue-background";
@@ -38,26 +38,40 @@ export async function startDraftJob(
   const siteUrl = siteUrlOf(target);
   if (!siteUrl) return { status: "not_configured", reason: "Missing the site address." };
 
+  const id = Number(draftId);
   const send = options.fetch ?? fetch;
-  const response = await send(`${siteUrl.replace(/\/+$/, "")}${DRAFT_BACKGROUND_PATH}`, {
-    method: "POST",
-    headers: { authorization: `Bearer ${createJobToken("draft-issue", secret, now())}`, "content-type": "application/json" },
-    body: JSON.stringify({ draftId: Number(draftId) }),
-    signal: AbortSignal.timeout(10_000),
-  });
+  let response: Response;
+  try {
+    response = await send(`${siteUrl.replace(/\/+$/, "")}${DRAFT_BACKGROUND_PATH}`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${createJobToken("draft-issue", secret, now(), String(id))}`, "content-type": "application/json" },
+      body: JSON.stringify({ draftId: id }),
+      // A redirect would resend this as a GET, which Netlify answers 202 and the function then ignores.
+      redirect: "error",
+      signal: AbortSignal.timeout(10_000),
+    });
+  } catch (error) {
+    throw new Error(`Starting the draft job failed: ${describeFetchError(error)}.`);
+  }
   if (!response.ok) throw new Error(`Starting the draft job failed with HTTP ${response.status}.`);
   return { status: "started" };
 }
 
-/** The draft id from a POST with a valid `draft-issue` job token, else null. */
+function describeFetchError(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  const cause = error instanceof Error && error.cause instanceof Error ? error.cause.message : "";
+  return cause ? `${message} (${cause})` : message;
+}
+
+/** The draft id from a POST with a valid `draft-issue` job token signed for that id, else null. */
 export async function readDraftJobRequest(request: Request, env: Record<string, string | undefined>, now: Date): Promise<number | null> {
   const secret = env.SESSION_SECRET?.trim();
   if (!secret || request.method !== "POST") return null;
-  if (!isValidJobToken("draft-issue", bearerToken(request), secret, now)) return null;
 
   const body = (await request.json().catch(() => null)) as { draftId?: unknown } | null;
   const draftId = body?.draftId;
-  return typeof draftId === "number" && Number.isSafeInteger(draftId) && draftId > 0 ? draftId : null;
+  if (typeof draftId !== "number" || !Number.isSafeInteger(draftId) || draftId <= 0) return null;
+  return isValidJobToken("draft-issue", bearerToken(request), secret, now, String(draftId)) ? draftId : null;
 }
 
 export function describeStartDraft(result: StartDraftResult): string {
