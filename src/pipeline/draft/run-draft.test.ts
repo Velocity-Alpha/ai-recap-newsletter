@@ -174,6 +174,23 @@ describe("runDraftJob", () => {
     expect(draftRow(draftId)).toMatchObject({ status: "failed", failedStep: "validate", content: short });
   });
 
+  it("logs one event for a rewrite, with the problem count and no story text, and saves the rewrite", async () => {
+    const { draftId } = await commit();
+    const short = { ...SAMPLE_CONTENT, title: "Short" };
+    const writer = vi.fn(async () => structuredClone(SAMPLE_CONTENT)).mockImplementationOnce(async () => structuredClone(short));
+
+    const result = await runDraftJob(draftId, { env: ENV, now: () => NOW, deps: deps({ writer }) });
+
+    expect(result).toMatchObject({ status: "ready" });
+    expect(draftRow(draftId)).toMatchObject({ status: "ready", content: SAMPLE_CONTENT });
+    expect(stepHistory()).toEqual(["load", "read_articles", "write", "validate", "write", "validate", "image", "html", "ghl", "save", null]);
+    const rewrites = runLog.events.filter((event) => event.level === "warn");
+    expect(rewrites).toEqual([
+      { level: "warn", step: "write", message: "The written issue failed 1 check. Writing it once more with the problems listed.", data: { problems: 1 } },
+    ]);
+    expect(JSON.stringify(runLog.events)).not.toContain("Short");
+  });
+
   it("fails at load when a story in the outline is missing", async () => {
     fakeDb.state.stories.rows = fakeDb.state.stories.rows.filter((row) => Number(row.id) !== 507);
     const { draftId } = await commit();

@@ -14,6 +14,7 @@ import {
   type ProduceDraftInput,
   type ReadArticles,
 } from "@/src/pipeline/draft/produce-draft";
+import type { IssueWriter } from "@/src/pipeline/draft/writer";
 import { parseSentEmail } from "@/src/pipeline/publish/sent-email-parser";
 
 const IMAGE_URL = "https://assets.example.test/newsletter-dev/2027-01-04-abc.jpg";
@@ -127,10 +128,10 @@ describe("produceDraft", () => {
   });
 
   const badTitle: WrittenIssueContent = { ...SAMPLE_CONTENT, title: "Too short" };
+  // Validate failures write twice, so they have their own tests below.
   const failures: Array<[DraftStep, Partial<ProduceDraftDeps>, Partial<ProduceDraftInput>, string]> = [
     ["read_articles", { readArticles: vi.fn(async () => Promise.reject(new Error("reader down"))) }, {}, "reader down"],
     ["write", { writer: vi.fn(async () => Promise.reject(new Error("The writer refused: no."))) }, {}, "The writer refused: no."],
-    ["validate", { writer: vi.fn(async () => structuredClone(badTitle)) }, {}, "The title has 2 words"],
     [
       "image",
       { makeImage: vi.fn(async () => Promise.reject(new FeaturedImageError("upload", new Error("S3 returned HTTP 403.")))) },
@@ -171,6 +172,101 @@ describe("produceDraft", () => {
 
     expect(error.partial.content).toEqual(badTitle);
     expect(error.partial.unreadStoryIds).toEqual([501, 502, 503, 504]);
+  });
+
+  describe("when the written issue fails its checks", () => {
+    // The writer varies from run to run: a story it left out once is usually there on a second try.
+    const missingStory: WrittenIssueContent = {
+      ...SAMPLE_CONTENT,
+      research_and_analysis: SAMPLE_CONTENT.research_and_analysis.filter((story) => story.story_id !== 504),
+    };
+    const MISSING_PROBLEM = "Story 504 (Research & Analysis) is missing.";
+
+    function writerReturning(...results: WrittenIssueContent[]) {
+      const writer = vi.fn<IssueWriter>(async () => structuredClone(SAMPLE_CONTENT));
+      for (const result of results) writer.mockImplementationOnce(async () => structuredClone(result));
+      return writer;
+    }
+
+    it("writes once more, and goes on as normal when the rewrite passes", async () => {
+      const onRewrite = vi.fn();
+      const { deps, steps } = fakeDeps({ writer: writerReturning(missingStory, SAMPLE_CONTENT), onRewrite });
+
+      const draft = await produceDraft(INPUT, deps);
+
+      expect(deps.writer).toHaveBeenCalledTimes(2);
+      expect(onRewrite).toHaveBeenCalledTimes(1);
+      expect(onRewrite).toHaveBeenCalledWith(1);
+      expect(steps).toEqual(["read_articles", "write", "validate", "write", "validate", "image", "html", "ghl"]);
+      expect(draft.content).toEqual(SAMPLE_CONTENT);
+      expect(deps.makeImage).toHaveBeenCalledWith(expect.objectContaining({ context: expect.objectContaining({ subjectLine: SAMPLE_CONTENT.title }) }));
+    });
+
+    it("gives the rewrite the same stories, its previous draft, and every problem the checks found", async () => {
+      const writer = writerReturning(missingStory, SAMPLE_CONTENT);
+      const { deps } = fakeDeps({ writer });
+
+      await produceDraft(INPUT, deps);
+
+      const [first, second] = writer.mock.calls.map(([input]) => input);
+      expect(first.revision).toBeUndefined();
+      expect(second).toEqual({ ...first, revision: { previous: missingStory, problems: [MISSING_PROBLEM] } });
+    });
+
+    it("fails at validate as before when the rewrite fails the checks too, keeping the rewrite", async () => {
+      const stillShort: WrittenIssueContent = { ...SAMPLE_CONTENT, title: "Still too short" };
+      const { deps, steps } = fakeDeps({ writer: writerReturning(missingStory, stillShort) });
+
+      const error = await failure(produceDraft(INPUT, deps));
+
+      expect(deps.writer).toHaveBeenCalledTimes(2);
+      expect(error.step).toBe("validate");
+      expect(error.message).toBe('The written issue failed 1 check: The title has 3 words; it needs 4 to 8: "Still too short".');
+      expect(error.partial.content).toEqual(stillShort);
+      expect(steps).toEqual(["read_articles", "write", "validate", "write", "validate"]);
+      expect(deps.makeImage).not.toHaveBeenCalled();
+    });
+
+    it("does not rewrite a draft that passes the first time", async () => {
+      const onRewrite = vi.fn();
+      const { deps } = fakeDeps({ onRewrite });
+
+      await produceDraft(INPUT, deps);
+
+      expect(deps.writer).toHaveBeenCalledTimes(1);
+      expect(onRewrite).not.toHaveBeenCalled();
+    });
+
+    it("counts both writes in the write step's time", async () => {
+      let clock = 0;
+      const results = [missingStory, SAMPLE_CONTENT];
+      const writer = vi.fn<IssueWriter>(async () => {
+        clock += 100;
+        return structuredClone(results.shift()!);
+      });
+      const { deps } = fakeDeps({ writer, now: () => clock });
+
+      const draft = await produceDraft(INPUT, deps);
+
+      expect(draft.stepMs.write).toBe(200);
+    });
+
+    it("stops the rewrite at the deadline, keeping the first draft", async () => {
+      const deadline = new AbortController();
+      const writer = vi.fn<IssueWriter>(async () => structuredClone(missingStory));
+      writer.mockImplementationOnce(async () => structuredClone(missingStory));
+      writer.mockImplementationOnce(() => {
+        deadline.abort(new Error("The draft timed out after 13 min."));
+        return new Promise<never>(() => undefined);
+      });
+      const { deps } = fakeDeps({ writer, signal: deadline.signal });
+
+      const error = await failure(produceDraft(INPUT, deps));
+
+      expect(error.step).toBe("write");
+      expect(error.message).toBe("The draft timed out after 13 min.");
+      expect(error.partial.content).toEqual(missingStory);
+    });
   });
 
   it("fails the running step as soon as the deadline passes, without waiting for it", async () => {
