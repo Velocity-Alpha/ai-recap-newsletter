@@ -6,6 +6,7 @@ import { buildReadyMessage, createTelegramSender } from "@/src/pipeline/ingest/t
 import { createGmailReader, readGmailCredentials } from "@/src/pipeline/publish/gmail-client";
 import { finishRun, logEvent, startRun, type EventLevel, type RunTrigger } from "@/src/pipeline/runs";
 import { readSetting } from "@/src/pipeline/settings";
+import { createSideEffects } from "@/src/pipeline/side-effects";
 
 /**
  * Story ingestion with its switch, run log and Telegram message, independent of the job runner. The
@@ -61,18 +62,31 @@ async function notify(
   sendTelegram: ((text: string) => Promise<void>) | undefined,
 ): Promise<TelegramStatus> {
   const text = buildReadyMessage(result);
-  if (env.APP_ENV !== "production") {
-    await logEvent(runId, { level: "info", step: "telegram", message: "Not sent outside production. Recorded the text.", data: { text } });
-    return "recorded";
-  }
+  const effects = createSideEffects({
+    appEnv: env.APP_ENV,
+    record: (entry) =>
+      logEvent(runId, {
+        level: "info",
+        step: "telegram",
+        message: "Not sent outside production. Recorded the text.",
+        data: entry.payload as Prisma.InputJsonValue,
+      }).then(() => undefined),
+  });
   const token = env.TELEGRAM_REVIEW_BOT_TOKEN?.trim();
   const send = sendTelegram ?? (token ? createTelegramSender({ token, chatId: env.TELEGRAM_REVIEW_CHAT_ID?.trim() || undefined }) : undefined);
-  if (!send) {
+  if (effects.live && !send) {
     await logEvent(runId, { level: "warn", step: "telegram", message: "Missing setting: TELEGRAM_REVIEW_BOT_TOKEN. Not sent." });
     return "not_configured";
   }
   try {
-    await send(text);
+    const outcome = await effects.run({
+      target: "review_group",
+      action: "sendMessage",
+      payload: { text },
+      send: () => send!(text),
+      dryRun: () => undefined,
+    });
+    if (outcome.mode === "recorded") return "recorded";
     await logEvent(runId, { level: "info", step: "telegram", message: "Sent the ready message." });
     return "sent";
   } catch (error) {

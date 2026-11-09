@@ -209,7 +209,7 @@ Required environment variables:
 Optional:
 
 - `PRODUCTION_DATABASE_URL` for running Prisma production migration commands from your local machine
-- `OUTLINE_COMMIT_WEBHOOK_URL` to override the approval outline commit webhook destination. Defaults to the production n8n story approval webhook.
+- `OUTLINE_COMMIT_WEBHOOK_URL` sets where the approval board's commit goes. In production it defaults to the production n8n story approval webhook. Outside production it has no default, and the production webhook is refused, so a preview cannot create a production issue.
 - `NEWSLETTER_RUNTIME_DB_ROLE` to override the runtime role name used by the bootstrap scripts. Defaults to `newsletter_web`.
 
 Google Analytics IDs and `APP_ENV` are configured per deploy context in `netlify.toml`.
