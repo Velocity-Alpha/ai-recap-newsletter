@@ -192,3 +192,15 @@ model Alert {
   @@map("alerts")
   @@schema("newsletter")
 }
+
+/// A weekday the owner chose not to publish an issue (#52): "No issue today" on /approval.
+/// The check job skips that date's checks. Undo deletes the row.
+model SkippedDate {
+  date      DateTime @id @db.Date
+  note      String?
+  createdBy String   @default("approval") @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("skipped_dates")
+  @@schema("newsletter")
+}

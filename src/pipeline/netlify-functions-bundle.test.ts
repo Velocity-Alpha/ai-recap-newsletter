@@ -2,6 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
+import { CHECK_SCHEDULE } from "@/src/pipeline/checks/schedule";
 import { INGEST_SCHEDULE } from "@/src/pipeline/ingest/schedule";
 
 const root = path.resolve(__dirname, "../..");
@@ -28,6 +29,7 @@ describe("Netlify function bundle", () => {
   it("gives each scheduled function a literal schedule", () => {
     const read = (name: string) => readFileSync(path.join(root, "netlify/functions", name), "utf8");
     expect(read("ingest-stories.mts")).toContain(`export const config = { schedule: "${INGEST_SCHEDULE}" };`);
+    expect(read("run-checks.mts")).toContain(`export const config = { schedule: "${CHECK_SCHEDULE}" };`);
     for (const file of readdirSync(path.join(root, "netlify/functions"))) {
       const source = read(file);
       if (source.includes("schedule:")) expect(source, file).toMatch(/export const config = \{ schedule: "[^"]+" \};/);

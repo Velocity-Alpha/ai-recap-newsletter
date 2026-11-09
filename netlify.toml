@@ -22,3 +22,6 @@
 
 [functions."ingest-stories*"]
   included_files = ["node_modules/@prisma/client-runtime-utils/**"]
+
+[functions."run-checks*"]
+  included_files = ["node_modules/@prisma/client-runtime-utils/**"]

@@ -146,6 +146,7 @@ Read routes:
 - `GET /api/approval/outline?date=` for the password-protected approval board outline
 - `GET /api/newsletters/outline?date=` for the authenticated newsletter outline API
 - `GET /api/approval/issues/[id]/publish` previews what "Mark as published" would publish (approval session)
+- `GET /api/approval/skipped-dates?date=` says whether a date is a skipped date (approval session)
 
 Mutation routes:
 
@@ -157,6 +158,7 @@ Mutation routes:
 - `GET|POST /api/subscriber/unsubscribe` with a signed `token`
 - `POST /api/subscriber/unsubscribe/webhook` with `Authorization: Bearer <GHL_UNSUBSCRIBE_WEBHOOK_SECRET>` or `x-webhook-secret`
 - `POST /api/newsletters/commit` to commit an approved outline to the generation webhook
+- `POST /api/approval/skipped-dates` with `{ date, note? }` marks a skipped date, and `DELETE /api/approval/skipped-dates?date=` undoes it, until that day is over (approval session). Used by "No issue today" on `/approval`.
 - `POST /api/approval/issues/[id]/publish` publishes an unpublished draft from its stored email HTML (approval session). Used by the "Mark as published" button on `/approval/issues`. It sends no email.
 - `POST /api/revalidate` refreshes the cached issue lists, issue pages, and sitemap. It needs `Authorization: Bearer <token>`, a 5-minute token signed with a key derived from `SESSION_SECRET` (`src/server/cache-refresh-auth.ts`). The publish job calls it after it publishes an issue.
 
@@ -179,6 +181,7 @@ Jobs run as Netlify functions in `netlify/functions/` (see `docs/adr/0001-job-ru
 
 - `detect-publish` reads the seed inbox (read-only) every 5 minutes on weekdays, 09:00–20:59 New York time, and `detect-publish-catch-up` looks back 3 days once a day. Each run checks Gmail first and opens the database only when an issue email arrived. The `publish.owner` key decides what happens next: `n8n` (the default) does nothing, `shadow` only records `publish_events` rows, and `native` publishes. The functions need `DATABASE_URL`, `GMAIL_OAUTH_CLIENT_ID`, `GMAIL_OAUTH_CLIENT_SECRET`, and `GMAIL_OAUTH_REFRESH_TOKEN` as secret Netlify env vars, plus `PUBLISH_SEED_RECIPIENTS`. Set that to the one monitor seed address. Each send also reaches the owner's `+` alias in the same inbox; without the filter, the job reads every send twice. Secret vars use the scopes builds, functions, and runtime; the Free plan cannot narrow them further.
 - `ingest-stories` collects the day's candidate stories at 09:55 New York time on weekdays. It reads 5 newsletters from the seed inbox (read-only) and the Product Hunt and Hugging Face feeds, extracts stories with `gpt-6-luna`, and saves them to `newsletter.stories` for the approval board. Then it sends the "stories are ready" message to the AI Recap Review Telegram group (production only; elsewhere the run log records the text). The scheduled function only starts `ingest-stories-background`, which does the work in up to 15 minutes; the call carries a 5-minute token signed with a key derived from `SESSION_SECRET`. The `ingest.owner` key decides who ingests: `n8n` (the default) or `native`. The job needs the Gmail variables above, `OPENAI_API_KEY`, and `TELEGRAM_REVIEW_BOT_TOKEN` (production only). Sources live in `src/pipeline/ingest/sources.ts`; each has a bookmark in `newsletter.scraper_bookmarks`, and a failed email is tried again on the next run. Each run is in `pipeline_runs` and `pipeline_events`.
+- `run-checks` runs the checks at 10:05, 12:00, and 18:00 New York time on weekdays (`src/pipeline/checks/`). It reads only the database and the public site, and raises or resolves incidents through `src/pipeline/notify/`. At 18:00 it posts the daily summary to the ops chat, then pings `HEALTHCHECKS_PING_URL` (production only). A skipped date ("No issue today" on `/approval`) turns off that date's checks; the summary still goes out. On a preview, "Run now" runs a full 18:00 pass at any time.
 - Scheduled functions fire only on the production deploy. To try one on a deploy preview (Neon `dev`), use "Run now" on the preview's function page in the Netlify UI. On a preview, `ingest-stories` runs at any time.
 - Do this before merging a new job. A local bundle can still load packages from the repo's `node_modules`, so it can pass while the Netlify bundle fails. `netlify.toml` ships `@prisma/client-runtime-utils` with the jobs for this reason.
 
@@ -194,6 +197,7 @@ Required environment variables:
 - `OPENAI_API_KEY` — story extraction in the ingest job
 - `TELEGRAM_REVIEW_BOT_TOKEN` — production only; the ingest job's "stories are ready" message
 - `TELEGRAM_OPS_CHAT_ID` — production only; the "AI Recap Ops" chat where the review bot posts ops alerts (`src/pipeline/notify/`). Never the review group. Without it, alerts are not sent.
+- `HEALTHCHECKS_PING_URL` — production only; the Healthchecks.io ping URL for the daily summary. `run-checks` pings it after the 18:00 summary. Without it, the run log records "not configured".
 - `RESEND_API_KEY`
 - `RESEND_FROM_NAME`
 - `RESEND_FROM_EMAIL`

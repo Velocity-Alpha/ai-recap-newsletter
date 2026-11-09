@@ -26,6 +26,7 @@ import {
   Zap,
 } from "lucide-react";
 
+import NoIssueTodayButton from "@/components/approval/NoIssueTodayButton";
 import { Button } from "@/components/ui/button";
 
 type StoryOption = {
@@ -648,7 +649,8 @@ export default function ApprovalBoard({
             </div>
           )}
 
-          <div className="ml-auto shrink-0 pl-2">
+          <div className="ml-auto flex shrink-0 items-center gap-2 pl-2">
+            <NoIssueTodayButton dateKey={dateKey} />
             <Button
               className={`px-3 py-1.5 text-xs font-medium text-white transition ${
                 publishDateBlockError
