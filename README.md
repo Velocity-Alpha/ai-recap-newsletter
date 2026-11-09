@@ -144,8 +144,12 @@ Read routes:
 - `GET /api/issues/[slug]`
 - `GET /api/ticker`
 - `GET /api/approval/outline?date=` for the password-protected approval board outline
+- `GET /api/approval/outline/marker?date=` the highest story id in the board's candidate window; the board reads it to spot stories newer than its cached copy (approval session)
 - `GET /api/newsletters/outline?date=` for the authenticated newsletter outline API
 - `GET /api/approval/issues/[id]/publish` previews what "Mark as published" would publish (approval session)
+- `GET /api/approval/drafts?date=` lists a date's native drafts for the board; none while `draft.owner` is `n8n` (approval session)
+- `GET /api/approval/drafts/[id]` one draft's status, polled by `/approval/drafts` while it runs (approval session)
+- `GET /api/approval/drafts/[id]/html` the draft's email HTML for the sandboxed preview frame (approval session)
 
 Mutation routes:
 
@@ -157,7 +161,11 @@ Mutation routes:
 - `POST /api/subscriber/sign-out`
 - `GET|POST /api/subscriber/unsubscribe` with a signed `token`
 - `POST /api/subscriber/unsubscribe/webhook` with `Authorization: Bearer <GHL_UNSUBSCRIBE_WEBHOOK_SECRET>` or `x-webhook-secret`
-- `POST /api/newsletters/commit` to commit an approved outline to the generation webhook
+- `POST /api/newsletters/commit` to commit an approved outline. With `draft.owner` = `n8n` (default) it posts to the n8n webhook. With `native` it saves the story changes, makes the next draft, and starts `draft-issue-background`; it never calls n8n
+- `POST /api/approval/drafts/[id]/retry` runs a failed or stuck draft again from the start (approval session)
+- `POST /api/approval/drafts/[id]/image/ideas` three scene ideas for "New image" on a ready draft, from one GPT-6 Luna call (approval session)
+- `POST /api/approval/drafts/[id]/image/generate` makes one image from `{ scenePrompt }` plus the fixed style prompt and uploads it to S3; it makes no draft (approval session)
+- `POST /api/approval/drafts/[id]/image` "Use this image": `{ imageUrl, scenePrompt }` from "generate" becomes the issue's next draft, with the same text, new HTML, and a new GHL template; it starts `draft-issue-background` (approval session)
 - `POST /api/approval/issues/[id]/publish` publishes an unpublished draft from its stored email HTML (approval session). Used by the "Mark as published" button on `/approval/issues`. It sends no email.
 - `POST /api/admin/stage-switches` with `{ key, value }` sets `ingest.owner`, `draft.owner`, or `publish.owner` to `n8n` or `native` (approval session). Used by `/admin/settings`. It refuses other keys and values, native drafting until #79, and changes to the current value. Each change is logged as a `pipeline_runs` row with job `admin-setting`.
 - `proxy.ts` refuses writes (any method but GET, HEAD, OPTIONS) to `/approval/*`, `/api/approval/*`, `/api/newsletters/commit`, and `/api/admin/*` unless they come from this site's own origin (`403`), and refuses API writes that are not `Content-Type: application/json` (`415`). See `src/server/same-origin.ts`.
@@ -213,11 +221,14 @@ Required environment variables:
 - `OPENROUTER_API_KEY`
 - `FOR_BRANDS_WEBHOOK_URL` if you want to override the default for-brands destination
 - `NEXT_PUBLIC_SITE_URL`
+- `GHL_PRIVATE_INTEGRATION_TOKEN`, `GHL_LOCATION_ID`, `GHL_USER_ID` — production only; native drafting creates a new GHL email template per draft. Outside production the GHL calls are recorded, not sent.
+- `VERTEX_API_KEY`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_REGION`, `S3_BUCKET` — the draft job's featured image (`src/pipeline/draft/image`). Outside production the image still uploads, but only under `newsletter-dev/`; the prefix comes from `APP_ENV`.
 
 Optional:
 
 - `PRODUCTION_DATABASE_URL` for running Prisma production migration commands from your local machine
-- `OUTLINE_COMMIT_WEBHOOK_URL` to override the approval outline commit webhook destination. Defaults to the production n8n story approval webhook.
+- `OUTLINE_COMMIT_WEBHOOK_URL` sets where the approval board's commit goes. In production it defaults to the production n8n story approval webhook. Outside production it has no default, and the production webhook is refused, so a preview cannot create a production issue.
 - `NEWSLETTER_RUNTIME_DB_ROLE` to override the runtime role name used by the bootstrap scripts. Defaults to `newsletter_web`.
+- `JINA_API_KEY` and `GITHUB_TOKEN` for the draft job's article reader (`src/pipeline/draft/articles`). Both work without a key: Jina Reader is the last fallback and is sent the key as a Bearer header only if set (higher rate limit); the GitHub token only raises the README API's rate limit.
 
 Google Analytics IDs and `APP_ENV` are configured per deploy context in `netlify.toml`.

@@ -1,11 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const findManyMock = vi.hoisted(() => vi.fn());
+const aggregateMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/src/server/prisma", () => ({
   prisma: {
     story: {
       findMany: findManyMock,
+      aggregate: aggregateMock,
     },
   },
 }));
@@ -25,6 +27,7 @@ import {
   cleanText,
   createDedupedOutline,
   createOutlineCandidateStories,
+  getCandidateMarker,
 } from "@/src/features/newsletter/curation.service";
 
 const OUTLINE_DATE = new Date("2026-06-09T00:00:00.000Z");
@@ -76,6 +79,7 @@ describe("newsletter curation", () => {
     findManyMock.mockReset();
     // Calls in order: recently used stories, candidates, published URL lookup.
     findManyMock.mockResolvedValue([]);
+    aggregateMock.mockReset();
     findUnsentDraftsMock.mockReset();
     findUnsentDraftsMock.mockResolvedValue([]);
   });
@@ -385,6 +389,54 @@ describe("newsletter curation", () => {
 
       expect(selectedIds(outline, "research")).toEqual([26, 27]);
       expect(selectedIds(outline, "headlines")).toEqual([1, 2, 3]);
+    });
+  });
+
+  describe("candidate marker", () => {
+    it("records the highest story id in the candidate window", async () => {
+      findManyMock.mockResolvedValueOnce([]).mockResolvedValueOnce(POOL_ROWS);
+
+      const { outline } = await createOutlineCandidateStories(OUTLINE_DATE);
+
+      expect(outline.candidate_marker).toBe(36);
+    });
+
+    it("counts stories the board does not show, so they never look new", async () => {
+      // Story 36 is held for an unsent draft and story 35 is removed by the duplicate check.
+      findUnsentDraftsMock.mockResolvedValue([{ date: "2026-06-08", storyIds: [36] }]);
+      findManyMock.mockResolvedValueOnce([]).mockResolvedValueOnce(POOL_ROWS);
+
+      const outline = await createDedupedOutline(
+        OUTLINE_DATE,
+        POOL_IDS.filter((id) => id !== 35)
+      );
+
+      expect(outline.candidate_marker).toBe(36);
+    });
+
+    it("is null when the candidate window is empty", async () => {
+      const { outline } = await createOutlineCandidateStories(OUTLINE_DATE);
+
+      expect(outline.candidate_marker).toBeNull();
+    });
+
+    it("reads the current marker over the same candidate window", async () => {
+      findManyMock.mockResolvedValueOnce([]).mockResolvedValueOnce(POOL_ROWS);
+      await createOutlineCandidateStories(OUTLINE_DATE);
+      const candidateQuery = findManyMock.mock.calls[1][0];
+      aggregateMock.mockResolvedValue({ _max: { id: 41 } });
+
+      await expect(getCandidateMarker(OUTLINE_DATE)).resolves.toBe(41);
+      expect(aggregateMock).toHaveBeenCalledWith({
+        where: candidateQuery.where,
+        _max: { id: true },
+      });
+    });
+
+    it("reads null when no story is in the window", async () => {
+      aggregateMock.mockResolvedValue({ _max: { id: null } });
+
+      await expect(getCandidateMarker(OUTLINE_DATE)).resolves.toBeNull();
     });
   });
 });

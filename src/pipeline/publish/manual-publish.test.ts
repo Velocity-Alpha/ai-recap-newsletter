@@ -66,6 +66,15 @@ describe("manualPublish", () => {
     );
   });
 
+  it("records which native draft it published", async () => {
+    const html = DRAFT_HTML.replace('data-issue-id="268"', 'data-issue-id="268" data-draft-id="41"');
+    const { store, publish } = fakeStore(draft({ html }));
+
+    await manualPublish(268, NOW, store);
+
+    expect(publish).toHaveBeenCalledWith(expect.objectContaining({ event: expect.objectContaining({ draftId: 41 }) }));
+  });
+
   it("publishes a draft with parse problems, because a person confirmed it", async () => {
     const html = renderIssueEmail({ ...PLACEHOLDER_ISSUE, summary: undefined });
     const { store, publish } = fakeStore(draft({ html }));

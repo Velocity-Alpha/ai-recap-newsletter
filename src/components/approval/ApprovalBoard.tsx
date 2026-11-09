@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { hasBoardEdits } from "@/components/approval/board-edits";
 import {
   ChevronDown,
   ChevronLeft,
@@ -27,6 +28,12 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import {
+  draftViewHref,
+  nativeCommitTarget,
+  secondCommitNotice,
+  type DraftingSummary,
+} from "@/features/newsletter/draft-links";
 
 type StoryOption = {
   id: number;
@@ -79,6 +86,10 @@ type ApprovalBoardProps = {
   dateKey: string;
   unsentDrafts: UnsentDraft[];
   onToggleDraftReuse: (draftDate: string) => void;
+  /** Called once the owner has changed anything on the board. */
+  onEdit?: () => void;
+  /** Extra notice shown at the bottom of the sticky header. */
+  headerNotice?: ReactNode;
   outlineDateLabel: string;
   referenceStories: ReferenceStory[];
   candidateSections: CandidateSection[];
@@ -95,6 +106,8 @@ type ApprovalBoardProps = {
       published_at: string | null;
     } | null;
   } | null;
+  /** The date's native drafts (#79). Null while n8n drafts: the board then works as before. */
+  drafting?: DraftingSummary | null;
 };
 
 type PreviewStory = CandidateMapEntry & {
@@ -202,14 +215,20 @@ export default function ApprovalBoard({
   dateKey,
   unsentDrafts,
   onToggleDraftReuse,
+  onEdit,
+  headerNotice,
   outlineDateLabel,
   referenceStories,
   candidateSections,
   candidateMap,
   dedupFailureReason,
   publishStatus,
+  drafting = null,
 }: ApprovalBoardProps) {
   const router = useRouter();
+  const nextDraftNotice = secondCommitNotice(drafting);
+  const draftCount = drafting?.owner === "native" ? drafting.drafts.length : 0;
+  const latestDraft = draftCount > 0 ? drafting?.drafts[0] : undefined;
   const [commitModalOpen, setCommitModalOpen] = useState(false);
   const [isCommitting, setIsCommitting] = useState(false);
   const [commitResponseMessage, setCommitResponseMessage] = useState<string | null>(null);
@@ -229,6 +248,18 @@ export default function ApprovalBoard({
   useEffect(() => {
     setSections(initSections(candidateSections));
   }, [candidateSections]);
+
+  const edited = hasBoardEdits({
+    candidateSections,
+    sections,
+    headlineStoryId,
+    excludeState,
+    urlOverrides,
+    notesOverrides,
+  });
+  useEffect(() => {
+    if (edited) onEdit?.();
+  }, [edited, onEdit]);
 
   const toggleExpand = (id: number) =>
     setExpandedIds((prev) => {
@@ -571,6 +602,14 @@ export default function ApprovalBoard({
         error?: string;
       };
 
+      // A native commit made a draft: follow it, also when its job did not start (the view offers "Retry").
+      const draftTarget = nativeCommitTarget(commitResponseBody, dateKey);
+      if (draftTarget) {
+        setCommitModalOpen(false);
+        router.push(draftTarget);
+        return;
+      }
+
       if (!response.ok || !commitResponseBody.success) {
         throw new Error(
           commitResponseBody.error ||
@@ -700,6 +739,20 @@ export default function ApprovalBoard({
             </button>
           </div>
         ))}
+        {latestDraft ? (
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[rgba(107,155,184,0.3)] bg-[rgba(232,242,248,0.7)] px-4 py-3 sm:px-6">
+            <p className="text-sm font-semibold text-[var(--watercolor-ink)]">
+              {draftCount === 1 ? "This date has 1 draft." : `This date has ${draftCount} drafts.`}{" "}
+              {`The latest is v${latestDraft.version}, ${latestDraft.status}.`}
+            </p>
+            <a
+              href={draftViewHref(dateKey, latestDraft.id)}
+              className="shrink-0 rounded-md border border-[rgba(107,155,184,0.5)] bg-white/80 px-3 py-1.5 text-xs font-medium text-[var(--watercolor-ink)] transition hover:bg-white"
+            >
+              View drafts
+            </a>
+          </div>
+        ) : null}
         {dedupFailureReason ? (
           <div className="border-t border-red-300 bg-red-50 px-4 py-3 sm:px-6">
             <p className="text-sm font-semibold text-red-700">
@@ -707,6 +760,7 @@ export default function ApprovalBoard({
             </p>
           </div>
         ) : null}
+        {headerNotice}
       </header>
 
       <div className="flex flex-1">
@@ -1131,6 +1185,12 @@ export default function ApprovalBoard({
                 </div>
               ) : (
                 <div className="space-y-4">
+                  {nextDraftNotice ? (
+                    <div className="rounded-xl border border-[rgba(107,155,184,0.24)] bg-[rgba(232,242,248,0.7)] px-4 py-3 text-sm font-medium text-[var(--watercolor-ink)]">
+                      {nextDraftNotice}
+                    </div>
+                  ) : null}
+
                   {commitResponseMessage ? (
                     <div className="rounded-xl border border-[rgba(107,155,184,0.24)] bg-[rgba(232,242,248,0.7)] px-4 py-3 text-sm text-[var(--watercolor-ink)]">
                       {commitResponseMessage}

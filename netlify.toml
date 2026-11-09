@@ -1,4 +1,6 @@
 # APP_ENV is required by next.config.mjs; a build without it fails.
+# Functions in netlify/functions cannot read variables from this file at runtime (Netlify docs), so APP_ENV is
+# also a Netlify env var with the same value per context (set 2026-11-09). Keep the two in step.
 [context.production.environment]
   APP_ENV = "production"
   NEXT_PUBLIC_GA_MEASUREMENT_ID = "G-1ZK1RC1RE1"
@@ -21,4 +23,7 @@
   included_files = ["node_modules/@prisma/client-runtime-utils/**"]
 
 [functions."ingest-stories*"]
+  included_files = ["node_modules/@prisma/client-runtime-utils/**"]
+
+[functions."draft-issue*"]
   included_files = ["node_modules/@prisma/client-runtime-utils/**"]
