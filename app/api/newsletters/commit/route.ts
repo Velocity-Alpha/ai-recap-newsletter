@@ -8,6 +8,8 @@ import {
 import { hasValidApprovalSession } from "@/src/server/approval-auth";
 import { fetchLastPublishedIssueDateOnOrBefore } from "@/src/features/newsletter/repository";
 import { parseCommitDate, resolveCommitWebhook } from "@/src/pipeline/side-effects/commit-webhook";
+import { normalizeOutline, type ApprovalOutline } from "@/src/pipeline/draft/outline";
+import { readDraftOwner, saveOutline } from "@/src/pipeline/draft/outline-store";
 import jwt from "jsonwebtoken";
 
 export const runtime = "nodejs";
@@ -79,6 +81,17 @@ export async function POST(request: Request) {
       return jsonWithRequestId(context, { success: false, error: webhook.error }, { status: 503 });
     }
 
+    let outline: ApprovalOutline;
+    try {
+      outline = normalizeOutline(normalizedPayload, targetDate);
+    } catch (err) {
+      return jsonWithRequestId(
+        context,
+        { success: false, error: err instanceof Error ? err.message : "Invalid outline." },
+        { status: 400 },
+      );
+    }
+
     const publishStatus = await fetchLastPublishedIssueDateOnOrBefore(targetDate);
     if (publishStatus.has_exact_match) {
       return jsonWithRequestId(
@@ -91,6 +104,17 @@ export async function POST(request: Request) {
         { status: 409 }
       );
     }
+
+    // Native drafting starts here in #79. Until then a commit under `native` would draft nothing.
+    const draftOwner = await readDraftOwner();
+    if (draftOwner === "native") {
+      return jsonWithRequestId(
+        context,
+        { success: false, error: "draft.owner is native, but native drafting is not built yet. Set it back to n8n." },
+        { status: 503 },
+      );
+    }
+    const savedOutline = await saveOutline(outline, draftOwner);
 
     const authClaims = {
       scope: "story-approval",
@@ -131,6 +155,8 @@ export async function POST(request: Request) {
       webhookStatus: webhookResponse.status,
       webhookHostname,
       forwardedSuccessfully: true,
+      outlineId: savedOutline.id.toString(),
+      outlineHash: savedOutline.hash,
     });
 
     return jsonWithRequestId(context, {
