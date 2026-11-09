@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 
+import { noIssueRequest } from "@/src/components/approval/no-issue-request";
+
 /**
  * "No issue today" (#52): marks the board's date as a skipped date, so the check job leaves it alone.
  * It can be undone until that day is over in New York.
@@ -33,9 +35,7 @@ export default function NoIssueTodayButton({ dateKey }: { dateKey: string }) {
   async function change(skip: boolean) {
     setBusy(true);
     setError(null);
-    const response = skip
-      ? await fetch(endpoint, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ date: dateKey }) })
-      : await fetch(`${endpoint}?date=${dateKey}`, { method: "DELETE" });
+    const response = await fetch(...noIssueRequest(dateKey, skip));
     const body = (await response.json().catch(() => ({}))) as { error?: string };
     if (response.ok) setStatus((current) => ({ canChange: current?.canChange ?? true, skipped: skip }));
     else setError(body.error ?? "Could not save.");
