@@ -148,3 +148,44 @@ describe("approval proxy", () => {
     }
   });
 });
+
+describe("admin proxy", () => {
+  beforeEach(() => {
+    vi.stubEnv("APPROVAL_PASSWORD", "approval-secret");
+    vi.stubEnv("SESSION_SECRET", "test-session-secret");
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("runs on every admin page and admin API path", () => {
+    expect(config.matcher).toEqual(expect.arrayContaining(["/admin", "/admin/:path*", "/api/admin", "/api/admin/:path*"]));
+  });
+
+  it("sends a visitor without a session from an admin page to the login page", async () => {
+    const response = await visit("/admin/runs?before=40");
+
+    expect(response.status).toBe(307);
+    const location = new URL(response.headers.get("location") ?? "");
+    expect(location.pathname).toBe("/approval/login");
+    expect(location.searchParams.get("redirect")).toBe("/admin/runs?before=40");
+  });
+
+  it("refuses a cross-site admin API write, and leaves the session check to the route (withAdminApi)", async () => {
+    const crossSite = await send("/api/admin/stage-switches", {
+      headers: { origin: "https://evil.example", "content-type": "application/json" },
+    });
+    const noSession = await send("/api/admin/stage-switches", { headers: SAME_ORIGIN_JSON });
+
+    expect(crossSite.status).toBe(403);
+    expect(isPassedThrough(noSession)).toBe(true);
+  });
+
+  it("lets a signed-in owner reach the admin pages and API", async () => {
+    const token = await createApprovalSessionToken();
+
+    expect(isPassedThrough(await visit("/admin", token))).toBe(true);
+    expect(isPassedThrough(await visit("/api/admin/stage-switches", token))).toBe(true);
+  });
+});

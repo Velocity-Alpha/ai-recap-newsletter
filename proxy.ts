@@ -28,6 +28,15 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // Every path that uses the approval session. `/:path*` also matches the bare prefix.
-  matcher: ["/approval/:path*", "/api/approval/:path*", "/api/newsletters/commit", "/api/admin/:path*"],
+  // Every path that uses the approval session. `/:path*` also matches the bare prefix; /admin and /api/admin
+  // are listed anyway so the admin coverage is plain to see (app/admin/admin-access.test.ts checks it).
+  matcher: [
+    "/approval/:path*",
+    "/admin",
+    "/admin/:path*",
+    "/api/approval/:path*",
+    "/api/newsletters/commit",
+    "/api/admin",
+    "/api/admin/:path*",
+  ],
 };

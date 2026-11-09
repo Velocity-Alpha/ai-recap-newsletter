@@ -47,18 +47,18 @@
 </ul>
 
 <h2 id="owners">2. Who owns each stage (production)</h2>
-<p>The switches are rows in <code>newsletter.pipeline_settings</code> (key, JSON value). A switch moves a stage back to n8n in minutes.</p>
+<p>The switches are rows in <code>newsletter.pipeline_settings</code> (key, JSON value). A switch moves a stage back to n8n in minutes. The owner changes <code>ingest.owner</code>, <code>draft.owner</code>, and <code>publish.owner</code> on <code>/admin/settings</code> (<code>n8n</code> or <code>native</code>); each change is logged as an <code>admin-setting</code> run. Turning the matching n8n workflows on or off is still done by hand in n8n.</p>
 <table>
   <tr><th>Stage</th><th>Current owner</th><th>Target</th><th>Switch</th><th>Issues</th></tr>
   <tr><td>Ingest stories from newsletters and feeds</td><td><span class="now">native</span> since 2026-11-09 04:05 UTC</td><td>native, hourly runs and more sources later</td><td><code>ingest.owner</code> = <code>"native"</code></td><td>#39, extras #111</td></tr>
   <tr><td>"Board is ready" Telegram ping to the review group</td><td><span class="now">native</span> (end of the ingest run)</td><td>native</td><td>same as ingest</td><td>#39</td></tr>
   <tr><td>Approval board proposal (sections, dedup)</td><td><span class="now">native</span> (app)</td><td>native; later "accept or swap"</td><td>none</td><td>#37, #56, #58, #59, #89</td></tr>
-  <tr><td>Draft issue, featured image, GHL template</td><td><span class="n8n">n8n</span></td><td>native <code>draft-issue</code> background job; a new draft and GHL template per commit (ADR 0002)</td><td><code>draft.owner</code> = <code>"n8n"</code> (default) or <code>"native"</code>: the commit route reads it (#79)</td><td>#40, #74–#80, #115, #116, #120</td></tr>
+  <tr><td>Draft issue, featured image, GHL template</td><td><span class="n8n">n8n</span></td><td>native <code>draft-issue</code> background job; a new draft and GHL template per commit (ADR 0002)</td><td><code>draft.owner</code> = <code>"n8n"</code> (default) or <code>"native"</code>, settable on <code>/admin/settings</code>: the commit route reads it (#79)</td><td>#40, #74–#80, #115, #116, #120</td></tr>
   <tr><td>Send the campaign</td><td>owner, by hand in GHL</td><td>owner (optional: schedule through the GHL API)</td><td>none</td><td>#91</td></tr>
   <tr><td>Publish detection (mark issue published on the site)</td><td><span class="now">native</span> since 2026-11-08 22:47 UTC</td><td>native; later a Resend listener instead of Gmail</td><td><code>publish.owner</code> = <code>"native"</code> (also <code>"shadow"</code>, <code>"n8n"</code>)</td><td>#38, #107</td></tr>
   <tr><td>Job runner</td><td><span class="now">Netlify functions</span></td><td>Netlify functions</td><td><code>pipeline.runner</code> = <code>"netlify"</code> (default) or <code>"trigger"</code></td><td>ADR 0001</td></tr>
   <tr><td>Alerts and outcome checks</td><td><code>alerts</code> table and <code>raiseAlert()</code> only. No checks, no ops bot, no heartbeat.</td><td><span class="plan">planned</span>: one check job at 10:05, 12:00, 18:00; alerts from the review bot to an ops chat; Healthchecks.io heartbeat</td><td>none</td><td>#36, #48, #50, #52</td></tr>
-  <tr><td>Admin pages</td><td>none (only <code>/approval</code>)</td><td><span class="plan">planned</span> <code>/admin</code>: runs, incidents, settings, and stage switches</td><td>none</td><td>#54</td></tr>
+  <tr><td>Admin pages</td><td><span class="now">native</span> <code>/admin</code> behind the approval login: runs, incidents, settings, and stage switches</td><td>same; per-user login later (#83)</td><td>none</td><td>#54</td></tr>
 </table>
 
 <h2 id="flow-now">3. Daily flow now (weekdays, New York time)</h2>
@@ -183,8 +183,8 @@ Later: pre-send review in the app before the GHL template (#117)
   <tr><td><code>scraper_bookmarks</code></td><td>Last-read time per source (keys such as <code>the_signal</code>; <code>tldr_ai</code> and <code>aloa_ai</code> are unused)</td><td>native ingest</td></tr>
   <tr><td><code>issues</code></td><td>Drafts and published issues: <code>html</code>, <code>content_json</code>, <code>published_at</code> (NULL = draft), <code>slug</code> (generated)</td><td>n8n (insert), native draft (insert, update), native publish (update; a native email's draft is copied over), owner ("Mark as published")</td></tr>
   <tr><td><code>subscribers</code>, <code>auth_codes</code></td><td>Site subscriber records and one-time codes</td><td>app</td></tr>
-  <tr><td><code>pipeline_settings</code></td><td>Owner switches and thresholds</td><td>owner, by SQL</td></tr>
-  <tr><td><code>pipeline_runs</code>, <code>pipeline_events</code></td><td>Job runs and their step logs</td><td>native jobs</td></tr>
+  <tr><td><code>pipeline_settings</code></td><td>Owner switches and thresholds</td><td>owner, on <code>/admin/settings</code> (stage owners) or by SQL</td></tr>
+  <tr><td><code>pipeline_runs</code>, <code>pipeline_events</code></td><td>Job runs and their step logs; stage owner changes as job <code>admin-setting</code></td><td>native jobs, <code>/admin/settings</code></td></tr>
   <tr><td><code>publish_events</code></td><td>Each seed email seen by publish detection and the decision, and which draft was sent (<code>draft_id</code>)</td><td>native publish</td></tr>
   <tr><td><code>approval_outlines</code></td><td>Each board commit: the normalised outline, its hash, the draft owner, and when n8n accepted it (<code>forwarded_at</code>)</td><td>commit route (migration not applied yet)</td></tr>
   <tr><td><code>issue_drafts</code></td><td>Each draft of an issue, version 1, 2, ... (one per commit, or per "New image"): status, current or failed step, content, html, image, GHL template; <code>source_draft_id</code> on a "New image" draft</td><td>native <code>draft-issue</code> (not live yet)</td></tr>
@@ -199,12 +199,15 @@ Later: pre-send review in the app before the GHL template (#117)
 app/                         Next.js routes
   page.tsx, archive/, issue/[slug]/, newsletter/[id]/, for-brands/, unsubscribe/, privacy/, terms/
   approval/                  board (page.tsx), login/, issues/ ("Mark as published"), submitted/
+  admin/                     overview, runs/ (+ [id]), incidents/, settings/ (stage switches); guard: src/server/admin-auth.ts
   api/newsletters/           list, [id], outline, commit (-> n8n), publish-status
   api/approval/              login, outline (+ status), issues/[id]/publish
+  api/admin/                 stage-switches (POST)
   api/subscriber/            subscribe, request-code, verify-code, sign-out, unsubscribe (+ webhook from GHL)
   api/issues/[slug], api/ticker, api/for-brands, api/revalidate (job token)
 src/features/newsletter/     site and board logic: repository, cache, curation.service, openai-dedup, render/, parsers/
 src/features/subscriber/     subscriber sessions, provider switch (ghl | beehiiv), Resend email, GHL webhook
+src/features/admin/          admin page data, stage switch config (allowed values) and change log
 src/pipeline/                runner-neutral job logic
   ingest/                    sources.ts, feeds, email-text, redirects, url, extract (gpt-6-luna), paywall,
                              ingest-store, telegram, schedule, start-ingest, run-ingest
@@ -217,7 +220,7 @@ netlify/functions/           thin wrappers: ingest-stories(.mts, -background.mts
 prisma/                      schema.prisma, migrations/, bootstrap/
 scripts/                     reset-dev-branch.mjs, run-prisma-prod.mjs, import-subscribers-from-csv.mjs,
                              replay-drafts.mts (native draft vs n8n, side by side)
-<span class="plan">planned</span> src/pipeline/{draft,llm,checks,notify,side-effects,sources}/ and /admin pages
+<span class="plan">planned</span> src/pipeline/{draft,llm,checks,notify,side-effects,sources}/
 </pre>
 
 <h2 id="envs">10. Environments</h2>
