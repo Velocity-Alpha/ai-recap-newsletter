@@ -297,16 +297,23 @@ describe("admin access (#54)", () => {
     });
   });
 
-  it("the proxy runs on every admin URL and stops it without a session", async () => {
+  // API URLs pass the proxy to the route's own 401 (checked above); the proxy refuses their cross-site writes.
+  it("the proxy runs on every admin URL: pages go to the login, cross-site writes are refused", async () => {
     const urls = ["/admin", "/api/admin", ...PAGES.map((page) => page.url), ...ROUTES.map((route) => route.url)];
 
     for (const url of urls) {
       expect(unstable_doesMiddlewareMatch({ config: proxyConfig, url }), url).toBe(true);
 
-      const response = await proxy(new NextRequest(`http://localhost${url}`, { method: "POST" }));
-      if (url.startsWith("/api/")) {
-        expect(response.status, url).toBe(401);
-      } else {
+      const crossSite = await proxy(
+        new NextRequest(`http://localhost${url}`, {
+          method: "POST",
+          headers: { origin: "https://evil.example", "content-type": "application/json" },
+        }),
+      );
+      expect(crossSite.status, url).toBe(403);
+
+      if (!url.startsWith("/api/")) {
+        const response = await proxy(new NextRequest(`http://localhost${url}`));
         expect(response.status, url).toBe(307);
         expect(new URL(response.headers.get("location")!).pathname).toBe("/approval/login");
       }

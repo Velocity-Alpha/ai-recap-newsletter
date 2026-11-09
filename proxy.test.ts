@@ -12,6 +12,19 @@ function visit(path: string, token?: string) {
   );
 }
 
+function send(path: string, { method = "POST", token, headers = {} }: SendOptions = {}) {
+  return proxy(
+    new NextRequest(`https://airecap.news${path}`, {
+      method,
+      headers: { ...(token ? { cookie: `${APPROVAL_SESSION_COOKIE_NAME}=${token}` } : {}), ...headers },
+    }),
+  );
+}
+
+type SendOptions = { method?: string; token?: string; headers?: Record<string, string> };
+
+const SAME_ORIGIN_JSON = { origin: "https://airecap.news", "content-type": "application/json" };
+
 function isPassedThrough(response: Response) {
   return response.headers.get("x-middleware-next") === "1";
 }
@@ -60,6 +73,80 @@ describe("approval proxy", () => {
     expect((await visit("/approval")).status).toBe(307);
     expect((await visit("/approval", token)).status).toBe(307);
   });
+
+  describe("state-changing requests", () => {
+    it.each([
+      ["/api/newsletters/commit", "https://example.com"],
+      ["/api/newsletters/commit", "https://sites.airecap.news"],
+      ["/api/approval/issues/3/publish", "https://sites.airecap.news"],
+      ["/api/admin/subscribers", "https://sites.airecap.news"],
+      ["/approval", "https://sites.airecap.news"],
+    ])("refuses a POST to %s from %s, even with a valid session", async (path, origin) => {
+      const token = await createApprovalSessionToken();
+
+      const response = await send(path, { token, headers: { origin, "content-type": "application/json" } });
+
+      expect(response.status).toBe(403);
+    });
+
+    it("refuses a POST without Origin when Sec-Fetch-Site is same-site", async () => {
+      const token = await createApprovalSessionToken();
+      const headers = { "sec-fetch-site": "same-site", "content-type": "application/json" };
+
+      expect((await send("/api/newsletters/commit", { token, headers })).status).toBe(403);
+    });
+
+    it("lets the board's own JSON POSTs through to the route's session check", async () => {
+      const token = await createApprovalSessionToken();
+
+      expect(isPassedThrough(await send("/api/newsletters/commit", { token, headers: SAME_ORIGIN_JSON }))).toBe(true);
+      expect(isPassedThrough(await send("/api/approval/issues/3/publish", { headers: SAME_ORIGIN_JSON }))).toBe(true);
+      expect(isPassedThrough(await send("/api/approval/login", { headers: SAME_ORIGIN_JSON }))).toBe(true);
+    });
+
+    it("refuses an API write that is not JSON with 415", async () => {
+      const token = await createApprovalSessionToken();
+      const headers = { origin: "https://airecap.news", "content-type": "text/plain;charset=UTF-8" };
+
+      expect((await send("/api/newsletters/commit", { token, headers })).status).toBe(415);
+      expect((await send("/api/approval/issues/3/publish", { token, headers: { origin: headers.origin } })).status).toBe(
+        415,
+      );
+    });
+
+    it("leaves API reads to the route, without redirecting to login", async () => {
+      const response = await send("/api/approval/outline?date=2026-11-09", {
+        method: "GET",
+        headers: { origin: "https://sites.airecap.news" },
+      });
+
+      expect(isPassedThrough(response)).toBe(true);
+    });
+  });
+
+  it("runs for the approval pages and every approval and admin API", async () => {
+    // Next's matcher helper reads AsyncLocalStorage from the global scope, as the Next server provides it.
+    const { AsyncLocalStorage } = await import("node:async_hooks");
+    Object.assign(globalThis, { AsyncLocalStorage });
+    const { unstable_doesMiddlewareMatch: matches } = await import("next/experimental/testing/server");
+
+    for (const url of [
+      "/approval",
+      "/approval/issues",
+      "/approval/login",
+      "/api/approval/login",
+      "/api/approval/outline",
+      "/api/approval/issues/3/publish",
+      "/api/newsletters/commit",
+      "/api/admin",
+      "/api/admin/subscribers/7",
+    ]) {
+      expect(matches({ config, url }), url).toBe(true);
+    }
+    for (const url of ["/", "/api/newsletters", "/api/subscriber/subscribe", "/api/administrator"]) {
+      expect(matches({ config, url }), url).toBe(false);
+    }
+  });
 });
 
 describe("admin proxy", () => {
@@ -85,11 +172,14 @@ describe("admin proxy", () => {
     expect(location.searchParams.get("redirect")).toBe("/admin/runs?before=40");
   });
 
-  it("answers 401 for an admin API call without a session, instead of a redirect", async () => {
-    const response = await visit("/api/admin/stage-switches", "a".repeat(64));
+  it("refuses a cross-site admin API write, and leaves the session check to the route (withAdminApi)", async () => {
+    const crossSite = await send("/api/admin/stage-switches", {
+      headers: { origin: "https://evil.example", "content-type": "application/json" },
+    });
+    const noSession = await send("/api/admin/stage-switches", { headers: SAME_ORIGIN_JSON });
 
-    expect(response.status).toBe(401);
-    expect(await response.json()).toEqual({ error: "Unauthorized." });
+    expect(crossSite.status).toBe(403);
+    expect(isPassedThrough(noSession)).toBe(true);
   });
 
   it("lets a signed-in owner reach the admin pages and API", async () => {
