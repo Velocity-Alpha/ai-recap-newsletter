@@ -45,7 +45,12 @@ export default function MarkPublishedButton({ issueId }: { issueId: number }) {
 
   async function publish(preview: ManualPublishPreview) {
     setState({ kind: "publishing", preview });
-    const response = await fetch(endpoint, { method: "POST" });
+    // proxy.ts accepts only JSON writes to the approval APIs.
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+    });
     const body = await readJson(response);
     if (body.outcome === "published") {
       setState({ kind: "done", message: "Published. It is now on airecap.news." });
