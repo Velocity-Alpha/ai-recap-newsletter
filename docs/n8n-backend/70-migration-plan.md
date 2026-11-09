@@ -209,6 +209,16 @@ route tests. **Rollback:** revert the pull request.
 
 Goal: environments, the job runner, alerts, and outcome checks exist and are proven end to end.
 
+**Revised 2026-11-09 with the owner (the issues hold the details):**
+
+- Alerts: the existing review bot posts to one "AI Recap Ops" chat, in production only, with no email (#48).
+  Slack may replace Telegram later (#119).
+- Checks: one `run-checks` job runs at 10:05, 12:00, and 18:00 New York time (#50, #52). The check 10 minutes
+  after each commit is dropped (#51 closed).
+- A "No issue today" button marks a skipped date and silences its checks (#52).
+- The admin pages can flip stage switches, with a confirmation step and a log (#54).
+- Order: #53, #49, #48, then drafting (#40), then #50 and #52, then #54.
+
 1. **Repair Prisma migration history.** Mark `20260630000000_add_story_paywall_note_error` as applied
    (`prisma migrate resolve --applied ...`) where it was applied by hand. `prisma migrate status` must be
    clean on `dev` and production.
@@ -423,6 +433,23 @@ Exit: all sources native for 2 weeks, with story volume and board quality equal 
 
 Goal: commit → draft runs natively, with real status in the UI, one draft per date, and no duplicates.
 
+**Revised 2026-11-09 with the owner. These points replace the steps below where they conflict:**
+
+- One issue per date. Each commit makes a new draft with its own new GHL template, and the latest draft is
+  current ([ADR 0002](../adr/0002-new-draft-per-commit.md)).
+- No shadow mode and no `draft_previews` table. Testing replays at least 5 past commits on `dev`, and the owner
+  reviews the results (#76).
+- The writer reads the article of each feature-section story at draft time. How to read articles is investigated
+  first, with a real browser screenshot as the ground truth (#115). The reader saves the text per story (#120).
+- The writing prompt's contradictions are fixed, and it adds an excerpt. Web search stays off unless #115 shows
+  it helps.
+- The board shows the draft's live steps, the email preview, an "Open in GHL" link, and every draft for the
+  date (#79).
+- "New image" replaces the n8n image agent (#116). A full pre-send review in the app comes later (#117).
+- Each n8n workflow is switched off the day its native replacement is ready. The duplicate drafts are deleted
+  right after the switch (#84).
+- Credentials are reused from n8n, and nothing is rotated (#74).
+
 1. **Persist the outline:** `approval_outlines` (date, payload, payload_hash, committed_at, status). The app
    writes it on every commit, while n8n still drafts.
 2. **`draft-issue` task**, with the idempotency key `date + payload_hash`. It ports the writing call to
@@ -446,6 +473,19 @@ Cutover: after 2 good previews, set `draft.owner = native`, then deactivate `2. 
 Exit: 1 week native-only with no duplicate drafts and no silent draft failures.
 
 ### Phase 6: Retire n8n (size: S–M)
+
+**Revised 2026-11-09 with the owner. These points replace the list below where they conflict:**
+
+- n8n stays as a backup for 30 days. The 30 days start after 10 weekday issues in a row go out with no manual fixes.
+- After the 30 days, the workflows are exported to the private archive, then the workflows and their credentials
+  are deleted from n8n. Nothing is revoked, because native code uses the same keys (#81).
+- The schema cleanup is trimmed to these changes (#82):
+  - an issue status (draft or published);
+  - a unique issue date;
+  - an index on `stories(day)`.
+- The issue-to-story link and a stable story key need a design first (#118). The separate database role is dropped.
+- Per-user login is dropped, because there is one operator (#83 closed). The duplicate drafts are deleted, not
+  marked (#84).
 
 - Deactivate the remaining AI Recap workflows. After 30 days (R6), export them to the archive and delete
   them. Remove `N8N_WEBHOOK_JWT_SECRET` and `OUTLINE_COMMIT_WEBHOOK_URL`. Revoke n8n's database credential
