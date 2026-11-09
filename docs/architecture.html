@@ -162,6 +162,7 @@ Later: pre-send review in the app before the GHL template (#117)
   <tr><td>AWS S3</td><td>Featured images, bucket <code>velocity-alpha-public-assets</code>, prefix <code>newsletter/</code></td><td>n8n only</td><td>native; dev uses prefix <code>newsletter-dev/</code></td></tr>
   <tr><td>Google Vertex AI</td><td>Featured image, <code>gemini-3.1-flash-image</code></td><td>n8n only</td><td>native</td></tr>
   <tr><td>n8n (self-hosted)</td><td>Drafting chain (section 12)</td><td>commit route webhook</td><td>switched off (Phase 6)</td></tr>
+  <tr><td>Article sources: arXiv HTML, GitHub README API, Hugging Face READMEs, story sites, Jina Reader</td><td>Reading feature-section articles for the writer (#120), in the #115 order; Jina Reader is the last fallback, keyless unless <code>JINA_API_KEY</code> is set</td><td>native <code>draft-issue</code> (not live yet)</td><td>same</td></tr>
   <tr><td>Google Analytics</td><td>Site analytics</td><td>site</td><td>same</td></tr>
   <tr><td>Healthchecks.io</td><td>Dead-man switch for the daily digest</td><td>none</td><td><span class="plan">planned</span></td></tr>
   <tr><td>Trigger.dev</td><td>Alternative job runner</td><td>dormant (vendor blocks production deploys)</td><td>dormant</td></tr>
@@ -178,10 +179,11 @@ Later: pre-send review in the app before the GHL template (#117)
   <tr><td><code>pipeline_runs</code>, <code>pipeline_events</code></td><td>Job runs and their step logs</td><td>native jobs</td></tr>
   <tr><td><code>publish_events</code></td><td>Each seed email seen by publish detection and the decision, and which draft was sent (<code>draft_id</code>)</td><td>native publish</td></tr>
   <tr><td><code>issue_drafts</code></td><td>Each draft of an issue, version 1, 2, ... (one per commit): status, current or failed step, content, html, image, GHL template</td><td>native <code>draft-issue</code> (not live yet)</td></tr>
+  <tr><td><code>story_articles</code></td><td>The saved copy of each story's article, per story and link: status (read, paywalled, blocked, failed), method, text, read time. A read copy is reused by later drafts; an edited link is read again.</td><td>native <code>draft-issue</code> (not live yet; migration not applied yet)</td></tr>
   <tr><td><code>alerts</code></td><td>Open and resolved incidents, one open row per <code>incident_key</code></td><td><code>raiseAlert()</code> (no callers yet)</td></tr>
   <tr><td><code>public.schema_migrations</code></td><td>Legacy migration record</td><td>none</td></tr>
 </table>
-<p><span class="plan">Planned:</span> <code>approval_outlines</code> (#75), saved article text per story (#120), and skipped dates (#52). After n8n is off (#82): an issue <code>status</code> (draft or published), a unique issue date, and an index on <code>stories(day)</code>. Later: the issue-to-story link and a stable story key (#118), and raw items for ingestion (#111). The runtime DB role is <code>newsletter_web</code> (<code>prisma/bootstrap/001_grant_newsletter_web.sql</code>).</p>
+<p><span class="plan">Planned:</span> <code>approval_outlines</code> (#75) and skipped dates (#52). After n8n is off (#82): an issue <code>status</code> (draft or published), a unique issue date, and an index on <code>stories(day)</code>. Later: the issue-to-story link and a stable story key (#118), and raw items for ingestion (#111). The runtime DB role is <code>newsletter_web</code> (<code>prisma/bootstrap/001_grant_newsletter_web.sql</code>).</p>
 
 <h2 id="code">9. Code map</h2>
 <pre>
@@ -226,7 +228,7 @@ scripts/                     reset-dev-branch.mjs, run-prisma-prod.mjs, import-s
   <tr><th>Group</th><th>Names</th></tr>
   <tr><td>Core</td><td><code>APP_ENV</code> <code>DATABASE_URL</code> <code>NEXT_PUBLIC_SITE_URL</code> <code>SESSION_SECRET</code> <code>APPROVAL_PASSWORD</code> <code>NEWSLETTER_RUNTIME_DB_ROLE</code></td></tr>
   <tr><td>Production DB scripts (local only)</td><td><code>PRODUCTION_DATABASE_URL</code> <code>NEON_PROJECT_ID</code></td></tr>
-  <tr><td>Pipeline</td><td><code>OPENAI_API_KEY</code> <code>GMAIL_OAUTH_CLIENT_ID</code> <code>GMAIL_OAUTH_CLIENT_SECRET</code> <code>GMAIL_OAUTH_REFRESH_TOKEN</code> <code>PUBLISH_SEED_RECIPIENTS</code> <code>TELEGRAM_REVIEW_BOT_TOKEN</code> (production only) <code>TELEGRAM_REVIEW_CHAT_ID</code> (optional)</td></tr>
+  <tr><td>Pipeline</td><td><code>OPENAI_API_KEY</code> <code>GMAIL_OAUTH_CLIENT_ID</code> <code>GMAIL_OAUTH_CLIENT_SECRET</code> <code>GMAIL_OAUTH_REFRESH_TOKEN</code> <code>PUBLISH_SEED_RECIPIENTS</code> <code>TELEGRAM_REVIEW_BOT_TOKEN</code> (production only) <code>TELEGRAM_REVIEW_CHAT_ID</code> (optional) <code>JINA_API_KEY</code> <code>GITHUB_TOKEN</code> (both optional, article reader)</td></tr>
   <tr><td>Subscribers</td><td><code>SUBSCRIBER_PROVIDER</code> <code>GHL_SUBSCRIBE_WEBHOOK_URL</code> <code>GHL_UNSUBSCRIBE_WEBHOOK_SECRET</code> <code>RESEND_API_KEY</code> <code>RESEND_FROM_EMAIL</code> <code>RESEND_FROM_NAME</code> <code>BEEHIIV_API_KEY</code> <code>BEEHIIV_PUBLICATION_ID</code></td></tr>
   <tr><td>n8n hand-off (removed in Phase 6)</td><td><code>OUTLINE_COMMIT_WEBHOOK_URL</code> <code>N8N_WEBHOOK_JWT_SECRET</code></td></tr>
   <tr><td>Other</td><td><code>FOR_BRANDS_WEBHOOK_URL</code> <code>NEXT_PUBLIC_GA_MEASUREMENT_ID</code> (set in <code>netlify.toml</code>), <code>OPENROUTER_API_KEY</code> (unused)</td></tr>

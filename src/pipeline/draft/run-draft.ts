@@ -1,5 +1,6 @@
 import type { Prisma } from "@/src/generated/prisma";
 import { loadApprovedSections } from "@/src/pipeline/draft/approved-stories";
+import { articleReadLogData, describeArticleRead, summarizeArticleReads, type ArticleReadReport } from "@/src/pipeline/draft/articles";
 import {
   claimDraft,
   findDraftToRun,
@@ -133,6 +134,21 @@ export async function runDraftJob(draftId: bigint | number | string, options: Ru
       data: { target: entry.target, action: entry.action, payload: withoutHtml(entry.payload) } as Prisma.InputJsonValue,
     });
   };
+  // One event per feature story (#120): how its article was read, or why not. The article text stays out.
+  const onArticleReads = async (reads: ArticleReadReport[]) => {
+    for (const read of reads) {
+      await logEvent(runId, {
+        level: read.status === "read" ? "info" : "warn",
+        step: "read_articles",
+        message: describeArticleRead(read),
+        data: articleReadLogData(read) as unknown as Prisma.InputJsonValue,
+      });
+    }
+    await logEvent(runId, { level: "info", step: "read_articles", message: summarizeArticleReads(reads) });
+  };
+  const onArticleWarning = async (message: string) => {
+    await logEvent(runId, { level: "warn", step: "read_articles", message });
+  };
 
   try {
     await enter("load");
@@ -144,7 +160,7 @@ export async function runDraftJob(draftId: bigint | number | string, options: Ru
 
     produced = await produceDraft(
       { outline, stories, issue, draft: { id, version: draft.version } },
-      { ...createDraftDeps(env, { record }), ...options.deps, onStep: enter },
+      { ...createDraftDeps(env, { record, onArticleReads, onArticleWarning }), ...options.deps, onStep: enter },
     );
     Object.assign(stepMs, produced.stepMs);
 

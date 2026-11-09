@@ -26,13 +26,23 @@ vi.mock("@/src/pipeline/runs", () => ({
   }),
 }));
 vi.mock("@/src/pipeline/notify", () => notify);
+// The job's own article reader, with a fake web and saved copies in memory.
+const articleWeb = vi.hoisted(() => ({ routes: {} as Record<string, unknown> }));
+const articleStore = vi.hoisted(() => ({ findRead: vi.fn(), save: vi.fn() }));
+vi.mock("@/src/pipeline/draft/articles/http", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/src/pipeline/draft/articles/http")>();
+  const { fakeWeb } = await import("@/src/pipeline/draft/articles/fake-web.fixture");
+  return { ...actual, createNodeFetch: () => fakeWeb(articleWeb.routes as never).fetch };
+});
+vi.mock("@/src/pipeline/draft/articles/article-store", () => ({ prismaArticleStore: articleStore }));
 
+import { htmlPage, jinaAnswer, jinaUrl, prose } from "@/src/pipeline/draft/articles/fake-web.fixture";
 import { toIssueContentJson, type WrittenIssueContent } from "@/src/pipeline/draft/content";
 import { SAMPLE_APPROVED, SAMPLE_CONTENT, SAMPLE_OUTLINE } from "@/src/pipeline/draft/draft.fixture";
 import { createDraft, retryDraft } from "@/src/pipeline/draft/draft-store";
 import { emailImageUrl } from "@/src/pipeline/draft/email-html";
 import { fakeDb } from "@/src/pipeline/draft/fake-db.fixture";
-import { DRAFT_STEPS, type ProduceDraftDeps } from "@/src/pipeline/draft/produce-draft";
+import { DRAFT_STEPS, readNoArticles, type ProduceDraftDeps } from "@/src/pipeline/draft/produce-draft";
 import { runDraftJob } from "@/src/pipeline/draft/run-draft";
 
 const DATE = SAMPLE_OUTLINE.date;
@@ -43,6 +53,7 @@ const ENV = { APP_ENV: "development" };
 
 function deps(overrides: Partial<ProduceDraftDeps> = {}): Partial<ProduceDraftDeps> {
   return {
+    readArticles: vi.fn(readNoArticles),
     writer: vi.fn(async () => structuredClone(SAMPLE_CONTENT)),
     makeImage: vi.fn(async () => ({ imageUrl: IMAGE_URL, scenePrompt: "A pretend robot folds towels." })),
     createTemplate: vi.fn(async () => ({ templateId: "tpl-1", previewUrl: "https://preview.example.test/tpl-1", mode: "sent" as const })),
@@ -162,6 +173,41 @@ describe("runDraftJob", () => {
       expect.objectContaining({ runId: BigInt(7) }),
     );
     expect(notify.resolveIncident).not.toHaveBeenCalled();
+  });
+
+  it("reads the feature stories' articles and logs each story's outcome, so the board can say why one was not read", async () => {
+    const [planner, laundry] = SAMPLE_APPROVED.headlines;
+    const [paperOne, paperTwo] = SAMPLE_APPROVED.research;
+    articleWeb.routes = {
+      [planner.url]: htmlPage(prose("planner")),
+      [laundry.url]: htmlPage("Forbidden", 403),
+      [jinaUrl(laundry.url)]: jinaAnswer(laundry.url, "Just a moment..."),
+      [paperOne.url]: htmlPage(prose("paper one")),
+      [paperTwo.url]: htmlPage(prose("paper two")),
+    };
+    articleStore.findRead.mockReset().mockRejectedValue(new Error('relation "story_articles" does not exist'));
+    articleStore.save.mockReset().mockResolvedValue(undefined);
+    const { draftId } = await commit();
+    // No readArticles: the job's own reader runs.
+    const rest = deps();
+    delete rest.readArticles;
+
+    const result = await runDraftJob(draftId, { env: ENV, now: () => NOW, deps: rest });
+
+    expect(result).toMatchObject({ status: "ready" });
+    expect(draftRow(draftId).unreadStoryIds).toEqual([laundry.id]);
+    const reads = runLog.events.filter((event) => event.step === "read_articles" && !event.message.startsWith("Started"));
+    expect(reads.map(({ level, message }) => ({ level, message }))).toEqual([
+      { level: "warn", message: 'Could not load saved articles, so every story was read: relation "story_articles" does not exist' },
+      { level: "info", message: expect.stringMatching(/^Story 501: read with fetch in [\d.]+ s \([\d,]+ characters\)\.$/) },
+      { level: "warn", message: expect.stringMatching(/^Story 502: not read \(blocked\) after [\d.]+ s\. fetch: HTTP 403\. jina: A bot check or block page\.$/) },
+      { level: "info", message: expect.stringMatching(/^Story 503: read with fetch/) },
+      { level: "info", message: expect.stringMatching(/^Story 504: read with fetch/) },
+      { level: "info", message: "Read 3 of 4 articles. Not read: story 502." },
+    ]);
+    expect(reads[2].data).toMatchObject({ storyId: 502, status: "blocked", method: null, reused: false, attempts: [expect.objectContaining({ method: "fetch", httpStatus: 403 }), expect.objectContaining({ method: "jina" })] });
+    expect(JSON.stringify(reads)).not.toContain("planner pretend lab");
+    expect(articleStore.save).toHaveBeenCalledTimes(1);
   });
 
   it("keeps the written content on a draft that failed its checks", async () => {

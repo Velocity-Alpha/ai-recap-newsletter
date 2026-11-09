@@ -1,5 +1,11 @@
 import type { SectionKey } from "@/src/features/newsletter/section-config";
 import {
+  createDraftArticleReader,
+  prismaArticleStore,
+  readerOptionsFromEnv,
+  type ArticleReadReport,
+} from "@/src/pipeline/draft/articles";
+import {
   FEATURE_SECTIONS,
   type ApprovedSections,
   type ApprovedStory,
@@ -49,8 +55,8 @@ export type MakeImage = (input: FeaturedImageInput) => Promise<FeaturedImage>;
 export type CreateTemplate = (input: DraftTemplateInput) => Promise<DraftTemplateResult>;
 
 export interface ProduceDraftDeps {
-  /** Defaults to `readNoArticles`. */
-  readArticles?: ReadArticles;
+  /** `createDraftDeps` gives the article reader (#120); `readNoArticles` skips reading. */
+  readArticles: ReadArticles;
   writer: IssueWriter;
   makeImage: MakeImage;
   createTemplate: CreateTemplate;
@@ -93,8 +99,8 @@ export class DraftStepError extends Error {
 }
 
 /**
- * Until the article reader exists (#120), no article is read: the writer works from the summaries and every
- * feature-section story is saved as "source not read". #120 replaces this as the `readArticles` dependency.
+ * Reads no article: the writer works from the summaries and every feature-section story is saved as "source not
+ * read". For tests, and the replay script's `--no-read`.
  */
 export const readNoArticles: ReadArticles = async (stories) => stories.map((story) => ({ storyId: story.id, unread: true }));
 
@@ -104,7 +110,7 @@ function featureStories(sections: ApprovedSections): ApprovedStory[] {
 
 export async function produceDraft(input: ProduceDraftInput, deps: ProduceDraftDeps): Promise<ProducedDraft> {
   const now = deps.now ?? (() => Date.now());
-  const readArticles = deps.readArticles ?? readNoArticles;
+  const readArticles = deps.readArticles;
   const partial: PartialDraft = {};
   const stepMs: Partial<Record<DraftStep, number>> = {};
 
@@ -170,14 +176,28 @@ export async function produceDraft(input: ProduceDraftInput, deps: ProduceDraftD
   };
 }
 
+export interface DraftDepsOptions {
+  /** Gets each GHL call outside production. */
+  record?: (entry: SideEffectRecord) => void | Promise<void>;
+  /** Gets every feature-section story's read outcome, for the run log. */
+  onArticleReads?: (reads: ArticleReadReport[]) => void | Promise<void>;
+  /** Gets saved-copy problems, which never fail the step. */
+  onArticleWarning?: (message: string) => void | Promise<void>;
+}
+
 /** The real services. GHL only sends in production; elsewhere `record` gets each call. */
 export function createDraftDeps(
   env: Record<string, string | undefined> = process.env,
-  options: { record?: (entry: SideEffectRecord) => void | Promise<void> } = {},
+  options: DraftDepsOptions = {},
 ): Omit<ProduceDraftDeps, "onStep" | "now"> {
   return {
-    // #120 plugs in here: read each feature-section story's article, or return `unread` for it.
-    readArticles: readNoArticles,
+    // Reuses each story's saved copy, reads the rest (#115 order, 60 s deadline), and saves what it read (#120).
+    readArticles: createDraftArticleReader({
+      store: prismaArticleStore,
+      readOptions: readerOptionsFromEnv(env),
+      onReads: options.onArticleReads,
+      onWarning: options.onArticleWarning,
+    }),
     // Built per call, so a missing OPENAI_API_KEY fails the write step with a plain message.
     writer: (input) => createOpenAIIssueWriter({ apiKey: env.OPENAI_API_KEY })(input),
     makeImage: (input) =>

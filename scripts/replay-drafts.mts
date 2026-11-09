@@ -3,17 +3,20 @@
 //
 // Usage:
 //   npx vite-node --config vitest.config.ts scripts/replay-drafts.mts -- \
-//     --out tmp/replay \
+//     --out tmp/replay [--no-read] \
 //     --commit <date>.commit.json --reuse-image-from <date>.issue.json \
 //     [--commit ... --reuse-image-from ... for each date]
 //
 //   <date>.commit.json  the board's commit body (what the board POSTs to /api/newsletters/commit)
 //   <date>.issue.json   n8n's newsletter.issues row for that date (html, title, feature_image_url,
 //                       prompt_featured_image, issue_date, id), as JSON
+//   --no-read           skip reading the feature stories' articles: the writer gets the summaries only
 //
 // Needs: DATABASE_URL (the Neon dev branch; stories are only read) and OPENAI_API_KEY. Refuses APP_ENV=production.
-// Effect: no issue or draft row is written, the image step reuses n8n's image and scene prompt, and GHL is a dry
-// run. Writes <out>/<date>.native.html, <out>/<date>.n8n.html, <out>/<date>.json, and <out>/index.html.
+// Optional: JINA_API_KEY and GITHUB_TOKEN, for the article reader (#120).
+// Effect: no issue, draft, or saved-article row is written, articles are read from the web each time, the image
+// step reuses n8n's image and scene prompt, and GHL is a dry run. Writes <out>/<date>.native.html,
+// <out>/<date>.n8n.html, <out>/<date>.json (with each article's read outcome, not its text), and <out>/index.html.
 
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -24,6 +27,7 @@ import {
   parseReplayArgs,
   readN8nIssue,
   renderReplayIndex,
+  replayArticleReader,
   replayDraft,
   type ReplayReport,
 } from "@/src/pipeline/draft/replay";
@@ -48,14 +52,17 @@ async function main(): Promise<void> {
     const stories = await loadApprovedSections(outline);
     console.log(`${outline.date}: drafting from ${pair.commit}...`);
 
-    const { nativeHtml, n8nHtml, report } = await replayDraft({ outline, stories, n8nIssue }, { openAIKey });
+    const reader = replayArticleReader({ read: args.read, env: process.env });
+    const replayed = await replayDraft({ outline, stories, n8nIssue }, { openAIKey, readArticles: reader.readArticles });
+    const { nativeHtml, n8nHtml } = replayed;
+    const report: ReplayReport = { ...replayed.report, articles: reader.reads() };
     await writeFile(path.join(args.out, `${report.date}.native.html`), nativeHtml);
     await writeFile(path.join(args.out, `${report.date}.n8n.html`), n8nHtml);
     await writeFile(path.join(args.out, `${report.date}.json`), `${JSON.stringify(report, null, 2)}\n`);
     reports.push(report);
 
     const outcome = report.status === "ready" ? "ready" : `failed at ${report.failedStep}: ${report.error}`;
-    console.log(`${report.date}: ${outcome}; ${report.problems.length} problem(s); ${report.totalMs} ms.`);
+    console.log(`${report.date}: ${outcome}; ${report.problems.length} problem(s); ${report.unreadStoryIds.length} article(s) not read; ${report.totalMs} ms.`);
   }
 
   await writeFile(path.join(args.out, "index.html"), renderReplayIndex(reports));
