@@ -146,6 +146,9 @@ Read routes:
 - `GET /api/approval/outline?date=` for the password-protected approval board outline
 - `GET /api/newsletters/outline?date=` for the authenticated newsletter outline API
 - `GET /api/approval/issues/[id]/publish` previews what "Mark as published" would publish (approval session)
+- `GET /api/approval/drafts?date=` lists a date's native drafts for the board; none while `draft.owner` is `n8n` (approval session)
+- `GET /api/approval/drafts/[id]` one draft's status, polled by `/approval/drafts` while it runs (approval session)
+- `GET /api/approval/drafts/[id]/html` the draft's email HTML for the sandboxed preview frame (approval session)
 
 Mutation routes:
 
@@ -156,7 +159,8 @@ Mutation routes:
 - `POST /api/subscriber/sign-out`
 - `GET|POST /api/subscriber/unsubscribe` with a signed `token`
 - `POST /api/subscriber/unsubscribe/webhook` with `Authorization: Bearer <GHL_UNSUBSCRIBE_WEBHOOK_SECRET>` or `x-webhook-secret`
-- `POST /api/newsletters/commit` to commit an approved outline to the generation webhook
+- `POST /api/newsletters/commit` to commit an approved outline. With `draft.owner` = `n8n` (default) it posts to the n8n webhook. With `native` it saves the story changes, makes the next draft, and starts `draft-issue-background`; it never calls n8n
+- `POST /api/approval/drafts/[id]/retry` runs a failed or stuck draft again from the start (approval session)
 - `POST /api/approval/issues/[id]/publish` publishes an unpublished draft from its stored email HTML (approval session). Used by the "Mark as published" button on `/approval/issues`. It sends no email.
 - `POST /api/revalidate` refreshes the cached issue lists, issue pages, and sitemap. It needs `Authorization: Bearer <token>`, a 5-minute token signed with a key derived from `SESSION_SECRET` (`src/server/cache-refresh-auth.ts`). The publish job calls it after it publishes an issue.
 

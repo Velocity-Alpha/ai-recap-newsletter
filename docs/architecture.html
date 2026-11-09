@@ -53,7 +53,7 @@
   <tr><td>Ingest stories from newsletters and feeds</td><td><span class="now">native</span> since 2026-11-09 04:05 UTC</td><td>native, hourly runs and more sources later</td><td><code>ingest.owner</code> = <code>"native"</code></td><td>#39, extras #111</td></tr>
   <tr><td>"Board is ready" Telegram ping to the review group</td><td><span class="now">native</span> (end of the ingest run)</td><td>native</td><td>same as ingest</td><td>#39</td></tr>
   <tr><td>Approval board proposal (sections, dedup)</td><td><span class="now">native</span> (app)</td><td>native; later "accept or swap"</td><td>none</td><td>#37, #56, #58, #59, #89</td></tr>
-  <tr><td>Draft issue, featured image, GHL template</td><td><span class="n8n">n8n</span></td><td>native <code>draft-issue</code> background job; a new draft and GHL template per commit (ADR 0002)</td><td><code>draft.owner</code> <span class="plan">planned</span> (not in code)</td><td>#40, #74–#80, #115, #116, #120</td></tr>
+  <tr><td>Draft issue, featured image, GHL template</td><td><span class="n8n">n8n</span></td><td>native <code>draft-issue</code> background job; a new draft and GHL template per commit (ADR 0002)</td><td><code>draft.owner</code> = <code>"n8n"</code> (default) or <code>"native"</code>: the commit route reads it (#79)</td><td>#40, #74–#80, #115, #116, #120</td></tr>
   <tr><td>Send the campaign</td><td>owner, by hand in GHL</td><td>owner (optional: schedule through the GHL API)</td><td>none</td><td>#91</td></tr>
   <tr><td>Publish detection (mark issue published on the site)</td><td><span class="now">native</span> since 2026-11-08 22:47 UTC</td><td>native; later a Resend listener instead of Gmail</td><td><code>publish.owner</code> = <code>"native"</code> (also <code>"shadow"</code>, <code>"n8n"</code>)</td><td>#38, #107</td></tr>
   <tr><td>Job runner</td><td><span class="now">Netlify functions</span></td><td>Netlify functions</td><td><code>pipeline.runner</code> = <code>"netlify"</code> (default) or <code>"trigger"</code></td><td>ADR 0001</td></tr>
@@ -101,7 +101,7 @@ Terms: GLOSSARY.md. One issue per date; each commit makes a new draft with its o
 10:05  run-checks: an ingest run happened, story count vs 8-week median, per source       <span class="plan">planned</span> #50
        Owner commits on /approval  ("No issue today" marks a skipped date instead)       <span class="plan">planned</span> #52
          -> approval_outlines row (normalised outline + hash), for either draft.owner    <span class="plan">planned</span> #75
-         -> draft.owner = native: story changes in one transaction, start draft-issue    <span class="plan">planned</span> #79
+         -> draft.owner = native: story changes in one transaction, start draft-issue    #79 (built, off until switched)
             find or create the issue for the date; new issue_drafts row, version n+1     #76
             read articles of feature-section stories (saved per story; methods from #115) #120
             gpt-6-luna writes the issue (fixed n8n prompt, no web search unless #115 says so)
@@ -109,7 +109,7 @@ Terms: GLOSSARY.md. One issue per date; each commit makes a new draft with its o
             TypeScript email template (data-issue-id, data-story-id, data-src-url, data-draft-id)
             new GHL template "&lt;date&gt; v&lt;n&gt;: &lt;subject&gt;"; never overwrites an old one   #78
             issue row takes the current draft's title, HTML, image, excerpt, content_json
-         -> board: live steps, error + Retry, email preview, "Open in GHL", list of drafts  #79
+         -> board: live steps, error + Retry, email preview, "Open in GHL", list of drafts  #79 (/approval/drafts)
          -> "New image": edit the scene prompt, 3 suggestions, then a new draft          #116
          n8n "2. Public approval page" is switched off the day native drafting goes live  #80
 12:00  run-checks: no commit yet -> warning                                              <span class="plan">planned</span> #52
@@ -130,7 +130,7 @@ Later: pre-send review in the app before the GHL template (#117)
   <tr><td><code>ingest-stories-background</code></td><td>none (called by the above)</td><td>valid token</td><td><code>runIngest()</code> in <code>src/pipeline/ingest/run-ingest.ts</code></td></tr>
   <tr><td><code>detect-publish</code></td><td><code>*/5 0,1,13-23 * * *</code></td><td>weekdays 09:00–21:00 New York</td><td>Reads the seed inbox, 20-minute lookback, publishes</td></tr>
   <tr><td><code>detect-publish-catch-up</code></td><td><code>0 3 * * *</code></td><td>daily</td><td>Same, 3-day lookback</td></tr>
-  <tr><td><code>draft-issue-background</code></td><td>none (on commit)</td><td>valid token; the draft is waiting to run</td><td><code>runDraftJob()</code> in <code>src/pipeline/draft/run-draft.ts</code>. Built (#76); nothing starts it until the commit route calls <code>startDraftJob()</code> (#79)</td></tr>
+  <tr><td><code>draft-issue-background</code></td><td>none (on commit)</td><td>valid token; the draft is waiting to run</td><td><code>runDraftJob()</code> in <code>src/pipeline/draft/run-draft.ts</code>. Built (#76). The commit route and "Retry" start it with <code>startDraftJob()</code> when <code>draft.owner</code> is <code>"native"</code> (#79)</td></tr>
   <tr><td>outcome checks, digest</td><td>fixed times</td><td colspan="2"><span class="plan">planned</span> Phase 1 (#50–#52)</td></tr>
 </table>
 <p>Each run writes <code>pipeline_runs</code> (job, trigger, status, stats) and <code>pipeline_events</code> (step log). Job tokens: <code>src/server/job-token.ts</code>, format <code>&lt;expiresAtMs&gt;.&lt;sig&gt;</code>, HMAC key derived from <code>SESSION_SECRET</code> per purpose.</p>

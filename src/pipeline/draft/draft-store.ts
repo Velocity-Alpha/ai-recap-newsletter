@@ -140,6 +140,22 @@ export async function retryDraft(draftId: Id, options: { now?: () => Date } = {}
   return { draftId: Number(draft.id), issueId: Number(draft.issueId), version: draft.version, issueDate };
 }
 
+/** The failed step of a draft whose background function could not be started (it is not one of the job's steps). */
+export const DRAFT_START_STEP = "start";
+
+/**
+ * Marks a draft failed at `start` when its background function could not be started, so the board can retry it.
+ * Only a draft the job has not taken (still `running`, no `started_at`) changes: a job that did start keeps its
+ * draft. True when the draft changed.
+ */
+export async function markDraftStartFailed(draftId: Id, error: string, now: Date): Promise<boolean> {
+  const updated = await prisma.issueDraft.updateMany({
+    where: { id: BigInt(draftId), status: "running", startedAt: null },
+    data: { status: "failed", currentStep: null, failedStep: DRAFT_START_STEP, error, finishedAt: now },
+  });
+  return updated.count === 1;
+}
+
 // ---- The draft job's reads and writes (run-draft.ts) ----
 
 export interface DraftToRun {
