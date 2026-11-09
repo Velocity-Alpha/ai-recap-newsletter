@@ -153,7 +153,7 @@ Mutation routes:
 - `POST /api/subscriber/subscribe`
 - `POST /api/subscriber/request-code`
 - `POST /api/subscriber/verify-code`
-- The three routes above, and `POST /api/approval/login`, answer `429` with `Retry-After` once a caller passes its limit (per IP, and per email where there is one). Limits live in `src/server/rate-limit.ts`; counts are in `newsletter.rate_limits`.
+- The three routes above, and `POST /api/approval/login`, answer `429` with `Retry-After` once a caller passes its limit (per IP, with IPv6 grouped by /64; per email where there is one; and for the approval login, across the whole site). The IP comes from Netlify's `x-nf-client-connection-ip` header. Limits live in `src/server/rate-limit.ts`; counts are in `newsletter.rate_limits`.
 - `POST /api/subscriber/sign-out`
 - `GET|POST /api/subscriber/unsubscribe` with a signed `token`
 - `POST /api/subscriber/unsubscribe/webhook` with `Authorization: Bearer <GHL_UNSUBSCRIBE_WEBHOOK_SECRET>` or `x-webhook-secret`

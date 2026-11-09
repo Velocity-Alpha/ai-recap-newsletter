@@ -20,6 +20,7 @@ import { submitSubscriberToBeehiiv } from "@/src/features/subscriber/beehiiv";
 import { submitSubscriberToGhl } from "@/src/features/subscriber/ghl";
 import { getSubscriberProvider } from "@/src/features/subscriber/provider";
 import type { SubscriberRecord } from "@/src/features/subscriber/types";
+import { rateLimitIpIdentifier } from "@/src/server/client-ip";
 import {
   consumeRateLimit,
   describeRetryAfter,
@@ -52,10 +53,6 @@ async function enforceRateLimit(rule: RateLimitRule, identifier: string) {
       result.retryAfterSeconds,
     );
   }
-}
-
-function ipIdentifier(ip: string | null | undefined) {
-  return ip?.trim() || "unknown";
 }
 
 export function validateSubscriberEmail(email: unknown) {
@@ -93,7 +90,7 @@ export async function subscribeAndUpsertSubscriber(input: {
   path: string | null;
   requestIp?: string | null;
 }) {
-  await enforceRateLimit(RATE_LIMITS.subscribeByIp, ipIdentifier(input.requestIp));
+  await enforceRateLimit(RATE_LIMITS.subscribeByIp, rateLimitIpIdentifier(input.requestIp));
   const normalizedFirstName = validateSubscriberFirstName(input.firstName);
   const normalizedEmail = validateSubscriberEmail(input.email);
   await enforceRateLimit(RATE_LIMITS.subscribeByEmail, normalizedEmail);
@@ -146,7 +143,7 @@ export async function requestSubscriberSignInCode(input: {
 }) {
   await maybeCleanupExpiredAuthCodes();
 
-  await enforceRateLimit(RATE_LIMITS.requestCodeByIp, ipIdentifier(input.requestIp));
+  await enforceRateLimit(RATE_LIMITS.requestCodeByIp, rateLimitIpIdentifier(input.requestIp));
   const normalizedEmail = validateSubscriberEmail(input.email);
   await enforceRateLimit(RATE_LIMITS.requestCodeByEmail, normalizedEmail);
   const subscriber = await findRequiredActiveSubscriber(normalizedEmail);
@@ -179,7 +176,7 @@ export async function verifySubscriberSignInCode(input: {
 }) {
   await maybeCleanupExpiredAuthCodes();
 
-  await enforceRateLimit(RATE_LIMITS.verifyCodeByIp, ipIdentifier(input.requestIp));
+  await enforceRateLimit(RATE_LIMITS.verifyCodeByIp, rateLimitIpIdentifier(input.requestIp));
   const normalizedEmail = validateSubscriberEmail(input.email);
   const normalizedCode = input.code.trim();
 

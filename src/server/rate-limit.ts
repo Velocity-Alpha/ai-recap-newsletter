@@ -13,6 +13,8 @@ const HOUR = 60 * MINUTE;
 export const RATE_LIMITS = {
   /** Approval board password tries per IP. A correct password clears the count. */
   approvalLogin: { name: "approval-login:ip", limit: 5, windowSeconds: 15 * MINUTE },
+  /** Approval board password tries across all IPs. A correct password does not clear it. */
+  approvalLoginSiteWide: { name: "approval-login:site", limit: 30, windowSeconds: HOUR },
   subscribeByIp: { name: "subscribe:ip", limit: 10, windowSeconds: HOUR },
   subscribeByEmail: { name: "subscribe:email", limit: 5, windowSeconds: HOUR },
   requestCodeByIp: { name: "request-code:ip", limit: 20, windowSeconds: HOUR },

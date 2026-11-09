@@ -62,6 +62,17 @@ describe("POST /api/approval/login", () => {
     await expect(hasValidApprovalSession(nextRequest)).resolves.toBe(true);
   });
 
+  it("marks the cookie Secure for the whole site in production", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+
+    const response = await login({ password: PASSWORD });
+
+    expect(response.status).toBe(200);
+    const setCookie = response.headers.get("set-cookie") ?? "";
+    expect(setCookie).toMatch(/;\s*Secure/i);
+    expect(setCookie).toMatch(/;\s*Path=\/(;|$)/);
+  });
+
   it("rejects a wrong password without setting a cookie", async () => {
     for (const password of ["wrong", "approval-secreT", `${PASSWORD}x`, ""]) {
       const response = await login({ password }, `198.51.100.${password.length}`);
@@ -94,6 +105,38 @@ describe("POST /api/approval/login", () => {
 
   it("keeps other IPs working while one is locked out", async () => {
     for (let attempt = 0; attempt < 6; attempt++) {
+      await login({ password: "wrong" }, "203.0.113.7");
+    }
+
+    expect((await login({ password: PASSWORD }, "198.51.100.20")).status).toBe(200);
+  });
+
+  it("locks a whole IPv6 /64 out together", async () => {
+    for (let attempt = 0; attempt < 5; attempt++) {
+      await login({ password: "wrong" }, `2001:db8:1:2::${attempt + 1}`);
+    }
+
+    expect((await login({ password: PASSWORD }, "2001:db8:1:2:aaaa:bbbb:cccc:dddd")).status).toBe(429);
+    expect((await login({ password: PASSWORD }, "2001:db8:1:3::1")).status).toBe(200);
+  });
+
+  it("locks every IP out after 30 tries in an hour across the site", async () => {
+    for (let ip = 1; ip <= 6; ip++) {
+      for (let attempt = 0; attempt < 5; attempt++) {
+        expect((await login({ password: "wrong" }, `198.51.100.${ip}`)).status).toBe(401);
+      }
+    }
+
+    const locked = await login({ password: PASSWORD }, "192.0.2.50");
+
+    expect(locked.status).toBe(429);
+    expect(Number(locked.headers.get("retry-after"))).toBeGreaterThan(0);
+    expect((await locked.json()).error).toMatch(/Too many attempts/);
+    expect(sessionCookie(locked)).toBeUndefined();
+  });
+
+  it("does not count tries an IP lockout already refused toward the site-wide limit", async () => {
+    for (let attempt = 0; attempt < 40; attempt++) {
       await login({ password: "wrong" }, "203.0.113.7");
     }
 
