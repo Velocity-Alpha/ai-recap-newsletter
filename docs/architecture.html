@@ -47,18 +47,18 @@
 </ul>
 
 <h2 id="owners">2. Who owns each stage (production)</h2>
-<p>The switches are rows in <code>newsletter.pipeline_settings</code> (key, JSON value). A switch moves a stage back to n8n in minutes.</p>
+<p>The switches are rows in <code>newsletter.pipeline_settings</code> (key, JSON value). A switch moves a stage back to n8n in minutes. The owner changes <code>ingest.owner</code>, <code>draft.owner</code>, and <code>publish.owner</code> on <code>/admin/settings</code> (<code>n8n</code> or <code>native</code>); each change is logged as an <code>admin-setting</code> run. Turning the matching n8n workflows on or off is still done by hand in n8n.</p>
 <table>
   <tr><th>Stage</th><th>Current owner</th><th>Target</th><th>Switch</th><th>Issues</th></tr>
   <tr><td>Ingest stories from newsletters and feeds</td><td><span class="now">native</span> since 2026-11-09 04:05 UTC</td><td>native, hourly runs and more sources later</td><td><code>ingest.owner</code> = <code>"native"</code></td><td>#39, extras #111</td></tr>
   <tr><td>"Board is ready" Telegram ping to the review group</td><td><span class="now">native</span> (end of the ingest run)</td><td>native</td><td>same as ingest</td><td>#39</td></tr>
   <tr><td>Approval board proposal (sections, dedup)</td><td><span class="now">native</span> (app)</td><td>native; later "accept or swap"</td><td>none</td><td>#37, #56, #58, #59, #89</td></tr>
-  <tr><td>Draft issue, featured image, GHL template</td><td><span class="n8n">n8n</span></td><td>native <code>draft-issue</code> background job; a new draft and GHL template per commit (ADR 0002)</td><td><code>draft.owner</code> <span class="plan">planned</span> (not in code)</td><td>#40, #74–#80, #115, #116, #120</td></tr>
+  <tr><td>Draft issue, featured image, GHL template</td><td><span class="n8n">n8n</span></td><td>native <code>draft-issue</code> background job; a new draft and GHL template per commit (ADR 0002)</td><td><code>draft.owner</code> = <code>"n8n"</code> (default) or <code>"native"</code>, settable on <code>/admin/settings</code>: the commit route reads it (#79)</td><td>#40, #74–#80, #115, #116, #120</td></tr>
   <tr><td>Send the campaign</td><td>owner, by hand in GHL</td><td>owner (optional: schedule through the GHL API)</td><td>none</td><td>#91</td></tr>
   <tr><td>Publish detection (mark issue published on the site)</td><td><span class="now">native</span> since 2026-11-08 22:47 UTC</td><td>native; later a Resend listener instead of Gmail</td><td><code>publish.owner</code> = <code>"native"</code> (also <code>"shadow"</code>, <code>"n8n"</code>)</td><td>#38, #107</td></tr>
   <tr><td>Job runner</td><td><span class="now">Netlify functions</span></td><td>Netlify functions</td><td><code>pipeline.runner</code> = <code>"netlify"</code> (default) or <code>"trigger"</code></td><td>ADR 0001</td></tr>
   <tr><td>Alerts and outcome checks</td><td><code>alerts</code> table; <span class="now">native</span> <code>run-checks</code> job: checks at 10:05, 12:00, 18:00, daily summary, Healthchecks.io heartbeat</td><td>same; alerts from the review bot to an ops chat</td><td>none</td><td>#36, #48, #50, #52</td></tr>
-  <tr><td>Admin pages</td><td>none (only <code>/approval</code>)</td><td><span class="plan">planned</span> <code>/admin</code>: runs, incidents, settings, and stage switches</td><td>none</td><td>#54</td></tr>
+  <tr><td>Admin pages</td><td><span class="now">native</span> <code>/admin</code> behind the approval login: runs, incidents, settings, and stage switches</td><td>same; per-user login later (#83)</td><td>none</td><td>#54</td></tr>
 </table>
 
 <h2 id="flow-now">3. Daily flow now (weekdays, New York time)</h2>
@@ -100,17 +100,25 @@ Terms: GLOSSARY.md. One issue per date; each commit makes a new draft with its o
 09:55  ingest (later: hourly 06:00-12:00 ET, raw items stored, per-source modules)     same as now
 10:05  run-checks: an ingest run happened, story count vs 8-week median, per source       <span class="now">native</span> #50
        Owner commits on /approval  ("No issue today" marks a skipped date instead)       <span class="now">native</span> #52
-         -> approval_outlines row (normalised outline + hash), for either draft.owner    <span class="plan">planned</span> #75
-         -> draft.owner = native: story changes in one transaction, start draft-issue    <span class="plan">planned</span> #79
+         -> approval_outlines row (normalised outline + hash), for either draft.owner    #75 (built)
+            n8n mode: a failed save is logged and the commit still goes to n8n;
+            forwarded_at is set when n8n answers 2xx. Native mode: a failed save is a
+            500 and nothing starts; forwarded_at stays null (issue_drafts tracks the job)
+         -> draft.owner = native: story changes in one transaction, start draft-issue    #79 (built, off until switched)
             find or create the issue for the date; new issue_drafts row, version n+1     #76
             read articles of feature-section stories (saved per story; methods from #115) #120
+              (pages are parsed in a worker thread with a 256 MB heap, stopped at the method timeout)
             gpt-6-luna writes the issue (fixed n8n prompt, no web search unless #115 says so)
             gpt-6-luna scene prompt -> Vertex Gemini image (fixed style) -> S3            #77
             TypeScript email template (data-issue-id, data-story-id, data-src-url, data-draft-id)
             new GHL template "&lt;date&gt; v&lt;n&gt;: &lt;subject&gt;"; never overwrites an old one   #78
             issue row takes the current draft's title, HTML, image, excerpt, content_json
-         -> board: live steps, error + Retry, email preview, "Open in GHL", list of drafts  #79
-         -> "New image": edit the scene prompt, 3 suggestions, then a new draft          #116
+         -> board: live steps, error + Retry, email preview, "Open in GHL", list of drafts  #79 (/approval/drafts)
+         -> "New image": edit the scene prompt, 3 suggestions, Generate, then a new draft #116 (built)
+            only from the newest ready draft, with nothing newer running (checked under the lock)
+            the new draft copies the source draft's text (source_draft_id), so the job
+            runs only image check (URL + S3 HEAD) -> HTML -> new GHL template -> save; no
+            article reading (#120) and no writing
          n8n "2. Public approval page" is switched off the day native drafting goes live  #80
 12:00  run-checks: no commit yet -> warning                                              <span class="now">native</span> #52
        Owner sends in GHL (unchanged)
@@ -130,7 +138,7 @@ Later: pre-send review in the app before the GHL template (#117)
   <tr><td><code>ingest-stories-background</code></td><td>none (called by the above)</td><td>valid token</td><td><code>runIngest()</code> in <code>src/pipeline/ingest/run-ingest.ts</code></td></tr>
   <tr><td><code>detect-publish</code></td><td><code>*/5 0,1,13-23 * * *</code></td><td>weekdays 09:00–21:00 New York</td><td>Reads the seed inbox, 20-minute lookback, publishes</td></tr>
   <tr><td><code>detect-publish-catch-up</code></td><td><code>0 3 * * *</code></td><td>daily</td><td>Same, 3-day lookback</td></tr>
-  <tr><td><code>draft-issue</code></td><td>none (on commit)</td><td colspan="2"><span class="plan">planned</span> Phase 5</td></tr>
+  <tr><td><code>draft-issue-background</code></td><td>none (on commit)</td><td>valid token signed for the draft; the draft is waiting to run</td><td><code>runDraftJob()</code> in <code>src/pipeline/draft/run-draft.ts</code>; gives up at 13 min. Built (#76). The commit route and "Retry" start it with <code>startDraftJob()</code> when <code>draft.owner</code> is <code>"native"</code> (#79)</td></tr>
   <tr><td><code>run-checks</code></td><td><code>0,5 14,15,16,17,22,23 * * 1-5</code></td><td>10:05, 12:00, 18:00 New York on weekdays (1 min early to 4 min late); outside production, a run at any other time ("Run now") is a full 18:00 pass</td><td>Outcome checks raise or resolve incidents; at 18:00 the daily summary to the ops chat, then the Healthchecks.io ping. Each outside call gets 5 s; Telegram and site calls stop 20 s into the run. <code>runChecks()</code> in <code>src/pipeline/checks/run-checks.ts</code></td></tr>
 </table>
 <p>Each run writes <code>pipeline_runs</code> (job, trigger, status, stats) and <code>pipeline_events</code> (step log). Job tokens: <code>src/server/job-token.ts</code>, format <code>&lt;expiresAtMs&gt;.&lt;sig&gt;</code>, HMAC key derived from <code>SESSION_SECRET</code> per purpose.</p>
@@ -162,6 +170,7 @@ Later: pre-send review in the app before the GHL template (#117)
   <tr><td>AWS S3</td><td>Featured images, bucket <code>velocity-alpha-public-assets</code>, prefix <code>newsletter/</code></td><td>n8n only</td><td>native; dev uses prefix <code>newsletter-dev/</code></td></tr>
   <tr><td>Google Vertex AI</td><td>Featured image, <code>gemini-3.1-flash-image</code></td><td>n8n only</td><td>native</td></tr>
   <tr><td>n8n (self-hosted)</td><td>Drafting chain (section 12)</td><td>commit route webhook</td><td>switched off (Phase 6)</td></tr>
+  <tr><td>Article sources: arXiv HTML, GitHub README API, Hugging Face READMEs, story sites, Jina Reader</td><td>Reading feature-section articles for the writer (#120), in the #115 order; Jina Reader is the last fallback, keyless unless <code>JINA_API_KEY</code> is set</td><td>native <code>draft-issue</code> (not live yet)</td><td>same</td></tr>
   <tr><td>Google Analytics</td><td>Site analytics</td><td>site</td><td>same</td></tr>
   <tr><td>Healthchecks.io</td><td>Dead-man switch for the daily digest</td><td><code>run-checks</code> pings after the 18:00 summary (production only, needs <code>HEALTHCHECKS_PING_URL</code>)</td><td>same</td></tr>
   <tr><td>Trigger.dev</td><td>Alternative job runner</td><td>dormant (vendor blocks production deploys)</td><td>dormant</td></tr>
@@ -172,28 +181,34 @@ Later: pre-send review in the app before the GHL template (#117)
   <tr><th>Table</th><th>Holds</th><th>Written by</th></tr>
   <tr><td><code>stories</code></td><td>Extracted stories per day and source (snake_case columns, but <code>"createdAt"</code> is camelCase)</td><td>native ingest</td></tr>
   <tr><td><code>scraper_bookmarks</code></td><td>Last-read time per source (keys such as <code>the_signal</code>; <code>tldr_ai</code> and <code>aloa_ai</code> are unused)</td><td>native ingest</td></tr>
-  <tr><td><code>issues</code></td><td>Drafts and published issues: <code>html</code>, <code>content_json</code>, <code>published_at</code> (NULL = draft), <code>slug</code> (generated)</td><td>n8n (insert), native publish (update), owner ("Mark as published")</td></tr>
+  <tr><td><code>issues</code></td><td>Drafts and published issues: <code>html</code>, <code>content_json</code>, <code>published_at</code> (NULL = draft), <code>slug</code> (generated)</td><td>n8n (insert), native draft (insert, update), native publish (update; a native email's draft is copied over), owner ("Mark as published")</td></tr>
   <tr><td><code>subscribers</code>, <code>auth_codes</code></td><td>Site subscriber records and one-time codes</td><td>app</td></tr>
-  <tr><td><code>pipeline_settings</code></td><td>Owner switches and thresholds</td><td>owner, by SQL</td></tr>
-  <tr><td><code>pipeline_runs</code>, <code>pipeline_events</code></td><td>Job runs and their step logs</td><td>native jobs</td></tr>
-  <tr><td><code>publish_events</code></td><td>Each seed email seen by publish detection and the decision</td><td>native publish</td></tr>
+  <tr><td><code>pipeline_settings</code></td><td>Owner switches and thresholds</td><td>owner, on <code>/admin/settings</code> (stage owners) or by SQL</td></tr>
+  <tr><td><code>pipeline_runs</code>, <code>pipeline_events</code></td><td>Job runs and their step logs; stage owner changes as job <code>admin-setting</code></td><td>native jobs, <code>/admin/settings</code></td></tr>
+  <tr><td><code>publish_events</code></td><td>Each seed email seen by publish detection and the decision, and which draft was sent (<code>draft_id</code>)</td><td>native publish</td></tr>
+  <tr><td><code>approval_outlines</code></td><td>Each board commit: the normalised outline, its hash, the draft owner, and when n8n accepted it (<code>forwarded_at</code>)</td><td>commit route (migration not applied yet)</td></tr>
+  <tr><td><code>issue_drafts</code></td><td>Each draft of an issue, version 1, 2, ... (one per commit, or per "New image"): status, current or failed step, content, html, image, GHL template; <code>source_draft_id</code> on a "New image" draft</td><td>native <code>draft-issue</code> (not live yet)</td></tr>
+  <tr><td><code>story_articles</code></td><td>The saved copy of each story's article, per story and link: status (read, paywalled, blocked, failed), method, text (at most 50,000 characters), read time, and the issue whose draft read it. A read copy is reused by later drafts; an edited link is read again. Each draft job first clears the text (not the row) of up to 200 copies whose issue was published over 14 days ago or that were read over 30 days ago.</td><td>native <code>draft-issue</code> (not live yet; migration not applied yet)</td></tr>
   <tr><td><code>alerts</code></td><td>Open and resolved incidents, one open row per <code>incident_key</code></td><td><code>run-checks</code>, through the ops alert module</td></tr>
   <tr><td><code>skipped_dates</code></td><td>Dates the owner marked "No issue today"; that date's checks are off</td><td>app (<code>/approval</code>)</td></tr>
   <tr><td><code>public.schema_migrations</code></td><td>Legacy migration record</td><td>none</td></tr>
 </table>
-<p><span class="plan">Planned:</span> <code>approval_outlines</code> (#75), <code>issue_drafts</code> (#76), and saved article text per story (#120). After n8n is off (#82): an issue <code>status</code> (draft or published), a unique issue date, and an index on <code>stories(day)</code>. Later: the issue-to-story link and a stable story key (#118), and raw items for ingestion (#111). The runtime DB role is <code>newsletter_web</code> (<code>prisma/bootstrap/001_grant_newsletter_web.sql</code>).</p>
+<p><span class="plan">Planned:</span> After n8n is off (#82): an issue <code>status</code> (draft or published), a unique issue date, and an index on <code>stories(day)</code>. Later: the issue-to-story link and a stable story key (#118), and raw items for ingestion (#111). The runtime DB role is <code>newsletter_web</code> (<code>prisma/bootstrap/001_grant_newsletter_web.sql</code>).</p>
 
 <h2 id="code">9. Code map</h2>
 <pre>
 app/                         Next.js routes
   page.tsx, archive/, issue/[slug]/, newsletter/[id]/, for-brands/, unsubscribe/, privacy/, terms/
   approval/                  board (page.tsx), login/, issues/ ("Mark as published"), submitted/
+  admin/                     overview, runs/ (+ [id]), incidents/, settings/ (stage switches); guard: src/server/admin-auth.ts
   api/newsletters/           list, [id], outline, commit (-> n8n), publish-status
   api/approval/              login, outline (+ status), issues/[id]/publish, skipped-dates
+  api/admin/                 stage-switches (POST)
   api/subscriber/            subscribe, request-code, verify-code, sign-out, unsubscribe (+ webhook from GHL)
   api/issues/[slug], api/ticker, api/for-brands, api/revalidate (job token)
 src/features/newsletter/     site and board logic: repository, cache, curation.service, openai-dedup, render/, parsers/
 src/features/subscriber/     subscriber sessions, provider switch (ghl | beehiiv), Resend email, GHL webhook
+src/features/admin/          admin page data, stage switch config (allowed values) and change log
 src/pipeline/                runner-neutral job logic
   ingest/                    sources.ts, feeds, email-text, redirects, url, extract (gpt-6-luna), paywall,
                              ingest-store, telegram, schedule, start-ingest, run-ingest
@@ -206,28 +221,30 @@ src/server/                  prisma client, job-token, approval and cache-refres
 src/trigger/                 dormant Trigger.dev adapters
 netlify/functions/           thin wrappers: ingest-stories(.mts, -background.mts), detect-publish(.mts, -catch-up.mts), run-checks.mts
 prisma/                      schema.prisma, migrations/, bootstrap/
-scripts/                     reset-dev-branch.mjs, run-prisma-prod.mjs, import-subscribers-from-csv.mjs
-<span class="plan">planned</span> src/pipeline/{draft,llm,notify,side-effects,sources}/ and /admin pages
+scripts/                     reset-dev-branch.mjs, run-prisma-prod.mjs, import-subscribers-from-csv.mjs,
+                             replay-drafts.mts (native draft vs n8n, side by side)
+<span class="plan">planned</span> src/pipeline/{draft,llm,notify,side-effects,sources}/
 </pre>
 
 <h2 id="envs">10. Environments</h2>
 <table>
   <tr><th>Part</th><th>Local and deploy previews</th><th>Production</th></tr>
-  <tr><td><code>APP_ENV</code></td><td><code>development</code> (local) / <code>preview</code> (set in <code>netlify.toml</code>)</td><td><code>production</code></td></tr>
+  <tr><td><code>APP_ENV</code></td><td><code>development</code> (local) / <code>preview</code></td><td><code>production</code></td></tr>
   <tr><td>Database</td><td>Neon <code>dev</code> branch, fake subscribers (<code>npm run db:reset-dev</code>)</td><td>Neon production branch</td></tr>
   <tr><td>Jobs</td><td>No schedules act. Use "Run now" on the deploy preview.</td><td>Scheduled on the <code>main</code> deploy</td></tr>
   <tr><td>Gmail</td><td colspan="2">Same mailbox, read-only scope in both</td></tr>
   <tr><td>Telegram</td><td>Not sent; the text is recorded in the run</td><td>Review group</td></tr>
-  <tr><td>n8n</td><td colspan="2">One production instance. The commit route still defaults to the production n8n webhook in every environment.</td></tr>
+  <tr><td>n8n</td><td>The commit route needs <code>OUTLINE_COMMIT_WEBHOOK_URL</code> and refuses the production webhook</td><td>One production instance; the commit route defaults to its webhook</td></tr>
 </table>
-<p><span class="plan">Planned guards:</span> <code>src/pipeline/side-effects/</code> is the only caller of GHL, S3, and the review group, with dry-run outside production; the commit route refuses to call production n8n outside production.</p>
+<p><code>APP_ENV</code> is set in <code>netlify.toml</code> and also as a Netlify env var with the same value per context, because functions cannot read <code>netlify.toml</code> values at runtime. Next routes get the build's value inlined (<code>next.config.mjs</code> <code>env</code>), so they must read <code>process.env.APP_ENV</code> by name, never <code>process.env</code> whole.</p>
+<p>Guards (#49): <code>src/pipeline/side-effects/</code> gates GHL, S3, and the review group (record-only outside production; S3 only under <code>newsletter-dev/</code>). The commit route refuses production n8n outside production.</p>
 
 <h2 id="vars">11. Env var names (values live in Netlify and <code>.env.local</code>, never in git)</h2>
 <table>
   <tr><th>Group</th><th>Names</th></tr>
   <tr><td>Core</td><td><code>APP_ENV</code> <code>DATABASE_URL</code> <code>NEXT_PUBLIC_SITE_URL</code> <code>SESSION_SECRET</code> <code>APPROVAL_PASSWORD</code> <code>NEWSLETTER_RUNTIME_DB_ROLE</code></td></tr>
   <tr><td>Production DB scripts (local only)</td><td><code>PRODUCTION_DATABASE_URL</code> <code>NEON_PROJECT_ID</code></td></tr>
-  <tr><td>Pipeline</td><td><code>OPENAI_API_KEY</code> <code>GMAIL_OAUTH_CLIENT_ID</code> <code>GMAIL_OAUTH_CLIENT_SECRET</code> <code>GMAIL_OAUTH_REFRESH_TOKEN</code> <code>PUBLISH_SEED_RECIPIENTS</code> <code>TELEGRAM_REVIEW_BOT_TOKEN</code> (production only) <code>TELEGRAM_REVIEW_CHAT_ID</code> (optional) <code>HEALTHCHECKS_PING_URL</code> (production only)</td></tr>
+  <tr><td>Pipeline</td><td><code>OPENAI_API_KEY</code> <code>GMAIL_OAUTH_CLIENT_ID</code> <code>GMAIL_OAUTH_CLIENT_SECRET</code> <code>GMAIL_OAUTH_REFRESH_TOKEN</code> <code>PUBLISH_SEED_RECIPIENTS</code> <code>TELEGRAM_REVIEW_BOT_TOKEN</code> (production only) <code>TELEGRAM_REVIEW_CHAT_ID</code> (optional) <code>HEALTHCHECKS_PING_URL</code> (production only) <code>JINA_API_KEY</code> <code>GITHUB_TOKEN</code> (both optional, article reader)</td></tr>
   <tr><td>Subscribers</td><td><code>SUBSCRIBER_PROVIDER</code> <code>GHL_SUBSCRIBE_WEBHOOK_URL</code> <code>GHL_UNSUBSCRIBE_WEBHOOK_SECRET</code> <code>RESEND_API_KEY</code> <code>RESEND_FROM_EMAIL</code> <code>RESEND_FROM_NAME</code> <code>BEEHIIV_API_KEY</code> <code>BEEHIIV_PUBLICATION_ID</code></td></tr>
   <tr><td>n8n hand-off (removed in Phase 6)</td><td><code>OUTLINE_COMMIT_WEBHOOK_URL</code> <code>N8N_WEBHOOK_JWT_SECRET</code></td></tr>
   <tr><td>Other</td><td><code>FOR_BRANDS_WEBHOOK_URL</code> <code>NEXT_PUBLIC_GA_MEASUREMENT_ID</code> (set in <code>netlify.toml</code>), <code>OPENROUTER_API_KEY</code> (unused)</td></tr>
@@ -242,7 +259,7 @@ scripts/                     reset-dev-branch.mjs, run-prisma-prod.mjs, import-s
   <tr><td>2. Create Issue Draft</td><td><code>QLPaj244TM7azSAH</code></td><td>active</td></tr>
   <tr><td>2.2.1 Sub: Create Image Prompt</td><td><code>j2B4f4kFJs6sBdog</code></td><td>active</td></tr>
   <tr><td>2.2.2 Sub: Generate Stylized Image From Prompt</td><td><code>0Gd3lzvwITBnd8om</code></td><td>active</td></tr>
-  <tr><td>Agent: Change Featured Image</td><td><code>Ixc1D30eBAT0Mauf</code></td><td>active</td></tr>
+  <tr><td>Agent: Change Featured Image</td><td><code>Ixc1D30eBAT0Mauf</code></td><td>active; replaced by "New image" on /approval/drafts (#116), deactivate after native drafting is live</td></tr>
   <tr><td>Error Handler</td><td><code>kmX0qX1GOqSfPmjD</code></td><td>active</td></tr>
   <tr><td>2.2 Sub: Generate Issue Featured Image (deprecated), 2.1 / 2.1.1 (legacy), Extract Page for LLM (unused)</td><td><code>OPjiGtzSNgCkQdG8</code> <code>rsHDKdELUG59wZzX</code> <code>m6oCt1cUcJHuPgeR</code> <code>VOZgpsTDYAPJCDuR</code></td><td>no live use</td></tr>
   <tr><td>Switched off: <code>1. Fetch Stories</code> and 8 helpers (2026-11-09), <code>3. Gmail Listen - Publish</code> (2026-11-08)</td><td>see migration plan</td><td>rollback only</td></tr>

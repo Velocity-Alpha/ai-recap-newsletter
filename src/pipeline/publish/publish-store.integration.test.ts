@@ -53,6 +53,7 @@ describe.skipIf(!enabled)("publish store on a real database", () => {
       storyIds,
       contentJson: null,
       problems: [],
+      draftId: 41,
     };
   }
 
@@ -84,6 +85,7 @@ describe.skipIf(!enabled)("publish store on a real database", () => {
       orderBy: { id: "asc" },
     });
     expect(events.map((row) => row.outcome)).toEqual(["published", "already_published"]);
+    expect(events.map((row) => row.draftId)).toEqual([BigInt(41), BigInt(41)]);
   });
 
   it("records a message once per mode and reports which messages it has seen", async () => {

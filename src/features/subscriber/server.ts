@@ -6,6 +6,8 @@ import type { SubscriberRecord, SubscriberSessionPayload } from "@/src/features/
 import { prisma } from "@/src/server/prisma";
 import { getBeehiivSubscriberStatus } from "@/src/features/subscriber/beehiiv";
 import { getSubscriberProvider } from "@/src/features/subscriber/provider";
+import { consumeRateLimit, RATE_LIMITS } from "@/src/server/rate-limit";
+import { safeEqual } from "@/src/server/safe-compare";
 
 const COOKIE_NAME = "ai_recap_subscriber";
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
@@ -412,42 +414,61 @@ export async function storeOneTimeCode(input: {
   ]);
 }
 
-export async function consumeOneTimeCode(email: string, code: string) {
+export type ConsumeOneTimeCodeResult = "consumed" | "invalid" | "too_many_tries";
+
+function retireOneTimeCode(id: bigint) {
+  return prisma.authCode.updateMany({
+    where: { id, consumedAt: null },
+    data: { consumedAt: new Date() },
+  });
+}
+
+/**
+ * Checks a sign-in code against the email's live code. Each code allows RATE_LIMITS.signInCodeTries.limit
+ * tries; the try that uses up the last one retires the code, so the reader has to request a new one.
+ */
+export async function consumeOneTimeCode(email: string, code: string): Promise<ConsumeOneTimeCodeResult> {
   const normalizedEmail = normalizeSubscriberEmail(email);
-  const codeHash = hashOneTimeCode(normalizedEmail, code);
 
-  return prisma.$transaction(async (tx) => {
-    const authCode = await tx.authCode.findFirst({
-      where: {
-        email: normalizedEmail,
-        codeHash,
-        purpose: "sign_in",
-        consumedAt: null,
-        expiresAt: {
-          gt: new Date(),
-        },
+  // storeOneTimeCode retires older codes, so an email has at most one live code.
+  const liveCode = await prisma.authCode.findFirst({
+    where: {
+      email: normalizedEmail,
+      purpose: "sign_in",
+      consumedAt: null,
+      expiresAt: {
+        gt: new Date(),
       },
-      orderBy: {
-        createdAt: "desc",
-      },
-    });
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+    select: { id: true, codeHash: true },
+  });
 
-    if (!authCode) {
-      return false;
+  if (!liveCode) {
+    return "invalid";
+  }
+
+  // Counted before the compare, so parallel tries cannot get past the limit.
+  const tries = await consumeRateLimit(RATE_LIMITS.signInCodeTries, liveCode.id.toString());
+
+  if (!tries.allowed) {
+    await retireOneTimeCode(liveCode.id);
+    return "too_many_tries";
+  }
+
+  if (!safeEqual(hashOneTimeCode(normalizedEmail, code), liveCode.codeHash)) {
+    if (tries.count >= RATE_LIMITS.signInCodeTries.limit) {
+      await retireOneTimeCode(liveCode.id);
+      return "too_many_tries";
     }
 
-    const result = await tx.authCode.updateMany({
-      where: {
-        id: authCode.id,
-        consumedAt: null,
-      },
-      data: {
-        consumedAt: new Date(),
-      },
-    });
+    return "invalid";
+  }
 
-    return result.count > 0;
-  });
+  const result = await retireOneTimeCode(liveCode.id);
+  return result.count > 0 ? "consumed" : "invalid";
 }
 
 export async function deleteOneTimeCode(email: string, code: string) {

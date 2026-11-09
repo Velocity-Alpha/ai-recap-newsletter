@@ -18,7 +18,7 @@ const RECORD = { date: "2026-11-10", note: null, createdBy: "approval", createdA
 
 async function request(method: "GET" | "POST" | "DELETE", options: { query?: string; body?: unknown; session?: boolean } = {}) {
   const headers: Record<string, string> = { "content-type": "application/json" };
-  if (options.session !== false) headers.cookie = `approval_session=${await createApprovalSessionToken("approval-secret")}`;
+  if (options.session !== false) headers.cookie = `approval_session=${await createApprovalSessionToken()}`;
   return new Request(`http://localhost/api/approval/skipped-dates${options.query ?? ""}`, {
     method,
     headers,
@@ -32,6 +32,7 @@ describe("/api/approval/skipped-dates", () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-11-10T15:00:00Z")); // Tue 10:00 New York
     process.env.APPROVAL_PASSWORD = "approval-secret";
+    process.env.SESSION_SECRET = "test-session-secret";
   });
   afterEach(() => vi.useRealTimers());
 

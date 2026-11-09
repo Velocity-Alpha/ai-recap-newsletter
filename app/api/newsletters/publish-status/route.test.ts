@@ -14,6 +14,7 @@ describe("GET /api/newsletters/publish-status", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.APPROVAL_PASSWORD = "approval-secret";
+    process.env.SESSION_SECRET = "test-session-secret";
     repositoryFns.fetchLastPublishedIssueDateOnOrBefore.mockResolvedValue({
       target_date: "2026-05-21",
       has_exact_match: false,
@@ -37,7 +38,7 @@ describe("GET /api/newsletters/publish-status", () => {
   });
 
   it("returns publish status for authenticated requests", async () => {
-    const token = await createApprovalSessionToken("approval-secret");
+    const token = await createApprovalSessionToken();
     repositoryFns.fetchLastPublishedIssueDateOnOrBefore.mockResolvedValue({
       target_date: "2026-05-21",
       has_exact_match: true,
@@ -74,9 +75,9 @@ describe("GET /api/newsletters/publish-status", () => {
   });
 
   it("normalizes date input and falls back to today for invalid dates", async () => {
-    const token = await createApprovalSessionToken("approval-secret");
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-05-25T10:00:00.000Z"));
+    const token = await createApprovalSessionToken();
 
     await GET(
       new Request(

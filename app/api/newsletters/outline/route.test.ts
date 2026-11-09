@@ -14,6 +14,7 @@ describe("GET /api/newsletters/outline", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.APPROVAL_PASSWORD = "approval-secret";
+    process.env.SESSION_SECRET = "test-session-secret";
   });
 
   it("rejects requests without an approval session", async () => {
@@ -32,7 +33,7 @@ describe("GET /api/newsletters/outline", () => {
       candidate_map: {},
       selected_story_ids: [],
     });
-    const token = await createApprovalSessionToken("approval-secret");
+    const token = await createApprovalSessionToken();
 
     const response = await GET(
       new Request("http://localhost/api/newsletters/outline?date=bad-date", {
