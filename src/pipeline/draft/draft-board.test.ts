@@ -12,7 +12,7 @@ import {
   readDraftForBoard,
   toDraftBoardView,
 } from "@/src/pipeline/draft/draft-board";
-import { DRAFT_START_STEP, STUCK_AFTER_MS, type DraftView } from "@/src/pipeline/draft/draft-store";
+import { DRAFT_START_STEP, NEVER_STARTED_AFTER_MS, STUCK_AFTER_MS, type DraftView } from "@/src/pipeline/draft/draft-store";
 import { fakeDb } from "@/src/pipeline/draft/fake-db.fixture";
 
 const NOW = new Date("2027-01-04T15:00:00.000Z");
@@ -34,6 +34,7 @@ function view(data: Partial<DraftView> = {}): DraftView {
     ghlPreviewUrl: null,
     unreadStoryIds: [],
     createdAt: new Date("2027-01-04T14:58:00.000Z"),
+    queuedAt: new Date("2027-01-04T14:58:00.000Z"),
     startedAt: null,
     finishedAt: null,
     ...data,
@@ -114,6 +115,14 @@ describe("toDraftBoardView", () => {
     expect(toDraftBoardView(fresh, { now: NOW })).toMatchObject({ retryable: false, stepLabel: "writing" });
     expect(toDraftBoardView(stuck, { now: NOW }).retryable).toBe(true);
     expect(toDraftBoardView(view({ status: "ready" }), { now: NOW }).retryable).toBe(false);
+  });
+
+  it("allows Retry on a draft whose job never started, once it has waited 5 minutes", () => {
+    const waiting = view({ queuedAt: new Date(NOW.getTime() - 60_000) });
+    const neverStarted = view({ queuedAt: new Date(NOW.getTime() - NEVER_STARTED_AFTER_MS - 1) });
+
+    expect(toDraftBoardView(waiting, { now: NOW }).retryable).toBe(false);
+    expect(toDraftBoardView(neverStarted, { now: NOW }).retryable).toBe(true);
   });
 });
 

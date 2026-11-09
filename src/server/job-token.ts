@@ -8,7 +8,8 @@ import crypto from "node:crypto";
  * They reuse SESSION_SECRET, so no new credential is needed. Each purpose signs with its own key derived
  * from that secret, so a token for one purpose never verifies for another, or as a subscriber session
  * (which signs with the raw secret). A token is `<expiresAtMs>.<signature>`. A leaked token works for a
- * few minutes, for its one purpose.
+ * few minutes, for its one purpose. A token can also sign a subject (the draft id for `draft-issue`), so it
+ * works only for that one input; the receiver passes the subject it was sent to check it.
  */
 
 export type JobTokenPurpose = "cache-refresh" | "ingest-stories" | "draft-issue";
@@ -16,14 +17,16 @@ export type JobTokenPurpose = "cache-refresh" | "ingest-stories" | "draft-issue"
 export const JOB_TOKEN_TTL_MS = 5 * 60 * 1000;
 const CLOCK_SKEW_MS = 60 * 1000;
 
-function sign(purpose: JobTokenPurpose, expiresAt: string, secret: string): string {
+function sign(purpose: JobTokenPurpose, expiresAt: string, secret: string, subject?: string): string {
   const key = crypto.createHmac("sha256", secret).update(`ai-recap/${purpose}/v1`).digest();
-  return crypto.createHmac("sha256", key).update(`${purpose}.${expiresAt}`).digest("base64url");
+  // Without a subject this signs exactly what it always did, so existing tokens are unchanged.
+  const payload = subject === undefined ? `${purpose}.${expiresAt}` : `${purpose}.${expiresAt}.${subject}`;
+  return crypto.createHmac("sha256", key).update(payload).digest("base64url");
 }
 
-export function createJobToken(purpose: JobTokenPurpose, secret: string, now: Date): string {
+export function createJobToken(purpose: JobTokenPurpose, secret: string, now: Date, subject?: string): string {
   const expiresAt = String(now.getTime() + JOB_TOKEN_TTL_MS);
-  return `${expiresAt}.${sign(purpose, expiresAt, secret)}`;
+  return `${expiresAt}.${sign(purpose, expiresAt, secret, subject)}`;
 }
 
 export function isValidJobToken(
@@ -31,6 +34,7 @@ export function isValidJobToken(
   token: string | null | undefined,
   secret: string,
   now: Date,
+  subject?: string,
 ): boolean {
   const parts = token?.split(".") ?? [];
   if (parts.length !== 2) return false;
@@ -43,7 +47,7 @@ export function isValidJobToken(
   const latestExpiry = now.getTime() + JOB_TOKEN_TTL_MS + CLOCK_SKEW_MS;
   if (expiresAtMs <= now.getTime() || expiresAtMs > latestExpiry) return false;
 
-  const expected = Buffer.from(sign(purpose, expiresAt, secret));
+  const expected = Buffer.from(sign(purpose, expiresAt, secret, subject));
   const actual = Buffer.from(signature);
   return actual.length === expected.length && crypto.timingSafeEqual(actual, expected);
 }

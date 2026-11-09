@@ -593,7 +593,7 @@ describe("POST /api/newsletters/commit", () => {
       });
       expect(outlineStore.saveOutline).toHaveBeenCalledWith(OUTLINE, "native");
       expect(storyChanges.applyStoryChanges).toHaveBeenCalledWith(OUTLINE);
-      expect(draftStore.createDraft).toHaveBeenCalledWith(BigInt(5));
+      expect(draftStore.createDraft).toHaveBeenCalledWith(BigInt(5), expect.anything());
       expect(fetchMock).toHaveBeenCalledTimes(1);
       const [url, init] = fetchMock.mock.calls[0];
       expect(url).toBe(BACKGROUND_URL);

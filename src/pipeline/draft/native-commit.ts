@@ -56,7 +56,7 @@ export async function commitNativeDraft(
 ): Promise<NativeCommit> {
   const saved = await saveOutline(outline, "native");
   const storyChanges = await applyStoryChanges(outline);
-  const draft = await createDraft(saved.id);
+  const draft = await createDraft(saved.id, { now: options.now });
   const start = await startDraftOrMarkFailed(draft.draftId, target, options);
   return { outlineId: saved.id, outlineHash: saved.hash, storyChanges, draft, start };
 }

@@ -2,7 +2,9 @@ import { Prisma } from "@/src/generated/prisma";
 import { toIssueContentJson, type WrittenIssueContent } from "@/src/pipeline/draft/content";
 import { emailImageUrl } from "@/src/pipeline/draft/email-html";
 import type { ApprovalOutline } from "@/src/pipeline/draft/outline";
+import { readDraftOwner } from "@/src/pipeline/draft/outline-store";
 import type { PartialDraft, ProducedDraft } from "@/src/pipeline/draft/produce-draft";
+import { finishRun, logEvent, startRun } from "@/src/pipeline/runs";
 import { prisma } from "@/src/server/prisma";
 
 /**
@@ -14,8 +16,11 @@ export type DraftStatus = "running" | "ready" | "failed";
 
 /** A draft in `running` whose attempt started this long ago has died: a background function lives 15 minutes. */
 export const STUCK_AFTER_MS = 20 * 60_000;
+/** A draft in `running` whose job has not started this long after it was queued never will. */
+export const NEVER_STARTED_AFTER_MS = 5 * 60_000;
 
 type Id = bigint | number | string;
+type Client = Prisma.TransactionClient;
 
 export class IssuePublishedError extends Error {
   constructor(
@@ -31,6 +36,13 @@ export class DraftNotRetryableError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "DraftNotRetryableError";
+  }
+}
+
+export class DraftOwnerError extends Error {
+  constructor() {
+    super("draft.owner is n8n, so native drafting is off.");
+    this.name = "DraftOwnerError";
   }
 }
 
@@ -56,11 +68,36 @@ export function placeholderIssueTitle(date: string): string {
 }
 
 /**
- * Finds the outline's issue, or creates it, and adds the next draft as `running`. Never creates a second issue
- * for a date. When n8n left several, it uses the latest unpublished one. Throws `IssuePublishedError` if any
- * issue for the date is published.
+ * A `running` draft whose job died (started over 20 minutes ago) or never started (queued over 5 minutes ago).
+ * The board offers "Retry" for these, and `retryDraft` accepts them.
  */
-export async function createDraft(outlineId: Id): Promise<CreatedDraft> {
+export function isStuckDraft(draft: { status: string; startedAt: Date | null; queuedAt: Date }, now: Date): boolean {
+  if (draft.status !== "running") return false;
+  if (draft.startedAt) return now.getTime() - draft.startedAt.getTime() > STUCK_AFTER_MS;
+  return now.getTime() - draft.queuedAt.getTime() > NEVER_STARTED_AFTER_MS;
+}
+
+/**
+ * Serialises everything that picks or writes the issue for a date: creating a draft, and copying a ready draft to
+ * the issue. Until #82 adds a unique index on the date, this is what keeps one issue per date.
+ */
+async function lockIssueDate(tx: Client, date: string): Promise<void> {
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`issue-date:${date}`}))`;
+}
+
+/** Any published issue for the date. n8n could leave several issue rows for one date, so check them all. */
+async function publishedIssueFor(client: Client, date: string): Promise<{ id: bigint } | null> {
+  return client.issue.findFirst({ where: { issueDate: day(date), publishedAt: { not: null } }, select: { id: true } });
+}
+
+/**
+ * Finds the outline's issue, or creates it, and adds the next draft as `running`. Never creates a second issue
+ * for a date. When n8n left several, it uses the latest unpublished one. Throws `DraftOwnerError` unless
+ * `draft.owner` is native, and `IssuePublishedError` if any issue for the date is published.
+ */
+export async function createDraft(outlineId: Id, options: { now?: () => Date } = {}): Promise<CreatedDraft> {
+  const now = (options.now ?? (() => new Date()))();
+  if ((await readDraftOwner()) !== "native") throw new DraftOwnerError();
   const outline = await prisma.approvalOutline.findUnique({
     where: { id: BigInt(outlineId) },
     select: { id: true, issueDate: true },
@@ -69,9 +106,8 @@ export async function createDraft(outlineId: Id): Promise<CreatedDraft> {
   const issueDate = dateKey(outline.issueDate)!;
 
   return prisma.$transaction(async (tx) => {
-    // Until #82 adds a unique index on the date, this lock is what stops two commits for one date from both
-    // creating an issue: the second waits here, then finds the first one's issue.
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`issue-date:${issueDate}`}))`;
+    // Two commits for one date: the second waits here, then finds the first one's issue.
+    await lockIssueDate(tx, issueDate);
 
     const issues = await tx.issue.findMany({
       where: { issueDate: day(issueDate) },
@@ -88,7 +124,8 @@ export async function createDraft(outlineId: Id): Promise<CreatedDraft> {
     const last = await tx.issueDraft.findFirst({ where: { issueId }, orderBy: { version: "desc" }, select: { version: true } });
     const version = (last?.version ?? 0) + 1;
     const draft = await tx.issueDraft.create({
-      data: { issueId, version, outlineId: outline.id, status: "running" },
+      // queuedAt from here, not the column default: retryDraft matches on it, and JS dates have no microseconds.
+      data: { issueId, version, outlineId: outline.id, status: "running", queuedAt: now },
       select: { id: true },
     });
     return { draftId: Number(draft.id), issueId: Number(issueId), version, issueDate };
@@ -97,29 +134,35 @@ export async function createDraft(outlineId: Id): Promise<CreatedDraft> {
 
 /**
  * Puts a failed draft back to `running`, cleared, so the job runs the same draft (same id and version) again from
- * the start. Start the job afterwards with `startDraftJob`. A draft stuck in `running` past `STUCK_AFTER_MS` counts
- * as failed.
+ * the start. Start the job afterwards with `startDraftJob`. A stuck draft (`isStuckDraft`) counts as failed.
  */
 export async function retryDraft(draftId: Id, options: { now?: () => Date } = {}): Promise<CreatedDraft> {
   const now = (options.now ?? (() => new Date()))();
   const draft = await prisma.issueDraft.findUnique({
     where: { id: BigInt(draftId) },
-    select: { id: true, issueId: true, version: true, status: true, startedAt: true },
+    select: { id: true, issueId: true, version: true, status: true, queuedAt: true, startedAt: true, ghlTemplateId: true, ghlPreviewUrl: true },
   });
   if (!draft) throw new DraftNotRetryableError(`Draft ${draftId} does not exist.`);
   const issue = await prisma.issue.findUnique({ where: { id: draft.issueId }, select: { issueDate: true, publishedAt: true } });
   const issueDate = dateKey(issue?.issueDate ?? null) ?? "";
   if (issue?.publishedAt) throw new IssuePublishedError(Number(draft.issueId), issueDate);
+  const published = issueDate ? await publishedIssueFor(prisma, issueDate) : null;
+  if (published) throw new IssuePublishedError(Number(published.id), issueDate);
 
-  const stuck = draft.status === "running" && draft.startedAt !== null && now.getTime() - draft.startedAt.getTime() > STUCK_AFTER_MS;
+  const stuck = isStuckDraft(draft, now);
   if (draft.status === "running" && !stuck) throw new DraftNotRetryableError(`Draft ${draftId} is running now.`);
   if (draft.status !== "failed" && !stuck) {
     throw new DraftNotRetryableError(`Draft ${draftId} is ${draft.status}. Only a failed draft can be retried.`);
   }
 
-  // Matching on the status and start time makes two clicks on "Retry" reset it once.
+  // The retry makes a new GHL template. The old one stays in GHL, so keep its id in the run log.
+  if (draft.ghlTemplateId) {
+    await logRetriedTemplate({ ...draft, issueDate, ghlTemplateId: draft.ghlTemplateId }, now);
+  }
+
+  // Matching on the status and times makes two clicks on "Retry" reset it once.
   const reset = await prisma.issueDraft.updateMany({
-    where: { id: draft.id, status: draft.status, startedAt: draft.startedAt },
+    where: { id: draft.id, status: draft.status, queuedAt: draft.queuedAt, startedAt: draft.startedAt },
     data: {
       status: "running",
       currentStep: null,
@@ -132,6 +175,7 @@ export async function retryDraft(draftId: Id, options: { now?: () => Date } = {}
       ghlTemplateId: null,
       ghlPreviewUrl: null,
       unreadStoryIds: [],
+      queuedAt: now,
       startedAt: null,
       finishedAt: null,
     },
@@ -154,6 +198,30 @@ export async function markDraftStartFailed(draftId: Id, error: string, now: Date
     data: { status: "failed", currentStep: null, failedStep: DRAFT_START_STEP, error, finishedAt: now },
   });
   return updated.count === 1;
+}
+
+/** The job name for a retry's run log entry. Not `draft-issue`: a retry does no drafting. */
+export const DRAFT_RETRY_JOB = "draft-retry";
+
+async function logRetriedTemplate(
+  draft: { id: bigint; version: number; issueDate: string; ghlTemplateId: string; ghlPreviewUrl: string | null },
+  now: Date,
+): Promise<void> {
+  const runId = await startRun({ job: DRAFT_RETRY_JOB, trigger: "manual" }, now);
+  const data = {
+    draftId: Number(draft.id),
+    version: draft.version,
+    issueDate: draft.issueDate,
+    ghlTemplateId: draft.ghlTemplateId,
+    ghlPreviewUrl: draft.ghlPreviewUrl,
+  };
+  await logEvent(runId, {
+    level: "info",
+    step: "retry",
+    message: `Retrying draft ${draft.id} (v${draft.version} for ${draft.issueDate}). Its old GHL template ${draft.ghlTemplateId} stays in GHL.`,
+    data,
+  });
+  await finishRun(runId, { status: "succeeded", stats: data }, now);
 }
 
 // ---- The draft job's reads and writes (run-draft.ts) ----
@@ -202,7 +270,8 @@ export async function loadDraftInputs(draft: DraftToRun): Promise<{ outline: App
   if (!issue) throw new Error(`Issue ${draft.issueId} does not exist.`);
   const date = dateKey(issue.issueDate);
   if (!date) throw new Error(`Issue ${draft.issueId} has no date.`);
-  if (issue.publishedAt) throw new IssuePublishedError(Number(draft.issueId), date);
+  const published = await publishedIssueFor(prisma, date);
+  if (published) throw new IssuePublishedError(Number(published.id), date);
   return { outline: outline.payload as unknown as ApprovalOutline, issue: { id: Number(draft.issueId), date } };
 }
 
@@ -210,7 +279,8 @@ export type IssueUpdate = "updated" | "newer_draft" | "published";
 
 /**
  * Marks the draft ready and, in the same transaction, copies it to the issue row, so the site and publish
- * detection read it as before. The issue keeps a newer ready draft, and a published issue never changes.
+ * detection read it as before. The issue keeps a newer ready draft, and nothing changes once any issue for the
+ * date is published.
  */
 export async function saveReadyDraft(
   draft: DraftToRun & { issueDate: string },
@@ -218,6 +288,8 @@ export async function saveReadyDraft(
   now: Date,
 ): Promise<IssueUpdate> {
   return prisma.$transaction(async (tx) => {
+    // Two drafts finishing together: the second waits here, so it sees the first one's ready row below.
+    await lockIssueDate(tx, draft.issueDate);
     await tx.issueDraft.update({
       where: { id: draft.id },
       data: {
@@ -236,6 +308,7 @@ export async function saveReadyDraft(
 
     const newer = await tx.issueDraft.count({ where: { issueId: draft.issueId, version: { gt: draft.version }, status: "ready" } });
     if (newer > 0) return "newer_draft";
+    if (await publishedIssueFor(tx, draft.issueDate)) return "published";
 
     const updated = await tx.issue.updateMany({
       where: { id: draft.issueId, publishedAt: null },
@@ -260,6 +333,25 @@ export function issueFields(produced: Pick<ProducedDraft, "content" | "html" | "
       featuredImageUrl: emailImageUrl(produced.featuredImageUrl),
     }) as unknown as Prisma.InputJsonValue,
   };
+}
+
+/**
+ * The issue columns for the draft a sent email carried, so the archive shows the version that was sent, not the
+ * newest one. Null when the draft is not this issue's or has no email yet: publishing then works as before.
+ */
+export async function sentDraftIssueFields(client: Client, issueId: number, draftId: number) {
+  const draft = await client.issueDraft.findUnique({
+    where: { id: BigInt(draftId) },
+    select: { issueId: true, content: true, html: true, featuredImageUrl: true, scenePrompt: true },
+  });
+  if (!draft || draft.issueId !== BigInt(issueId) || !draft.content || !draft.html || !draft.featuredImageUrl || !draft.scenePrompt) {
+    return null;
+  }
+  const issue = await client.issue.findUnique({ where: { id: BigInt(issueId) }, select: { issueDate: true } });
+  const issueDate = dateKey(issue?.issueDate ?? null);
+  if (!issueDate) return null;
+  const { html, featuredImageUrl, scenePrompt } = draft;
+  return issueFields({ content: draft.content as unknown as WrittenIssueContent, html, featuredImageUrl, scenePrompt }, { issueId, issueDate });
 }
 
 /** Marks the draft failed at a step, keeping what it made before the step, so the owner can see it. */
@@ -310,6 +402,8 @@ export interface DraftView {
   /** Feature-section stories whose article was not read ("source not read"). */
   unreadStoryIds: number[];
   createdAt: Date;
+  /** When it last waited for its job (create or retry). */
+  queuedAt: Date;
   startedAt: Date | null;
   finishedAt: Date | null;
 }
@@ -335,6 +429,7 @@ const VIEW_SELECT = {
   ghlPreviewUrl: true,
   unreadStoryIds: true,
   createdAt: true,
+  queuedAt: true,
   startedAt: true,
   finishedAt: true,
 } as const;
@@ -362,6 +457,7 @@ function toView(row: ViewRow, issueDate: string | null): DraftView {
     ghlPreviewUrl: row.ghlPreviewUrl,
     unreadStoryIds: row.unreadStoryIds,
     createdAt: row.createdAt,
+    queuedAt: row.queuedAt,
     startedAt: row.startedAt,
     finishedAt: row.finishedAt,
   };

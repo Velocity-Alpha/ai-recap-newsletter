@@ -94,7 +94,7 @@ describe("commitNativeDraft", () => {
 
     expect(fetch).not.toHaveBeenCalled();
     expect(noSecret.start).toEqual({ started: false, error: "Could not start the draft job. Missing setting: SESSION_SECRET." });
-    expect(offline.start).toEqual({ started: false, error: "Could not start the draft job: fetch failed" });
+    expect(offline.start).toEqual({ started: false, error: "Starting the draft job failed: fetch failed." });
     expect(draftRow(offline.draft.draftId)).toMatchObject({ status: "failed", failedStep: DRAFT_START_STEP });
   });
 

@@ -14,6 +14,7 @@ import {
   createDraftDeps,
   DraftStepError,
   produceDraft,
+  untilAborted,
   type DraftStep,
   type PartialDraft,
   type ProduceDraftDeps,
@@ -50,9 +51,16 @@ export const DRAFT_STEP_LABELS: Record<DraftJobStep, string> = {
 const MAX_ERROR_CHARS = 2_000;
 const SITE_URL = "https://airecap.news";
 
+/**
+ * Netlify stops a background function at 15 minutes, without warning. The job gives up at 13, so it still has
+ * time to mark the draft failed and raise the incident.
+ */
+export const DRAFT_DEADLINE_MS = 13 * 60_000;
+
 export type RunDraftJobResult =
   | { status: "ready"; draftId: number; runId: string; issue: IssueUpdate }
-  | { status: "failed"; draftId: number; runId: string; step: DraftJobStep; error: string }
+  /** `runId` is null when the run log itself could not be started. */
+  | { status: "failed"; draftId: number; runId: string | null; step: DraftJobStep; error: string }
   | { status: "skipped"; draftId: number; reason: string };
 
 export interface RunDraftJobOptions {
@@ -61,12 +69,21 @@ export interface RunDraftJobOptions {
   /** Defaults to `event`: a commit or a retry started it. */
   trigger?: RunTrigger;
   /** Replaces the real services (tests). */
-  deps?: Partial<Omit<ProduceDraftDeps, "onStep">>;
+  deps?: Partial<Omit<ProduceDraftDeps, "onStep" | "signal">>;
+  /** Defaults to `DRAFT_DEADLINE_MS`. */
+  deadlineMs?: number;
+}
+
+/** This deploy's site: Netlify's `URL` in production, the deploy's own address on previews, else production. */
+export function siteUrl(env: Record<string, string | undefined>): string {
+  const candidates = env.APP_ENV === "production" ? [env.URL] : [env.DEPLOY_PRIME_URL, env.URL];
+  const url = candidates.map((value) => value?.trim()).find(Boolean);
+  return (url ?? SITE_URL).replace(/\/+$/, "");
 }
 
 /** The board for a date, where the owner sees the draft and can retry it. */
-export function boardLink(date: string): string {
-  return `${SITE_URL}/approval?date=${encodeURIComponent(date)}`;
+export function boardLink(date: string, env: Record<string, string | undefined> = {}): string {
+  return `${siteUrl(env)}/approval?date=${encodeURIComponent(date)}`;
 }
 
 export function draftIncidentKey(date: string): string {
@@ -103,9 +120,14 @@ function partialFrom(error: unknown, produced: ProducedDraft | null): PartialDra
   return { content, html, featuredImageUrl, scenePrompt, unreadStoryIds, ghlTemplateId, ghlPreviewUrl: ghlPreviewUrl ?? undefined };
 }
 
+function minutes(ms: number): string {
+  return String(Math.round(ms / 6_000) / 10);
+}
+
 export async function runDraftJob(draftId: bigint | number | string, options: RunDraftJobOptions = {}): Promise<RunDraftJobResult> {
   const env = options.env ?? process.env;
   const now = options.now ?? (() => new Date());
+  const deadlineMs = options.deadlineMs ?? DRAFT_DEADLINE_MS;
   const id = Number(draftId);
 
   const draft = await findDraftToRun(draftId);
@@ -113,20 +135,23 @@ export async function runDraftJob(draftId: bigint | number | string, options: Ru
   if (draft.status !== "running") return { status: "skipped", draftId: id, reason: `Draft ${draftId} is ${draft.status}, not waiting to run.` };
   if (!(await claimDraft(draft.id, now()))) return { status: "skipped", draftId: id, reason: `Draft ${draftId} is running already.` };
 
-  const runId = await startRun({ job: DRAFT_JOB, trigger: options.trigger ?? "event" }, now());
   const date = draft.issueDate ?? `issue-${draft.issueId}`;
   const incidentKey = draftIncidentKey(date);
   const stepMs: Partial<Record<DraftJobStep, number>> = {};
+  let runId: bigint | null = null;
   let step: DraftJobStep = "load";
   let produced: ProducedDraft | null = null;
 
+  const log = async (event: Parameters<typeof logEvent>[1]) => {
+    if (runId !== null) await logEvent(runId, event);
+  };
   const enter = async (next: DraftJobStep) => {
     step = next;
     if (next !== "load") await setDraftStep(draft.id, next);
-    await logEvent(runId, { level: "info", step: next, message: `Started ${DRAFT_STEP_LABELS[next]}.` });
+    await log({ level: "info", step: next, message: `Started ${DRAFT_STEP_LABELS[next]}.` });
   };
   const record = async (entry: SideEffectRecord) => {
-    await logEvent(runId, {
+    await log({
       level: "info",
       step: "ghl",
       message: "Not sent outside production. Recorded the call.",
@@ -134,56 +159,115 @@ export async function runDraftJob(draftId: bigint | number | string, options: Ru
     });
   };
 
-  try {
-    await enter("load");
-    const loadStarted = Date.now();
-    if ((await readDraftOwner()) !== "native") throw new Error("draft.owner is n8n, so native drafting is off.");
-    const { outline, issue } = await loadDraftInputs(draft);
-    const stories = await loadApprovedSections(outline);
-    stepMs.load = Date.now() - loadStarted;
-
-    produced = await produceDraft(
-      { outline, stories, issue, draft: { id, version: draft.version } },
-      { ...createDraftDeps(env, { record }), ...options.deps, onStep: enter },
-    );
-    Object.assign(stepMs, produced.stepMs);
-
-    await enter("save");
-    const issueUpdate = await saveReadyDraft({ ...draft, issueDate: issue.date }, produced, now());
-
-    const stats = { draftId: id, issueId: issue.id, version: draft.version, issueDate: issue.date, issue: issueUpdate, ghlMode: produced.ghlMode, unreadStoryIds: produced.unreadStoryIds, stepMs };
-    await finishRun(runId, { status: "succeeded", stats }, now());
+  /** Runs one bookkeeping write. A failure is logged (if it can be) and returned, and never stops the job. */
+  const bestEffort = async (logStep: string, what: string, work: () => Promise<unknown>): Promise<string | null> => {
     try {
-      await resolveIncident(incidentKey, { runId, env, now: now(), link: boardLink(issue.date), note: `Draft v${draft.version} is ready.` });
+      await work();
+      return null;
     } catch (error) {
-      await logEvent(runId, { level: "warn", step: "alert", message: `Could not resolve ${incidentKey}: ${plainError(error, "save", null)}` });
+      const problem = `Could not ${what}: ${plainError(error, step, null)}`;
+      try {
+        await log({ level: "warn", step: logStep, message: problem });
+      } catch {
+        console.error(`[draft-issue] Draft ${id}: ${problem}`);
+      }
+      return problem;
     }
-    return { status: "ready", draftId: id, runId: runId.toString(), issue: issueUpdate };
-  } catch (error) {
+  };
+
+  /** Marks the draft failed and raises the incident. Each write is separate, so the incident goes out regardless. */
+  const failDraft = async (error: unknown): Promise<RunDraftJobResult> => {
     const failedStep: DraftJobStep = error instanceof DraftStepError ? error.step : step;
     if (error instanceof DraftStepError) Object.assign(stepMs, error.stepMs);
     const message = plainError(error, failedStep, produced);
 
-    await saveFailedDraft(draft.id, { step: failedStep, error: message, partial: partialFrom(error, produced) }, now());
-    await logEvent(runId, { level: "error", step: failedStep, message });
-    await finishRun(runId, { status: "failed", error: message, stats: { draftId: id, version: draft.version, issueDate: date, failedStep, stepMs } }, now());
-    try {
-      await raiseIncident(
+    const problems = [
+      await bestEffort("save", "mark the draft failed", () =>
+        saveFailedDraft(draft.id, { step: failedStep, error: message, partial: partialFrom(error, produced) }, now()),
+      ),
+      await bestEffort("run", "log the failure", () => log({ level: "error", step: failedStep, message })),
+      await bestEffort("run", "finish the run", async () => {
+        if (runId === null) throw new Error("The run log was never started.");
+        await finishRun(runId, { status: "failed", error: message, stats: { draftId: id, version: draft.version, issueDate: date, failedStep, stepMs } }, now());
+      }),
+    ].filter((problem): problem is string => problem !== null);
+
+    await bestEffort("alert", `raise ${incidentKey}`, () =>
+      raiseIncident(
         {
           incidentKey,
           severity: "critical",
           what: `Draft v${draft.version} for ${date} failed at ${DRAFT_STEP_LABELS[failedStep]}.`,
           evidence: message,
-          link: boardLink(date),
-          details: { draftId: id, version: draft.version, step: failedStep, runId: runId.toString() },
+          link: boardLink(date, env),
+          details: {
+            draftId: id,
+            version: draft.version,
+            step: failedStep,
+            runId: runId?.toString() ?? null,
+            ...(problems.length > 0 ? { alsoFailed: problems } : {}),
+          },
         },
-        { runId, env, now: now() },
-      );
-    } catch (alertError) {
-      await logEvent(runId, { level: "warn", step: "alert", message: `Could not raise ${incidentKey}: ${plainError(alertError, failedStep, null)}` });
-    }
-    return { status: "failed", draftId: id, runId: runId.toString(), step: failedStep, error: message };
+        { runId: runId ?? undefined, env, now: now() },
+      ),
+    );
+    return { status: "failed", draftId: id, runId: runId?.toString() ?? null, step: failedStep, error: message };
+  };
+
+  const deadline = new AbortController();
+  const timer = setTimeout(
+    () => deadline.abort(new Error(`The draft timed out after ${minutes(deadlineMs)} min. Netlify stops the job at 15 min.`)),
+    deadlineMs,
+  );
+
+  let saved: { issue: { id: number; date: string }; issueUpdate: IssueUpdate; produced: ProducedDraft };
+  try {
+    runId = await startRun({ job: DRAFT_JOB, trigger: options.trigger ?? "event" }, now());
+    await enter("load");
+    const loadStarted = Date.now();
+    const { outline, issue, stories } = await untilAborted(
+      (async () => {
+        if ((await readDraftOwner()) !== "native") throw new Error("draft.owner is n8n, so native drafting is off.");
+        const inputs = await loadDraftInputs(draft);
+        return { ...inputs, stories: await loadApprovedSections(inputs.outline) };
+      })(),
+      deadline.signal,
+    );
+    stepMs.load = Date.now() - loadStarted;
+
+    produced = await produceDraft(
+      { outline, stories, issue, draft: { id, version: draft.version } },
+      { ...createDraftDeps(env, { record }), ...options.deps, onStep: enter, signal: deadline.signal },
+    );
+    Object.assign(stepMs, produced.stepMs);
+
+    // Not cut short by the deadline: a save that commits after the draft was marked failed would contradict it.
+    await enter("save");
+    saved = { issue, produced, issueUpdate: await saveReadyDraft({ ...draft, issueDate: issue.date }, produced, now()) };
+  } catch (error) {
+    return failDraft(error);
+  } finally {
+    clearTimeout(timer);
   }
+
+  // The draft is saved. Problems with the run log or the incident from here on do not undo that.
+  const { issue, issueUpdate } = saved;
+  const stats = {
+    draftId: id,
+    issueId: issue.id,
+    version: draft.version,
+    issueDate: issue.date,
+    issue: issueUpdate,
+    ghlMode: saved.produced.ghlMode,
+    unreadStoryIds: saved.produced.unreadStoryIds,
+    stepMs,
+  };
+  const readyRunId: bigint = runId!;
+  await bestEffort("run", "finish the run", () => finishRun(readyRunId, { status: "succeeded", stats }, now()));
+  await bestEffort("alert", `resolve ${incidentKey}`, () =>
+    resolveIncident(incidentKey, { runId: readyRunId, env, now: now(), link: boardLink(issue.date, env), note: `Draft v${draft.version} is ready.` }),
+  );
+  return { status: "ready", draftId: id, runId: readyRunId.toString(), issue: issueUpdate };
 }
 
 export function describeDraftRun(result: RunDraftJobResult): string {

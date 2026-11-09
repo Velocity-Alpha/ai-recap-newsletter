@@ -1,8 +1,8 @@
 import {
   DRAFT_START_STEP,
   getDraftStatus,
+  isStuckDraft,
   listDraftsForDate,
-  STUCK_AFTER_MS,
   type DraftListItem,
   type DraftStatus,
   type DraftView,
@@ -93,8 +93,7 @@ export function draftSteps(view: Pick<DraftView, "status" | "currentStep" | "fai
 }
 
 function isRetryable(view: DraftView, now: Date): boolean {
-  if (view.status === "failed") return true;
-  return view.status === "running" && view.startedAt !== null && now.getTime() - view.startedAt.getTime() > STUCK_AFTER_MS;
+  return view.status === "failed" || isStuckDraft(view, now);
 }
 
 function iso(value: Date | null): string | null {
