@@ -1,6 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import { fakeWeb, hang, htmlPage, jinaAnswer, jinaError, jinaUrl, prose } from "@/src/pipeline/draft/articles/fake-web.fixture";
+import { fakeWeb, hang, hostileHtml, htmlPage, jinaAnswer, jinaError, jinaUrl, prose, rawHtml } from "@/src/pipeline/draft/articles/fake-web.fixture";
+import { parseInThisThread, type HtmlParser } from "@/src/pipeline/draft/articles/html-worker";
+import { HostLimiter } from "@/src/pipeline/draft/articles/http";
 import { DEFAULT_TIMEOUTS, MAX_TEXT_CHARS, readArticle } from "@/src/pipeline/draft/articles/read-article";
 
 const STORY = "https://news.example.com/toy-arm";
@@ -115,6 +117,67 @@ describe("readArticle", () => {
     expect(read.text).toHaveLength(50_000);
     expect(read.chars).toBe(prose("long", 60_000).length);
     expect(read.chars).toBeGreaterThan(59_000);
+  });
+
+  it.each([
+    ["tags nested 4,000 deep", hostileHtml.deep(4_000), "The page nests HTML tags over 400 deep."],
+    ["600,000 tiny elements", hostileHtml.tiny(600_000), "The page has over 30,000 HTML elements."],
+  ])("refuses a hostile page (%s) before parsing it, well within the fetch timeout, and lets Jina try", async (_kind, html, reason) => {
+    const web = fakeWeb({ [STORY]: rawHtml(html), [jinaUrl(STORY)]: jinaAnswer(STORY, prose("rescued")) });
+    const parse = vi.fn<HtmlParser>(parseInThisThread);
+    const started = performance.now();
+
+    const read = await readArticle(STORY, { fetch: web.fetch, parse });
+
+    expect(performance.now() - started).toBeLessThan(2_000);
+    expect(read).toMatchObject({ status: "read", method: "jina" });
+    expect(read.attempts[0]).toMatchObject({ method: "fetch", outcome: "failed", error: reason });
+    expect(parse.mock.calls.map(([job]) => job.kind)).toEqual(["markdown"]);
+  });
+
+  it("stops the parse at the method's timeout, as the worker is stopped, and moves on", async () => {
+    const web = fakeWeb({ [STORY]: htmlPage(prose("slow")), [jinaUrl(STORY)]: jinaAnswer(STORY, prose("rescued")) });
+    const stopped: unknown[] = [];
+    // Stands in for the worker: it ends only when its signal aborts.
+    const slowParse: HtmlParser = (job, signal) =>
+      job.kind !== "readable"
+        ? parseInThisThread(job, signal)
+        : new Promise((_resolve, reject) =>
+            signal.addEventListener("abort", () => {
+              stopped.push(signal.reason);
+              reject(signal.reason);
+            }),
+          );
+
+    const read = await readArticle(STORY, { fetch: web.fetch, parse: slowParse, timeouts: { fetch: 30 } });
+
+    expect(stopped).toEqual([expect.objectContaining({ message: "Timed out after 0.03 s." })]);
+    expect(read).toMatchObject({ status: "read", method: "jina" });
+    expect(read.attempts[0]).toMatchObject({ method: "fetch", outcome: "failed", error: "Timed out after 0.03 s." });
+  });
+
+  it("starts a method's clock once its host slot is free, so waiting on another read does not use up its timeout", async () => {
+    const limiter = new HostLimiter(1);
+    const web = fakeWeb({ [STORY]: htmlPage(prose("patient")) });
+    const busy = limiter.run("news.example.com", new AbortController().signal, () => new Promise((resolve) => setTimeout(resolve, 80)));
+
+    const read = await readArticle(STORY, { fetch: web.fetch, limiter, timeouts: { fetch: 40 } });
+    await busy;
+
+    expect(read).toMatchObject({ status: "read", method: "fetch" });
+  });
+
+  it("stops, without passing the link to Jina, when a redirect points at a private address", async () => {
+    const web = fakeWeb({
+      [STORY]: () => new Response(null, { status: 302, headers: { location: "http://127.0.0.1:8080/admin" } }),
+      [jinaUrl(STORY)]: jinaAnswer(STORY, prose("should not be asked")),
+    });
+
+    const read = await readArticle(STORY, { fetch: web.fetch });
+
+    expect(web.calls).toEqual([STORY]);
+    expect(read).toMatchObject({ status: "failed", method: null, error: "fetch: Refused 127.0.0.1: a private address." });
+    expect(read.attempts).toHaveLength(1);
   });
 
   it("times each method and the whole read with the given clock", async () => {

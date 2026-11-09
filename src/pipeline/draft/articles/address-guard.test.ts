@@ -24,11 +24,15 @@ describe("isPrivateAddress", () => {
     "::ffff:127.0.0.1",
     "::ffff:7f00:1",
     "64:ff9b::a9fe:a9fe",
+    "::ffff:0:7f00:1",
+    "::ffff:0:808:808",
+    "64:ff9b:1::808:808",
+    "64:ff9b:1:abcd::1",
   ])("treats %s as private", (address) => {
     expect(isPrivateAddress(address)).toBe(true);
   });
 
-  it.each(["93.184.216.34", "140.82.112.3", "172.32.0.1", "100.128.0.1", "2001:4998:60:807::1", "::ffff:8.8.8.8"])(
+  it.each(["93.184.216.34", "140.82.112.3", "172.32.0.1", "100.128.0.1", "2001:4998:60:807::1", "::ffff:8.8.8.8", "64:ff9b::808:808"])(
     "treats %s as public",
     (address) => {
       expect(isPrivateAddress(address)).toBe(false);

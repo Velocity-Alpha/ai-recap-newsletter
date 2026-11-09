@@ -2,7 +2,7 @@ import { lookup as dnsLookup } from "node:dns";
 
 import { Agent, fetch as undiciFetch } from "undici";
 
-import { assertPublicUrl, createGuardedLookup, RefusedUrlError } from "@/src/pipeline/draft/articles/address-guard";
+import { assertPublicUrl, createGuardedLookup, RefusedUrlError, type ResolveAll } from "@/src/pipeline/draft/articles/address-guard";
 
 /** The part of `fetch` the reader uses, so tests can pass a fake. Redirects are followed by `fetchText`. */
 export interface FetchInit {
@@ -22,7 +22,7 @@ export interface FetchResponse {
 
 export type FetchLike = (url: string, init: FetchInit) => Promise<FetchResponse>;
 
-export type FetchFailureKind = "network" | "too_large" | "redirects";
+export type FetchFailureKind = "network" | "too_large" | "redirects" | "wrong_type";
 
 export class FetchFailure extends Error {
   constructor(
@@ -49,9 +49,18 @@ export interface FetchTextOptions {
   headers?: Record<string, string>;
   maxBytes: number;
   limiter?: HostLimiter;
+  /** Called as each request gets its host slot (at once without a limiter). */
+  onStart?: () => void;
+  /** Checks a successful answer's media type before its body is read: a reason refuses it, null reads it. */
+  rejectType?: (mediaType: string) => string | null;
 }
 
 const MAX_REDIRECTS = 5;
+
+/** `text/html` from `text/html; charset=utf-8`. */
+export function mediaType(contentType: string): string {
+  return contentType.split(";")[0].trim().toLowerCase();
+}
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 
 /** Caps how many requests go to one host at once (#115: at most 2), across all the stories being read. */
@@ -162,10 +171,16 @@ function finalError(error: unknown): unknown {
 
 async function requestOnce(url: URL, headers: Record<string, string>, options: FetchTextOptions): Promise<{ response: FetchResponse; body: string | null }> {
   const send = async () => {
+    options.onStart?.();
     const response = await options.fetch(url.href, { method: "GET", headers, redirect: "manual", signal: options.signal });
     if (REDIRECT_STATUSES.has(response.status) && response.headers.get("location")) {
       await response.body?.getReader().cancel().catch(() => undefined);
       return { response, body: null };
+    }
+    const refused = response.status < 400 ? options.rejectType?.(mediaType(response.headers.get("content-type") ?? "")) : null;
+    if (refused) {
+      await response.body?.getReader().cancel().catch(() => undefined);
+      throw new FetchFailure("wrong_type", refused);
     }
     return { response, body: await readBody(response, options.maxBytes) };
   };
@@ -212,19 +227,18 @@ export async function fetchText(link: string, options: FetchTextOptions): Promis
 
 let sharedAgent: Agent | null = null;
 
+const systemResolver: ResolveAll = (hostname, callback) =>
+  dnsLookup(hostname, { all: true, verbatim: true }, (error, addresses) => callback(error, addresses ?? []));
+
+function guardedAgent(resolveAll: ResolveAll): Agent {
+  return new Agent({ maxHeaderSize: 64 * 1024, connect: { lookup: createGuardedLookup(resolveAll) as never } });
+}
+
 /**
  * The real network: undici with the address guard at connect time, and a larger header limit (finance.yahoo.com
- * sends response headers over Node's 16 KB default, #115).
+ * sends response headers over Node's 16 KB default, #115). `resolveAll` replaces DNS (tests).
  */
-export function createNodeFetch(): FetchLike {
-  sharedAgent ??= new Agent({
-    maxHeaderSize: 64 * 1024,
-    connect: {
-      lookup: createGuardedLookup((hostname, callback) =>
-        dnsLookup(hostname, { all: true, verbatim: true }, (error, addresses) => callback(error, addresses ?? [])),
-      ) as never,
-    },
-  });
-  const dispatcher = sharedAgent;
+export function createNodeFetch(options: { resolveAll?: ResolveAll } = {}): FetchLike {
+  const dispatcher = options.resolveAll ? guardedAgent(options.resolveAll) : (sharedAgent ??= guardedAgent(systemResolver));
   return (url, init) => undiciFetch(url, { ...init, dispatcher }) as unknown as Promise<FetchResponse>;
 }

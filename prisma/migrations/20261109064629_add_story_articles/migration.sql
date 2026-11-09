@@ -3,6 +3,7 @@ CREATE TABLE "newsletter"."story_articles" (
     "id" BIGSERIAL NOT NULL,
     "story_id" INTEGER NOT NULL,
     "url" TEXT NOT NULL,
+    "issue_id" BIGINT,
     "status" TEXT NOT NULL,
     "method" TEXT,
     "final_url" TEXT,

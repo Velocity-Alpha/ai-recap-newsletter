@@ -72,10 +72,12 @@ function isPrivateV6(address: string): boolean {
   if (zeroTo(8)) return true; // ::
   if (zeroTo(7) && groups[7] === 1) return true; // ::1
   if (zeroTo(5) && groups[5] === 0xffff) return isPrivateV4(embeddedV4(groups)); // IPv4-mapped
+  if (zeroTo(4) && groups[4] === 0xffff && groups[5] === 0) return true; // IPv4-translated ::ffff:0:0/96
   if (zeroTo(6)) return true; // deprecated IPv4-compatible
   if (first === 0x64 && groups[1] === 0xff9b && groups.slice(2, 6).every((group) => group === 0)) {
     return isPrivateV4(embeddedV4(groups)); // NAT64
   }
+  if (first === 0x64 && groups[1] === 0xff9b && groups[2] === 1) return true; // local-use NAT64 64:ff9b:1::/48
   if ((first & 0xfe00) === 0xfc00) return true; // unique local fc00::/7 (AWS metadata is fd00:ec2::254)
   if ((first & 0xffc0) === 0xfe80) return true; // link-local fe80::/10
   if ((first & 0xff00) === 0xff00) return true; // multicast

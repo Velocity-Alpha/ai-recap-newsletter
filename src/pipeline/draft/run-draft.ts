@@ -149,6 +149,9 @@ export async function runDraftJob(draftId: bigint | number | string, options: Ru
   const onArticleWarning = async (message: string) => {
     await logEvent(runId, { level: "warn", step: "read_articles", message });
   };
+  const onArticleInfo = async (message: string) => {
+    await logEvent(runId, { level: "info", step: "read_articles", message });
+  };
 
   try {
     await enter("load");
@@ -160,7 +163,7 @@ export async function runDraftJob(draftId: bigint | number | string, options: Ru
 
     produced = await produceDraft(
       { outline, stories, issue, draft: { id, version: draft.version } },
-      { ...createDraftDeps(env, { record, onArticleReads, onArticleWarning }), ...options.deps, onStep: enter },
+      { ...createDraftDeps(env, { record, onArticleReads, onArticleWarning, onArticleInfo }), ...options.deps, onStep: enter },
     );
     Object.assign(stepMs, produced.stepMs);
 

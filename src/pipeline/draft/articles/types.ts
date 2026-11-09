@@ -1,3 +1,4 @@
+import type { HtmlParser } from "@/src/pipeline/draft/articles/html-worker";
 import type { FetchLike, HostLimiter } from "@/src/pipeline/draft/articles/http";
 import type { NotReadStatus } from "@/src/pipeline/draft/articles/quality";
 
@@ -18,7 +19,11 @@ export interface MethodContext {
   fetch: FetchLike;
   /** Aborts at the method's timeout or the step's deadline. */
   signal: AbortSignal;
+  /** Does the text work (HTML, Readability, Markdown): in a worker in the Netlify function. */
+  parse: HtmlParser;
   limiter?: HostLimiter;
+  /** Called when a request gets its host slot. The method's timeout starts at the first call. */
+  onStart?: () => void;
   jinaApiKey?: string;
   githubToken?: string;
 }

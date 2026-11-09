@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const prismaMock = vi.hoisted(() => ({ storyArticle: { findMany: vi.fn(), upsert: vi.fn() } }));
+const prismaMock = vi.hoisted(() => ({ storyArticle: { findMany: vi.fn(), upsert: vi.fn(), updateMany: vi.fn() }, issue: { findMany: vi.fn() } }));
 vi.mock("@/src/server/prisma", () => ({ prisma: prismaMock }));
 
-import { prismaArticleStore } from "@/src/pipeline/draft/articles/article-store";
+import { CLEAR_BATCH, prismaArticleStore } from "@/src/pipeline/draft/articles/article-store";
+import { MAX_TEXT_CHARS } from "@/src/pipeline/draft/articles/read-article";
 import type { StoryArticleRead } from "@/src/pipeline/draft/articles/read-articles";
 
 const NOW = new Date("2027-01-04T15:00:00.000Z");
@@ -28,6 +29,8 @@ function savedRow(storyId: number, url: string, status = "read") {
 beforeEach(() => {
   prismaMock.storyArticle.findMany.mockReset();
   prismaMock.storyArticle.upsert.mockReset().mockResolvedValue({});
+  prismaMock.storyArticle.updateMany.mockReset();
+  prismaMock.issue.findMany.mockReset();
 });
 
 describe("prismaArticleStore.findRead", () => {
@@ -42,7 +45,7 @@ describe("prismaArticleStore.findRead", () => {
       { storyId: 502, url: "https://news.example.com/edited-on-the-board" },
     ]);
 
-    expect(prismaMock.storyArticle.findMany).toHaveBeenCalledWith({ where: { storyId: { in: [501, 502] }, status: "read" } });
+    expect(prismaMock.storyArticle.findMany).toHaveBeenCalledWith({ where: { storyId: { in: [501, 502] }, status: "read", text: { not: null } } });
     expect(found).toEqual([
       {
         storyId: 501,
@@ -114,5 +117,62 @@ describe("prismaArticleStore.save", () => {
       create: { storyId: 502, url: "https://news.example.com/b", ...fields },
       update: fields,
     });
+  });
+
+  it("records the drafting issue, and holds the 50,000-character cap whatever it is given", async () => {
+    const long: StoryArticleRead = {
+      storyId: 503,
+      url: "https://news.example.com/c",
+      status: "read",
+      method: "fetch",
+      text: "x".repeat(MAX_TEXT_CHARS + 500),
+      finalUrl: "https://news.example.com/c",
+      chars: MAX_TEXT_CHARS + 500,
+      ms: 900,
+      error: null,
+      attempts: [],
+    };
+
+    await prismaArticleStore.save([long], NOW, { issueId: 301 });
+
+    const { create, update } = prismaMock.storyArticle.upsert.mock.calls[0][0];
+    expect(create.text).toHaveLength(MAX_TEXT_CHARS);
+    expect(create).toMatchObject({ issueId: BigInt(301), chars: MAX_TEXT_CHARS + 500 });
+    expect(update.issueId).toBe(BigInt(301));
+  });
+});
+
+describe("prismaArticleStore.clearOldText", () => {
+  it("clears the text of copies read over 30 days ago, or whose issue was published over 14 days ago, in one bounded batch", async () => {
+    prismaMock.issue.findMany.mockResolvedValue([{ id: BigInt(280) }, { id: BigInt(281) }]);
+    prismaMock.storyArticle.findMany.mockResolvedValue([{ id: BigInt(7) }, { id: BigInt(9) }]);
+    prismaMock.storyArticle.updateMany.mockResolvedValue({ count: 2 });
+
+    await expect(prismaArticleStore.clearOldText(NOW)).resolves.toBe(2);
+
+    const day = 24 * 60 * 60 * 1000;
+    const readBefore = new Date(NOW.getTime() - 30 * day);
+    expect(prismaMock.issue.findMany).toHaveBeenCalledWith({
+      where: { publishedAt: { lt: new Date(NOW.getTime() - 14 * day), gte: readBefore } },
+      select: { id: true },
+    });
+    expect(prismaMock.storyArticle.findMany).toHaveBeenCalledWith({
+      where: { text: { not: null }, OR: [{ readAt: { lt: readBefore } }, { issueId: { in: [BigInt(280), BigInt(281)] } }] },
+      select: { id: true },
+      orderBy: { readAt: "asc" },
+      take: CLEAR_BATCH,
+    });
+    // Only the text goes: status, method, timings and attempts stay for the record.
+    expect(prismaMock.storyArticle.updateMany).toHaveBeenCalledWith({ where: { id: { in: [BigInt(7), BigInt(9)] } }, data: { text: null } });
+  });
+
+  it("uses only the age rule when no issue is in the window, and writes nothing when no row is due", async () => {
+    prismaMock.issue.findMany.mockResolvedValue([]);
+    prismaMock.storyArticle.findMany.mockResolvedValue([]);
+
+    await expect(prismaArticleStore.clearOldText(NOW)).resolves.toBe(0);
+
+    expect(prismaMock.storyArticle.findMany.mock.calls[0][0].where.OR).toEqual([{ readAt: { lt: new Date(NOW.getTime() - 30 * 24 * 60 * 60 * 1000) } }]);
+    expect(prismaMock.storyArticle.updateMany).not.toHaveBeenCalled();
   });
 });

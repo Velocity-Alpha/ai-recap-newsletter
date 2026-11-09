@@ -19,20 +19,24 @@ function story(id: number, url: string): ApprovedStory {
   return { id, url, headline: `Pretend story ${id}`, summary: "A made-up summary.", storyDetails: null, note: "" };
 }
 
-/** Behaves like story_articles: keyed by story and link, and only read copies are found. */
+type MemoryRow = SavedArticleRead & { issueId?: number };
+
+/** Behaves like story_articles: keyed by story and link, and only read copies with their text are found. */
 function memoryStore() {
-  const rows = new Map<string, SavedArticleRead>();
-  const store: ArticleStore = {
+  const rows = new Map<string, MemoryRow>();
+  const store = {
     findRead: vi.fn(async (keys: Array<{ storyId: number; url: string }>) =>
       keys.flatMap((key) => {
         const row = rows.get(`${key.storyId} ${key.url}`);
-        return row && row.status === "read" ? [structuredClone(row)] : [];
+        return row && row.status === "read" && row.text !== null ? [structuredClone(row)] : [];
       }),
     ),
-    save: vi.fn(async (reads: StoryArticleRead[], now: Date) => {
-      for (const read of reads) rows.set(`${read.storyId} ${read.url}`, { ...structuredClone(read), readAt: now });
+    save: vi.fn(async (reads: StoryArticleRead[], now: Date, context: { issueId?: number } = {}) => {
+      for (const read of reads) rows.set(`${read.storyId} ${read.url}`, { ...structuredClone(read), readAt: now, issueId: context.issueId });
     }),
-  };
+    // The age rules are tested in article-store.test.ts. Tests set how many rows it reports.
+    clearOldText: vi.fn<(now: Date) => Promise<number>>(async () => 0),
+  } satisfies ArticleStore;
   return { store, rows };
 }
 
@@ -87,20 +91,51 @@ describe("createDraftArticleReader", () => {
     expect(web.calls.filter((url) => url === A)).toHaveLength(2);
   });
 
-  it("goes on reading when the saved copies cannot be loaded or saved, and warns", async () => {
+  it("goes on reading when the saved copies cannot be cleared, loaded or saved, and warns", async () => {
     const web = fakeWeb({ [A]: htmlPage(prose("alpha")) });
+    const missing = () => Promise.reject(new Error('relation "story_articles" does not exist'));
     const store: ArticleStore = {
-      findRead: vi.fn(async () => Promise.reject(new Error('relation "story_articles" does not exist'))),
+      findRead: vi.fn(missing),
       save: vi.fn(async () => Promise.reject(new Error("connection reset"))),
+      clearOldText: vi.fn(missing),
     };
     const onWarning = vi.fn();
     const reader = createDraftArticleReader({ store, readOptions: { fetch: web.fetch }, onWarning, now: () => NOW });
 
     await expect(reader([story(1, A)])).resolves.toEqual([{ storyId: 1, text: expect.stringContaining("alpha") }]);
     expect(onWarning.mock.calls.map(([message]) => message)).toEqual([
+      'Could not clear old article text: relation "story_articles" does not exist',
       'Could not load saved articles, so every story was read: relation "story_articles" does not exist',
       "Could not save the articles read: connection reset",
     ]);
+  });
+
+  it("clears old saved text first, says so, and records the drafting issue on what it saves", async () => {
+    const web = fakeWeb({ [A]: htmlPage(prose("alpha")) });
+    const { store, rows } = memoryStore();
+    store.clearOldText.mockResolvedValueOnce(3);
+    const onInfo = vi.fn();
+    const reader = createDraftArticleReader({ store, readOptions: { fetch: web.fetch }, onInfo, now: () => NOW });
+
+    await reader([story(1, A)], { issueId: 301 });
+
+    expect(store.clearOldText).toHaveBeenCalledWith(NOW);
+    expect(store.clearOldText.mock.invocationCallOrder[0]).toBeLessThan(store.findRead.mock.invocationCallOrder[0]);
+    expect(onInfo).toHaveBeenCalledWith("Cleared the saved text of 3 old articles (issue published over 14 days ago, or read over 30 days ago).");
+    expect(rows.get(`1 ${A}`)).toMatchObject({ status: "read", issueId: 301 });
+  });
+
+  it("reads a story again when its saved copy's text was cleared", async () => {
+    const web = fakeWeb({ [A]: htmlPage(prose("alpha")) });
+    const { store, rows } = memoryStore();
+    const reader = createDraftArticleReader({ store, readOptions: { fetch: web.fetch }, now: () => NOW });
+
+    await reader([story(1, A)]);
+    rows.get(`1 ${A}`)!.text = null;
+    const articles = await reader([story(1, A)]);
+
+    expect(web.calls).toEqual([A, A]);
+    expect(articles).toEqual([{ storyId: 1, text: expect.stringContaining("alpha pretend lab") }]);
   });
 
   it("reads every story and saves nothing without a store (the replay script)", async () => {

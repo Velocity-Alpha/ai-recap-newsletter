@@ -4,6 +4,7 @@ import {
   prismaArticleStore,
   readerOptionsFromEnv,
   type ArticleReadReport,
+  type ReadContext,
 } from "@/src/pipeline/draft/articles";
 import {
   FEATURE_SECTIONS,
@@ -49,8 +50,8 @@ export interface ProduceDraftInput {
   draft: { id: number; version: number };
 }
 
-/** Reads the articles of feature-section stories. */
-export type ReadArticles = (stories: ApprovedStory[]) => Promise<ArticleText[]>;
+/** Reads the articles of feature-section stories, for the issue being drafted. */
+export type ReadArticles = (stories: ApprovedStory[], context?: ReadContext) => Promise<ArticleText[]>;
 export type MakeImage = (input: FeaturedImageInput) => Promise<FeaturedImage>;
 export type CreateTemplate = (input: DraftTemplateInput) => Promise<DraftTemplateResult>;
 
@@ -128,7 +129,7 @@ export async function produceDraft(input: ProduceDraftInput, deps: ProduceDraftD
 
   const { stories: sections, issue, draft } = input;
 
-  const articles = await step("read_articles", () => readArticles(featureStories(sections)));
+  const articles = await step("read_articles", () => readArticles(featureStories(sections), { issueId: issue.id }));
   partial.unreadStoryIds = unreadArticleStoryIds(sections, articles);
 
   const content = await step("write", () => deps.writer({ sections, leadStoryId: input.outline.leadStoryId, articles }));
@@ -183,6 +184,8 @@ export interface DraftDepsOptions {
   onArticleReads?: (reads: ArticleReadReport[]) => void | Promise<void>;
   /** Gets saved-copy problems, which never fail the step. */
   onArticleWarning?: (message: string) => void | Promise<void>;
+  /** Gets other read-step news, such as old saved text cleared. */
+  onArticleInfo?: (message: string) => void | Promise<void>;
 }
 
 /** The real services. GHL only sends in production; elsewhere `record` gets each call. */
@@ -191,12 +194,14 @@ export function createDraftDeps(
   options: DraftDepsOptions = {},
 ): Omit<ProduceDraftDeps, "onStep" | "now"> {
   return {
-    // Reuses each story's saved copy, reads the rest (#115 order, 60 s deadline), and saves what it read (#120).
+    // Clears old saved text, reuses each story's saved copy, reads the rest (#115 order, 60 s deadline), and saves
+    // what it read (#120).
     readArticles: createDraftArticleReader({
       store: prismaArticleStore,
       readOptions: readerOptionsFromEnv(env),
       onReads: options.onArticleReads,
       onWarning: options.onArticleWarning,
+      onInfo: options.onArticleInfo,
     }),
     // Built per call, so a missing OPENAI_API_KEY fails the write step with a plain message.
     writer: (input) => createOpenAIIssueWriter({ apiKey: env.OPENAI_API_KEY })(input),

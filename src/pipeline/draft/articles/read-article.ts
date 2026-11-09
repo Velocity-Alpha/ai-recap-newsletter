@@ -1,4 +1,5 @@
 import { assertPublicUrl, RefusedUrlError } from "@/src/pipeline/draft/articles/address-guard";
+import { defaultHtmlParser, type HtmlParser } from "@/src/pipeline/draft/articles/html-worker";
 import type { FetchLike, HostLimiter } from "@/src/pipeline/draft/articles/http";
 import { readWithJina } from "@/src/pipeline/draft/articles/jina";
 import { checkArticleText, type ArticleStatus, type NotReadStatus } from "@/src/pipeline/draft/articles/quality";
@@ -10,6 +11,8 @@ import { MethodError, type ArticleMethod, type MethodContext, type MethodText } 
  * Reads one article with the #115 order: a site adapter when the host has one (20 s), then the page with
  * Readability (12 s), then Jina Reader (30 s). The first text that passes the quality check wins. When none
  * does, the article is unread, and its status is the strongest reason seen: paywalled, then blocked, then failed.
+ * A method's timeout starts when its first request gets a host slot, so waiting behind other stories on the same
+ * host does not use it up. A link the address guard refuses, at any hop, stops the chain: Jina is not asked either.
  */
 
 export interface MethodTimeouts {
@@ -58,6 +61,8 @@ export interface ReadArticleOptions {
   signal?: AbortSignal;
   timeouts?: Partial<MethodTimeouts>;
   limiter?: HostLimiter;
+  /** The text work. Defaults to the text worker when it can start (the Netlify function), this thread otherwise. */
+  parse?: HtmlParser;
   jinaApiKey?: string;
   githubToken?: string;
 }
@@ -121,17 +126,25 @@ export async function readArticle(url: string, options: ReadArticleOptions): Pro
   }
 
   const timeouts = { ...DEFAULT_TIMEOUTS, ...options.timeouts };
+  const parse = options.parse ?? defaultHtmlParser();
   for (const step of stepsFor(url, timeouts)) {
     if (options.signal?.aborted) break;
 
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(new MethodTimeout(step.timeoutMs)), step.timeoutMs);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const startClock = () => {
+      timer ??= setTimeout(() => controller.abort(new MethodTimeout(step.timeoutMs)), step.timeoutMs);
+    };
+    // With no limiter there is no slot to wait for, so the clock starts now.
+    if (!options.limiter) startClock();
     const onDeadline = () => controller.abort(options.signal?.reason);
     options.signal?.addEventListener("abort", onDeadline, { once: true });
     const context: MethodContext = {
       fetch: options.fetch,
       signal: controller.signal,
+      parse,
       limiter: options.limiter,
+      onStart: startClock,
       jinaApiKey: options.jinaApiKey,
       githubToken: options.githubToken,
     };
@@ -159,6 +172,8 @@ export async function readArticle(url: string, options: ReadArticleOptions): Pro
     } catch (error) {
       const outcome = error instanceof MethodError ? error.status : "failed";
       attempts.push({ method: step.method, ms: now() - attemptStarted, chars: 0, outcome, error: errorMessage(error) });
+      // A redirect or DNS answer pointing at a private address: no other method should go there either.
+      if (error instanceof RefusedUrlError) break;
     } finally {
       clearTimeout(timer);
       options.signal?.removeEventListener("abort", onDeadline);

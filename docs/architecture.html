@@ -104,6 +104,7 @@ Terms: GLOSSARY.md. One issue per date; each commit makes a new draft with its o
          -> draft.owner = native: story changes in one transaction, start draft-issue    <span class="plan">planned</span> #79
             find or create the issue for the date; new issue_drafts row, version n+1     #76
             read articles of feature-section stories (saved per story; methods from #115) #120
+              (pages are parsed in a worker thread with a 256 MB heap, stopped at the method timeout)
             gpt-6-luna writes the issue (fixed n8n prompt, no web search unless #115 says so)
             gpt-6-luna scene prompt -> Vertex Gemini image (fixed style) -> S3            #77
             TypeScript email template (data-issue-id, data-story-id, data-src-url, data-draft-id)
@@ -179,7 +180,7 @@ Later: pre-send review in the app before the GHL template (#117)
   <tr><td><code>pipeline_runs</code>, <code>pipeline_events</code></td><td>Job runs and their step logs</td><td>native jobs</td></tr>
   <tr><td><code>publish_events</code></td><td>Each seed email seen by publish detection and the decision, and which draft was sent (<code>draft_id</code>)</td><td>native publish</td></tr>
   <tr><td><code>issue_drafts</code></td><td>Each draft of an issue, version 1, 2, ... (one per commit): status, current or failed step, content, html, image, GHL template</td><td>native <code>draft-issue</code> (not live yet)</td></tr>
-  <tr><td><code>story_articles</code></td><td>The saved copy of each story's article, per story and link: status (read, paywalled, blocked, failed), method, text, read time. A read copy is reused by later drafts; an edited link is read again.</td><td>native <code>draft-issue</code> (not live yet; migration not applied yet)</td></tr>
+  <tr><td><code>story_articles</code></td><td>The saved copy of each story's article, per story and link: status (read, paywalled, blocked, failed), method, text (at most 50,000 characters), read time, and the issue whose draft read it. A read copy is reused by later drafts; an edited link is read again. Each draft job first clears the text (not the row) of up to 200 copies whose issue was published over 14 days ago or that were read over 30 days ago.</td><td>native <code>draft-issue</code> (not live yet; migration not applied yet)</td></tr>
   <tr><td><code>alerts</code></td><td>Open and resolved incidents, one open row per <code>incident_key</code></td><td><code>raiseAlert()</code> (no callers yet)</td></tr>
   <tr><td><code>public.schema_migrations</code></td><td>Legacy migration record</td><td>none</td></tr>
 </table>

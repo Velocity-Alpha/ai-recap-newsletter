@@ -1,4 +1,4 @@
-import type { ArticleStore } from "@/src/pipeline/draft/articles/article-store";
+import { KEEP_AFTER_PUBLISH_DAYS, KEEP_TEXT_DAYS, type ArticleStore } from "@/src/pipeline/draft/articles/article-store";
 import {
   readArticles,
   toArticleText,
@@ -10,9 +10,15 @@ import type { ApprovedStory } from "@/src/pipeline/draft/content";
 import type { ArticleText } from "@/src/pipeline/draft/writer";
 
 /**
- * The draft's read-articles step (#120): reuse each story's saved copy when its link has one, read the rest, save
- * what was read, and report every story's outcome so the run log can say why a story was not read.
+ * The draft's read-articles step (#120): clear old saved text, reuse each story's saved copy when its link has one,
+ * read the rest, save what was read, and report every story's outcome so the run log can say why a story was not
+ * read.
  */
+
+/** Which draft is reading: the saved copies record the issue, for the clean-up. */
+export interface ReadContext {
+  issueId?: number;
+}
 
 export interface ArticleReadReport extends StoryArticleRead {
   /** True when a saved copy from an earlier commit was used. */
@@ -30,6 +36,8 @@ export interface DraftArticleReaderOptions {
   onReads?: (reads: ArticleReadReport[]) => void | Promise<void>;
   /** A saved-copy problem. It never fails the step: drafting reads the articles again instead. */
   onWarning?: (message: string) => void | Promise<void>;
+  /** Other news for the run log, such as how many old copies had their text cleared. */
+  onInfo?: (message: string) => void | Promise<void>;
   now?: () => Date;
   /** Replaces the reads (tests). */
   read?: (stories: Array<{ id: number; url: string }>, options: ReadArticlesOptions) => Promise<ReadArticlesResult>;
@@ -44,14 +52,26 @@ function message(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-export function createDraftArticleReader(options: DraftArticleReaderOptions): (stories: ApprovedStory[]) => Promise<ArticleText[]> {
+export function createDraftArticleReader(
+  options: DraftArticleReaderOptions,
+): (stories: ApprovedStory[], context?: ReadContext) => Promise<ArticleText[]> {
   const now = options.now ?? (() => new Date());
   const read = options.read ?? readArticles;
 
-  return async (stories) => {
+  return async (stories, context = {}) => {
     const keys = stories.map((story) => ({ storyId: story.id, url: story.url }));
     const saved = new Map<number, ArticleReadReport>();
     if (options.store) {
+      try {
+        const cleared = await options.store.clearOldText(now());
+        if (cleared > 0) {
+          await options.onInfo?.(
+            `Cleared the saved text of ${cleared} old ${cleared === 1 ? "article" : "articles"} (issue published over ${KEEP_AFTER_PUBLISH_DAYS} days ago, or read over ${KEEP_TEXT_DAYS} days ago).`,
+          );
+        }
+      } catch (error) {
+        await options.onWarning?.(`Could not clear old article text: ${message(error)}`);
+      }
       try {
         for (const copy of await options.store.findRead(keys)) saved.set(copy.storyId, { ...copy, reused: true });
       } catch (error) {
@@ -63,7 +83,7 @@ export function createDraftArticleReader(options: DraftArticleReaderOptions): (s
     const fresh = toRead.length > 0 ? await read(toRead, options.readOptions ?? {}) : { articles: [], reads: [] };
     if (options.store && fresh.reads.length > 0) {
       try {
-        await options.store.save(fresh.reads, now());
+        await options.store.save(fresh.reads, now(), { issueId: context.issueId });
       } catch (error) {
         await options.onWarning?.(`Could not save the articles read: ${message(error)}`);
       }

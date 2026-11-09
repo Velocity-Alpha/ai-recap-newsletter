@@ -1,5 +1,4 @@
 import { fetchText } from "@/src/pipeline/draft/articles/http";
-import { markdownToText } from "@/src/pipeline/draft/articles/text";
 import { MethodError, PAGE_MAX_BYTES, READER_USER_AGENT, type MethodContext, type MethodText } from "@/src/pipeline/draft/articles/types";
 
 /**
@@ -38,7 +37,7 @@ export async function readWithJina(url: string, context: MethodContext): Promise
   }
 
   return {
-    text: markdownToText(body.data.content ?? ""),
+    text: await context.parse({ kind: "markdown", text: body.data.content ?? "" }, context.signal),
     httpStatus: typeof body.data.httpStatus === "number" ? body.data.httpStatus : 200,
     finalUrl: body.data.url ?? url,
   };

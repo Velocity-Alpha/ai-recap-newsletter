@@ -24,6 +24,18 @@ export function htmlPage(text: string, status = 200): () => Response {
   return () => new Response(body, { status, headers: { "content-type": "text/html; charset=utf-8" } });
 }
 
+/** Generated hostile HTML (#120 review). Each kind made Readability run for seconds to minutes, or run out of memory. */
+export const hostileHtml = {
+  /** Tags nested `levels` deep. 4,000 levels took 122 s. */
+  deep: (levels: number) => `<html><body>${"<div>".repeat(levels)}Pretend text.${"</div>".repeat(levels)}</body></html>`,
+  /** `count` tiny elements. 600,000 (4.8 MB) used over 700 MB. */
+  tiny: (count: number) => `<html><body>${"<b>x</b>".repeat(count)}</body></html>`,
+};
+
+export function rawHtml(html: string): () => Response {
+  return () => new Response(html, { headers: { "content-type": "text/html; charset=utf-8" } });
+}
+
 export function jinaAnswer(url: string, text: string, httpStatus = 200): () => Response {
   return () =>
     new Response(JSON.stringify({ code: 200, status: 20000, data: { url, content: text, httpStatus } }), {

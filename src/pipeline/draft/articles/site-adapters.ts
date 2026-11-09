@@ -1,7 +1,4 @@
-import { parseHTML } from "linkedom";
-
 import { fetchText } from "@/src/pipeline/draft/articles/http";
-import { htmlToText, markdownToText, type TextNodeLike } from "@/src/pipeline/draft/articles/text";
 import { ADAPTER_MAX_BYTES, READER_USER_AGENT, type ArticleMethod, type MethodContext, type MethodText } from "@/src/pipeline/draft/articles/types";
 
 /**
@@ -40,18 +37,6 @@ const HF_RESERVED = new Set([
 
 const MARKDOWN_HEADERS = { "User-Agent": READER_USER_AGENT, Accept: "text/plain, text/markdown;q=0.9, */*;q=0.5" };
 
-/** The arXiv paper's text: drops the references, appendices and contents list, and writes math as its TeX. */
-export function arxivPaperText(html: string): string {
-  const { document } = parseHTML(html);
-  const paper = document.querySelector("article.ltx_document") ?? document.querySelector("article") ?? document.body;
-  if (!paper) return "";
-  for (const node of paper.querySelectorAll(".ltx_bibliography, .ltx_appendix, nav, .ltx_pagination, .ltx_page_navbar")) node.remove();
-  for (const math of paper.querySelectorAll("math")) {
-    math.replaceWith(document.createTextNode(` ${math.getAttribute("alttext") ?? ""} `));
-  }
-  return htmlToText(paper as unknown as TextNodeLike);
-}
-
 function arxivAdapter(id: string): SiteAdapter {
   const source = `https://arxiv.org/html/${id}`;
   return {
@@ -59,7 +44,8 @@ function arxivAdapter(id: string): SiteAdapter {
     source,
     async read(context) {
       const page = await fetchText(source, { ...context, headers: { "User-Agent": READER_USER_AGENT, Accept: "text/html" }, maxBytes: ADAPTER_MAX_BYTES });
-      const text = page.status < 400 ? arxivPaperText(page.body) : "";
+      // The paper's text (html-text.ts arxivPaperText), in the text worker.
+      const text = page.status < 400 ? await context.parse({ kind: "arxiv", html: page.body }, context.signal) : "";
       return { text, httpStatus: page.status, finalUrl: page.url };
     },
   };
@@ -73,7 +59,8 @@ function markdownAdapter(method: SiteAdapter["method"], link: string, source: st
       const auth: Record<string, string> = method === "github" && context.githubToken ? { Authorization: `Bearer ${context.githubToken}` } : {};
       const file = await fetchText(source, { ...context, headers: { ...headers, ...auth }, maxBytes: ADAPTER_MAX_BYTES });
       // The story's link stays the final URL: the README is the repo or model page's own text.
-      return { text: file.status < 400 ? markdownToText(file.body) : "", httpStatus: file.status, finalUrl: link };
+      const text = file.status < 400 ? await context.parse({ kind: "markdown", text: file.body }, context.signal) : "";
+      return { text, httpStatus: file.status, finalUrl: link };
     },
   };
 }
