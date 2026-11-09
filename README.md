@@ -193,6 +193,7 @@ Required environment variables:
 - `SESSION_SECRET` — signs subscriber sessions and, through derived keys, the job tokens (cache refresh, ingest start)
 - `OPENAI_API_KEY` — story extraction in the ingest job
 - `TELEGRAM_REVIEW_BOT_TOKEN` — production only; the ingest job's "stories are ready" message
+- `TELEGRAM_OPS_CHAT_ID` — production only; the "AI Recap Ops" chat where the review bot posts ops alerts (`src/pipeline/notify/`). Never the review group. Without it, alerts are not sent.
 - `RESEND_API_KEY`
 - `RESEND_FROM_NAME`
 - `RESEND_FROM_EMAIL`
