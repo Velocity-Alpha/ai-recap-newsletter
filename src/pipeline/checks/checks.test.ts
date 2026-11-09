@@ -46,6 +46,13 @@ function keys(outcome: CheckOutcome): string[] {
   return outcome.findings.map((finding) => finding.incidentKey);
 }
 
+function notes(outcome: CheckOutcome): string[] {
+  if (outcome.status !== "checked") throw new Error("expected checks to run");
+  return outcome.notes;
+}
+
+const RUNNING = { id: "41", status: "running", startedAt: new Date("2026-11-10T14:55:00Z") };
+
 const SOURCE_KEYS = ["rundown_ai", "ai_breakfast", "the_signal", "tldr", "alphasignal", "product_hunt_ai", "huggingface"];
 
 describe("10:05 stories check", () => {
@@ -80,13 +87,42 @@ describe("10:05 stories check", () => {
     });
   });
 
-  it("raises a critical for a missing ingest run, plus the empty day", () => {
-    const found = failures(run("10:05", missingRun()));
+  it("raises a critical for a missing ingest run and the empty day, and no per-source warnings", () => {
+    const outcome = run("10:05", missingRun());
+    const found = failures(outcome);
 
+    expect(Object.keys(found).sort()).toEqual(["ingest-run-missing:2026-11-10", "stories-thin:2026-11-10"]);
     expect(found["ingest-run-missing:2026-11-10"]).toMatchObject({ severity: "critical" });
     expect(found["ingest-run-missing:2026-11-10"].evidence).toContain("ingest-stories");
     expect(found["stories-thin:2026-11-10"]).toMatchObject({ severity: "critical" });
-    for (const key of SOURCE_KEYS) expect(found[`source-empty:${key}:2026-11-10`]).toMatchObject({ severity: "warning" });
+    // Not judged at all, so open source incidents are neither raised nor resolved.
+    expect(keys(outcome).filter((key) => key.startsWith("source-empty:"))).toEqual([]);
+    expect(notes(outcome)).toEqual([expect.stringContaining("per-source checks are left to the critical")]);
+  });
+
+  it("leaves the per-source checks to the critical when the run is missing, even with some stories", () => {
+    const outcome = run("10:05", thinDay({ ingestRun: null }));
+    expect(keys(outcome).filter((key) => key.startsWith("source-empty:"))).toEqual([]);
+    expect(failures(outcome)["ingest-run-missing:2026-11-10"]).toBeDefined();
+  });
+
+  it("waits for an ingest run still running at 10:05, and judges the stories at 12:00", () => {
+    const early = run("10:05", thinDay({ ingestRun: RUNNING }));
+    expect(keys(early)).toEqual(["ingest-run-missing:2026-11-10"]);
+    expect(failures(early)).toEqual({});
+    expect(notes(early)).toEqual([
+      "Ingest run 41 is still running at 10:05, so the story total and per-source checks wait until 12:00.",
+    ]);
+
+    const noon = failures(run("12:00", thinDay({ ingestRun: RUNNING })));
+    expect(noon["stories-thin:2026-11-10"]).toBeDefined();
+    expect(noon["source-empty:alphasignal:2026-11-10"]).toBeDefined();
+  });
+
+  it("raises a critical for a day without stories even without history", () => {
+    const found = failures(run("10:05", missingRun({ ingestRun: normalDay().ingestRun, weekdayTotals: [], sourceWeekdays: {} })));
+    expect(found["stories-thin:2026-11-10"]).toMatchObject({ severity: "critical", what: "No stories today." });
+    expect(found["stories-thin:2026-11-10"].evidence).toContain("no Tuesday history yet");
   });
 
   it("does not look for an ingest run while n8n owns ingestion", () => {
@@ -109,8 +145,11 @@ describe("10:05 stories check", () => {
   });
 
   it("warns about every empty source without any history", () => {
-    const found = failures(run("10:05", missingRun({ weekdayTotals: [], sourceWeekdays: {} })));
-    for (const key of SOURCE_KEYS) expect(found[`source-empty:${key}:2026-11-10`]).toBeDefined();
+    const found = failures(run("10:05", normalDay({ storiesBySource: { tldr: 5 }, weekdayTotals: [], sourceWeekdays: {} })));
+    for (const key of SOURCE_KEYS.filter((key) => key !== "tldr")) {
+      expect(found[`source-empty:${key}:2026-11-10`]).toBeDefined();
+    }
+    expect(found["source-empty:tldr:2026-11-10"]).toBeUndefined();
   });
 });
 

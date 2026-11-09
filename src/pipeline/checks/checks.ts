@@ -46,7 +46,8 @@ export interface SiteFacts {
 export type Failure = { severity: AlertSeverity; what: string; evidence: string; link: string };
 /** `failure` is null when the check passes, which resolves its incident. */
 export type Finding = { check: CheckName; incidentKey: string; failure: Failure | null };
-export type CheckOutcome = { status: "skipped" } | { status: "checked"; findings: Finding[] };
+/** `notes` are info lines for the run log, e.g. why a check was not judged this time. */
+export type CheckOutcome = { status: "skipped" } | { status: "checked"; findings: Finding[]; notes: string[] };
 
 export interface CheckContext {
   /** Read only when the issue is published at 18:00 (needsSiteCheck). */
@@ -90,12 +91,9 @@ export function ingestRunNote(facts: DayFacts): string {
   return facts.ingestRun ? `Ingest run ${facts.ingestRun.id}: ${facts.ingestRun.status}.` : "No ingest run today.";
 }
 
-function storyChecks(facts: DayFacts, context: CheckContext): Finding[] {
+function ingestRunCheck(facts: DayFacts, runMissing: boolean, context: CheckContext): Finding {
   const { date } = facts;
-  const findings: Finding[] = [];
-
-  const runMissing = facts.ingestOwner === "native" && !facts.ingestRun;
-  findings.push({
+  return {
     check: "ingest-run",
     incidentKey: keyFor("ingest-run", date),
     failure: runMissing
@@ -106,30 +104,45 @@ function storyChecks(facts: DayFacts, context: CheckContext): Finding[] {
           link: context.runLink,
         }
       : null,
-  });
+  };
+}
 
+function thinCheck(facts: DayFacts, context: CheckContext): Finding {
+  const { date } = facts;
   const usual = median(facts.weekdayTotals);
   const floor = usual === null ? null : usual * THIN_SHARE;
   const weekday = WEEKDAY_NAMES[facts.weekday];
-  findings.push({
+  // Without history only an empty day is clearly wrong.
+  const thin = floor === null ? facts.storyTotal === 0 : facts.storyTotal < floor;
+  const usualNote =
+    floor === null
+      ? `There is no ${weekday} history yet.`
+      : `The 8-week ${weekday} median is ${usual}, so the floor is ${floor}.`;
+  return {
     check: "stories-thin",
     incidentKey: keyFor("stories-thin", date),
-    failure:
-      floor !== null && facts.storyTotal < floor
-        ? {
-            severity: "critical",
-            what: `Only ${stories(facts.storyTotal)} today, under half the usual ${weekday}.`,
-            evidence: `${stories(facts.storyTotal)} ingested on ${date}. The 8-week ${weekday} median is ${usual}, so the floor is ${floor}. ${ingestRunNote(facts)}`,
-            link: context.runLink,
-          }
-        : null,
-  });
+    failure: thin
+      ? {
+          severity: "critical",
+          what:
+            facts.storyTotal === 0
+              ? "No stories today."
+              : `Only ${stories(facts.storyTotal)} today, under half the usual ${weekday}.`,
+          evidence: `${stories(facts.storyTotal)} ingested on ${date}. ${usualNote} ${ingestRunNote(facts)}`,
+          link: context.runLink,
+        }
+      : null,
+  };
+}
 
+function sourceChecks(facts: DayFacts, context: CheckContext): Finding[] {
+  const { date } = facts;
+  const weekday = WEEKDAY_NAMES[facts.weekday];
   const historyDays = facts.weekdayTotals.length;
-  for (const source of STORY_SOURCES) {
+  return STORY_SOURCES.map((source) => {
     const empty = (facts.storiesBySource[source.key] ?? 0) === 0;
     const sentOn = facts.sourceWeekdays[source.key] ?? 0;
-    findings.push({
+    return {
       check: "source-empty",
       incidentKey: keyFor("source-empty", date, source.key),
       failure:
@@ -141,9 +154,30 @@ function storyChecks(facts: DayFacts, context: CheckContext): Finding[] {
               link: context.runLink,
             }
           : null,
-    });
+    };
+  });
+}
+
+/**
+ * The 10:05 checks. Two cases are not judged, so their open incidents are neither raised nor resolved:
+ * - the ingest run is still running at 10:05 (it can take up to 15 minutes): the story checks wait for 12:00;
+ * - no stories or no ingest run: the per-source warnings would only repeat the critical.
+ */
+function storyChecks(time: CheckTime, facts: DayFacts, context: CheckContext): { findings: Finding[]; notes: string[] } {
+  const runMissing = facts.ingestOwner === "native" && !facts.ingestRun;
+  const findings = [ingestRunCheck(facts, runMissing, context)];
+
+  if (time === "10:05" && facts.ingestRun?.status === "running") {
+    const note = `Ingest run ${facts.ingestRun.id} is still running at 10:05, so the story total and per-source checks wait until 12:00.`;
+    return { findings, notes: [note] };
   }
-  return findings;
+
+  findings.push(thinCheck(facts, context));
+  if (runMissing || facts.storyTotal === 0) {
+    const missing = [runMissing && "no ingest run", facts.storyTotal === 0 && "no stories"].filter(Boolean).join(" and ");
+    return { findings, notes: [`${missing[0].toUpperCase()}${missing.slice(1)} today, so the per-source checks are left to the critical.`] };
+  }
+  return { findings: [...findings, ...sourceChecks(facts, context)], notes: [] };
 }
 
 /**
@@ -244,10 +278,10 @@ export function needsSiteCheck(time: CheckTime, facts: DayFacts): boolean {
 /** Runs every check due at `time`. A skipped date runs none. */
 export function evaluateChecks(time: CheckTime, facts: DayFacts, context: CheckContext): CheckOutcome {
   if (facts.skipped) return { status: "skipped" };
-  const findings = storyChecks(facts, context);
+  const { findings, notes } = storyChecks(time, facts, context);
   if (isDue("commit", time)) findings.push(commitCheck(facts, context));
   if (isDue("draft", time)) {
     findings.push(draftCheck(facts, context), publishCheck(facts, context), siteCheck(facts, context));
   }
-  return { status: "checked", findings };
+  return { status: "checked", findings, notes };
 }

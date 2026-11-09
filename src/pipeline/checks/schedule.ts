@@ -23,8 +23,13 @@ export const WEEKDAY_NAMES: Record<Weekday, string> = {
 
 const TIME_ZONE = "America/New_York";
 const WEEKDAYS = new Set<Weekday>(["Mon", "Tue", "Wed", "Thu", "Fri"]);
-/** A fire acts if it lands this many minutes after a check time or less. The next fire is 5 minutes on. */
+/**
+ * A fire acts from 1 minute before a check time to 4 minutes after it. The other fires of the hour are
+ * 5 minutes away, so exactly one fire acts per check time.
+ */
+const EARLY_MINUTES = 1;
 const LATE_MINUTES = 4;
+const DAY_MS = 24 * 3_600_000;
 
 const newYorkParts = new Intl.DateTimeFormat("en-US", {
   timeZone: TIME_ZONE,
@@ -57,6 +62,11 @@ export function newYorkDay(date: Date): { date: string; weekday: Weekday } {
   return { date: day, weekday };
 }
 
+/** A date key (YYYY-MM-DD) moved by whole days. */
+export function shiftDate(date: string, days: number): string {
+  return new Date(new Date(`${date}T00:00:00Z`).getTime() + days * DAY_MS).toISOString().slice(0, 10);
+}
+
 /** An instant as a New York wall time, "HH:MM". */
 export function newYorkClock(date: Date): string {
   const { minutes } = partsOf(date);
@@ -74,9 +84,14 @@ export function newYorkTime(date: string, time: string): Date {
   return new Date(wall + 5 * 3_600_000);
 }
 
-/** The check time this instant acts as, or null: weekdays only, within a few minutes after the time. */
+/** The check time this instant acts as, or null: weekdays only, from 1 minute early to 4 minutes late. */
 export function checkTimeAt(date: Date): CheckTime | null {
   const { weekday, minutes } = partsOf(date);
   if (!WEEKDAYS.has(weekday)) return null;
-  return CHECK_TIMES.find((time) => minutes - minutesOf(time) >= 0 && minutes - minutesOf(time) <= LATE_MINUTES) ?? null;
+  return (
+    CHECK_TIMES.find((time) => {
+      const offset = minutes - minutesOf(time);
+      return offset >= -EARLY_MINUTES && offset <= LATE_MINUTES;
+    }) ?? null
+  );
 }

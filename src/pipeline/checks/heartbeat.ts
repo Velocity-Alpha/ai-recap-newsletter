@@ -1,3 +1,5 @@
+import { CALL_TIMEOUT_MS } from "@/src/pipeline/checks/deadline";
+
 /**
  * The heartbeat (GLOSSARY.md): after the 18:00 summary, ping Healthchecks.io. If a weekday ping does not
  * arrive, Healthchecks.io emails the owner. When the summary did not reach the ops chat, ping the check's
@@ -9,8 +11,6 @@ export type HeartbeatResult =
   | { status: "failed"; reason: string }
   | { status: "not_configured" }
   | { status: "not_production" };
-
-const TIMEOUT_MS = 10_000;
 
 export async function pingHeartbeat(options: {
   env: Record<string, string | undefined>;
@@ -29,7 +29,7 @@ export async function pingHeartbeat(options: {
     const response = await send(options.ok ? url : `${url}/fail`, {
       method: "POST",
       body: options.body,
-      signal: AbortSignal.timeout(TIMEOUT_MS),
+      signal: AbortSignal.timeout(CALL_TIMEOUT_MS),
     });
     return response.ok ? { status: "sent" } : { status: "failed", reason: `HTTP ${response.status}` };
   } catch (error) {

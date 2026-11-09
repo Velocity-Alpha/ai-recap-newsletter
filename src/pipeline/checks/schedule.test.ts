@@ -7,6 +7,7 @@ import {
   newYorkClock,
   newYorkDay,
   newYorkTime,
+  shiftDate,
 } from "@/src/pipeline/checks/schedule";
 
 /** The UTC instants a 5-field cron with plain lists and ranges fires at on one UTC day. */
@@ -59,6 +60,15 @@ describe("check schedule", () => {
     expect(checkTimeAt(new Date("2026-07-06T22:00:00Z"))).toBe("18:00"); // 18:00 EDT
   });
 
+  it("accepts a fire from 1 minute early to 4 minutes late", () => {
+    expect(checkTimeAt(new Date("2026-11-09T15:04:00Z"))).toBe("10:05"); // 10:04 EST
+    expect(checkTimeAt(new Date("2026-11-09T15:03:59Z"))).toBeNull(); // 10:03 EST
+    expect(checkTimeAt(new Date("2026-11-09T15:09:59Z"))).toBe("10:05"); // 10:09 EST
+    expect(checkTimeAt(new Date("2026-11-09T15:10:00Z"))).toBeNull(); // 10:10 EST
+    expect(checkTimeAt(new Date("2026-07-06T15:59:30Z"))).toBe("12:00"); // 11:59 EDT
+    expect(checkTimeAt(new Date("2026-11-09T22:59:00Z"))).toBe("18:00"); // 17:59 EST
+  });
+
   it("never acts on a weekend", () => {
     expect(checkTimeAt(new Date("2026-11-07T15:05:00Z"))).toBeNull(); // Sat 10:05 EST
     expect(checkTimeAt(new Date("2026-11-08T23:00:00Z"))).toBeNull(); // Sun 18:00 EST
@@ -76,6 +86,14 @@ describe("newYorkTime", () => {
   it("turns a New York wall time into an instant in either offset", () => {
     expect(newYorkTime("2026-11-09", "00:00").toISOString()).toBe("2026-11-09T05:00:00.000Z");
     expect(newYorkTime("2026-07-06", "18:00").toISOString()).toBe("2026-07-06T22:00:00.000Z");
+  });
+});
+
+describe("shiftDate", () => {
+  it("moves a date key by whole days, across months and the daylight-saving switch", () => {
+    expect(shiftDate("2026-11-02", -3)).toBe("2026-10-30");
+    expect(shiftDate("2026-11-30", 1)).toBe("2026-12-01");
+    expect(shiftDate("2026-03-09", -7)).toBe("2026-03-02");
   });
 });
 

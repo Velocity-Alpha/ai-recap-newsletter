@@ -1,10 +1,9 @@
 import type { SiteFacts } from "@/src/pipeline/checks/checks";
+import { CALL_TIMEOUT_MS } from "@/src/pipeline/checks/deadline";
 
 /** The 18:00 site check reads only the public site: the issue page and the home page. */
 
 export const PUBLIC_SITE_URL = "https://airecap.news";
-
-const TIMEOUT_MS = 10_000;
 
 const ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " };
 
@@ -25,7 +24,7 @@ export function htmlContainsText(html: string, text: string): boolean {
 
 async function readPage(url: string, fetchPage: typeof fetch): Promise<{ status: number | null; body: string; error?: string }> {
   try {
-    const response = await fetchPage(url, { signal: AbortSignal.timeout(TIMEOUT_MS) });
+    const response = await fetchPage(url, { signal: AbortSignal.timeout(CALL_TIMEOUT_MS) });
     return { status: response.status, body: response.ok ? await response.text() : "" };
   } catch (error) {
     return { status: null, body: "", error: error instanceof Error ? error.message : String(error) };

@@ -1,4 +1,4 @@
-import { newYorkTime, type Weekday } from "@/src/pipeline/checks/schedule";
+import { newYorkTime, shiftDate, type Weekday } from "@/src/pipeline/checks/schedule";
 import { dateOnly, findSkippedDate } from "@/src/pipeline/checks/skipped-dates";
 import { readSetting } from "@/src/pipeline/settings";
 import { prisma } from "@/src/server/prisma";
@@ -35,6 +35,8 @@ export interface DayFacts {
   draftReady: boolean;
   /** The published issue for this date, else the latest ready draft. */
   issue: { id: string; slug: string | null; title: string; publishedAt: Date | null } | null;
+  /** Facts that could not be read and fell back to a default. The run logs them as warnings. */
+  warnings: string[];
 }
 
 // Copied, not imported: run-ingest.ts would pull the OpenAI and Gmail clients into this function's bundle.
@@ -42,16 +44,11 @@ const INGEST_JOB = "ingest-stories";
 const INGEST_OWNER_KEY = "ingest.owner";
 
 const HISTORY_WEEKS = 8;
-const DAY_MS = 24 * 3_600_000;
 const WEEKDAYS: Weekday[] = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
-function shiftDays(date: string, days: number): string {
-  return new Date(dateOnly(date).getTime() + days * DAY_MS).toISOString().slice(0, 10);
-}
 
 /** The New York day as a UTC range: 23 or 25 hours on the daylight-saving switch days. */
 function newYorkDayRange(date: string): { gte: Date; lt: Date } {
-  return { gte: newYorkTime(date, "00:00"), lt: newYorkTime(shiftDays(date, 1), "00:00") };
+  return { gte: newYorkTime(date, "00:00"), lt: newYorkTime(shiftDate(date, 1), "00:00") };
 }
 
 /** Stories created in the range, by source. A missing source counts as "unknown". */
@@ -83,12 +80,20 @@ function earliest(...dates: Array<Date | null>): Date | null {
  * `issue_drafts` with status `ready` (#76) here. The checks do not change.
  */
 export async function readDayFacts(date: string): Promise<DayFacts> {
+  const warnings: string[] = [];
+  // A missing skipped_dates table (migration not applied) must not stop the checks: the date counts as not
+  // skipped, and the run log says why.
+  const readSkipped = findSkippedDate(date).catch((error: unknown) => {
+    const reason = (error instanceof Error ? error.message : String(error)).replace(/\s+/g, " ").trim().slice(0, 300);
+    warnings.push(`Could not read skipped_dates, so ${date} counts as not skipped: ${reason}`);
+    return null;
+  });
   const day = dateOnly(date);
   const today = newYorkDayRange(date);
-  const history = Array.from({ length: HISTORY_WEEKS }, (_, index) => newYorkDayRange(shiftDays(date, -7 * (index + 1))));
+  const history = Array.from({ length: HISTORY_WEEKS }, (_, index) => newYorkDayRange(shiftDate(date, -7 * (index + 1))));
 
   const [skipped, ingestOwner, ingestRun, storiesBySource, historyBySource, queued, drafts, readyIssues] = await Promise.all([
-    findSkippedDate(date),
+    readSkipped,
     readSetting(INGEST_OWNER_KEY),
     prisma.pipelineRun.findFirst({
       where: { job: INGEST_JOB, startedAt: today },
@@ -136,5 +141,6 @@ export async function readDayFacts(date: string): Promise<DayFacts> {
     draftsMade,
     draftReady: readyIssues.length > 0,
     issue: issue && { id: issue.id.toString(), slug: issue.slug, title: issue.title, publishedAt: issue.publishedAt },
+    warnings,
   };
 }

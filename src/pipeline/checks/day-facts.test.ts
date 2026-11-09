@@ -68,6 +68,19 @@ describe("readDayFacts", () => {
       draftReady: true,
       // The published draft wins over a later unpublished one.
       issue: { id: "270", slug: "first-draft", title: "First draft", publishedAt: new Date("2026-11-10T17:31:00Z") },
+      warnings: [],
+    });
+  });
+
+  it("counts the date as not skipped when skipped_dates cannot be read, and says why", async () => {
+    db.skippedDate.findUnique.mockRejectedValue(new Error('relation "newsletter.skipped_dates" does not exist'));
+
+    await expect(readDayFacts("2026-11-10")).resolves.toMatchObject({
+      skipped: null,
+      storyTotal: 31,
+      warnings: [
+        'Could not read skipped_dates, so 2026-11-10 counts as not skipped: relation "newsletter.skipped_dates" does not exist',
+      ],
     });
   });
 

@@ -39,6 +39,7 @@ export function normalDay(overrides: Partial<DayFacts> = {}): DayFacts {
       title: "Synthetic Model Ships & Agents Learn",
       publishedAt: new Date("2026-11-10T17:31:00Z"),
     },
+    warnings: [],
     ...overrides,
     storiesBySource,
     storyTotal: overrides.storyTotal ?? total(storiesBySource),

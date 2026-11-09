@@ -1,17 +1,28 @@
+import { resolveAlert } from "@/src/pipeline/alerts";
 import { checkIncidentDate, evaluateChecks, needsSiteCheck, type Finding } from "@/src/pipeline/checks/checks";
 import { readDayFacts, type DayFacts } from "@/src/pipeline/checks/day-facts";
+import { OUTSIDE_CALLS_BUDGET_MS, withDeadline } from "@/src/pipeline/checks/deadline";
 import { pingHeartbeat, type HeartbeatResult } from "@/src/pipeline/checks/heartbeat";
-import { CHECK_TIMES, checkTimeAt, newYorkDay, newYorkTime, type CheckTime } from "@/src/pipeline/checks/schedule";
+import {
+  CHECK_TIMES,
+  checkTimeAt,
+  newYorkDay,
+  newYorkTime,
+  shiftDate,
+  type CheckTime,
+} from "@/src/pipeline/checks/schedule";
 import { PUBLIC_SITE_URL, readSiteFacts } from "@/src/pipeline/checks/site";
 import { buildDailySummary } from "@/src/pipeline/checks/summary";
 import {
   listInfoIncidents,
   listOpenIncidents,
+  opsChannelFromEnv,
   postToOpsChat,
   raiseIncident,
   resendOpenCriticals,
   resolveIncident,
   runLink,
+  type AlertChannel,
   type Delivery,
   type NotifyOptions,
 } from "@/src/pipeline/notify";
@@ -25,7 +36,6 @@ import { finishRun, logEvent, startRun, type RunTrigger } from "@/src/pipeline/r
  */
 
 const JOB = "run-checks";
-const DAY_MS = 24 * 3_600_000;
 
 export type RunChecksResult =
   | { status: "not_time" }
@@ -46,41 +56,80 @@ export interface RunChecksOptions {
   trigger?: RunTrigger;
   /** The site to check at 18:00. Defaults to the public site. */
   siteUrl?: string;
-  /** For the site check and the heartbeat. */
+  /** For Telegram, the site check and the heartbeat. */
   fetch?: typeof fetch;
   /** Replaces the database read (tests). */
   readFacts?: (date: string) => Promise<DayFacts>;
+  /** How long Telegram and site calls may run in total. Defaults to OUTSIDE_CALLS_BUDGET_MS. */
+  budgetMs?: number;
+}
+
+type RunNotify = NotifyOptions & { runId: bigint; now: Date };
+type OpenIncident = Awaited<ReturnType<typeof listOpenIncidents>>[number];
+
+const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? "" : "s"}`;
+
+/**
+ * Closes incidents that no check will resolve: one combined message instead of one "resolved" each, and
+ * only for the incidents the owner was told about. A same-day fix still goes through resolveIncident, one
+ * message per incident (#123).
+ */
+async function closeTogether(incidents: OpenIncident[], headline: (count: number) => string, notify: RunNotify) {
+  for (const incident of incidents) await resolveAlert(incident.incidentKey, notify.now);
+  const told = incidents.filter((incident) => incident.severity !== "info" && incident.notifiedAt !== null);
+  if (told.length === 0) return;
+  const lines = told.map((incident) => `- ${incident.severity.toUpperCase()} ${incident.incidentKey}: ${incident.message}`);
+  await postToOpsChat([`RESOLVED: ${headline(told.length)}`, ...lines].join("\n"), notify);
 }
 
 /** Check incidents of earlier dates can no longer pass: their day is over. */
-async function closeEarlierDates(date: string, notify: NotifyOptions): Promise<string[]> {
+async function closeEarlierDates(date: string, notify: RunNotify): Promise<string[]> {
   const stale = (await listOpenIncidents()).filter((alert) => {
     const incidentDate = checkIncidentDate(alert.incidentKey);
     return incidentDate !== null && incidentDate < date;
   });
-  for (const alert of stale) {
-    await resolveIncident(alert.incidentKey, {
-      ...notify,
-      note: "Closed: that day is over, so this check no longer runs.",
-    });
-  }
+  await closeTogether(
+    stale,
+    (count) => `closed ${plural(count, "incident")} from earlier days. Their day is over, so their checks no longer run.`,
+    notify,
+  );
   return stale.map((alert) => alert.incidentKey);
 }
 
-async function silenceSkippedDate(date: string, notify: NotifyOptions): Promise<void> {
+async function silenceSkippedDate(date: string, notify: RunNotify): Promise<void> {
   const open = (await listOpenIncidents()).filter((alert) => checkIncidentDate(alert.incidentKey) === date);
-  for (const alert of open) {
-    await resolveIncident(alert.incidentKey, {
-      ...notify,
-      note: `Skipped date: no issue today. This check is off for ${date}.`,
-    });
-  }
+  await closeTogether(
+    open,
+    (count) => `${date} is a skipped date (no issue today), so its checks are off. Closed ${plural(count, "incident")}.`,
+    notify,
+  );
+}
+
+/** The ops channel with the run's time limits. Undefined lets notify record why it is not configured. */
+function opsChannel(env: Record<string, string | undefined>, fetchImpl: typeof fetch): AlertChannel | undefined {
+  if (env.APP_ENV !== "production") return undefined;
+  const result = opsChannelFromEnv(env, fetchImpl);
+  return result.ok ? result.channel : undefined;
+}
+
+function errorText(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+/** One message when the run throws. It must never hide the original error. */
+async function reportFailure(error: unknown, run: { time: CheckTime; date: string; runId?: bigint }, notify: NotifyOptions) {
+  const text = [
+    `CRITICAL: run-checks failed. The ${run.time} checks for ${run.date} stopped.`,
+    `Error: ${errorText(error).replace(/\s+/g, " ").trim().slice(0, 500)}`,
+    run.runId === undefined ? "No run row was written. The database may be down." : `Link: ${runLink(run.runId)}`,
+  ].join("\n");
+  await postToOpsChat(text, notify).catch(() => undefined);
 }
 
 async function applyFindings(
   findings: Finding[],
   details: { date: string; time: CheckTime },
-  notify: NotifyOptions & { runId: bigint },
+  notify: RunNotify,
 ) {
   for (const finding of findings) {
     if (!finding.failure) {
@@ -103,11 +152,11 @@ async function applyFindings(
 /** The 18:00 summary goes out on skipped dates too. Then the heartbeat, which never fails the run. */
 async function sendSummary(
   facts: DayFacts,
-  context: { env: Record<string, string | undefined>; fetch?: typeof fetch; weekday: string },
-  notify: NotifyOptions & { runId: bigint },
+  context: { env: Record<string, string | undefined>; fetch: typeof fetch; weekday: string },
+  notify: RunNotify,
 ) {
-  // Info incidents since the previous weekday's summary.
-  const since = new Date(newYorkTime(facts.date, "18:00").getTime() - (context.weekday === "Mon" ? 3 : 1) * DAY_MS);
+  // Info incidents since the previous weekday's summary: Friday's on a Monday.
+  const since = newYorkTime(shiftDate(facts.date, context.weekday === "Mon" ? -3 : -1), "18:00");
   const [openIncidents, infoIncidents] = await Promise.all([listOpenIncidents(), listInfoIncidents(since)]);
   const summary = await postToOpsChat(buildDailySummary({ facts, openIncidents, infoIncidents }), notify);
 
@@ -142,15 +191,24 @@ export async function runChecks(options: RunChecksOptions = {}): Promise<RunChec
 
   const { date, weekday } = newYorkDay(startedAt);
   const siteUrl = options.siteUrl ?? PUBLIC_SITE_URL;
-  const runId = await startRun({ job: JOB, trigger: options.trigger ?? "schedule" }, startedAt);
-  const notify = { runId, now: startedAt, env };
+  // Netlify stops this function at 30 s (deadline.ts). The heartbeat keeps its own 5 s after the budget.
+  const baseFetch = options.fetch ?? fetch;
+  const deadline = AbortSignal.timeout(options.budgetMs ?? OUTSIDE_CALLS_BUDGET_MS);
+  const outsideFetch = withDeadline(baseFetch, deadline);
+  const channel = opsChannel(env, outsideFetch);
+  const base: NotifyOptions & { now: Date } = { now: startedAt, env, ...(channel && { channel }) };
 
+  let runId: bigint | undefined;
   try {
+    runId = await startRun({ job: JOB, trigger: options.trigger ?? "schedule" }, startedAt);
+    const notify: RunNotify = { ...base, runId };
+
     const closed = await closeEarlierDates(date, notify);
     const facts = await (options.readFacts ?? readDayFacts)(date);
+    for (const warning of facts.warnings) await logEvent(runId, { level: "warn", step: "facts", message: warning });
     const site =
       needsSiteCheck(time, facts) && facts.issue?.slug
-        ? await readSiteFacts({ slug: facts.issue.slug, title: facts.issue.title }, { siteUrl, fetch: options.fetch })
+        ? await readSiteFacts({ slug: facts.issue.slug, title: facts.issue.title }, { siteUrl, fetch: outsideFetch })
         : null;
     const outcome = evaluateChecks(time, facts, { site, siteUrl, runLink: runLink(runId) });
 
@@ -159,11 +217,19 @@ export async function runChecks(options: RunChecksOptions = {}): Promise<RunChec
       await silenceSkippedDate(date, notify);
       await logEvent(runId, { level: "info", step: "check", message: `${date} is a skipped date. Its checks are off.` });
     } else {
+      for (const note of outcome.notes) await logEvent(runId, { level: "info", step: "check", message: note });
       await applyFindings(outcome.findings, { date, time }, notify);
       failing = outcome.findings.flatMap((finding) => (finding.failure ? [finding.incidentKey] : []));
     }
     const resent = await resendOpenCriticals(notify);
-    const daily = time === "18:00" ? await sendSummary(facts, { env, fetch: options.fetch, weekday }, notify) : {};
+    const daily = time === "18:00" ? await sendSummary(facts, { env, fetch: baseFetch, weekday }, notify) : {};
+    if (deadline.aborted) {
+      await logEvent(runId, {
+        level: "warn",
+        step: "deadline",
+        message: "The run used up its budget for Telegram and site calls. Any call after that was cut off; unsent alerts are retried at the next check time.",
+      });
+    }
 
     const skipped = outcome.status === "skipped";
     await finishRun(
@@ -176,7 +242,10 @@ export async function runChecks(options: RunChecksOptions = {}): Promise<RunChec
     );
     return { status: "ran", runId: runId.toString(), time, date, skipped, failing, ...daily };
   } catch (error) {
-    await finishRun(runId, { status: "failed", error: error instanceof Error ? error.message : String(error) }, now());
+    await reportFailure(error, { time, date, runId }, runId === undefined ? base : { ...base, runId });
+    if (runId !== undefined) {
+      await finishRun(runId, { status: "failed", error: errorText(error) }, now()).catch(() => undefined);
+    }
     throw error;
   }
 }
