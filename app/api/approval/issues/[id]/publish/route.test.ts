@@ -18,7 +18,7 @@ const PREVIEW = { issueId: 260, status: "ready", title: "T", date: "2026-10-22",
 
 async function request(method: "GET" | "POST", withSession = true) {
   const headers = withSession
-    ? { cookie: `approval_session=${await createApprovalSessionToken("approval-secret")}` }
+    ? { cookie: `approval_session=${await createApprovalSessionToken()}` }
     : undefined;
   return new Request("http://localhost/api/approval/issues/260/publish", { method, headers });
 }
@@ -29,6 +29,7 @@ describe("/api/approval/issues/[id]/publish", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.APPROVAL_PASSWORD = "approval-secret";
+    process.env.SESSION_SECRET = "test-session-secret";
   });
 
   it("rejects requests without an approval session", async () => {

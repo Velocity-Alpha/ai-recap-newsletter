@@ -1,9 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import {
-  APPROVAL_SESSION_COOKIE_NAME,
-  createApprovalSessionToken,
-} from "@/src/server/approval-auth";
+import { hasValidApprovalSession } from "@/src/server/approval-auth";
 
 export async function proxy(request: NextRequest) {
   // Let the login page and login API through
@@ -12,15 +9,8 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const password = process.env.APPROVAL_PASSWORD;
-
-  // If no password is configured, allow through (dev convenience)
-  if (!password) return NextResponse.next();
-
-  const expectedToken = await createApprovalSessionToken(password);
-  const sessionCookie = request.cookies.get(APPROVAL_SESSION_COOKIE_NAME);
-
-  if (sessionCookie?.value === expectedToken) {
+  // Fails closed: with APPROVAL_PASSWORD or SESSION_SECRET unset, no session is valid.
+  if (await hasValidApprovalSession(request)) {
     return NextResponse.next();
   }
 

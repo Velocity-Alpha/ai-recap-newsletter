@@ -38,8 +38,10 @@ function LoginForm() {
           : "/approval";
       router.push(redirect);
     } else {
+      // The server explains lockouts ("Too many attempts...") as well as wrong passwords.
+      const data = (await res.json().catch(() => null)) as { error?: string } | null;
       setLoading(false);
-      setError("Password incorrect.");
+      setError(data?.error || "Password incorrect.");
       setPassword("");
     }
   }
