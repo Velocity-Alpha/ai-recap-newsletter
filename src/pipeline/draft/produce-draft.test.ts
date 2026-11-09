@@ -198,6 +198,25 @@ describe("produceDraft", () => {
     expect(error.partial.content).toEqual(badTitle);
     expect(error.partial.unreadStoryIds).toEqual([501, 502, 503, 504]);
   });
+
+  it("fails the running step as soon as the deadline passes, without waiting for it", async () => {
+    const deadline = new AbortController();
+    const { deps, steps } = fakeDeps({
+      makeImage: vi.fn(() => {
+        deadline.abort(new Error("The draft timed out after 13 min."));
+        return new Promise<never>(() => undefined);
+      }),
+      signal: deadline.signal,
+    });
+
+    const error = await failure(produceDraft(INPUT, deps));
+
+    expect(error.step).toBe("image");
+    expect(error.message).toBe("The draft timed out after 13 min.");
+    expect(error.partial.content).toEqual(SAMPLE_CONTENT);
+    expect(steps).toEqual(["read_articles", "write", "validate", "image"]);
+    expect(deps.createTemplate).not.toHaveBeenCalled();
+  });
 });
 
 describe("createDraftDeps", () => {

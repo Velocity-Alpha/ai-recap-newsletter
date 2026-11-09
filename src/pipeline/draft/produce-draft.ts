@@ -65,6 +65,8 @@ export interface ProduceDraftDeps {
   onStep?: (step: DraftStep) => void | Promise<void>;
   /** Milliseconds clock for step timings. */
   now?: () => number;
+  /** Once aborted, the running step fails with the signal's reason (the job's deadline). */
+  signal?: AbortSignal;
 }
 
 export interface ProducedDraft {
@@ -105,6 +107,29 @@ export class DraftStepError extends Error {
  */
 export const readNoArticles: ReadArticles = async (stories) => stories.map((story) => ({ storyId: story.id, unread: true }));
 
+/**
+ * The work's result, or the signal's reason as soon as it aborts. The services take no signal, so the work itself
+ * keeps going in the background; the caller just stops waiting for it.
+ */
+export function untilAborted<T>(work: Promise<T>, signal?: AbortSignal): Promise<T> {
+  if (!signal) return work;
+  if (signal.aborted) return Promise.reject(signal.reason);
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => reject(signal.reason);
+    signal.addEventListener("abort", onAbort, { once: true });
+    work.then(
+      (value) => {
+        signal.removeEventListener("abort", onAbort);
+        resolve(value);
+      },
+      (error) => {
+        signal.removeEventListener("abort", onAbort);
+        reject(error);
+      },
+    );
+  });
+}
+
 function featureStories(sections: ApprovedSections): ApprovedStory[] {
   return (FEATURE_SECTIONS as readonly SectionKey[]).flatMap((key) => sections[key]);
 }
@@ -118,8 +143,9 @@ export async function produceDraft(input: ProduceDraftInput, deps: ProduceDraftD
   async function step<T>(name: DraftStep, run: () => Promise<T> | T): Promise<T> {
     const started = now();
     try {
+      deps.signal?.throwIfAborted();
       await deps.onStep?.(name);
-      return await run();
+      return await untilAborted(Promise.resolve().then(run), deps.signal);
     } catch (error) {
       throw new DraftStepError(name, error, { ...partial }, { ...stepMs, [name]: now() - started });
     } finally {
@@ -192,7 +218,7 @@ export interface DraftDepsOptions {
 export function createDraftDeps(
   env: Record<string, string | undefined> = process.env,
   options: DraftDepsOptions = {},
-): Omit<ProduceDraftDeps, "onStep" | "now"> {
+): Omit<ProduceDraftDeps, "onStep" | "now" | "signal"> {
   return {
     // Clears old saved text, reuses each story's saved copy, reads the rest (#115 order, 60 s deadline), and saves
     // what it read (#120).

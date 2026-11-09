@@ -46,7 +46,8 @@ import { createDraft, retryDraft } from "@/src/pipeline/draft/draft-store";
 import { emailImageUrl } from "@/src/pipeline/draft/email-html";
 import { fakeDb } from "@/src/pipeline/draft/fake-db.fixture";
 import { DRAFT_STEPS, readNoArticles, type ProduceDraftDeps } from "@/src/pipeline/draft/produce-draft";
-import { runDraftJob } from "@/src/pipeline/draft/run-draft";
+import { boardLink, runDraftJob } from "@/src/pipeline/draft/run-draft";
+import { finishRun, startRun } from "@/src/pipeline/runs";
 
 const DATE = SAMPLE_OUTLINE.date;
 const NOW = new Date("2027-01-04T15:00:00.000Z");
@@ -235,9 +236,9 @@ describe("runDraftJob", () => {
     expect(draftRow(draftId)).toMatchObject({ status: "failed", failedStep: "load" });
   });
 
-  it("fails at load while n8n owns drafting", async () => {
-    settings.set("draft.owner", "n8n");
+  it("fails at load when n8n took drafting back after the commit", async () => {
     const { draftId } = await commit();
+    settings.set("draft.owner", "n8n");
 
     const result = await runDraftJob(draftId, { env: ENV, now: () => NOW, deps: deps() });
 
@@ -331,6 +332,138 @@ describe("runDraftJob", () => {
     expect(JSON.stringify(recorded)).not.toContain("<html");
   });
 
+  it("does nothing when another invocation has already claimed the draft", async () => {
+    const { draftId } = await commit();
+    await fakeDb.client.issueDraft.update({ where: { id: BigInt(draftId) }, data: { startedAt: NOW, currentStep: "write" } });
+    const again = deps();
+
+    const result = await runDraftJob(draftId, { env: ENV, now: () => NOW, deps: again });
+
+    expect(result).toEqual({ status: "skipped", draftId, reason: `Draft ${draftId} is running already.` });
+    expect(again.writer).not.toHaveBeenCalled();
+    expect(runLog.started).toEqual([]);
+    expect(draftRow(draftId)).toMatchObject({ status: "running", currentStep: "write" });
+  });
+
+  it("fails the running step at the deadline, before Netlify stops the function", async () => {
+    const { draftId, issueId } = await commit();
+    const hangs = vi.fn(() => new Promise<WrittenIssueContent>(() => undefined));
+
+    const result = await runDraftJob(draftId, { env: ENV, now: () => NOW, deps: deps({ writer: hangs }), deadlineMs: 20 });
+
+    expect(result).toMatchObject({ status: "failed", step: "write", error: expect.stringContaining("timed out after") });
+    expect(draftRow(draftId)).toMatchObject({ status: "failed", failedStep: "write" });
+    expect(issueRow(issueId).html).toBeNull();
+    expect(notify.raiseIncident).toHaveBeenCalledWith(
+      expect.objectContaining({ evidence: expect.stringContaining("timed out after") }),
+      expect.anything(),
+    );
+  });
+
+  it("fails a hung article read at the deadline and raises the incident", async () => {
+    const { draftId } = await commit();
+    const hangs = vi.fn(() => new Promise<Awaited<ReturnType<typeof readNoArticles>>>(() => undefined));
+
+    const result = await runDraftJob(draftId, { env: ENV, now: () => NOW, deps: deps({ readArticles: hangs }), deadlineMs: 20 });
+
+    expect(result).toMatchObject({ status: "failed", step: "read_articles", error: expect.stringContaining("timed out after") });
+    expect(draftRow(draftId)).toMatchObject({ status: "failed", failedStep: "read_articles" });
+    expect(notify.raiseIncident).toHaveBeenCalledWith(
+      expect.objectContaining({ evidence: expect.stringContaining("timed out after") }),
+      expect.anything(),
+    );
+  });
+
+  it("marks the draft failed and raises the incident when the run log cannot start", async () => {
+    const { draftId } = await commit();
+    vi.mocked(startRun).mockRejectedValueOnce(new Error("pipeline_runs is down"));
+
+    const result = await runDraftJob(draftId, { env: ENV, now: () => NOW, deps: deps() });
+
+    expect(result).toEqual({ status: "failed", draftId, runId: null, step: "load", error: "pipeline_runs is down" });
+    expect(draftRow(draftId)).toMatchObject({ status: "failed", failedStep: "load", error: "pipeline_runs is down" });
+    expect(notify.raiseIncident).toHaveBeenCalledWith(
+      expect.objectContaining({ evidence: "pipeline_runs is down", details: expect.objectContaining({ runId: null }) }),
+      expect.objectContaining({ runId: undefined }),
+    );
+  });
+
+  it("raises the incident even when marking the draft failed and finishing the run both fail", async () => {
+    const { draftId } = await commit();
+    vi.mocked(finishRun).mockRejectedValueOnce(new Error("run update failed"));
+    const writer = vi.fn(async () => {
+      // The writer fails, and so does the next write to the draft row (marking it failed).
+      fakeDb.state.drafts.rows = fakeDb.state.drafts.rows.map((row) => ({ ...row, id: BigInt(-1) }));
+      throw new Error("The writer refused: no.");
+    });
+
+    const result = await runDraftJob(draftId, { env: ENV, now: () => NOW, deps: deps({ writer }) });
+
+    expect(result).toMatchObject({ status: "failed", step: "write", error: "The writer refused: no." });
+    const [incident] = notify.raiseIncident.mock.calls[0] as [{ details: { alsoFailed: string[] } }];
+    expect(incident.details.alsoFailed).toEqual([
+      expect.stringContaining("Could not mark the draft failed"),
+      "Could not finish the run: run update failed",
+    ]);
+  });
+
+  it("stays ready when only the run log fails after the save", async () => {
+    const { draftId } = await commit();
+    vi.mocked(finishRun).mockRejectedValueOnce(new Error("run update failed"));
+
+    const result = await runDraftJob(draftId, { env: ENV, now: () => NOW, deps: deps() });
+
+    expect(result).toMatchObject({ status: "ready" });
+    expect(draftRow(draftId).status).toBe("ready");
+    expect(runLog.events.at(-1)).toMatchObject({ level: "warn", step: "run", message: "Could not finish the run: run update failed" });
+  });
+
+  it("takes the date's lock to save, so drafts finishing together cannot overwrite each other", async () => {
+    const { draftId } = await commit();
+
+    await runDraftJob(draftId, { env: ENV, now: () => NOW, deps: deps() });
+
+    expect(fakeDb.state.locks).toEqual([
+      ["SELECT pg_advisory_xact_lock(hashtext(?))", `issue-date:${DATE}`],
+      ["SELECT pg_advisory_xact_lock(hashtext(?))", `issue-date:${DATE}`],
+    ]);
+  });
+
+  it("stops at load when another issue row for the date is published", async () => {
+    const { draftId, issueId } = await commit();
+    await fakeDb.client.issue.create({ data: { title: "An n8n copy", issueDate: new Date(`${DATE}T00:00:00.000Z`), publishedAt: NOW } });
+
+    const result = await runDraftJob(draftId, { env: ENV, now: () => NOW, deps: deps() });
+
+    expect(result).toMatchObject({ status: "failed", step: "load", error: expect.stringContaining("already published") });
+    expect(issueRow(issueId).html).toBeNull();
+  });
+
+  it("leaves the issue alone when another issue row for the date is published while it drafts", async () => {
+    const { draftId, issueId } = await commit();
+    const readArticles = vi.fn(async (stories: Parameters<typeof readNoArticles>[0]) => {
+      await fakeDb.client.issue.create({ data: { title: "An n8n copy", issueDate: new Date(`${DATE}T00:00:00.000Z`), publishedAt: NOW } });
+      return readNoArticles(stories);
+    });
+
+    const result = await runDraftJob(draftId, { env: ENV, now: () => NOW, deps: deps({ readArticles }) });
+
+    expect(result).toMatchObject({ status: "ready", issue: "published" });
+    expect(issueRow(issueId)).toMatchObject({ title: `AI Recap draft ${DATE}`, html: null });
+  });
+
+  it("links the incident to this deploy's board", async () => {
+    const { draftId } = await commit();
+    const env = { APP_ENV: "preview", DEPLOY_PRIME_URL: "https://deploy-preview-9--ai-recap.netlify.app", URL: "https://airecap.news" };
+
+    await runDraftJob(draftId, { env, now: () => NOW, deps: deps({ writer: vi.fn(writerFailure) }) });
+
+    expect(notify.raiseIncident).toHaveBeenCalledWith(
+      expect.objectContaining({ link: `https://deploy-preview-9--ai-recap.netlify.app/approval?date=${DATE}` }),
+      expect.anything(),
+    );
+  });
+
   it("still returns the failure when raising the incident fails", async () => {
     const { draftId } = await commit();
     notify.raiseIncident.mockRejectedValue(new Error("alerts table is down"));
@@ -339,5 +472,18 @@ describe("runDraftJob", () => {
 
     expect(result).toMatchObject({ status: "failed", step: "write" });
     expect(runLog.events.at(-1)).toMatchObject({ level: "warn", step: "alert" });
+  });
+});
+
+describe("boardLink", () => {
+  it("uses Netlify's URL in production, the deploy's address on previews, and production otherwise", () => {
+    expect(boardLink(DATE, { APP_ENV: "production", URL: "https://airecap.news/", DEPLOY_PRIME_URL: "https://main--ai-recap.netlify.app" })).toBe(
+      `https://airecap.news/approval?date=${DATE}`,
+    );
+    expect(boardLink(DATE, { APP_ENV: "preview", URL: "https://airecap.news", DEPLOY_PRIME_URL: "https://deploy-preview-9--ai-recap.netlify.app" })).toBe(
+      `https://deploy-preview-9--ai-recap.netlify.app/approval?date=${DATE}`,
+    );
+    expect(boardLink(DATE, {})).toBe(BOARD_LINK);
+    expect(boardLink(DATE, { APP_ENV: "production" })).toBe(BOARD_LINK);
   });
 });

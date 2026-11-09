@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { hashOutline, normalizeOutline } from "@/src/pipeline/draft/outline";
+import { hashOutline, normalizeOutline, type ApprovalOutline } from "@/src/pipeline/draft/outline";
 
 /** A board commit body like ApprovalBoard sends, with made-up stories. */
 function boardBody() {
@@ -58,9 +58,23 @@ describe("normalizeOutline", () => {
     expect(outline.leadStoryId).toBe(12);
   });
 
+  it("skips bad ids in the informational story and exclusion lists", () => {
+    const body = boardBody();
+    const withBadIds = {
+      ...body,
+      stories: [...body.stories, { id: "abc", url: "https://example.com/x", note: "" }, { id: null }],
+      excluded_stories: [...body.excluded_stories, { id: -4, reason: "bad" }, { reason: "no id" }],
+    };
+
+    const outline = normalizeOutline(withBadIds, "2026-11-09");
+
+    expect(outline).toEqual(normalizeOutline(body, "2026-11-09"));
+  });
+
   it.each([
     ["no approved stories", { approved_ids_by_section: undefined }],
     ["a bad story id", { approved_ids_by_section: { top_stories: ["abc"] } }],
+    ["a bad lead story id", { newsletter_headline: "abc" }],
     ["no story in any section", { approved_ids_by_section: { top_stories: [] } }],
   ])("rejects %s", (_name, override) => {
     expect(() => normalizeOutline({ ...boardBody(), ...override }, "2026-11-09")).toThrow();
@@ -73,6 +87,26 @@ describe("hashOutline", () => {
     const second = normalizeOutline({ ...boardBody(), candidate_map: {}, queue_update_count: 99 }, "2026-11-09");
     expect(hashOutline(first)).toBe(hashOutline(second));
     expect(hashOutline(first)).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it("does not change when a stored outline comes back with its keys reordered", () => {
+    // jsonb does not keep key order, so a saved payload may come back like this.
+    const reorderKeys = (value: unknown): unknown => {
+      if (Array.isArray(value)) return value.map(reorderKeys);
+      if (value && typeof value === "object") {
+        return Object.fromEntries(
+          Object.entries(value)
+            .reverse()
+            .map(([key, inner]) => [key, reorderKeys(inner)]),
+        );
+      }
+      return value;
+    };
+    const outline = normalizeOutline(boardBody(), "2026-11-09");
+    const roundTripped = reorderKeys(JSON.parse(JSON.stringify(outline))) as ApprovalOutline;
+
+    expect(JSON.stringify(roundTripped)).not.toBe(JSON.stringify(outline));
+    expect(hashOutline(roundTripped)).toBe(hashOutline(outline));
   });
 
   it("changes when the board order changes", () => {

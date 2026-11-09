@@ -30,13 +30,13 @@ beforeEach(() => {
 
 describe("draft-issue-background", () => {
   it("runs the draft named in a request with a valid job token", async () => {
-    await draftIssueBackground(post(createJobToken("draft-issue", SECRET, new Date())));
+    await draftIssueBackground(post(createJobToken("draft-issue", SECRET, new Date(), "41")));
     expect(runDraftJob).toHaveBeenCalledWith(41);
   });
 
   it("does nothing without a valid draft-issue token", async () => {
     await draftIssueBackground(post(null));
-    await draftIssueBackground(post(createJobToken("ingest-stories", SECRET, new Date())));
+    await draftIssueBackground(post(createJobToken("ingest-stories", SECRET, new Date(), "41")));
     await draftIssueBackground(post("123.forged"));
     expect(runDraftJob).not.toHaveBeenCalled();
   });
@@ -44,6 +44,6 @@ describe("draft-issue-background", () => {
   // Netlify retries a background function that throws. The draft is already marked, so a retry would only skip.
   it("never throws, even when the job does", async () => {
     runDraftJob.mockRejectedValue(new Error("database down"));
-    await expect(draftIssueBackground(post(createJobToken("draft-issue", SECRET, new Date())))).resolves.toBeUndefined();
+    await expect(draftIssueBackground(post(createJobToken("draft-issue", SECRET, new Date(), "41")))).resolves.toBeUndefined();
   });
 });

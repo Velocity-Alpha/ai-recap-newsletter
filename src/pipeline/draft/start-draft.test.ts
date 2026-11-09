@@ -31,6 +31,8 @@ describe("startDraftJob", () => {
     const [url, init] = fetch.mock.calls[0];
     expect(url).toBe("https://airecap.news/.netlify/functions/draft-issue-background");
     expect(init?.method).toBe("POST");
+    // A redirect would turn the POST into a GET, which Netlify answers 202 and then ignores.
+    expect(init?.redirect).toBe("error");
     await expect(readDraftJobRequest(new Request(url, init), { SESSION_SECRET: SECRET }, NOW)).resolves.toBe(41);
   });
 
@@ -64,19 +66,32 @@ describe("startDraftJob", () => {
       "Starting the draft job failed with HTTP 404.",
     );
   });
+
+  it("fails in plain words when the call is redirected or cannot connect", async () => {
+    const fetch = vi.fn(async () => Promise.reject(new TypeError("fetch failed", { cause: new Error("unexpected redirect") })));
+    await expect(startDraftJob(41, PUBLISHED, { env: { SESSION_SECRET: SECRET }, now: () => NOW, fetch })).rejects.toThrow(
+      "Starting the draft job failed: fetch failed (unexpected redirect).",
+    );
+  });
 });
 
 describe("readDraftJobRequest", () => {
   const env = { SESSION_SECRET: SECRET };
-  const token = createJobToken("draft-issue", SECRET, NOW);
+  const token = createJobToken("draft-issue", SECRET, NOW, "41");
   const body = JSON.stringify({ draftId: 41 });
 
-  it("returns the draft id from a POST with a valid draft-issue token", async () => {
+  it("returns the draft id from a POST with a valid draft-issue token for that draft", async () => {
     await expect(readDraftJobRequest(request({ token, body }), env, NOW)).resolves.toBe(41);
   });
 
+  it("rejects a token signed for another draft, or for no draft", async () => {
+    await expect(readDraftJobRequest(request({ token, body: JSON.stringify({ draftId: 42 }) }), env, NOW)).resolves.toBeNull();
+    const unsigned = createJobToken("draft-issue", SECRET, NOW);
+    await expect(readDraftJobRequest(request({ token: unsigned, body }), env, NOW)).resolves.toBeNull();
+  });
+
   it("rejects a missing token, a token for another job, an expired token, a GET, and a missing secret", async () => {
-    const ingestToken = createJobToken("ingest-stories", SECRET, NOW);
+    const ingestToken = createJobToken("ingest-stories", SECRET, NOW, "41");
     const later = new Date(NOW.getTime() + JOB_TOKEN_TTL_MS + 1);
 
     await expect(readDraftJobRequest(request({ body }), env, NOW)).resolves.toBeNull();

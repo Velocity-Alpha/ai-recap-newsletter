@@ -24,3 +24,8 @@ export async function saveOutline(outline: ApprovalOutline, owner: DraftOwner): 
   });
   return { id: row.id, hash };
 }
+
+/** Records that n8n accepted the forwarded commit (2xx). Native drafting leaves `forwarded_at` null. */
+export async function markOutlineForwarded(id: bigint, now: Date = new Date()): Promise<void> {
+  await prisma.approvalOutline.update({ where: { id }, data: { forwardedAt: now }, select: { id: true } });
+}

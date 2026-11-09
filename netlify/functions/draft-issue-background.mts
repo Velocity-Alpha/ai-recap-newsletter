@@ -1,8 +1,9 @@
 import { describeDraftRun, runDraftJob } from "@/src/pipeline/draft/run-draft";
 import { readDraftJobRequest } from "@/src/pipeline/draft/start-draft";
 
-// Native drafting (#76). The "-background" name gives it 15 minutes. Only startDraftJob starts it, with a
-// short-lived job token and the draft id. runDraftJob does nothing for a draft that is not waiting to run.
+// Native drafting (#76). The "-background" name gives it 15 minutes; runDraftJob gives up at 13. Only
+// startDraftJob starts it, with the draft id and a short-lived job token signed for that id. runDraftJob does
+// nothing for a draft that is not waiting to run.
 export default async function draftIssueBackground(request: Request): Promise<void> {
   const draftId = await readDraftJobRequest(request, process.env, new Date());
   if (draftId === null) {

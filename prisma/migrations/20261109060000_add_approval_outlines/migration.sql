@@ -6,6 +6,7 @@ CREATE TABLE "newsletter"."approval_outlines" (
     "payload_hash" TEXT NOT NULL,
     "draft_owner" TEXT NOT NULL,
     "committed_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "forwarded_at" TIMESTAMPTZ(6),
 
     CONSTRAINT "approval_outlines_pkey" PRIMARY KEY ("id")
 );

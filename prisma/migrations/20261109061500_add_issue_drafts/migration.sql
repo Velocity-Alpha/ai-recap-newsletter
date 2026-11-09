@@ -16,6 +16,8 @@ CREATE TABLE "newsletter"."issue_drafts" (
     "ghl_preview_url" TEXT,
     "unread_story_ids" INTEGER[] DEFAULT ARRAY[]::INTEGER[],
     "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    -- When a draft last waited for its job (create or retry). A draft whose job never starts is stuck after 5 minutes.
+    "queued_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "started_at" TIMESTAMPTZ(6),
     "finished_at" TIMESTAMPTZ(6),
 

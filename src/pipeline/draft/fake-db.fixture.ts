@@ -88,6 +88,13 @@ function table(
       state.rows.push(row);
       return pick(row, select);
     },
+    /** Every `data` passed to createMany, as given (to check which columns an insert names). */
+    createManyCalls: [] as Array<Array<Record<string, unknown>>>,
+    async createMany({ data }: { data: Array<Record<string, unknown>>; skipDuplicates?: boolean }) {
+      this.createManyCalls.push(structuredClone(data));
+      for (const item of data) state.rows.push({ ...options.defaults(), ...stored(item), id: options.nextId() } as Row);
+      return { count: data.length };
+    },
     update: async ({ where, data, select }: { where: Where; data: Record<string, unknown>; select?: Record<string, boolean> }) => {
       const row = state.rows.find((candidate) => matches(candidate, where));
       if (!row) throw Object.assign(new Error("Record to update not found."), { code: "P2025" });
@@ -109,6 +116,7 @@ export function createFakeDb() {
     outlines: { rows: [], updates: [] } as FakeTable,
     stories: { rows: [], updates: [] } as FakeTable,
     publishEvents: { rows: [], updates: [] } as FakeTable,
+    settings: { rows: [], updates: [] } as FakeTable,
     locks: [] as unknown[][],
     /** Makes the next issue update fail with this error (then clears). */
     issueUpdateError: null as Error | null,
@@ -143,13 +151,15 @@ export function createFakeDb() {
         ghlPreviewUrl: null,
         unreadStoryIds: [],
         createdAt: now(),
+        queuedAt: now(),
         startedAt: null,
         finishedAt: null,
       }),
     }),
-    approvalOutline: table(state.outlines, { nextId: id, defaults: () => ({ committedAt: now() }) }),
+    approvalOutline: table(state.outlines, { nextId: id, defaults: () => ({ committedAt: now(), forwardedAt: null }) }),
     story: table(state.stories, { nextId: id, defaults: () => ({}) }),
     publishEvent: table(state.publishEvents, { nextId: id, defaults: () => ({ draftId: null }) }),
+    pipelineSetting: table(state.settings, { nextId: id, defaults: () => ({}) }),
     $executeRaw: async (strings: TemplateStringsArray, ...values: unknown[]) => {
       state.locks.push([strings.join("?"), ...values]);
       return 1;
@@ -179,13 +189,16 @@ export function createFakeDb() {
     state,
     client,
     reset() {
-      for (const key of ["issues", "drafts", "outlines", "stories", "publishEvents"] as const) {
+      for (const key of ["issues", "drafts", "outlines", "stories", "publishEvents", "settings"] as const) {
         state[key].rows = [];
         state[key].updates = [];
       }
+      client.publishEvent.createManyCalls.length = 0;
       state.locks.length = 0;
       state.issueUpdateError = null;
       nextId = 1000n;
+      // Native drafting is on unless a test turns it off.
+      state.settings.rows.push({ id: 1n, key: "draft.owner", value: "native" });
     },
   };
 }
