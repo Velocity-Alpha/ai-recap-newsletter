@@ -33,13 +33,13 @@ import { createDraft, retryDraft } from "@/src/pipeline/draft/draft-store";
 import { emailImageUrl } from "@/src/pipeline/draft/email-html";
 import { fakeDb } from "@/src/pipeline/draft/fake-db.fixture";
 import { DRAFT_STEPS, readNoArticles, type ProduceDraftDeps } from "@/src/pipeline/draft/produce-draft";
-import { boardLink, runDraftJob } from "@/src/pipeline/draft/run-draft";
+import { draftsLink, runDraftJob } from "@/src/pipeline/draft/run-draft";
 import { finishRun, startRun } from "@/src/pipeline/runs";
 
 const DATE = SAMPLE_OUTLINE.date;
 const NOW = new Date("2027-01-04T15:00:00.000Z");
 const IMAGE_URL = "https://assets.example.test/newsletter-dev/2027-01-04-abc.jpg";
-const BOARD_LINK = `https://airecap.news/approval?date=${DATE}`;
+const DRAFTS_LINK = `https://airecap.news/approval/drafts?date=${DATE}`;
 const ENV = { APP_ENV: "development" };
 
 function deps(overrides: Partial<ProduceDraftDeps> = {}): Partial<ProduceDraftDeps> {
@@ -158,7 +158,7 @@ describe("runDraftJob", () => {
         severity: "critical",
         what: expect.stringContaining(`Draft v1 for ${DATE} failed`),
         evidence: expect.stringContaining(message),
-        link: BOARD_LINK,
+        link: DRAFTS_LINK,
       }),
       expect.objectContaining({ runId: BigInt(7) }),
     );
@@ -393,7 +393,7 @@ describe("runDraftJob", () => {
     await runDraftJob(draftId, { env, now: () => NOW, deps: deps({ writer: vi.fn(writerFailure) }) });
 
     expect(notify.raiseIncident).toHaveBeenCalledWith(
-      expect.objectContaining({ link: `https://deploy-preview-9--ai-recap.netlify.app/approval?date=${DATE}` }),
+      expect.objectContaining({ link: `https://deploy-preview-9--ai-recap.netlify.app/approval/drafts?date=${DATE}` }),
       expect.anything(),
     );
   });
@@ -409,15 +409,15 @@ describe("runDraftJob", () => {
   });
 });
 
-describe("boardLink", () => {
+describe("draftsLink", () => {
   it("uses Netlify's URL in production, the deploy's address on previews, and production otherwise", () => {
-    expect(boardLink(DATE, { APP_ENV: "production", URL: "https://airecap.news/", DEPLOY_PRIME_URL: "https://main--ai-recap.netlify.app" })).toBe(
-      `https://airecap.news/approval?date=${DATE}`,
+    expect(draftsLink(DATE, { APP_ENV: "production", URL: "https://airecap.news/", DEPLOY_PRIME_URL: "https://main--ai-recap.netlify.app" })).toBe(
+      `https://airecap.news/approval/drafts?date=${DATE}`,
     );
-    expect(boardLink(DATE, { APP_ENV: "preview", URL: "https://airecap.news", DEPLOY_PRIME_URL: "https://deploy-preview-9--ai-recap.netlify.app" })).toBe(
-      `https://deploy-preview-9--ai-recap.netlify.app/approval?date=${DATE}`,
+    expect(draftsLink(DATE, { APP_ENV: "preview", URL: "https://airecap.news", DEPLOY_PRIME_URL: "https://deploy-preview-9--ai-recap.netlify.app" })).toBe(
+      `https://deploy-preview-9--ai-recap.netlify.app/approval/drafts?date=${DATE}`,
     );
-    expect(boardLink(DATE, {})).toBe(BOARD_LINK);
-    expect(boardLink(DATE, { APP_ENV: "production" })).toBe(BOARD_LINK);
+    expect(draftsLink(DATE, {})).toBe(DRAFTS_LINK);
+    expect(draftsLink(DATE, { APP_ENV: "production" })).toBe(DRAFTS_LINK);
   });
 });
