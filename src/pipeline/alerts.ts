@@ -24,14 +24,18 @@ function refreshOpenAlert(input: RaiseAlertInput, now: Date) {
 /**
  * Opens an alert for the incident, or refreshes the one already open.
  * `opened` is true only for a new incident, so callers notify once per incident.
+ * `previousSeverity` is the open alert's severity before this refresh (null when new or unknown).
  */
 export async function raiseAlert(input: RaiseAlertInput, now: Date) {
   // Look first: the usual repeat case then logs no Prisma error.
   const open = await prisma.alert.findUnique({
     where: { openIncidentKey: input.incidentKey },
-    select: { id: true },
+    select: { id: true, severity: true },
   });
-  if (open) return { opened: false, alert: await refreshOpenAlert(input, now) };
+  if (open) {
+    const alert = await refreshOpenAlert(input, now);
+    return { opened: false, alert, previousSeverity: open.severity as AlertSeverity };
+  }
 
   try {
     const alert = await prisma.alert.create({
@@ -46,11 +50,11 @@ export async function raiseAlert(input: RaiseAlertInput, now: Date) {
         context: input.context,
       },
     });
-    return { opened: true, alert };
+    return { opened: true, alert, previousSeverity: null };
   } catch (error) {
     // Another run opened the same incident between the lookup and the insert.
     if (!isUniqueViolation(error)) throw error;
-    return { opened: false, alert: await refreshOpenAlert(input, now) };
+    return { opened: false, alert: await refreshOpenAlert(input, now), previousSeverity: null };
   }
 }
 
@@ -65,10 +69,27 @@ export async function resolveAlert(incidentKey: string, now: Date) {
   });
 }
 
+/** `notified_at` is the last time the owner was told: sent, or recorded outside production. */
 export function markAlertNotified(id: bigint, now: Date) {
   return prisma.alert.update({ where: { id }, data: { notifiedAt: now } });
 }
 
 export function listOpenAlerts() {
   return prisma.alert.findMany({ where: { status: "open" }, orderBy: { firstSeen: "asc" } });
+}
+
+/** Open critical alerts never sent, or last sent before `cutoff`: the ones due a repeat. */
+export function listOpenCriticalsNotSentSince(cutoff: Date) {
+  return prisma.alert.findMany({
+    where: { status: "open", severity: "critical", OR: [{ notifiedAt: null }, { notifiedAt: { lt: cutoff } }] },
+    orderBy: { firstSeen: "asc" },
+  });
+}
+
+/** Info alerts seen since `since`, open or resolved. Info is never sent; the daily summary lists it. */
+export function listInfoAlertsSince(since: Date) {
+  return prisma.alert.findMany({
+    where: { severity: "info", lastSeen: { gte: since } },
+    orderBy: { firstSeen: "asc" },
+  });
 }

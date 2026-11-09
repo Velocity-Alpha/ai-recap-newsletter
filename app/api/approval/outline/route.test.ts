@@ -26,6 +26,7 @@ describe("GET /api/approval/outline", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.APPROVAL_PASSWORD = "approval-secret";
+    process.env.SESSION_SECRET = "test-session-secret";
   });
 
   it("rejects requests without an approval session", async () => {
@@ -44,7 +45,7 @@ describe("GET /api/approval/outline", () => {
       rankedCandidates: [],
     });
     dedupFns.submitDeduplication.mockResolvedValue("resp_abc123");
-    const token = await createApprovalSessionToken("approval-secret");
+    const token = await createApprovalSessionToken();
 
     const response = await GET(
       new Request("http://localhost/api/approval/outline?date=2026-04-30", {
@@ -70,7 +71,7 @@ describe("GET /api/approval/outline", () => {
       rankedCandidates: [],
     });
     dedupFns.submitDeduplication.mockResolvedValue("resp_abc123");
-    const token = await createApprovalSessionToken("approval-secret");
+    const token = await createApprovalSessionToken();
 
     await GET(
       new Request(
@@ -92,7 +93,7 @@ describe("GET /api/approval/outline", () => {
       rankedCandidates: [],
     });
     dedupFns.submitDeduplication.mockRejectedValue(new Error("OpenAI unavailable"));
-    const token = await createApprovalSessionToken("approval-secret");
+    const token = await createApprovalSessionToken();
 
     const response = await GET(
       new Request("http://localhost/api/approval/outline?date=2026-04-30", {
@@ -111,7 +112,7 @@ describe("GET /api/approval/outline", () => {
     curationFns.createOutlineCandidateStories.mockRejectedValue(
       new Error("DB unreachable")
     );
-    const token = await createApprovalSessionToken("approval-secret");
+    const token = await createApprovalSessionToken();
 
     const response = await GET(
       new Request("http://localhost/api/approval/outline?date=2026-04-30", {

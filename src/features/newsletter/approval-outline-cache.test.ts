@@ -3,6 +3,10 @@ import { describe, expect, it, vi } from "vitest";
 import {
   APPROVAL_OUTLINE_CACHE_TTL_MS,
   approvalOutlineCacheId,
+  cachedOutlineAction,
+  clearApprovalOutlineCache,
+  isApprovalOutlineCacheEdited,
+  markApprovalOutlineCacheEdited,
   normalizeApprovalOutlineData,
   readApprovalOutlineCache,
   writeApprovalOutlineCache,
@@ -203,6 +207,91 @@ describe("approvalOutlineCacheId", () => {
   it("caches a board that reuses a draft separately", () => {
     expect(approvalOutlineCacheId("2026-10-23", ["2026-10-22"])).toBe(
       "2026-10-23_reuse_2026-10-22"
+    );
+  });
+});
+
+describe("edited boards", () => {
+  it("starts unedited, and marking it edited keeps its data and its age", () => {
+    const storage = createStorage();
+    const now = Date.UTC(2026, 10, 8);
+    writeApprovalOutlineCache("2026-11-09", { ...rawOutlineData, candidate_marker: 40 }, storage, now);
+
+    expect(isApprovalOutlineCacheEdited("2026-11-09", storage)).toBe(false);
+
+    markApprovalOutlineCacheEdited("2026-11-09", storage);
+
+    expect(isApprovalOutlineCacheEdited("2026-11-09", storage)).toBe(true);
+    expect(readApprovalOutlineCache("2026-11-09", storage, now)).toEqual({
+      ...normalizedOutlineData,
+      candidate_marker: 40,
+    });
+    expect(
+      readApprovalOutlineCache("2026-11-09", storage, now + APPROVAL_OUTLINE_CACHE_TTL_MS + 1)
+    ).toBeNull();
+  });
+
+  it("does not create a board when marking one that is not cached", () => {
+    const storage = createStorage();
+
+    markApprovalOutlineCacheEdited("2026-11-09", storage);
+
+    expect(storage.setItem).not.toHaveBeenCalled();
+    expect(isApprovalOutlineCacheEdited("2026-11-09", storage)).toBe(false);
+  });
+
+  it("starts a rebuilt board unedited", () => {
+    const storage = createStorage();
+    writeApprovalOutlineCache("2026-11-09", rawOutlineData, storage);
+    markApprovalOutlineCacheEdited("2026-11-09", storage);
+
+    writeApprovalOutlineCache("2026-11-09", rawOutlineData, storage);
+
+    expect(isApprovalOutlineCacheEdited("2026-11-09", storage)).toBe(false);
+  });
+
+  it("clears a cached board", () => {
+    const storage = createStorage();
+    writeApprovalOutlineCache("2026-11-09", rawOutlineData, storage);
+
+    clearApprovalOutlineCache("2026-11-09", storage);
+
+    expect(readApprovalOutlineCache("2026-11-09", storage)).toBeNull();
+  });
+});
+
+describe("cachedOutlineAction", () => {
+  it("keeps the board when no newer story arrived", () => {
+    expect(cachedOutlineAction({ cachedMarker: 40, currentMarker: 40, edited: false })).toBe("keep");
+    expect(cachedOutlineAction({ cachedMarker: 40, currentMarker: 40, edited: true })).toBe("keep");
+  });
+
+  it("keeps the board when stories only left the window", () => {
+    expect(cachedOutlineAction({ cachedMarker: 40, currentMarker: 35, edited: false })).toBe("keep");
+    expect(cachedOutlineAction({ cachedMarker: 40, currentMarker: null, edited: false })).toBe("keep");
+  });
+
+  it("rebuilds an unchanged board when newer stories arrived", () => {
+    expect(cachedOutlineAction({ cachedMarker: 40, currentMarker: 85, edited: false })).toBe("rebuild");
+  });
+
+  it("offers a rebuild instead when the owner changed the board", () => {
+    expect(cachedOutlineAction({ cachedMarker: 40, currentMarker: 85, edited: true })).toBe(
+      "offer-rebuild"
+    );
+  });
+
+  it("treats a board built from an empty window as stale once stories arrive", () => {
+    expect(cachedOutlineAction({ cachedMarker: null, currentMarker: 1, edited: false })).toBe("rebuild");
+    expect(cachedOutlineAction({ cachedMarker: null, currentMarker: null, edited: false })).toBe("keep");
+  });
+
+  it("rebuilds a board cached before markers existed only when unchanged", () => {
+    expect(cachedOutlineAction({ cachedMarker: undefined, currentMarker: 40, edited: false })).toBe(
+      "rebuild"
+    );
+    expect(cachedOutlineAction({ cachedMarker: undefined, currentMarker: 40, edited: true })).toBe(
+      "keep"
     );
   });
 });

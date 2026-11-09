@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { RateLimitStore } from "@/src/server/rate-limit-store";
+
 const prismaMock = vi.hoisted(() => {
   const subscriber = {
     findUnique: vi.fn(),
@@ -36,8 +38,14 @@ const beehiivMock = vi.hoisted(() => ({
   getBeehiivSubscriberStatus: vi.fn(),
 }));
 
+const limits = vi.hoisted(() => ({ store: null as RateLimitStore | null }));
+
 vi.mock("@/src/server/prisma", () => prismaMock);
 vi.mock("@/src/features/subscriber/beehiiv", () => beehiivMock);
+vi.mock("@/src/server/rate-limit-store", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/src/server/rate-limit-store")>();
+  return { ...actual, getRateLimitStore: () => limits.store };
+});
 
 import {
   cleanupExpiredOneTimeCodes,
@@ -49,11 +57,13 @@ import {
   findSubscriberByEmail,
   findSubscriberById,
   findSubscriberByIdSafely,
+  hashOneTimeCode,
   markSubscriberUnsubscribed,
   storeOneTimeCode,
   upsertSubscriber,
   verifySubscriberSessionToken,
 } from "@/src/features/subscriber/server";
+import { createMemoryRateLimitStore } from "@/src/server/rate-limit-store";
 
 describe("subscriber server", () => {
   beforeEach(() => {
@@ -64,6 +74,9 @@ describe("subscriber server", () => {
     beehiivMock.getBeehiivSubscriberStatus.mockResolvedValue({ status: "active", id: "beehiiv-default" });
     vi.stubEnv("SESSION_SECRET", "test-session-secret");
     vi.stubEnv("SUBSCRIBER_PROVIDER", "");
+    prismaMock.prisma.authCode.findFirst.mockReset();
+    prismaMock.prisma.authCode.updateMany.mockReset();
+    limits.store = createMemoryRateLimitStore();
   });
 
   afterEach(() => {
@@ -247,25 +260,85 @@ describe("subscriber server", () => {
     );
   });
 
-  it("consumes the most recent valid one-time code", async () => {
-    prismaMock.prisma.authCode.findFirst.mockResolvedValueOnce({
-      id: 55n,
-      email: "reader@example.com",
-      codeHash: "hash",
-      purpose: "sign_in",
-      expiresAt: new Date(Date.now() + 60_000),
-      consumedAt: null,
-      createdAt: new Date(),
+  describe("consumeOneTimeCode", () => {
+    const email = "reader@example.com";
+
+    // One live code whose row behaves like the table: once consumed, it is no longer found.
+    function liveCode(code = "123456", id = 55n) {
+      let consumed = false;
+      prismaMock.prisma.authCode.findFirst.mockImplementation(async () =>
+        consumed ? null : { id, codeHash: hashOneTimeCode(email, code) },
+      );
+      prismaMock.prisma.authCode.updateMany.mockImplementation(async () => {
+        const count = consumed ? 0 : 1;
+        consumed = true;
+        return { count };
+      });
+      return { isConsumed: () => consumed };
+    }
+
+    it("consumes the email's live code when the code matches", async () => {
+      const code = liveCode();
+
+      await expect(consumeOneTimeCode("Reader@Example.com", "123456")).resolves.toBe("consumed");
+
+      expect(code.isConsumed()).toBe(true);
+      expect(prismaMock.prisma.authCode.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ email, purpose: "sign_in", consumedAt: null }),
+        }),
+      );
     });
-    prismaMock.prisma.authCode.updateMany.mockResolvedValueOnce({ count: 1 });
 
-    await expect(consumeOneTimeCode("reader@example.com", "123456")).resolves.toBe(true);
-  });
+    it("returns invalid when no live code exists", async () => {
+      prismaMock.prisma.authCode.findFirst.mockResolvedValueOnce(null);
 
-  it("returns false when no valid one-time code exists", async () => {
-    prismaMock.prisma.authCode.findFirst.mockResolvedValueOnce(null);
+      await expect(consumeOneTimeCode(email, "123456")).resolves.toBe("invalid");
+      expect(prismaMock.prisma.authCode.updateMany).not.toHaveBeenCalled();
+    });
 
-    await expect(consumeOneTimeCode("reader@example.com", "123456")).resolves.toBe(false);
+    it("keeps the code alive after a wrong try", async () => {
+      const code = liveCode();
+
+      await expect(consumeOneTimeCode(email, "000000")).resolves.toBe("invalid");
+
+      expect(code.isConsumed()).toBe(false);
+      await expect(consumeOneTimeCode(email, "123456")).resolves.toBe("consumed");
+    });
+
+    it("invalidates the code on the fifth wrong try", async () => {
+      const code = liveCode();
+
+      for (let attempt = 1; attempt <= 4; attempt++) {
+        await expect(consumeOneTimeCode(email, "000000")).resolves.toBe("invalid");
+      }
+      await expect(consumeOneTimeCode(email, "000000")).resolves.toBe("too_many_tries");
+
+      expect(code.isConsumed()).toBe(true);
+      await expect(consumeOneTimeCode(email, "123456")).resolves.toBe("invalid");
+    });
+
+    it("refuses even the right code once a code's tries are used up", async () => {
+      prismaMock.prisma.authCode.findFirst.mockResolvedValue({ id: 56n, codeHash: hashOneTimeCode(email, "123456") });
+      prismaMock.prisma.authCode.updateMany.mockResolvedValue({ count: 0 });
+
+      for (let attempt = 1; attempt <= 5; attempt++) {
+        await consumeOneTimeCode(email, "000000");
+      }
+
+      await expect(consumeOneTimeCode(email, "123456")).resolves.toBe("too_many_tries");
+    });
+
+    it("gives a new code a fresh set of tries", async () => {
+      liveCode("123456", 57n);
+      for (let attempt = 1; attempt <= 5; attempt++) {
+        await consumeOneTimeCode(email, "000000");
+      }
+
+      liveCode("654321", 58n);
+
+      await expect(consumeOneTimeCode(email, "654321")).resolves.toBe("consumed");
+    });
   });
 
   it("deletes matching active one-time codes and cleans up old codes", async () => {

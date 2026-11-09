@@ -12,6 +12,7 @@ import {
   logRequestWarning,
   maskEmail,
 } from "@/src/server/observability";
+import { safeEqual } from "@/src/server/safe-compare";
 
 // This is the route currently used by GHL unsubscribe automation.
 // It is server-to-server only: raw email is allowed here because the request must carry
@@ -28,10 +29,13 @@ function getWebhookSecret() {
 
 function isAuthorizedWebhookRequest(request: Request) {
   const expectedSecret = getWebhookSecret();
-  const authorization = request.headers.get("authorization")?.trim();
-  const headerSecret = request.headers.get("x-webhook-secret")?.trim();
+  const authorization = request.headers.get("authorization")?.trim() ?? "";
+  const headerSecret = request.headers.get("x-webhook-secret")?.trim() ?? "";
 
-  return authorization === `Bearer ${expectedSecret}` || headerSecret === expectedSecret;
+  // Check both headers every time, so the response time does not depend on which one was sent.
+  const bearerMatches = safeEqual(authorization, `Bearer ${expectedSecret}`);
+  const headerMatches = safeEqual(headerSecret, expectedSecret);
+  return bearerMatches || headerMatches;
 }
 
 async function getPayload(request: Request) {

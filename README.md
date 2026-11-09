@@ -144,8 +144,13 @@ Read routes:
 - `GET /api/issues/[slug]`
 - `GET /api/ticker`
 - `GET /api/approval/outline?date=` for the password-protected approval board outline
+- `GET /api/approval/outline/marker?date=` the highest story id in the board's candidate window; the board reads it to spot stories newer than its cached copy (approval session)
 - `GET /api/newsletters/outline?date=` for the authenticated newsletter outline API
 - `GET /api/approval/issues/[id]/publish` previews what "Mark as published" would publish (approval session)
+- `GET /api/approval/skipped-dates?date=` says whether a date is a skipped date (approval session)
+- `GET /api/approval/drafts?date=` lists a date's native drafts for the board; none while `draft.owner` is `n8n` (approval session)
+- `GET /api/approval/drafts/[id]` one draft's status, polled by `/approval/drafts` while it runs (approval session)
+- `GET /api/approval/drafts/[id]/html` the draft's email HTML for the sandboxed preview frame (approval session)
 
 Mutation routes:
 
@@ -153,16 +158,28 @@ Mutation routes:
 - `POST /api/subscriber/subscribe`
 - `POST /api/subscriber/request-code`
 - `POST /api/subscriber/verify-code`
+- The three routes above, and `POST /api/approval/login`, answer `429` with `Retry-After` once a caller passes its limit (per IP, with IPv6 grouped by /64; per email where there is one; and for the approval login, across the whole site). The IP comes from Netlify's `x-nf-client-connection-ip` header. Limits live in `src/server/rate-limit.ts`; counts are in `newsletter.rate_limits`.
 - `POST /api/subscriber/sign-out`
 - `GET|POST /api/subscriber/unsubscribe` with a signed `token`
 - `POST /api/subscriber/unsubscribe/webhook` with `Authorization: Bearer <GHL_UNSUBSCRIBE_WEBHOOK_SECRET>` or `x-webhook-secret`
-- `POST /api/newsletters/commit` to commit an approved outline to the generation webhook
+- `POST /api/newsletters/commit` to commit an approved outline. With `draft.owner` = `n8n` (default) it posts to the n8n webhook. With `native` it saves the story changes, makes the next draft, and starts `draft-issue-background`; it never calls n8n
+- `POST /api/approval/drafts/[id]/retry` runs a failed or stuck draft again from the start (approval session)
+- `POST /api/approval/drafts/[id]/image/ideas` three scene ideas for "New image" on a ready draft, from one GPT-6 Luna call (approval session)
+- `POST /api/approval/drafts/[id]/image/generate` makes one image from `{ scenePrompt }` plus the fixed style prompt and uploads it to S3; it makes no draft (approval session)
+- `POST /api/approval/drafts/[id]/image` "Use this image": `{ imageUrl, scenePrompt }` from "generate" becomes the issue's next draft, with the same text, new HTML, and a new GHL template; it starts `draft-issue-background` (approval session)
+- `POST /api/approval/skipped-dates` with `{ date, note? }` marks a skipped date, and `DELETE /api/approval/skipped-dates?date=` undoes it, until that day is over (approval session). Used by "No issue today" on `/approval`.
 - `POST /api/approval/issues/[id]/publish` publishes an unpublished draft from its stored email HTML (approval session). Used by the "Mark as published" button on `/approval/issues`. It sends no email.
+- `POST /api/admin/stage-switches` with `{ key, value }` sets `ingest.owner`, `draft.owner`, or `publish.owner` to `n8n` or `native` (approval session). Used by `/admin/settings`. It refuses other keys and values, and changes to the current value. Each change is logged as a `pipeline_runs` row with job `admin-setting`.
+- `proxy.ts` refuses writes (any method but GET, HEAD, OPTIONS) to `/approval/*`, `/api/approval/*`, `/api/newsletters/commit`, and `/api/admin/*` unless they come from this site's own origin (`403`), and refuses API writes that are not `Content-Type: application/json` (`415`). See `src/server/same-origin.ts`.
 - `POST /api/revalidate` refreshes the cached issue lists, issue pages, and sitemap. It needs `Authorization: Bearer <token>`, a 5-minute token signed with a key derived from `SESSION_SECRET` (`src/server/cache-refresh-auth.ts`). The publish job calls it after it publishes an issue.
 
 Public unsubscribe page:
 
 - `GET /unsubscribe?token=...`
+
+Admin pages (approval login; `proxy.ts` and `requireAdminPage()` in `src/server/admin-auth.ts` both check it):
+
+- `/admin` overview, `/admin/runs` and `/admin/runs/[id]`, `/admin/incidents`, `/admin/settings` (every `pipeline_settings` row and the stage owner switches)
 
 ## Architecture
 
@@ -179,6 +196,7 @@ Jobs run as Netlify functions in `netlify/functions/` (see `docs/adr/0001-job-ru
 
 - `detect-publish` reads the seed inbox (read-only) every 5 minutes on weekdays, 09:00–20:59 New York time, and `detect-publish-catch-up` looks back 3 days once a day. Each run checks Gmail first and opens the database only when an issue email arrived. The `publish.owner` key decides what happens next: `n8n` (the default) does nothing, `shadow` only records `publish_events` rows, and `native` publishes. The functions need `DATABASE_URL`, `GMAIL_OAUTH_CLIENT_ID`, `GMAIL_OAUTH_CLIENT_SECRET`, and `GMAIL_OAUTH_REFRESH_TOKEN` as secret Netlify env vars, plus `PUBLISH_SEED_RECIPIENTS`. Set that to the one monitor seed address. Each send also reaches the owner's `+` alias in the same inbox; without the filter, the job reads every send twice. Secret vars use the scopes builds, functions, and runtime; the Free plan cannot narrow them further.
 - `ingest-stories` collects the day's candidate stories at 09:55 New York time on weekdays. It reads 5 newsletters from the seed inbox (read-only) and the Product Hunt and Hugging Face feeds, extracts stories with `gpt-6-luna`, and saves them to `newsletter.stories` for the approval board. Then it sends the "stories are ready" message to the AI Recap Review Telegram group (production only; elsewhere the run log records the text). The scheduled function only starts `ingest-stories-background`, which does the work in up to 15 minutes; the call carries a 5-minute token signed with a key derived from `SESSION_SECRET`. The `ingest.owner` key decides who ingests: `n8n` (the default) or `native`. The job needs the Gmail variables above, `OPENAI_API_KEY`, and `TELEGRAM_REVIEW_BOT_TOKEN` (production only). Sources live in `src/pipeline/ingest/sources.ts`; each has a bookmark in `newsletter.scraper_bookmarks`, and a failed email is tried again on the next run. Each run is in `pipeline_runs` and `pipeline_events`.
+- `run-checks` runs the checks at 10:05, 12:00, and 18:00 New York time on weekdays (`src/pipeline/checks/`). It reads only the database and the public site, and raises or resolves incidents through `src/pipeline/notify/`. At 18:00 it posts the daily summary to the ops chat, then pings `HEALTHCHECKS_PING_URL` (production only). A skipped date ("No issue today" on `/approval`) turns off that date's checks; the summary still goes out. On a preview, "Run now" runs a full 18:00 pass at any time.
 - Scheduled functions fire only on the production deploy. To try one on a deploy preview (Neon `dev`), use "Run now" on the preview's function page in the Netlify UI. On a preview, `ingest-stories` runs at any time.
 - Do this before merging a new job. A local bundle can still load packages from the repo's `node_modules`, so it can pass while the Netlify bundle fails. `netlify.toml` ships `@prisma/client-runtime-utils` with the jobs for this reason.
 
@@ -190,9 +208,11 @@ Required environment variables:
 
 - `APP_ENV` — `development`, `preview`, or `production`. Set per deploy context in `netlify.toml` (`production` for production, `preview` for deploy previews and branch deploys). `next build` fails without it.
 - `DATABASE_URL` — production in the production context; the Neon `dev` branch for deploy previews and branch deploys
-- `SESSION_SECRET` — signs subscriber sessions and, through derived keys, the job tokens (cache refresh, ingest start)
+- `SESSION_SECRET` — signs subscriber sessions and, through derived keys, the job tokens (cache refresh, ingest start) and approval board sessions
 - `OPENAI_API_KEY` — story extraction in the ingest job
 - `TELEGRAM_REVIEW_BOT_TOKEN` — production only; the ingest job's "stories are ready" message
+- `TELEGRAM_OPS_CHAT_ID` — production only; the "AI Recap Ops" chat where the review bot posts ops alerts (`src/pipeline/notify/`). Never the review group. Without it, alerts are not sent.
+- `HEALTHCHECKS_PING_URL` — production only; the Healthchecks.io ping URL for the daily summary. `run-checks` pings it after the 18:00 summary. Without it, the run log records "not configured".
 - `RESEND_API_KEY`
 - `RESEND_FROM_NAME`
 - `RESEND_FROM_EMAIL`
@@ -200,16 +220,19 @@ Required environment variables:
 - `BEEHIIV_API_KEY` and `BEEHIIV_PUBLICATION_ID` when the provider is `beehiiv`
 - `GHL_SUBSCRIBE_WEBHOOK_URL` when the provider is `ghl`
 - `GHL_UNSUBSCRIBE_WEBHOOK_SECRET`
-- `APPROVAL_PASSWORD`
+- `APPROVAL_PASSWORD` — the approval board password. With it or `SESSION_SECRET` unset, `/approval` stays locked in every environment
 - `N8N_WEBHOOK_JWT_SECRET`
 - `OPENROUTER_API_KEY`
 - `FOR_BRANDS_WEBHOOK_URL` if you want to override the default for-brands destination
 - `NEXT_PUBLIC_SITE_URL`
+- `GHL_PRIVATE_INTEGRATION_TOKEN`, `GHL_LOCATION_ID`, `GHL_USER_ID` — production only; native drafting creates a new GHL email template per draft. Outside production the GHL calls are recorded, not sent.
+- `VERTEX_API_KEY`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_REGION`, `S3_BUCKET` — the draft job's featured image (`src/pipeline/draft/image`). Outside production the image still uploads, but only under `newsletter-dev/`; the prefix comes from `APP_ENV`.
 
 Optional:
 
 - `PRODUCTION_DATABASE_URL` for running Prisma production migration commands from your local machine
-- `OUTLINE_COMMIT_WEBHOOK_URL` to override the approval outline commit webhook destination. Defaults to the production n8n story approval webhook.
+- `OUTLINE_COMMIT_WEBHOOK_URL` sets where the approval board's commit goes. In production it defaults to the production n8n story approval webhook. Outside production it has no default, and the production webhook is refused, so a preview cannot create a production issue.
 - `NEWSLETTER_RUNTIME_DB_ROLE` to override the runtime role name used by the bootstrap scripts. Defaults to `newsletter_web`.
+- `JINA_API_KEY` and `GITHUB_TOKEN` for the draft job's article reader (`src/pipeline/draft/articles`). Both work without a key: Jina Reader is the last fallback and is sent the key as a Bearer header only if set (higher rate limit); the GitHub token only raises the README API's rate limit.
 
 Google Analytics IDs and `APP_ENV` are configured per deploy context in `netlify.toml`.

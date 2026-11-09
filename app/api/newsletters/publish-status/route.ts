@@ -6,14 +6,13 @@ import {
   logRequestSuccess,
 } from "@/src/server/observability";
 import { hasValidApprovalSession } from "@/src/server/approval-auth";
+import { approvalDateKey } from "@/src/features/newsletter/approval-date";
 import { fetchLastPublishedIssueDateOnOrBefore } from "@/src/features/newsletter/repository";
 
 export const runtime = "nodejs";
 
 function parseDateOnly(value: string | null): string {
-  const candidate = value ? new Date(value) : new Date();
-  const date = Number.isNaN(candidate.getTime()) ? new Date() : candidate;
-  return date.toISOString().slice(0, 10);
+  return approvalDateKey(value);
 }
 
 export async function GET(request: Request) {

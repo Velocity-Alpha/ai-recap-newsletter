@@ -41,6 +41,42 @@ describe("/api/subscriber/unsubscribe/webhook", () => {
     expect(json.error).toBe("Unauthorized.");
   });
 
+  it("rejects secrets that are close but not equal", async () => {
+    for (const headers of [
+      { Authorization: "Bearer test-secre" },
+      { Authorization: "Bearer test-secret-and-more" },
+      { Authorization: "test-secret" },
+      { "x-webhook-secret": "TEST-SECRET" },
+      { "x-webhook-secret": "" },
+    ] as Record<string, string>[]) {
+      const response = await POST(
+        new Request("http://localhost/api/subscriber/unsubscribe/webhook", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...headers },
+          body: JSON.stringify({ email: "reader@example.com" }),
+        }),
+      );
+      expect(response.status).toBe(401);
+    }
+
+    expect(serviceFns.unsubscribeSubscriberFromWebhook).not.toHaveBeenCalled();
+  });
+
+  it("accepts the secret in the x-webhook-secret header", async () => {
+    serviceFns.unsubscribeSubscriberFromWebhook.mockResolvedValue(null);
+
+    const response = await POST(
+      new Request("http://localhost/api/subscriber/unsubscribe/webhook", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-webhook-secret": "test-secret" },
+        body: JSON.stringify({ email: "reader@example.com" }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(serviceFns.unsubscribeSubscriberFromWebhook).toHaveBeenCalledWith({ email: "reader@example.com" });
+  });
+
   it("accepts a bearer token and unsubscribes the email", async () => {
     serviceFns.unsubscribeSubscriberFromWebhook.mockResolvedValue(null);
 
