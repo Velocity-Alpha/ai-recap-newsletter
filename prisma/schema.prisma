@@ -192,3 +192,15 @@ model Alert {
   @@map("alerts")
   @@schema("newsletter")
 }
+
+/// Fixed-window counters for login and sign-up limits (#53). key is "<rule>:<sha256 of the IP, email, or
+/// code id>", so no address is stored. The app deletes rows a day after their window starts.
+model RateLimit {
+  key             String   @id
+  count           Int      @default(0)
+  windowStartedAt DateTime @default(now()) @map("window_started_at") @db.Timestamptz(6)
+
+  @@index([windowStartedAt])
+  @@map("rate_limits")
+  @@schema("newsletter")
+}

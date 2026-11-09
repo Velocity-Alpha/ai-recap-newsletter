@@ -2,6 +2,8 @@ import crypto from "node:crypto";
 
 import { NextResponse } from "next/server";
 
+import { getClientIp } from "@/src/server/client-ip";
+
 type LogLevel = "info" | "warn" | "error";
 
 type LogMetadata = Record<string, unknown>;
@@ -30,7 +32,7 @@ export function createRequestLogContext(route: string, request: Request): Reques
     method: request.method,
     pathname: url.pathname,
     search: url.search,
-    ip: request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null,
+    ip: getClientIp(request),
     userAgent: request.headers.get("user-agent"),
     startedAt: Date.now(),
   };
