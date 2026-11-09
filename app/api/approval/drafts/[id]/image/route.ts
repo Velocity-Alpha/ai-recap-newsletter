@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { newImageErrorResponse, chooseNewImage } from "@/src/pipeline/draft/new-image";
 import { hasValidApprovalSession } from "@/src/server/approval-auth";
-import { logServerError, logServerInfo } from "@/src/server/observability";
+import { logServerError, logServerInfo, logServerWarn } from "@/src/server/observability";
 import { positiveIdParam, type IdRouteContext } from "@/src/server/route-params";
 
 export const runtime = "nodejs";
@@ -26,7 +26,10 @@ export async function POST(request: Request, context: IdRouteContext) {
     return NextResponse.json({ success: true, draft });
   } catch (error) {
     const known = newImageErrorResponse(error);
-    if (known) return NextResponse.json({ success: false, error: known.error }, { status: known.status });
+    if (known) {
+      if (known.status >= 500) logServerWarn("approval.drafts.new_image_unavailable", { draftId, error: known.error });
+      return NextResponse.json({ success: false, error: known.error }, { status: known.status });
+    }
     logServerError("approval.drafts.new_image_failed", error, { draftId });
     return NextResponse.json({ success: false, error: "Could not make the new draft." }, { status: 500 });
   }

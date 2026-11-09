@@ -142,4 +142,22 @@ describe("uploadImage", () => {
     expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(new Set(fetchMock.mock.calls.map(([target]) => target)).size).toBe(1);
   });
+
+  it("gives up on a slow upload after the caller's timeout, with no retries (the board's Generate button)", async () => {
+    // S3 never answers; only the timeout ends the request.
+    const slow = vi.fn<typeof fetch>(
+      (_url, init) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () => reject(init.signal?.reason));
+        }),
+    );
+
+    const started = Date.now();
+    await expect(
+      uploadImage(JPEG, "2026-11-09", { appEnv: "preview", s3: S3, fetch: slow, randomId: () => "ab12cd34", retries: 0, timeoutMs: 50 }),
+    ).rejects.toThrow("Upload failed after 1 attempts");
+
+    expect(slow).toHaveBeenCalledTimes(1);
+    expect(Date.now() - started).toBeLessThan(2_000);
+  });
 });

@@ -321,6 +321,42 @@ describe("new image drafts (#116)", () => {
     expect(fakeDb.state.drafts.rows).toHaveLength(1);
   });
 
+  it.each(["running", "ready"] as const)(
+    "refuses a new image from v1 while v2 is %s, under the date's lock, since the new draft would put v1's older text back",
+    async (status) => {
+      const source = await readyDraft();
+      const v2 = await createDraft(await outline());
+      if (status === "ready") {
+        await fakeDb.client.issueDraft.update({ where: { id: BigInt(v2.draftId) }, data: { status: "ready", content: SAMPLE_CONTENT } });
+      }
+      fakeDb.state.locks.length = 0;
+
+      const attempt = createImageDraft(source.draftId, NEW_IMAGE, { now: () => NOW });
+
+      await expect(attempt).rejects.toMatchObject({ name: "NewImageError", reason: "not_current" });
+      await expect(attempt).rejects.toThrow(`Draft v1 is not the newest draft: v2 is ${status}.`);
+      expect(fakeDb.state.locks).toEqual([["SELECT pg_advisory_xact_lock(hashtext(?))", `issue-date:${DATE}`]]);
+      expect(fakeDb.state.drafts.rows).toHaveLength(2);
+      // Ideas and Generate refuse too, before any model or Vertex call.
+      await expect(readImageSource(source.draftId)).rejects.toMatchObject({ reason: "not_current" });
+      await expect(getDraftStatus(source.draftId)).resolves.toMatchObject({ hasNewerDraft: true });
+      const listed = await listDraftsForDate(DATE);
+      expect(listed.map((draft) => [draft.version, draft.hasNewerDraft])).toEqual([
+        [2, false],
+        [1, true],
+      ]);
+    },
+  );
+
+  it("still allows a new image from v1 when the newer v2 failed", async () => {
+    const source = await readyDraft();
+    const v2 = await createDraft(await outline());
+    await fakeDb.client.issueDraft.update({ where: { id: BigInt(v2.draftId) }, data: { status: "failed", failedStep: "write" } });
+
+    await expect(getDraftStatus(source.draftId)).resolves.toMatchObject({ hasNewerDraft: false });
+    await expect(createImageDraft(source.draftId, NEW_IMAGE, { now: () => NOW })).resolves.toMatchObject({ version: 3 });
+  });
+
   it("refuses while n8n owns drafting", async () => {
     const source = await readyDraft();
     fakeDb.state.settings.rows[0].value = "n8n";

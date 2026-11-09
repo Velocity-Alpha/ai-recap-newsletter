@@ -415,10 +415,13 @@ describe("runDraftJob for a new image (#116)", () => {
     imageUrl: `https://example-bucket.s3.amazonaws.com/newsletter-dev/${DATE}-def456.jpg`,
     scenePrompt: "A pretend lighthouse on a rock.",
   };
+  // The image step's HEAD request to S3: the chosen file is there, as a JPEG.
+  const s3Head = vi.fn<typeof fetch>(async () => new Response(null, { status: 200, headers: { "content-type": "image/jpeg" } }));
+  beforeEach(() => s3Head.mockClear());
 
   async function readyV1() {
     const v1 = await commit();
-    await runDraftJob(v1.draftId, { env: IMAGE_ENV, now: () => NOW, deps: deps() });
+    await runDraftJob(v1.draftId, { env: IMAGE_ENV, fetch: s3Head, now: () => NOW, deps: deps() });
     expect(draftRow(v1.draftId).status).toBe("ready");
     fakeDb.state.drafts.updates.length = 0;
     runLog.events.length = 0;
@@ -435,13 +438,14 @@ describe("runDraftJob for a new image (#116)", () => {
     const v2 = await createImageDraft(v1.draftId, NEW_IMAGE, { now: () => NOW });
     const second = deps({ createTemplate: tpl2() });
 
-    const result = await runDraftJob(v2.draftId, { env: IMAGE_ENV, now: () => NOW, deps: second });
+    const result = await runDraftJob(v2.draftId, { env: IMAGE_ENV, fetch: s3Head, now: () => NOW, deps: second });
 
     expect(result).toEqual({ status: "ready", draftId: v2.draftId, runId: "7", issue: "updated" });
     expect(stepHistory()).toEqual(["load", ...NEW_IMAGE_STEPS, "save", null]);
     expect(runLog.events.map((event) => event.step)).toEqual(["load", ...NEW_IMAGE_STEPS, "save"]);
     expect(second.writer).not.toHaveBeenCalled();
     expect(second.makeImage).not.toHaveBeenCalled();
+    expect(s3Head).toHaveBeenCalledWith(NEW_IMAGE.imageUrl, expect.objectContaining({ method: "HEAD" }));
     expect(second.createTemplate).toHaveBeenCalledWith(
       expect.objectContaining({ issueDate: DATE, version: 2, subject: SAMPLE_CONTENT.title }),
     );
@@ -467,7 +471,7 @@ describe("runDraftJob for a new image (#116)", () => {
     const { v1 } = await readyV1();
     const v2 = await createImageDraft(v1.draftId, NEW_IMAGE, { now: () => NOW });
 
-    await runDraftJob(v2.draftId, { env: IMAGE_ENV, now: () => NOW, deps: deps({ createTemplate: tpl2() }) });
+    await runDraftJob(v2.draftId, { env: IMAGE_ENV, fetch: s3Head, now: () => NOW, deps: deps({ createTemplate: tpl2() }) });
 
     expect(issueRow(v1.issueId)).toMatchObject({
       title: SAMPLE_CONTENT.title,
@@ -486,16 +490,43 @@ describe("runDraftJob for a new image (#116)", () => {
     const v2 = await createImageDraft(v1.draftId, { ...NEW_IMAGE, imageUrl: "https://elsewhere.example.test/picture.jpg" }, { now: () => NOW });
     const second = deps({ createTemplate: tpl2() });
 
-    const result = await runDraftJob(v2.draftId, { env: IMAGE_ENV, now: () => NOW, deps: second });
+    const result = await runDraftJob(v2.draftId, { env: IMAGE_ENV, fetch: s3Head, now: () => NOW, deps: second });
 
     expect(result).toMatchObject({ status: "failed", draftId: v2.draftId, step: "image" });
     expect(draftRow(v2.draftId)).toMatchObject({ status: "failed", failedStep: "image" });
     expect(draftRow(v2.draftId).error).toContain("is not an image this site uploaded");
     expect(second.createTemplate).not.toHaveBeenCalled();
+    expect(s3Head).not.toHaveBeenCalled();
     expect(issueRow(v1.issueId)).toEqual(issueBefore);
+    // v1 is still ready and on the issue, so this is a warning, not a critical incident.
     expect(notify.raiseIncident).toHaveBeenCalledWith(
-      expect.objectContaining({ what: `Draft v2 for ${DATE} failed at making the image.` }),
+      expect.objectContaining({ severity: "warning", what: `Draft v2 for ${DATE} failed at making the image.` }),
       expect.anything(),
+    );
+  });
+
+  it("fails at image when the chosen file is not in S3", async () => {
+    const { v1 } = await readyV1();
+    const v2 = await createImageDraft(v1.draftId, NEW_IMAGE, { now: () => NOW });
+    const missing = vi.fn<typeof fetch>(async () => new Response(null, { status: 404, headers: { "content-type": "application/xml" } }));
+    const second = deps({ createTemplate: tpl2() });
+
+    const result = await runDraftJob(v2.draftId, { env: IMAGE_ENV, fetch: missing, now: () => NOW, deps: second });
+
+    expect(result).toMatchObject({ status: "failed", step: "image", error: "The chosen image is not in S3 as a JPEG (HTTP 404)." });
+    expect(second.createTemplate).not.toHaveBeenCalled();
+  });
+
+  it("asks for a new commit when the copied title clashes with another issue, since a retry copies the same title", async () => {
+    const { v1 } = await readyV1();
+    const v2 = await createImageDraft(v1.draftId, NEW_IMAGE, { now: () => NOW });
+    fakeDb.state.issueUpdateError = Object.assign(new Error("Unique constraint failed on the fields: (`slug`)"), { code: "P2002" });
+
+    const result = await runDraftJob(v2.draftId, { env: IMAGE_ENV, fetch: s3Head, now: () => NOW, deps: deps({ createTemplate: tpl2() }) });
+
+    expect(result).toMatchObject({ status: "failed", step: "save" });
+    expect(draftRow(v2.draftId).error).toBe(
+      `Another issue already uses the title "${SAMPLE_CONTENT.title}", and titles must be unique. Commit again for a new title.`,
     );
   });
 
@@ -503,12 +534,12 @@ describe("runDraftJob for a new image (#116)", () => {
     const { v1 } = await readyV1();
     const v2 = await createImageDraft(v1.draftId, NEW_IMAGE, { now: () => NOW });
     const ghlDown = vi.fn(async () => Promise.reject(new Error("GHL create template failed with HTTP 502.")));
-    await runDraftJob(v2.draftId, { env: IMAGE_ENV, now: () => NOW, deps: deps({ createTemplate: ghlDown }) });
+    await runDraftJob(v2.draftId, { env: IMAGE_ENV, fetch: s3Head, now: () => NOW, deps: deps({ createTemplate: ghlDown }) });
     expect(draftRow(v2.draftId)).toMatchObject({ status: "failed", failedStep: "ghl" });
 
     await retryDraft(v2.draftId, { now: () => NOW });
     const again = deps({ createTemplate: tpl2() });
-    const result = await runDraftJob(v2.draftId, { env: IMAGE_ENV, now: () => NOW, deps: again });
+    const result = await runDraftJob(v2.draftId, { env: IMAGE_ENV, fetch: s3Head, now: () => NOW, deps: again });
 
     expect(result).toMatchObject({ status: "ready", draftId: v2.draftId });
     expect(again.writer).not.toHaveBeenCalled();
@@ -531,7 +562,7 @@ describe("runDraftJob for a new image (#116)", () => {
     const published = structuredClone(issueRow(v1.issueId));
     const second = deps({ createTemplate: tpl2() });
 
-    const result = await runDraftJob(v2.draftId, { env: IMAGE_ENV, now: () => NOW, deps: second });
+    const result = await runDraftJob(v2.draftId, { env: IMAGE_ENV, fetch: s3Head, now: () => NOW, deps: second });
 
     expect(result).toMatchObject({ status: "failed", step: "load", error: expect.stringContaining("already published") });
     expect(second.createTemplate).not.toHaveBeenCalled();

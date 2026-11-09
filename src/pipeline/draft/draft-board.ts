@@ -55,7 +55,7 @@ export interface DraftBoardView {
   unreadStories: UnreadStory[];
   /** Failed, or stuck in running (or never started): the same rule as `retryDraft`. */
   retryable: boolean;
-  /** "New image" (#116): a ready draft whose issue is not published. */
+  /** "New image" (#116): the newest ready draft, with no newer draft running, while the issue is not published. */
   newImageAllowed: boolean;
   featuredImageUrl: string | null;
   scenePrompt: string | null;
@@ -129,7 +129,7 @@ export function toDraftBoardView(view: DraftView, options: { now: Date; unreadSt
     ghlPreviewUrl: view.ghlPreviewUrl,
     unreadStories: options.unreadStories ?? [],
     retryable: isRetryable(view, options.now),
-    newImageAllowed: view.status === "ready" && !view.issuePublished,
+    newImageAllowed: view.status === "ready" && !view.issuePublished && !view.hasNewerDraft,
     featuredImageUrl: view.featuredImageUrl,
     scenePrompt: view.scenePrompt,
     sourceVersion: view.sourceVersion,

@@ -20,8 +20,12 @@ import type { DraftJobTarget, StartDraftOptions } from "@/src/pipeline/draft/sta
  * does not write again. The routes under /api/approval/drafts/[id]/image call these.
  */
 
-/** A route must finish inside Netlify's 60 s, so the board's image gets one attempt with this timeout. */
+/**
+ * A route must finish inside Netlify's 60 s, so "Generate" makes one image attempt and one upload attempt, each
+ * with these timeouts.
+ */
 export const BOARD_IMAGE_TIMEOUT_MS = 40_000;
+export const BOARD_UPLOAD_TIMEOUT_MS = 10_000;
 /** The n8n scene prompts are 200 to 300 words. This leaves room for edits, and stops a pasted essay. */
 export const MAX_SCENE_PROMPT_CHARS = 4_000;
 
@@ -30,6 +34,14 @@ export class NewImageInputError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "NewImageInputError";
+  }
+}
+
+/** This deploy is missing a setting (500). Trying again will not help. */
+export class NewImageConfigError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "NewImageConfigError";
   }
 }
 
@@ -78,7 +90,11 @@ export async function generateImageForDraft(draftId: number, body: unknown, opti
   const source = await readSource(draftId);
   return makeImageFromScene(
     { scenePrompt, issueDate: source.issueDate },
-    { appEnv: env.APP_ENV, image: { apiKey: env.VERTEX_API_KEY, retries: 0, timeoutMs: BOARD_IMAGE_TIMEOUT_MS } },
+    {
+      appEnv: env.APP_ENV,
+      image: { apiKey: env.VERTEX_API_KEY, retries: 0, timeoutMs: BOARD_IMAGE_TIMEOUT_MS },
+      upload: { retries: 0, timeoutMs: BOARD_UPLOAD_TIMEOUT_MS },
+    },
   );
 }
 
@@ -94,6 +110,8 @@ export async function chooseNewImage(
   options: StartDraftOptions = {},
 ): Promise<{ draft: CreatedDraft; start: DraftStart }> {
   const env = options.env ?? process.env;
+  // A setting problem is the deploy's, not the request's: say so before looking at the request.
+  if (!env.S3_BUCKET?.trim()) throw new NewImageConfigError("S3_BUCKET is not set on this deploy, so the chosen image cannot be checked.");
   const { imageUrl, scenePrompt } = (body ?? {}) as { imageUrl?: unknown; scenePrompt?: unknown };
   if (typeof imageUrl !== "string" || typeof scenePrompt !== "string") {
     throw new NewImageInputError("Send the image and its scene prompt.");
@@ -114,6 +132,7 @@ export async function chooseNewImage(
 /** The status and plain message for a "New image" refusal or failure. Null for anything unexpected (a 500). */
 export function newImageErrorResponse(error: unknown): { status: number; error: string } | null {
   if (error instanceof NewImageInputError) return { status: 400, error: error.message };
+  if (error instanceof NewImageConfigError) return { status: 500, error: error.message };
   if (error instanceof NewImageError) return { status: error.reason === "missing" ? 404 : 409, error: error.message };
   if (error instanceof IssuePublishedError || error instanceof DraftOwnerError) return { status: 409, error: error.message };
   if (error instanceof FeaturedImageError || error instanceof NewImageServiceError) return { status: 502, error: error.message };

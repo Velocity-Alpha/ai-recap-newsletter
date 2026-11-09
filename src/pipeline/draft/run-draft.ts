@@ -75,6 +75,8 @@ export interface RunDraftJobOptions {
   deps?: Partial<Omit<ProduceDraftDeps, "onStep" | "signal">>;
   /** Defaults to `DRAFT_DEADLINE_MS`. */
   deadlineMs?: number;
+  /** For the job's own checks, such as the chosen image's HEAD request to S3. Defaults to the global fetch (tests replace it). */
+  fetch?: typeof fetch;
 }
 
 /** This deploy's site: Netlify's `URL` in production, the deploy's own address on previews, else production. */
@@ -93,10 +95,12 @@ export function draftIncidentKey(date: string): string {
   return `draft.failed:${date}`;
 }
 
-function plainError(error: unknown, step: DraftJobStep, produced: ProducedDraft | null): string {
+function plainError(error: unknown, step: DraftJobStep, produced: ProducedDraft | null, newImage = false): string {
   const code = (error as { code?: unknown } | null)?.code;
   if (step === "save" && code === "P2002" && produced) {
-    return `Another issue already uses the title "${produced.content.title}", and titles must be unique. Retry to write a new title.`;
+    // A "New image" draft copies its title, so its retry would clash again; only a commit writes a new one.
+    const next = newImage ? "Commit again for a new title." : "Retry to write a new title.";
+    return `Another issue already uses the title "${produced.content.title}", and titles must be unique. ${next}`;
   }
   const message = error instanceof Error ? error.message : String(error);
   return message.length > MAX_ERROR_CHARS ? `${message.slice(0, MAX_ERROR_CHARS)}...` : message;
@@ -183,7 +187,7 @@ export async function runDraftJob(draftId: bigint | number | string, options: Ru
   const failDraft = async (error: unknown): Promise<RunDraftJobResult> => {
     const failedStep: DraftJobStep = error instanceof DraftStepError ? error.step : step;
     if (error instanceof DraftStepError) Object.assign(stepMs, error.stepMs);
-    const message = plainError(error, failedStep, produced);
+    const message = plainError(error, failedStep, produced, draft.sourceDraftId !== null);
 
     const problems = [
       await bestEffort("save", "mark the draft failed", () =>
@@ -204,7 +208,8 @@ export async function runDraftJob(draftId: bigint | number | string, options: Ru
       raiseIncident(
         {
           incidentKey,
-          severity: "critical",
+          // A failed "New image" draft leaves its ready source draft in place, so the issue still has a draft.
+          severity: draft.sourceDraftId === null ? "critical" : "warning",
           what: `Draft v${draft.version} for ${date} failed at ${DRAFT_STEP_LABELS[failedStep]}.`,
           evidence: message,
           link: draftsLink(date, env),
@@ -248,7 +253,7 @@ export async function runDraftJob(draftId: bigint | number | string, options: Ru
     stepMs.load = Date.now() - loadStarted;
 
     produced = await produceDraft(input, {
-      ...createDraftDeps(env, { record }),
+      ...createDraftDeps(env, { record, fetch: options.fetch }),
       ...options.deps,
       onStep: enter,
       signal: deadline.signal,

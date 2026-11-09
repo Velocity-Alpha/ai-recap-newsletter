@@ -10,7 +10,7 @@ vi.mock("@/src/pipeline/draft/new-image", async (importOriginal) => ({
 }));
 
 import { POST } from "@/app/api/approval/drafts/[id]/image/route";
-import { NewImageInputError } from "@/src/pipeline/draft/new-image";
+import { NewImageConfigError, NewImageInputError } from "@/src/pipeline/draft/new-image";
 
 const SITE = "https://deploy-preview-9--ai-recap.netlify.app";
 const IMAGE = { imageUrl: "https://example-bucket.s3.amazonaws.com/newsletter-dev/2026-05-21-abc123.jpg", scenePrompt: "A lamp." };
@@ -73,6 +73,8 @@ describe("POST /api/approval/drafts/[id]/image (Use this image)", () => {
     [409, new NewImageError("Draft 41 is failed. Only a ready draft can get a new image.", "not_ready")],
     [409, new IssuePublishedError(3, "2026-05-21")],
     [409, new DraftOwnerError()],
+    [409, new NewImageError('Draft v1 is not the newest draft: v2 is running. Use "New image" on the newest ready draft.', "not_current")],
+    [500, new NewImageConfigError("S3_BUCKET is not set on this deploy, so the chosen image cannot be checked.")],
   ])("answers %i with the plain reason", async (status, error) => {
     newImage.chooseNewImage.mockRejectedValue(error);
 

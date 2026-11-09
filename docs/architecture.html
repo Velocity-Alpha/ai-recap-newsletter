@@ -114,8 +114,9 @@ Terms: GLOSSARY.md. One issue per date; each commit makes a new draft with its o
             issue row takes the current draft's title, HTML, image, excerpt, content_json
          -> board: live steps, error + Retry, email preview, "Open in GHL", list of drafts  #79 (/approval/drafts)
          -> "New image": edit the scene prompt, 3 suggestions, Generate, then a new draft #116 (built)
+            only from the newest ready draft, with nothing newer running (checked under the lock)
             the new draft copies the source draft's text (source_draft_id), so the job
-            runs only image check -> HTML -> new GHL template -> save; no writing
+            runs only image check (URL + S3 HEAD) -> HTML -> new GHL template -> save; no writing
          n8n "2. Public approval page" is switched off the day native drafting goes live  #80
 12:00  run-checks: no commit yet -> warning                                              <span class="plan">planned</span> #52
        Owner sends in GHL (unchanged)

@@ -9,11 +9,16 @@ function answer(status: number, body: unknown) {
 }
 
 describe("requestSceneIdeas", () => {
-  it("posts to the draft's ideas route and returns the ideas", async () => {
+  it("posts JSON to the draft's ideas route, with an empty object, and returns the ideas", async () => {
     const fetcher = answer(200, { ideas: [{ label: "Lamp", scene: "A pretend lamp." }] });
 
     await expect(requestSceneIdeas(41, fetcher)).resolves.toEqual([{ label: "Lamp", scene: "A pretend lamp." }]);
-    expect(fetcher).toHaveBeenCalledWith("/api/approval/drafts/41/image/ideas", { method: "POST" });
+    // The Origin check (#128) answers a write that is not JSON with 415.
+    expect(fetcher).toHaveBeenCalledWith("/api/approval/drafts/41/image/ideas", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{}",
+    });
   });
 
   it("throws the server's plain reason, or a plain fallback", async () => {

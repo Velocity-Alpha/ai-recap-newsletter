@@ -20,12 +20,14 @@ import { fakeDb } from "@/src/pipeline/draft/fake-db.fixture";
 import { FeaturedImageError } from "@/src/pipeline/draft/image/featured-image";
 import {
   BOARD_IMAGE_TIMEOUT_MS,
+  BOARD_UPLOAD_TIMEOUT_MS,
+  chooseNewImage,
   generateImageForDraft,
   MAX_SCENE_PROMPT_CHARS,
+  NewImageConfigError,
   newImageErrorResponse,
   NewImageInputError,
   suggestIdeasForDraft,
-  chooseNewImage,
 } from "@/src/pipeline/draft/new-image";
 import { readDraftJobRequest } from "@/src/pipeline/draft/start-draft";
 
@@ -105,9 +107,14 @@ describe("generateImageForDraft", () => {
 
     expect(images.makeImageFromScene).toHaveBeenCalledWith(
       { scenePrompt: "A pretend lighthouse.", issueDate: DATE },
-      { appEnv: "preview", image: { apiKey: "test-vertex", retries: 0, timeoutMs: BOARD_IMAGE_TIMEOUT_MS } },
+      {
+        appEnv: "preview",
+        image: { apiKey: "test-vertex", retries: 0, timeoutMs: BOARD_IMAGE_TIMEOUT_MS },
+        upload: { retries: 0, timeoutMs: BOARD_UPLOAD_TIMEOUT_MS },
+      },
     );
-    expect(BOARD_IMAGE_TIMEOUT_MS).toBeLessThan(60_000);
+    // The image and the upload together, with room for the database reads, inside Netlify's 60 s.
+    expect(BOARD_IMAGE_TIMEOUT_MS + BOARD_UPLOAD_TIMEOUT_MS).toBeLessThanOrEqual(50_000);
     // Nothing is drafted until the owner picks the image.
     expect(fakeDb.state.drafts.rows).toHaveLength(1);
   });
@@ -169,6 +176,19 @@ describe("chooseNewImage", () => {
 
     await expect(attempt).rejects.toBeInstanceOf(NewImageInputError);
     await expect(attempt).rejects.toThrow(message);
+    expect(fakeDb.state.drafts.rows).toHaveLength(1);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("answers 500 with a plain message when S3_BUCKET is not set, before reading the request, and makes no draft", async () => {
+    const source = await readyDraft();
+    const fetch = accepted();
+    const noBucket = { ...ENV, S3_BUCKET: undefined };
+
+    const error = await chooseNewImage(source.draftId, NEW_IMAGE, SITE, { env: noBucket, now: () => NOW, fetch }).catch((reason: unknown) => reason);
+
+    expect(error).toBeInstanceOf(NewImageConfigError);
+    expect(newImageErrorResponse(error)).toEqual({ status: 500, error: "S3_BUCKET is not set on this deploy, so the chosen image cannot be checked." });
     expect(fakeDb.state.drafts.rows).toHaveLength(1);
     expect(fetch).not.toHaveBeenCalled();
   });

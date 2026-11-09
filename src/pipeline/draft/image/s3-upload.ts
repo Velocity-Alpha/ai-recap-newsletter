@@ -29,6 +29,10 @@ export interface UploadImageOptions {
   randomId?: () => string;
   now?: () => Date;
   retryDelayMs?: number;
+  /** Attempts after the first. Defaults to `UPLOAD_RETRIES`; the board's Generate button uses 0. */
+  retries?: number;
+  /** Per attempt. Defaults to `UPLOAD_TIMEOUT_MS`. A route must finish inside Netlify's 60 s. */
+  timeoutMs?: number;
 }
 
 const ENV_NAMES = {
@@ -74,7 +78,7 @@ function s3ErrorCode(body: string): string | null {
   return /<Code>([^<]+)<\/Code>/.exec(body)?.[1] ?? null;
 }
 
-/** Uploads a JPEG and returns its public URL. Tries 3 times (2 retries) with the same key. */
+/** Uploads a JPEG and returns its public URL. By default tries 3 times (2 retries) with the same key. */
 export async function uploadImage(
   bytes: Uint8Array,
   issueDate: string,
@@ -105,14 +109,14 @@ export async function uploadImage(
         method: "PUT",
         headers,
         body: bytes as BodyInit,
-        signal: AbortSignal.timeout(UPLOAD_TIMEOUT_MS),
+        signal: AbortSignal.timeout(options.timeoutMs ?? UPLOAD_TIMEOUT_MS),
       });
       if (!response.ok) {
         const code = s3ErrorCode(await response.text().catch(() => ""));
         throw new Error(`S3 returned HTTP ${response.status}${code ? ` (${code})` : ""}.`);
       }
     },
-    { retries: UPLOAD_RETRIES, delayMs: options.retryDelayMs ?? 2_000 },
+    { retries: options.retries ?? UPLOAD_RETRIES, delayMs: options.retryDelayMs ?? 2_000 },
   );
 
   return publicImageUrl(s3.bucket, key);

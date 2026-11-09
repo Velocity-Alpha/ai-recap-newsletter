@@ -46,11 +46,14 @@ export class DraftOwnerError extends Error {
   }
 }
 
-/** "New image" (#116) asked of a draft that does not exist (`missing`) or is not ready (`not_ready`). */
+/**
+ * "New image" (#116) asked of a draft that does not exist (`missing`), is not ready (`not_ready`), or is not the
+ * newest (`not_current`: a newer draft is running or ready, and the new draft would put this one's older text back).
+ */
 export class NewImageError extends Error {
   constructor(
     message: string,
-    readonly reason: "missing" | "not_ready",
+    readonly reason: "missing" | "not_ready" | "not_current",
   ) {
     super(message);
     this.name = "NewImageError";
@@ -160,7 +163,31 @@ export interface ImageSource {
  * `IssuePublishedError` when any issue for its date is published.
  */
 export async function readImageSource(draftId: Id): Promise<ImageSource> {
-  return (await readSourceDraft(draftId)).source;
+  const { source } = await readSourceDraft(draftId);
+  await assertNewestDraft(prisma, source);
+  return source;
+}
+
+/** A draft that is running or ready wins over older drafts when it saves. */
+const LIVE_DRAFT_STATUSES: DraftStatus[] = ["running", "ready"];
+
+function newerLiveDraft(client: Client, issueId: bigint, version: number) {
+  return client.issueDraft.findFirst({
+    where: { issueId, version: { gt: version }, status: { in: LIVE_DRAFT_STATUSES } },
+    orderBy: { version: "desc" },
+    select: { version: true, status: true },
+  });
+}
+
+/** "New image" starts only from the newest ready draft, with nothing newer running. */
+async function assertNewestDraft(client: Client, source: Pick<ImageSource, "issueId" | "version">): Promise<void> {
+  const newer = await newerLiveDraft(client, BigInt(source.issueId), source.version);
+  if (newer) {
+    throw new NewImageError(
+      `Draft v${source.version} is not the newest draft: v${newer.version} is ${newer.status}. Use "New image" on the newest ready draft.`,
+      "not_current",
+    );
+  }
 }
 
 async function readSourceDraft(draftId: Id): Promise<{ source: ImageSource; outlineId: bigint }> {
@@ -209,6 +236,8 @@ export async function createImageDraft(
     await lockIssueDate(tx, source.issueDate);
     const published = await publishedIssueFor(tx, source.issueDate);
     if (published) throw new IssuePublishedError(Number(published.id), source.issueDate);
+    // Under the lock, so a commit cannot start a newer draft between this check and the insert.
+    await assertNewestDraft(tx, source);
 
     const issueId = BigInt(source.issueId);
     const last = await tx.issueDraft.findFirst({ where: { issueId }, orderBy: { version: "desc" }, select: { version: true } });
@@ -548,6 +577,8 @@ export interface DraftView {
   sourceVersion: number | null;
   /** Any issue row for the date is published, so nothing more can be drafted. */
   issuePublished: boolean;
+  /** A newer draft of the issue is running or ready, so "New image" cannot start from this one. */
+  hasNewerDraft: boolean;
 }
 
 export interface DraftListItem extends DraftView {
@@ -589,7 +620,7 @@ function subjectOf(content: unknown): string | null {
 function toView(
   row: ViewRow,
   issueDate: string | null,
-  extra: { issuePublished: boolean; sourceVersion: number | null },
+  extra: Pick<DraftView, "issuePublished" | "sourceVersion" | "hasNewerDraft">,
 ): DraftView {
   return {
     id: Number(row.id),
@@ -614,6 +645,7 @@ function toView(
     sourceDraftId: row.sourceDraftId === null ? null : Number(row.sourceDraftId),
     sourceVersion: extra.sourceVersion,
     issuePublished: extra.issuePublished,
+    hasNewerDraft: extra.hasNewerDraft,
   };
 }
 
@@ -640,6 +672,9 @@ export async function listDraftsForDate(date: string): Promise<DraftListItem[]> 
     ...toView(row, date, {
       issuePublished,
       sourceVersion: row.sourceDraftId === null ? null : (versions.get(String(row.sourceDraftId)) ?? null),
+      hasNewerDraft: rows.some(
+        (other) => other.issueId === row.issueId && other.version > row.version && LIVE_DRAFT_STATUSES.includes(other.status as DraftStatus),
+      ),
     }),
     sent: sent.has(String(row.id)),
     current: row.id === current,
@@ -655,7 +690,8 @@ export async function getDraftStatus(draftId: Id): Promise<DraftView | null> {
   const published = issueDate ? await publishedIssueFor(prisma, issueDate) : null;
   const source =
     row.sourceDraftId === null ? null : await prisma.issueDraft.findUnique({ where: { id: row.sourceDraftId }, select: { version: true } });
-  return toView(row, issueDate, { issuePublished: Boolean(published), sourceVersion: source?.version ?? null });
+  const newer = await newerLiveDraft(prisma, row.issueId, row.version);
+  return toView(row, issueDate, { issuePublished: Boolean(published), sourceVersion: source?.version ?? null, hasNewerDraft: Boolean(newer) });
 }
 
 /** The draft's email HTML, for the board's preview frame. */

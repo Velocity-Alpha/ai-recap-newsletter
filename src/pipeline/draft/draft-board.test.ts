@@ -42,6 +42,7 @@ function view(data: Partial<DraftView> = {}): DraftView {
     sourceDraftId: null,
     sourceVersion: null,
     issuePublished: false,
+    hasNewerDraft: false,
     ...data,
   };
 }
@@ -139,7 +140,7 @@ describe("toDraftBoardView", () => {
     expect(toDraftBoardView(view({ status: "ready" }), { now: NOW }).retryable).toBe(false);
   });
 
-  it("offers New image only on a ready draft whose issue is not published (#116)", () => {
+  it("offers New image only on the newest ready draft, with nothing newer running, while the issue is not published (#116)", () => {
     const ready = view({ status: "ready", hasHtml: true, featuredImageUrl: "https://img.example.test/a.jpg", scenePrompt: "A lamp." });
 
     expect(toDraftBoardView(ready, { now: NOW })).toMatchObject({
@@ -149,6 +150,7 @@ describe("toDraftBoardView", () => {
       sourceVersion: null,
     });
     expect(toDraftBoardView({ ...ready, issuePublished: true }, { now: NOW }).newImageAllowed).toBe(false);
+    expect(toDraftBoardView({ ...ready, hasNewerDraft: true }, { now: NOW }).newImageAllowed).toBe(false);
     expect(toDraftBoardView({ ...ready, status: "running" }, { now: NOW }).newImageAllowed).toBe(false);
     expect(toDraftBoardView({ ...ready, status: "failed" }, { now: NOW }).newImageAllowed).toBe(false);
     expect(toDraftBoardView({ ...ready, sourceDraftId: 6, sourceVersion: 1 }, { now: NOW })).toMatchObject({ newImageAllowed: true, sourceVersion: 1 });

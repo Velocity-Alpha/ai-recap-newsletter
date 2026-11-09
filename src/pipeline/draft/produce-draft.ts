@@ -13,7 +13,7 @@ import {
   type DraftTemplateResult,
 } from "@/src/pipeline/draft/ghl-template";
 import {
-  checkOwnImage,
+  checkUploadedImage,
   makeFeaturedImage,
   type FeaturedImage,
   type FeaturedImageInput,
@@ -246,7 +246,7 @@ export async function produceDraft(input: ProduceDraftInput | NewImageDraftInput
 /** The real services. GHL only sends in production; elsewhere `record` gets each call. */
 export function createDraftDeps(
   env: Record<string, string | undefined> = process.env,
-  options: { record?: (entry: SideEffectRecord) => void | Promise<void> } = {},
+  options: { record?: (entry: SideEffectRecord) => void | Promise<void>; fetch?: typeof fetch } = {},
 ): Omit<ProduceDraftDeps, "onStep" | "now" | "signal"> {
   return {
     // #120 plugs in here: read each feature-section story's article, or return `unread` for it.
@@ -259,7 +259,7 @@ export function createDraftDeps(
         scene: { apiKey: env.OPENAI_API_KEY },
         image: { apiKey: env.VERTEX_API_KEY },
       }),
-    checkImage: (image, issueDate) => checkOwnImage(image, issueDate, { appEnv: env.APP_ENV, bucket: env.S3_BUCKET }),
+    checkImage: (image, issueDate) => checkUploadedImage(image, issueDate, { appEnv: env.APP_ENV, bucket: env.S3_BUCKET, fetch: options.fetch }),
     createTemplate: (input) => createDraftTemplate(input, { env, record: options.record }),
   };
 }

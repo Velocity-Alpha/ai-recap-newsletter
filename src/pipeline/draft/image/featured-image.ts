@@ -91,8 +91,34 @@ export function checkOwnImage(
   if (!image.scenePrompt.trim()) throw new Error("The scene prompt is empty.");
   const prefix = publicImageUrl(bucket, `${s3KeyPrefix(place.appEnv)}${issueDate}-`);
   const id = image.imageUrl.startsWith(prefix) ? image.imageUrl.slice(prefix.length) : "";
-  if (!/^[a-z0-9]+\.jpg$/i.test(id)) {
+  // uploadImage's ids are lowercase hex.
+  if (!/^[a-z0-9]+\.jpg$/.test(id)) {
     throw new Error(`"${image.imageUrl}" is not an image this site uploaded for ${issueDate}.`);
+  }
+  return image;
+}
+
+export const IMAGE_CHECK_TIMEOUT_MS = 10_000;
+
+/**
+ * The image step of a "New image" draft: `checkOwnImage`, then a HEAD request that the file is a JPEG in S3, so the
+ * email never points at a missing image. Throws a plain error.
+ */
+export async function checkUploadedImage(
+  image: FeaturedImage,
+  issueDate: string,
+  place: { appEnv: string | undefined; bucket: string | undefined; fetch?: typeof fetch },
+): Promise<FeaturedImage> {
+  checkOwnImage(image, issueDate, place);
+  let response: Response;
+  try {
+    response = await (place.fetch ?? fetch)(image.imageUrl, { method: "HEAD", signal: AbortSignal.timeout(IMAGE_CHECK_TIMEOUT_MS) });
+  } catch (error) {
+    throw new Error(`Could not check the chosen image in S3: ${error instanceof Error ? error.message : String(error)}`);
+  }
+  const type = response.headers.get("content-type")?.split(";")[0]?.trim().toLowerCase() ?? null;
+  if (response.status !== 200 || type !== "image/jpeg") {
+    throw new Error(`The chosen image is not in S3 as a JPEG (HTTP ${response.status}${response.status === 200 && type ? `, ${type}` : ""}).`);
   }
   return image;
 }

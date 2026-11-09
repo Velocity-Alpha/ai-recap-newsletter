@@ -1,6 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { checkOwnImage, FeaturedImageError, makeFeaturedImage, makeImageFromScene } from "@/src/pipeline/draft/image/featured-image";
+import {
+  checkOwnImage,
+  checkUploadedImage,
+  FeaturedImageError,
+  makeFeaturedImage,
+  makeImageFromScene,
+} from "@/src/pipeline/draft/image/featured-image";
 import { STYLE_PROMPT, VERTEX_IMAGE_URL } from "@/src/pipeline/draft/image/vertex-image";
 
 const CONTEXT = {
@@ -157,6 +163,9 @@ describe("checkOwnImage (#116)", () => {
     ["another date", "https://example-bucket.s3.amazonaws.com/newsletter-dev/2026-11-10-ab12cd34.jpg"],
     ["a query string", "https://example-bucket.s3.amazonaws.com/newsletter-dev/2026-11-09-ab12cd34.jpg?x=1"],
     ["not a URL", "newsletter-dev/2026-11-09-ab12cd34.jpg"],
+    // uploadImage's ids are lowercase hex with a lowercase .jpg.
+    ["an upper-case id", "https://example-bucket.s3.amazonaws.com/newsletter-dev/2026-11-09-AB12CD34.jpg"],
+    ["an upper-case extension", "https://example-bucket.s3.amazonaws.com/newsletter-dev/2026-11-09-ab12cd34.JPG"],
   ])("refuses %s", (_name, imageUrl) => {
     expect(() => checkOwnImage({ ...IMAGE, imageUrl }, "2026-11-09", PLACE)).toThrow("is not an image this site uploaded for 2026-11-09");
   });
@@ -164,5 +173,36 @@ describe("checkOwnImage (#116)", () => {
   it("refuses an empty scene prompt, and says when the bucket is not set", () => {
     expect(() => checkOwnImage({ ...IMAGE, scenePrompt: " " }, "2026-11-09", PLACE)).toThrow("The scene prompt is empty.");
     expect(() => checkOwnImage(IMAGE, "2026-11-09", { appEnv: "preview", bucket: undefined })).toThrow("S3_BUCKET is not set");
+  });
+});
+
+describe("checkUploadedImage (#116, the new-image draft's image step)", () => {
+  const IMAGE = { imageUrl: "https://example-bucket.s3.amazonaws.com/newsletter-dev/2026-11-09-ab12cd34.jpg", scenePrompt: SCENE };
+  const head = (status: number, contentType: string | null) =>
+    vi.fn<typeof fetch>(async () => new Response(null, { status, headers: contentType ? { "content-type": contentType } : {} }));
+  const place = (fetchMock: typeof fetch) => ({ appEnv: "preview", bucket: "example-bucket", fetch: fetchMock });
+
+  it("checks with a HEAD request that the file is a JPEG in S3", async () => {
+    const fetchMock = head(200, "image/jpeg");
+
+    await expect(checkUploadedImage(IMAGE, "2026-11-09", place(fetchMock))).resolves.toEqual(IMAGE);
+    expect(fetchMock).toHaveBeenCalledWith(IMAGE.imageUrl, expect.objectContaining({ method: "HEAD", signal: expect.any(AbortSignal) }));
+  });
+
+  it.each([
+    ["missing", head(404, "application/xml"), "The chosen image is not in S3 as a JPEG (HTTP 404)."],
+    ["not a JPEG", head(200, "text/html"), "The chosen image is not in S3 as a JPEG (HTTP 200, text/html)."],
+    ["unreachable", vi.fn<typeof fetch>(async () => Promise.reject(new TypeError("fetch failed"))), "Could not check the chosen image in S3: fetch failed"],
+  ])("fails plainly when the file is %s", async (_name, fetchMock, message) => {
+    await expect(checkUploadedImage(IMAGE, "2026-11-09", place(fetchMock))).rejects.toThrow(message);
+  });
+
+  it("refuses an outside URL without requesting it", async () => {
+    const fetchMock = head(200, "image/jpeg");
+
+    await expect(
+      checkUploadedImage({ ...IMAGE, imageUrl: "https://evil.example.test/a.jpg" }, "2026-11-09", place(fetchMock)),
+    ).rejects.toThrow("is not an image this site uploaded");
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

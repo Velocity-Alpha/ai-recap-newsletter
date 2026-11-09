@@ -1,3 +1,4 @@
+import { jsonPost } from "@/src/features/newsletter/draft-links";
 import type { FeaturedImage } from "@/src/pipeline/draft/image/featured-image";
 import type { SceneIdea } from "@/src/pipeline/draft/image/scene-ideas";
 
@@ -11,13 +12,10 @@ const OFFLINE = "Could not reach the server. Try again.";
 type Fetch = typeof fetch;
 type Body = Record<string, unknown>;
 
-async function post(fetcher: Fetch, url: string, body?: unknown): Promise<{ response: Response; body: Body }> {
+async function post(fetcher: Fetch, url: string, body: unknown = {}): Promise<{ response: Response; body: Body }> {
   let response: Response;
   try {
-    response = await fetcher(
-      url,
-      body === undefined ? { method: "POST" } : { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) },
-    );
+    response = await fetcher(url, jsonPost(body));
   } catch {
     throw new Error(OFFLINE);
   }
