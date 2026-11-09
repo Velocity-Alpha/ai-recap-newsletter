@@ -26,7 +26,20 @@ vi.mock("@/src/pipeline/runs", () => ({
   }),
 }));
 vi.mock("@/src/pipeline/notify", () => notify);
+// The job's own article reader, with a fake web and saved copies in memory.
+const articleWeb = vi.hoisted(() => ({ routes: {} as Record<string, unknown> }));
+const articleStore = vi.hoisted(() => ({ findRead: vi.fn(), save: vi.fn(), clearOldText: vi.fn() }));
+vi.mock("@/src/pipeline/draft/articles/http", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/src/pipeline/draft/articles/http")>();
+  const { fakeWeb } = await import("@/src/pipeline/draft/articles/fake-web.fixture");
+  return { ...actual, createNodeFetch: () => fakeWeb(articleWeb.routes as never).fetch };
+});
+vi.mock("@/src/pipeline/draft/articles/article-store", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/src/pipeline/draft/articles/article-store")>()),
+  prismaArticleStore: articleStore,
+}));
 
+import { htmlPage, jinaAnswer, jinaUrl, prose } from "@/src/pipeline/draft/articles/fake-web.fixture";
 import { toIssueContentJson, type WrittenIssueContent } from "@/src/pipeline/draft/content";
 import { SAMPLE_APPROVED, SAMPLE_CONTENT, SAMPLE_OUTLINE } from "@/src/pipeline/draft/draft.fixture";
 import { createDraft, createImageDraft, retryDraft } from "@/src/pipeline/draft/draft-store";
@@ -44,6 +57,7 @@ const ENV = { APP_ENV: "development" };
 
 function deps(overrides: Partial<ProduceDraftDeps> = {}): Partial<ProduceDraftDeps> {
   return {
+    readArticles: vi.fn(readNoArticles),
     writer: vi.fn(async () => structuredClone(SAMPLE_CONTENT)),
     makeImage: vi.fn(async () => ({ imageUrl: IMAGE_URL, scenePrompt: "A pretend robot folds towels." })),
     createTemplate: vi.fn(async () => ({ templateId: "tpl-1", previewUrl: "https://preview.example.test/tpl-1", mode: "sent" as const })),
@@ -163,6 +177,44 @@ describe("runDraftJob", () => {
       expect.objectContaining({ runId: BigInt(7) }),
     );
     expect(notify.resolveIncident).not.toHaveBeenCalled();
+  });
+
+  it("reads the feature stories' articles and logs each story's outcome, so the board can say why one was not read", async () => {
+    const [planner, laundry] = SAMPLE_APPROVED.headlines;
+    const [paperOne, paperTwo] = SAMPLE_APPROVED.research;
+    articleWeb.routes = {
+      [planner.url]: htmlPage(prose("planner")),
+      [laundry.url]: htmlPage("Forbidden", 403),
+      [jinaUrl(laundry.url)]: jinaAnswer(laundry.url, "Just a moment..."),
+      [paperOne.url]: htmlPage(prose("paper one")),
+      [paperTwo.url]: htmlPage(prose("paper two")),
+    };
+    articleStore.findRead.mockReset().mockRejectedValue(new Error('relation "story_articles" does not exist'));
+    articleStore.save.mockReset().mockResolvedValue(undefined);
+    articleStore.clearOldText.mockReset().mockResolvedValue(2);
+    const { draftId, issueId } = await commit();
+    // No readArticles: the job's own reader runs.
+    const rest = deps();
+    delete rest.readArticles;
+
+    const result = await runDraftJob(draftId, { env: ENV, now: () => NOW, deps: rest });
+
+    expect(result).toMatchObject({ status: "ready" });
+    expect(draftRow(draftId).unreadStoryIds).toEqual([laundry.id]);
+    const reads = runLog.events.filter((event) => event.step === "read_articles" && !event.message.startsWith("Started"));
+    expect(reads.map(({ level, message }) => ({ level, message }))).toEqual([
+      { level: "info", message: "Cleared the saved text of 2 old articles (issue published over 14 days ago, or read over 30 days ago)." },
+      { level: "warn", message: 'Could not load saved articles, so every story was read: relation "story_articles" does not exist' },
+      { level: "info", message: expect.stringMatching(/^Story 501: read with fetch in [\d.]+ s \([\d,]+ characters\)\.$/) },
+      { level: "warn", message: expect.stringMatching(/^Story 502: not read \(blocked\) after [\d.]+ s\. fetch: HTTP 403\. jina: A bot check or block page\.$/) },
+      { level: "info", message: expect.stringMatching(/^Story 503: read with fetch/) },
+      { level: "info", message: expect.stringMatching(/^Story 504: read with fetch/) },
+      { level: "info", message: "Read 3 of 4 articles. Not read: story 502." },
+    ]);
+    expect(reads[3].data).toMatchObject({ storyId: 502, status: "blocked", method: null, reused: false, attempts: [expect.objectContaining({ method: "fetch", httpStatus: 403 }), expect.objectContaining({ method: "jina" })] });
+    expect(JSON.stringify(reads)).not.toContain("planner pretend lab");
+    expect(articleStore.save).toHaveBeenCalledTimes(1);
+    expect(articleStore.save.mock.calls[0][2]).toEqual({ issueId });
   });
 
   it("keeps the written content on a draft that failed its checks", async () => {
@@ -302,6 +354,20 @@ describe("runDraftJob", () => {
     expect(result).toMatchObject({ status: "failed", step: "write", error: expect.stringContaining("timed out after") });
     expect(draftRow(draftId)).toMatchObject({ status: "failed", failedStep: "write" });
     expect(issueRow(issueId).html).toBeNull();
+    expect(notify.raiseIncident).toHaveBeenCalledWith(
+      expect.objectContaining({ evidence: expect.stringContaining("timed out after") }),
+      expect.anything(),
+    );
+  });
+
+  it("fails a hung article read at the deadline and raises the incident", async () => {
+    const { draftId } = await commit();
+    const hangs = vi.fn(() => new Promise<Awaited<ReturnType<typeof readNoArticles>>>(() => undefined));
+
+    const result = await runDraftJob(draftId, { env: ENV, now: () => NOW, deps: deps({ readArticles: hangs }), deadlineMs: 20 });
+
+    expect(result).toMatchObject({ status: "failed", step: "read_articles", error: expect.stringContaining("timed out after") });
+    expect(draftRow(draftId)).toMatchObject({ status: "failed", failedStep: "read_articles" });
     expect(notify.raiseIncident).toHaveBeenCalledWith(
       expect.objectContaining({ evidence: expect.stringContaining("timed out after") }),
       expect.anything(),
@@ -465,6 +531,26 @@ describe("runDraftJob for a new image (#116)", () => {
     expect(runLog.finished).toEqual([
       expect.objectContaining({ status: "succeeded", stats: expect.objectContaining({ sourceDraftId: v1.draftId, version: 2 }) }),
     ]);
+  });
+
+  it("never reads articles: the job's own reader stays idle, and the source's unread stories carry over", async () => {
+    const { v1, v1Row } = await readyV1();
+    const v2 = await createImageDraft(v1.draftId, NEW_IMAGE, { now: () => NOW });
+    articleStore.findRead.mockReset().mockResolvedValue([]);
+    articleStore.save.mockReset().mockResolvedValue(undefined);
+    articleStore.clearOldText.mockReset().mockResolvedValue(0);
+    // No readArticles: the job's own reader (#120) is the one that must not run.
+    const rest = deps({ createTemplate: tpl2() });
+    delete rest.readArticles;
+
+    const result = await runDraftJob(v2.draftId, { env: IMAGE_ENV, fetch: s3Head, now: () => NOW, deps: rest });
+
+    expect(result).toMatchObject({ status: "ready" });
+    expect(articleStore.clearOldText).not.toHaveBeenCalled();
+    expect(articleStore.findRead).not.toHaveBeenCalled();
+    expect(articleStore.save).not.toHaveBeenCalled();
+    expect(runLog.events.filter((event) => event.step === "read_articles")).toEqual([]);
+    expect(draftRow(v2.draftId).unreadStoryIds).toEqual(v1Row.unreadStoryIds);
   });
 
   it("puts the new image on the unpublished issue, with the same title and text", async () => {

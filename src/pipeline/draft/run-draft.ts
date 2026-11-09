@@ -1,5 +1,6 @@
 import type { Prisma } from "@/src/generated/prisma";
 import { loadApprovedSections } from "@/src/pipeline/draft/approved-stories";
+import { articleReadLogData, describeArticleRead, summarizeArticleReads, type ArticleReadReport } from "@/src/pipeline/draft/articles";
 import {
   claimDraft,
   findDraftToRun,
@@ -166,6 +167,24 @@ export async function runDraftJob(draftId: bigint | number | string, options: Ru
       data: { target: entry.target, action: entry.action, payload: withoutHtml(entry.payload) } as Prisma.InputJsonValue,
     });
   };
+  // One event per feature story (#120): how its article was read, or why not. The article text stays out.
+  const onArticleReads = async (reads: ArticleReadReport[]) => {
+    for (const read of reads) {
+      await log({
+        level: read.status === "read" ? "info" : "warn",
+        step: "read_articles",
+        message: describeArticleRead(read),
+        data: articleReadLogData(read) as unknown as Prisma.InputJsonValue,
+      });
+    }
+    await log({ level: "info", step: "read_articles", message: summarizeArticleReads(reads) });
+  };
+  const onArticleWarning = async (message: string) => {
+    await log({ level: "warn", step: "read_articles", message });
+  };
+  const onArticleInfo = async (message: string) => {
+    await log({ level: "info", step: "read_articles", message });
+  };
 
   /** Runs one bookkeeping write. A failure is logged (if it can be) and returned, and never stops the job. */
   const bestEffort = async (logStep: string, what: string, work: () => Promise<unknown>): Promise<string | null> => {
@@ -253,7 +272,7 @@ export async function runDraftJob(draftId: bigint | number | string, options: Ru
     stepMs.load = Date.now() - loadStarted;
 
     produced = await produceDraft(input, {
-      ...createDraftDeps(env, { record, fetch: options.fetch }),
+      ...createDraftDeps(env, { record, fetch: options.fetch, onArticleReads, onArticleWarning, onArticleInfo }),
       ...options.deps,
       onStep: enter,
       signal: deadline.signal,
