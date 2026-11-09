@@ -197,6 +197,18 @@ model Alert {
   @@schema("newsletter")
 }
 
+/// A weekday the owner chose not to publish an issue (#52): "No issue today" on /approval.
+/// The check job skips that date's checks. Undo deletes the row.
+model SkippedDate {
+  date      DateTime @id @db.Date
+  note      String?
+  createdBy String   @default("approval") @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("skipped_dates")
+  @@schema("newsletter")
+}
+
 /// Fixed-window counters for login and sign-up limits (#53). key is "<rule>:<sha256 of the IP, email, or
 /// code id>", so no address is stored. The app deletes rows a day after their window starts.
 model RateLimit {

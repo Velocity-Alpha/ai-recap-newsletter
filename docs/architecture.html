@@ -57,7 +57,7 @@
   <tr><td>Send the campaign</td><td>owner, by hand in GHL</td><td>owner (optional: schedule through the GHL API)</td><td>none</td><td>#91</td></tr>
   <tr><td>Publish detection (mark issue published on the site)</td><td><span class="now">native</span> since 2026-11-08 22:47 UTC</td><td>native; later a Resend listener instead of Gmail</td><td><code>publish.owner</code> = <code>"native"</code> (also <code>"shadow"</code>, <code>"n8n"</code>)</td><td>#38, #107</td></tr>
   <tr><td>Job runner</td><td><span class="now">Netlify functions</span></td><td>Netlify functions</td><td><code>pipeline.runner</code> = <code>"netlify"</code> (default) or <code>"trigger"</code></td><td>ADR 0001</td></tr>
-  <tr><td>Alerts and outcome checks</td><td><code>alerts</code> table and <code>raiseAlert()</code> only. No checks, no ops bot, no heartbeat.</td><td><span class="plan">planned</span>: one check job at 10:05, 12:00, 18:00; alerts from the review bot to an ops chat; Healthchecks.io heartbeat</td><td>none</td><td>#36, #48, #50, #52</td></tr>
+  <tr><td>Alerts and outcome checks</td><td><code>alerts</code> table; <span class="now">native</span> <code>run-checks</code> job: checks at 10:05, 12:00, 18:00, daily summary, Healthchecks.io heartbeat</td><td>same; alerts from the review bot to an ops chat</td><td>none</td><td>#36, #48, #50, #52</td></tr>
   <tr><td>Admin pages</td><td><span class="now">native</span> <code>/admin</code> behind the approval login: runs, incidents, settings, and stage switches</td><td>same; per-user login later (#83)</td><td>none</td><td>#54</td></tr>
 </table>
 
@@ -98,8 +98,8 @@ If the issue is missing after a send: /approval/issues -> "Mark as published"
 Terms: GLOSSARY.md. One issue per date; each commit makes a new draft with its own GHL template (ADR 0002).
 
 09:55  ingest (later: hourly 06:00-12:00 ET, raw items stored, per-source modules)     same as now
-10:05  run-checks: an ingest run happened, story count vs 8-week median, per source       <span class="plan">planned</span> #50
-       Owner commits on /approval  ("No issue today" marks a skipped date instead)       <span class="plan">planned</span> #52
+10:05  run-checks: an ingest run happened, story count vs 8-week median, per source       <span class="now">native</span> #50
+       Owner commits on /approval  ("No issue today" marks a skipped date instead)       <span class="now">native</span> #52
          -> approval_outlines row (normalised outline + hash), for either draft.owner    #75 (built)
             n8n mode: a failed save is logged and the commit still goes to n8n;
             forwarded_at is set when n8n answers 2xx. Native mode: a failed save is a
@@ -120,11 +120,11 @@ Terms: GLOSSARY.md. One issue per date; each commit makes a new draft with its o
             runs only image check (URL + S3 HEAD) -> HTML -> new GHL template -> save; no
             article reading (#120) and no writing
          n8n "2. Public approval page" is switched off the day native drafting goes live  #80
-12:00  run-checks: no commit yet -> warning                                              <span class="plan">planned</span> #52
+12:00  run-checks: no commit yet -> warning                                              <span class="now">native</span> #52
        Owner sends in GHL (unchanged)
        detect-publish publishes the issue and records which draft was sent (data-draft-id)
 18:00  run-checks: ready draft exists, issue published, issue page and home page OK;
-       daily summary to the ops chat -> Healthchecks.io ping                              <span class="plan">planned</span> #52
+       daily summary to the ops chat -> Healthchecks.io ping                              <span class="now">native</span> #52
 Alerts: the review bot posts to the "AI Recap Ops" chat, production only, no email;
         one incident per incident key; Slack may replace Telegram later (#119)           #48
 Later: pre-send review in the app before the GHL template (#117)
@@ -139,7 +139,7 @@ Later: pre-send review in the app before the GHL template (#117)
   <tr><td><code>detect-publish</code></td><td><code>*/5 0,1,13-23 * * *</code></td><td>weekdays 09:00–21:00 New York</td><td>Reads the seed inbox, 20-minute lookback, publishes</td></tr>
   <tr><td><code>detect-publish-catch-up</code></td><td><code>0 3 * * *</code></td><td>daily</td><td>Same, 3-day lookback</td></tr>
   <tr><td><code>draft-issue-background</code></td><td>none (on commit)</td><td>valid token signed for the draft; the draft is waiting to run</td><td><code>runDraftJob()</code> in <code>src/pipeline/draft/run-draft.ts</code>; gives up at 13 min. Built (#76). The commit route and "Retry" start it with <code>startDraftJob()</code> when <code>draft.owner</code> is <code>"native"</code> (#79)</td></tr>
-  <tr><td>outcome checks, digest</td><td>fixed times</td><td colspan="2"><span class="plan">planned</span> Phase 1 (#50–#52)</td></tr>
+  <tr><td><code>run-checks</code></td><td><code>0,5 14,15,16,17,22,23 * * 1-5</code></td><td>10:05, 12:00, 18:00 New York on weekdays (1 min early to 4 min late); outside production, a run at any other time ("Run now") is a full 18:00 pass</td><td>Outcome checks raise or resolve incidents; at 18:00 the daily summary to the ops chat, then the Healthchecks.io ping. Each outside call gets 5 s; Telegram and site calls stop 20 s into the run. <code>runChecks()</code> in <code>src/pipeline/checks/run-checks.ts</code></td></tr>
 </table>
 <p>Each run writes <code>pipeline_runs</code> (job, trigger, status, stats) and <code>pipeline_events</code> (step log). Job tokens: <code>src/server/job-token.ts</code>, format <code>&lt;expiresAtMs&gt;.&lt;sig&gt;</code>, HMAC key derived from <code>SESSION_SECRET</code> per purpose.</p>
 
@@ -172,7 +172,7 @@ Later: pre-send review in the app before the GHL template (#117)
   <tr><td>n8n (self-hosted)</td><td>Drafting chain (section 12)</td><td>commit route webhook</td><td>switched off (Phase 6)</td></tr>
   <tr><td>Article sources: arXiv HTML, GitHub README API, Hugging Face READMEs, story sites, Jina Reader</td><td>Reading feature-section articles for the writer (#120), in the #115 order; Jina Reader is the last fallback, keyless unless <code>JINA_API_KEY</code> is set</td><td>native <code>draft-issue</code> (not live yet)</td><td>same</td></tr>
   <tr><td>Google Analytics</td><td>Site analytics</td><td>site</td><td>same</td></tr>
-  <tr><td>Healthchecks.io</td><td>Dead-man switch for the daily digest</td><td>none</td><td><span class="plan">planned</span></td></tr>
+  <tr><td>Healthchecks.io</td><td>Dead-man switch for the daily digest</td><td><code>run-checks</code> pings after the 18:00 summary (production only, needs <code>HEALTHCHECKS_PING_URL</code>)</td><td>same</td></tr>
   <tr><td>Trigger.dev</td><td>Alternative job runner</td><td>dormant (vendor blocks production deploys)</td><td>dormant</td></tr>
 </table>
 
@@ -189,10 +189,11 @@ Later: pre-send review in the app before the GHL template (#117)
   <tr><td><code>approval_outlines</code></td><td>Each board commit: the normalised outline, its hash, the draft owner, and when n8n accepted it (<code>forwarded_at</code>)</td><td>commit route (migration not applied yet)</td></tr>
   <tr><td><code>issue_drafts</code></td><td>Each draft of an issue, version 1, 2, ... (one per commit, or per "New image"): status, current or failed step, content, html, image, GHL template; <code>source_draft_id</code> on a "New image" draft</td><td>native <code>draft-issue</code> (not live yet)</td></tr>
   <tr><td><code>story_articles</code></td><td>The saved copy of each story's article, per story and link: status (read, paywalled, blocked, failed), method, text (at most 50,000 characters), read time, and the issue whose draft read it. A read copy is reused by later drafts; an edited link is read again. Each draft job first clears the text (not the row) of up to 200 copies whose issue was published over 14 days ago or that were read over 30 days ago.</td><td>native <code>draft-issue</code> (not live yet; migration not applied yet)</td></tr>
-  <tr><td><code>alerts</code></td><td>Open and resolved incidents, one open row per <code>incident_key</code></td><td><code>raiseAlert()</code> (no callers yet)</td></tr>
+  <tr><td><code>alerts</code></td><td>Open and resolved incidents, one open row per <code>incident_key</code></td><td><code>run-checks</code>, through the ops alert module</td></tr>
+  <tr><td><code>skipped_dates</code></td><td>Dates the owner marked "No issue today"; that date's checks are off</td><td>app (<code>/approval</code>)</td></tr>
   <tr><td><code>public.schema_migrations</code></td><td>Legacy migration record</td><td>none</td></tr>
 </table>
-<p><span class="plan">Planned:</span> skipped dates (#52). After n8n is off (#82): an issue <code>status</code> (draft or published), a unique issue date, and an index on <code>stories(day)</code>. Later: the issue-to-story link and a stable story key (#118), and raw items for ingestion (#111). The runtime DB role is <code>newsletter_web</code> (<code>prisma/bootstrap/001_grant_newsletter_web.sql</code>).</p>
+<p><span class="plan">Planned:</span> After n8n is off (#82): an issue <code>status</code> (draft or published), a unique issue date, and an index on <code>stories(day)</code>. Later: the issue-to-story link and a stable story key (#118), and raw items for ingestion (#111). The runtime DB role is <code>newsletter_web</code> (<code>prisma/bootstrap/001_grant_newsletter_web.sql</code>).</p>
 
 <h2 id="code">9. Code map</h2>
 <pre>
@@ -201,7 +202,7 @@ app/                         Next.js routes
   approval/                  board (page.tsx), login/, issues/ ("Mark as published"), submitted/
   admin/                     overview, runs/ (+ [id]), incidents/, settings/ (stage switches); guard: src/server/admin-auth.ts
   api/newsletters/           list, [id], outline, commit (-> n8n), publish-status
-  api/approval/              login, outline (+ status), issues/[id]/publish
+  api/approval/              login, outline (+ status), issues/[id]/publish, skipped-dates
   api/admin/                 stage-switches (POST)
   api/subscriber/            subscribe, request-code, verify-code, sign-out, unsubscribe (+ webhook from GHL)
   api/issues/[slug], api/ticker, api/for-brands, api/revalidate (job token)
@@ -213,14 +214,16 @@ src/pipeline/                runner-neutral job logic
                              ingest-store, telegram, schedule, start-ingest, run-ingest
   publish/                   gmail-client, sent-email-parser, publish-decision, publish-store, content-diff,
                              site-refresh, manual-publish, publish-schedule, detect-publish, run-detect-publish
+  checks/                    schedule, day-facts (the only DB reads), checks (pure), site, summary, heartbeat,
+                             skipped-dates, run-checks
   settings.ts, runs.ts, alerts.ts
 src/server/                  prisma client, job-token, approval and cache-refresh auth, observability
 src/trigger/                 dormant Trigger.dev adapters
-netlify/functions/           thin wrappers: ingest-stories(.mts, -background.mts), detect-publish(.mts, -catch-up.mts)
+netlify/functions/           thin wrappers: ingest-stories(.mts, -background.mts), detect-publish(.mts, -catch-up.mts), run-checks.mts
 prisma/                      schema.prisma, migrations/, bootstrap/
 scripts/                     reset-dev-branch.mjs, run-prisma-prod.mjs, import-subscribers-from-csv.mjs,
                              replay-drafts.mts (native draft vs n8n, side by side)
-<span class="plan">planned</span> src/pipeline/{draft,llm,checks,notify,side-effects,sources}/
+<span class="plan">planned</span> src/pipeline/{draft,llm,notify,side-effects,sources}/
 </pre>
 
 <h2 id="envs">10. Environments</h2>
@@ -241,11 +244,11 @@ scripts/                     reset-dev-branch.mjs, run-prisma-prod.mjs, import-s
   <tr><th>Group</th><th>Names</th></tr>
   <tr><td>Core</td><td><code>APP_ENV</code> <code>DATABASE_URL</code> <code>NEXT_PUBLIC_SITE_URL</code> <code>SESSION_SECRET</code> <code>APPROVAL_PASSWORD</code> <code>NEWSLETTER_RUNTIME_DB_ROLE</code></td></tr>
   <tr><td>Production DB scripts (local only)</td><td><code>PRODUCTION_DATABASE_URL</code> <code>NEON_PROJECT_ID</code></td></tr>
-  <tr><td>Pipeline</td><td><code>OPENAI_API_KEY</code> <code>GMAIL_OAUTH_CLIENT_ID</code> <code>GMAIL_OAUTH_CLIENT_SECRET</code> <code>GMAIL_OAUTH_REFRESH_TOKEN</code> <code>PUBLISH_SEED_RECIPIENTS</code> <code>TELEGRAM_REVIEW_BOT_TOKEN</code> (production only) <code>TELEGRAM_REVIEW_CHAT_ID</code> (optional) <code>JINA_API_KEY</code> <code>GITHUB_TOKEN</code> (both optional, article reader)</td></tr>
+  <tr><td>Pipeline</td><td><code>OPENAI_API_KEY</code> <code>GMAIL_OAUTH_CLIENT_ID</code> <code>GMAIL_OAUTH_CLIENT_SECRET</code> <code>GMAIL_OAUTH_REFRESH_TOKEN</code> <code>PUBLISH_SEED_RECIPIENTS</code> <code>TELEGRAM_REVIEW_BOT_TOKEN</code> (production only) <code>TELEGRAM_REVIEW_CHAT_ID</code> (optional) <code>HEALTHCHECKS_PING_URL</code> (production only) <code>JINA_API_KEY</code> <code>GITHUB_TOKEN</code> (both optional, article reader)</td></tr>
   <tr><td>Subscribers</td><td><code>SUBSCRIBER_PROVIDER</code> <code>GHL_SUBSCRIBE_WEBHOOK_URL</code> <code>GHL_UNSUBSCRIBE_WEBHOOK_SECRET</code> <code>RESEND_API_KEY</code> <code>RESEND_FROM_EMAIL</code> <code>RESEND_FROM_NAME</code> <code>BEEHIIV_API_KEY</code> <code>BEEHIIV_PUBLICATION_ID</code></td></tr>
   <tr><td>n8n hand-off (removed in Phase 6)</td><td><code>OUTLINE_COMMIT_WEBHOOK_URL</code> <code>N8N_WEBHOOK_JWT_SECRET</code></td></tr>
   <tr><td>Other</td><td><code>FOR_BRANDS_WEBHOOK_URL</code> <code>NEXT_PUBLIC_GA_MEASUREMENT_ID</code> (set in <code>netlify.toml</code>), <code>OPENROUTER_API_KEY</code> (unused)</td></tr>
-  <tr><td><span class="plan">Planned</span></td><td>S3 (<code>AWS_ACCESS_KEY_ID</code> <code>AWS_SECRET_ACCESS_KEY</code> <code>AWS_REGION</code> <code>S3_BUCKET</code> <code>S3_PREFIX</code>), GHL template token, Vertex credentials, ops bot token and chat ids, Healthchecks ping URL</td></tr>
+  <tr><td><span class="plan">Planned</span></td><td>S3 (<code>AWS_ACCESS_KEY_ID</code> <code>AWS_SECRET_ACCESS_KEY</code> <code>AWS_REGION</code> <code>S3_BUCKET</code> <code>S3_PREFIX</code>), GHL template token, Vertex credentials, ops bot token and chat ids</td></tr>
 </table>
 <p>Netlify Free plan: a secret must use scopes builds, functions, and runtime. Functions read env vars at deploy time, so a changed value needs a new deploy.</p>
 
