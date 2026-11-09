@@ -84,9 +84,9 @@ export function siteUrl(env: Record<string, string | undefined>): string {
   return (url ?? SITE_URL).replace(/\/+$/, "");
 }
 
-/** The board for a date, where the owner sees the draft and can retry it. */
-export function boardLink(date: string, env: Record<string, string | undefined> = {}): string {
-  return `${siteUrl(env)}/approval?date=${encodeURIComponent(date)}`;
+/** The drafts page for a date (#79), where the owner sees the failed step and can retry. */
+export function draftsLink(date: string, env: Record<string, string | undefined> = {}): string {
+  return `${siteUrl(env)}/approval/drafts?date=${encodeURIComponent(date)}`;
 }
 
 export function draftIncidentKey(date: string): string {
@@ -207,7 +207,7 @@ export async function runDraftJob(draftId: bigint | number | string, options: Ru
           severity: "critical",
           what: `Draft v${draft.version} for ${date} failed at ${DRAFT_STEP_LABELS[failedStep]}.`,
           evidence: message,
-          link: boardLink(date, env),
+          link: draftsLink(date, env),
           details: {
             draftId: id,
             version: draft.version,
@@ -280,7 +280,7 @@ export async function runDraftJob(draftId: bigint | number | string, options: Ru
   const readyRunId: bigint = runId!;
   await bestEffort("run", "finish the run", () => finishRun(readyRunId, { status: "succeeded", stats }, now()));
   await bestEffort("alert", `resolve ${incidentKey}`, () =>
-    resolveIncident(incidentKey, { runId: readyRunId, env, now: now(), link: boardLink(issue.date, env), note: `Draft v${draft.version} is ready.` }),
+    resolveIncident(incidentKey, { runId: readyRunId, env, now: now(), link: draftsLink(issue.date, env), note: `Draft v${draft.version} is ready.` }),
   );
   return { status: "ready", draftId: id, runId: readyRunId.toString(), issue: issueUpdate };
 }
