@@ -4,14 +4,13 @@ import {
   createOutlineCandidateStories 
 } from "@/src/features/newsletter/curation.service";
 import { submitDeduplication } from "@/src/features/newsletter/openai-dedup";
+import { approvalDateKey } from "@/src/features/newsletter/approval-date";
 import { parseReuseDraftDates } from "@/src/features/newsletter/reuse-drafts-param";
 import { hasValidApprovalSession } from "@/src/server/approval-auth";
 import { logServerError, logServerInfo } from "@/src/server/observability";
 
 function parseDateParam(value: string | null): Date {
-  if (!value) return new Date();
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+  return new Date(approvalDateKey(value));
 }
 
 function toDateOnlyIso(value: Date): string {
