@@ -9,7 +9,9 @@
 ## System Context
 
 - Content + publishing website: Next.js App Router app in this repo.
-- Automation/ops pipeline: n8n handles ingestion and the HITL workflow outside this repo.
+- Automation/ops pipeline: story ingestion and publish detection run as Netlify functions in this repo
+  (`src/pipeline/`, `netlify/functions/`). n8n still drafts each issue after approval. See
+  [docs/architecture.html](./docs/architecture.html).
 - Newsletter subscription source of truth is split across this app and external automations like GHL.
 - GHL sends the actual emails.
 
@@ -43,6 +45,9 @@
 
 ## Key References
 
+- Read first: current and target architecture (stage owners, daily flow, jobs, services, data, env vars,
+  what n8n still does). Update it in the same PR when any of these change:
+  [docs/architecture.html](./docs/architecture.html)
 - README for setup, env vars, deploy, and API inventory:
   [README.md](./README.md)
 - Prisma schema:
