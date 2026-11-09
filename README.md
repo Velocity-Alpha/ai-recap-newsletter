@@ -205,6 +205,7 @@ Required environment variables:
 - `OPENROUTER_API_KEY`
 - `FOR_BRANDS_WEBHOOK_URL` if you want to override the default for-brands destination
 - `NEXT_PUBLIC_SITE_URL`
+- `VERTEX_API_KEY`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_REGION`, `S3_BUCKET` — the draft job's featured image (`src/pipeline/draft/image`). Outside production the image still uploads, but only under `newsletter-dev/`; the prefix comes from `APP_ENV`.
 
 Optional:
 
