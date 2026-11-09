@@ -205,6 +205,7 @@ Required environment variables:
 - `OPENROUTER_API_KEY`
 - `FOR_BRANDS_WEBHOOK_URL` if you want to override the default for-brands destination
 - `NEXT_PUBLIC_SITE_URL`
+- `GHL_PRIVATE_INTEGRATION_TOKEN`, `GHL_LOCATION_ID`, `GHL_USER_ID` — production only; native drafting creates a new GHL email template per draft. Outside production the GHL calls are recorded, not sent.
 
 Optional:
 
