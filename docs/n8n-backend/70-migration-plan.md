@@ -346,6 +346,30 @@ Exit: 1 week native-only, with every send published within 10 minutes. Phases 4 
 
 Goal: ingestion moves off n8n source by source, and adding a source becomes a small, tested code change.
 
+**Revised 2026-11-08 (issue #110): all sources at once, n8n's behaviour with its bugs fixed.** The owner
+asked to switch "ASAP", so 4a–4d below are replaced by one switch, `ingest.owner` (`n8n` or `native`), and
+no shadow week. Extras (raw items, hourly runs, alerts, `ingested_by`, source modules) moved to #111.
+
+- Built: `src/pipeline/ingest/` and `netlify/functions/ingest-stories*.mts`. Same schedule as n8n (09:55 New
+  York, weekdays), same prompt, model `gpt-6-luna` (low effort, strict schema, no web search), same `guid`
+  formula, same Telegram ping. Aloa is dropped. Bugs fixed: every new email since the bookmark (not `limit 1`),
+  The Signal saved as `the_signal`, tracking links followed up to 5 hops, tracking parameters removed but
+  other query strings kept, stories without a link dropped, feed stories dated with the run date, a failed
+  email tried again, better paywall rules, and a ready message that names failed sources.
+- Dev run 2026-11-08 (Neon `dev`, real inbox): 31 s, 68 stories, all 7 sources ok. Against n8n's Friday run:
+  Rundown 4 of 5 links the same (the 5th was a sponsor), AlphaSignal 8 of 9, AI Breakfast 18 stories against 9.
+  TLDR could not be compared: n8n read Thursday's email, a day behind because of `limit 1`.
+- Cutover, after a successful "Run now" on the pull request preview:
+  1. Set `TELEGRAM_REVIEW_BOT_TOKEN` (production) in Netlify, then merge.
+  2. Set the production `the_signal` bookmark to the `tldr_ai` value (n8n wrote The Signal under `tldr_ai`).
+     `tldr_ai` and `aloa_ai` stay unused.
+  3. Set `ingest.owner = native`, then deactivate `Agent - Extract and Store` (v1), `1. Fetch Stories`, and its
+     helpers: `Resolve Redirect URLS from Emails`, `HTML Strip`, `Agent - Extract and Store v2`,
+     `Check for Paywalls`, `Bookmark: Get`, `Bookmark: Set`, and `Scrape Beehiiv`.
+  4. After the first run: check the run in `pipeline_runs`, the board, and the Telegram message.
+- **Rollback:** set `ingest.owner = n8n` and reactivate the n8n workflows. The bookmarks the native job
+  moved are newer than n8n's, so set them back to the native run's start first, or n8n skips that day's mail.
+
 **4a. Source modules and the engine.**
 - Each source is a module in `src/pipeline/sources/` that exports a `SourceDefinition`: `key` (matches
   `stories.source`), `name`, `type` (`gmail-newsletter`, `product-hunt`, `hugging-face`, ...), `config`,

@@ -56,7 +56,9 @@ const message = (id: string, html = ISSUE_HTML, sentAt = SENT_AT): GmailMessage 
   id,
   subject: "♊️ Placeholder Title For Tests",
   sentAt,
+  receivedAt: sentAt,
   html,
+  text: "",
 });
 
 // Gmail lists newest first.
