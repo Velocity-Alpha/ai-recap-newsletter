@@ -20,7 +20,7 @@ export type ApprovalAuthConfig = { password: string; sessionSecret: string };
 type Env = Record<string, string | undefined>;
 
 export function getApprovalAuthConfig(env: Env = process.env): ApprovalAuthConfig | null {
-  const password = env.APPROVAL_PASSWORD;
+  const password = env.APPROVAL_PASSWORD?.trim();
   const sessionSecret = env.SESSION_SECRET?.trim();
   if (!password || !sessionSecret) return null;
   return { password, sessionSecret };

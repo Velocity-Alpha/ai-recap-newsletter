@@ -4,6 +4,8 @@ import { useState, Suspense } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 
+import { safeRedirectPath } from "@/src/lib/safe-redirect";
+
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -31,12 +33,7 @@ function LoginForm() {
 
     if (res.ok) {
       setRedirecting(true);
-      const rawRedirect = searchParams.get("redirect") ?? "";
-      const redirect =
-        rawRedirect.startsWith("/") && !rawRedirect.startsWith("//")
-          ? rawRedirect
-          : "/approval";
-      router.push(redirect);
+      router.push(safeRedirectPath(searchParams.get("redirect"), window.location.origin));
     } else {
       // The server explains lockouts ("Too many attempts...") as well as wrong passwords.
       const data = (await res.json().catch(() => null)) as { error?: string } | null;
