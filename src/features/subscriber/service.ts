@@ -20,16 +20,42 @@ import { submitSubscriberToBeehiiv } from "@/src/features/subscriber/beehiiv";
 import { submitSubscriberToGhl } from "@/src/features/subscriber/ghl";
 import { getSubscriberProvider } from "@/src/features/subscriber/provider";
 import type { SubscriberRecord } from "@/src/features/subscriber/types";
+import {
+  consumeRateLimit,
+  describeRetryAfter,
+  RATE_LIMITS,
+  type RateLimitRule,
+} from "@/src/server/rate-limit";
 
 export class SubscriberError extends Error {
   statusCode: number;
   code?: string;
+  /** Set on 429s; routes send it as the Retry-After header. */
+  retryAfterSeconds?: number;
 
-  constructor(message: string, statusCode = 400, code?: string) {
+  constructor(message: string, statusCode = 400, code?: string, retryAfterSeconds?: number) {
     super(message);
     this.statusCode = statusCode;
     this.code = code;
+    this.retryAfterSeconds = retryAfterSeconds;
   }
+}
+
+async function enforceRateLimit(rule: RateLimitRule, identifier: string) {
+  const result = await consumeRateLimit(rule, identifier);
+
+  if (!result.allowed) {
+    throw new SubscriberError(
+      `Too many attempts. Try again in ${describeRetryAfter(result.retryAfterSeconds)}.`,
+      429,
+      "rate_limited",
+      result.retryAfterSeconds,
+    );
+  }
+}
+
+function ipIdentifier(ip: string | null | undefined) {
+  return ip?.trim() || "unknown";
 }
 
 export function validateSubscriberEmail(email: unknown) {
@@ -65,9 +91,12 @@ export async function subscribeAndUpsertSubscriber(input: {
   email: string;
   source: string;
   path: string | null;
+  requestIp?: string | null;
 }) {
+  await enforceRateLimit(RATE_LIMITS.subscribeByIp, ipIdentifier(input.requestIp));
   const normalizedFirstName = validateSubscriberFirstName(input.firstName);
   const normalizedEmail = validateSubscriberEmail(input.email);
+  await enforceRateLimit(RATE_LIMITS.subscribeByEmail, normalizedEmail);
   const existingSubscriber = await findSubscriberByEmail(normalizedEmail);
 
   if (existingSubscriber?.status === "active") {
@@ -117,7 +146,9 @@ export async function requestSubscriberSignInCode(input: {
 }) {
   await maybeCleanupExpiredAuthCodes();
 
+  await enforceRateLimit(RATE_LIMITS.requestCodeByIp, ipIdentifier(input.requestIp));
   const normalizedEmail = validateSubscriberEmail(input.email);
+  await enforceRateLimit(RATE_LIMITS.requestCodeByEmail, normalizedEmail);
   const subscriber = await findRequiredActiveSubscriber(normalizedEmail);
   const code = createOneTimeCode();
 
@@ -144,9 +175,11 @@ export async function requestSubscriberSignInCode(input: {
 export async function verifySubscriberSignInCode(input: {
   email: string;
   code: string;
+  requestIp?: string | null;
 }) {
   await maybeCleanupExpiredAuthCodes();
 
+  await enforceRateLimit(RATE_LIMITS.verifyCodeByIp, ipIdentifier(input.requestIp));
   const normalizedEmail = validateSubscriberEmail(input.email);
   const normalizedCode = input.code.trim();
 
@@ -154,10 +187,15 @@ export async function verifySubscriberSignInCode(input: {
     throw new SubscriberError("Enter the 6-digit code from your email.", 400);
   }
 
+  await enforceRateLimit(RATE_LIMITS.verifyCodeByEmail, normalizedEmail);
   const subscriber = await findRequiredActiveSubscriber(normalizedEmail);
-  const didConsumeCode = await consumeOneTimeCode(normalizedEmail, normalizedCode);
+  const codeResult = await consumeOneTimeCode(normalizedEmail, normalizedCode);
 
-  if (!didConsumeCode) {
+  if (codeResult === "too_many_tries") {
+    throw new SubscriberError("Too many wrong codes. Request a new code.", 400, "too_many_tries");
+  }
+
+  if (codeResult !== "consumed") {
     throw new SubscriberError("That code is invalid or expired.", 400);
   }
 

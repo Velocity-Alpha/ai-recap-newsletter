@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { RateLimitStore } from "@/src/server/rate-limit-store";
+
 import {
   requestSubscriberSignInCode,
   subscribeAndUpsertSubscriber,
@@ -8,6 +10,7 @@ import {
   unsubscribeSubscriberFromWebhook,
   verifySubscriberSignInCode,
 } from "@/src/features/subscriber/service";
+import { createMemoryRateLimitStore } from "@/src/server/rate-limit-store";
 
 const serverFns = vi.hoisted(() => ({
   cleanupExpiredOneTimeCodes: vi.fn(),
@@ -47,6 +50,12 @@ vi.mock("@/src/features/subscriber/ghl", () => ghlFns);
 vi.mock("@/src/features/subscriber/provider", () => providerFns);
 vi.mock("@/src/features/subscriber/email", () => emailFns);
 
+const limits = vi.hoisted(() => ({ store: null as RateLimitStore | null }));
+vi.mock("@/src/server/rate-limit-store", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/src/server/rate-limit-store")>();
+  return { ...actual, getRateLimitStore: () => limits.store };
+});
+
 describe("subscriber service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -54,6 +63,7 @@ describe("subscriber service", () => {
     serverFns.normalizeSubscriberEmail.mockImplementation((email: string) => email.trim().toLowerCase());
     serverFns.createOneTimeCode.mockReturnValue("123456");
     providerFns.getSubscriberProvider.mockReturnValue("beehiiv");
+    limits.store = createMemoryRateLimitStore();
   });
 
   it("treats an active subscriber as an idempotent subscribe success", async () => {
@@ -211,7 +221,7 @@ describe("subscriber service", () => {
       firstName: "Reader",
       status: "active",
     });
-    serverFns.consumeOneTimeCode.mockResolvedValue(false);
+    serverFns.consumeOneTimeCode.mockResolvedValue("invalid");
 
     await expect(
       verifySubscriberSignInCode({
@@ -221,6 +231,39 @@ describe("subscriber service", () => {
     ).rejects.toMatchObject({
       statusCode: 400,
     });
+  });
+
+  it("asks for a new code once a code's tries are used up", async () => {
+    serverFns.findSubscriberByEmail.mockResolvedValue({
+      id: 5,
+      email: "reader@example.com",
+      firstName: "Reader",
+      status: "active",
+    });
+    serverFns.consumeOneTimeCode.mockResolvedValue("too_many_tries");
+
+    await expect(
+      verifySubscriberSignInCode({
+        email: "reader@example.com",
+        code: "123456",
+      }),
+    ).rejects.toMatchObject({
+      statusCode: 400,
+      code: "too_many_tries",
+      message: "Too many wrong codes. Request a new code.",
+    });
+    expect(serverFns.touchSubscriberSeenAt).not.toHaveBeenCalled();
+  });
+
+  it("signs a reader in when the code is consumed", async () => {
+    const subscriber = { id: 5, email: "reader@example.com", firstName: "Reader", status: "active" };
+    serverFns.findSubscriberByEmail.mockResolvedValue(subscriber);
+    serverFns.consumeOneTimeCode.mockResolvedValue("consumed");
+
+    await expect(
+      verifySubscriberSignInCode({ email: "reader@example.com", code: "123456" }),
+    ).resolves.toEqual(subscriber);
+    expect(serverFns.touchSubscriberSeenAt).toHaveBeenCalledWith(5);
   });
 
   it("marks a subscriber inactive from an unsubscribe webhook", async () => {

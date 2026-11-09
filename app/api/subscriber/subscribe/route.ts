@@ -37,6 +37,7 @@ export async function POST(request: Request) {
       email,
       source,
       path,
+      requestIp: context.ip,
     });
 
     const response = jsonWithRequestId<SubscribeResponse>(context, {
@@ -68,7 +69,10 @@ export async function POST(request: Request) {
       return jsonWithRequestId(
         context,
         { error: error.message, code: error.code },
-        { status: error.statusCode },
+        {
+          status: error.statusCode,
+          headers: error.retryAfterSeconds ? { "Retry-After": String(error.retryAfterSeconds) } : undefined,
+        },
       );
     }
 

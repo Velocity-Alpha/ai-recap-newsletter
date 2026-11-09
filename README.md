@@ -153,6 +153,7 @@ Mutation routes:
 - `POST /api/subscriber/subscribe`
 - `POST /api/subscriber/request-code`
 - `POST /api/subscriber/verify-code`
+- The three routes above, and `POST /api/approval/login`, answer `429` with `Retry-After` once a caller passes its limit (per IP, and per email where there is one). Limits live in `src/server/rate-limit.ts`; counts are in `newsletter.rate_limits`.
 - `POST /api/subscriber/sign-out`
 - `GET|POST /api/subscriber/unsubscribe` with a signed `token`
 - `POST /api/subscriber/unsubscribe/webhook` with `Authorization: Bearer <GHL_UNSUBSCRIBE_WEBHOOK_SECRET>` or `x-webhook-secret`
@@ -190,7 +191,7 @@ Required environment variables:
 
 - `APP_ENV` — `development`, `preview`, or `production`. Set per deploy context in `netlify.toml` (`production` for production, `preview` for deploy previews and branch deploys). `next build` fails without it.
 - `DATABASE_URL` — production in the production context; the Neon `dev` branch for deploy previews and branch deploys
-- `SESSION_SECRET` — signs subscriber sessions and, through derived keys, the job tokens (cache refresh, ingest start)
+- `SESSION_SECRET` — signs subscriber sessions and, through derived keys, the job tokens (cache refresh, ingest start) and approval board sessions
 - `OPENAI_API_KEY` — story extraction in the ingest job
 - `TELEGRAM_REVIEW_BOT_TOKEN` — production only; the ingest job's "stories are ready" message
 - `RESEND_API_KEY`
@@ -200,7 +201,7 @@ Required environment variables:
 - `BEEHIIV_API_KEY` and `BEEHIIV_PUBLICATION_ID` when the provider is `beehiiv`
 - `GHL_SUBSCRIBE_WEBHOOK_URL` when the provider is `ghl`
 - `GHL_UNSUBSCRIBE_WEBHOOK_SECRET`
-- `APPROVAL_PASSWORD`
+- `APPROVAL_PASSWORD` — the approval board password. With it or `SESSION_SECRET` unset, `/approval` stays locked in every environment
 - `N8N_WEBHOOK_JWT_SECRET`
 - `OPENROUTER_API_KEY`
 - `FOR_BRANDS_WEBHOOK_URL` if you want to override the default for-brands destination
