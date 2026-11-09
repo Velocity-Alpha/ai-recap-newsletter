@@ -1,3 +1,4 @@
+import jwt from "jsonwebtoken";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createApprovalSessionToken } from "@/src/server/approval-auth";
@@ -9,6 +10,148 @@ const repositoryFns = vi.hoisted(() => ({
 vi.mock("@/src/features/newsletter/repository", () => repositoryFns);
 
 import { POST } from "@/app/api/newsletters/commit/route";
+
+type BoardStory = { id: number; headline: string; summary: string };
+type BoardSlot = { story: BoardStory; status: "selected" | "fill-in" };
+type BoardSection = { key: string; label: string; max: number; stories: BoardSlot[] };
+
+function boardCandidate(id: number, category: string) {
+  return {
+    id,
+    guid: `guid-${id}`,
+    day: "2026-05-20",
+    headline: `Synthetic headline ${id}`,
+    summary: `Synthetic summary ${id}`,
+    story_details: `Synthetic details ${id}`,
+    category,
+    source: "example.com",
+    url: `https://example.com/story-${id}`,
+    importance_score: 7,
+    keyword_score: 2,
+    combined_score: 9,
+  };
+}
+
+/**
+ * The body the approval board posts on commit, built the way `commitPayload` in
+ * src/components/approval/ApprovalBoard.tsx builds it (same keys, same order), from synthetic stories.
+ */
+function boardCommitPayload() {
+  const story = (id: number): BoardStory => ({
+    id,
+    headline: `Synthetic headline ${id}`,
+    summary: `Synthetic summary ${id}`,
+  });
+  const sections: BoardSection[] = [
+    {
+      key: "headlines",
+      label: "Headlines",
+      max: 2,
+      stories: [
+        { story: story(101), status: "selected" },
+        { story: story(102), status: "selected" },
+        { story: story(103), status: "fill-in" },
+      ],
+    },
+    { key: "research", label: "Research", max: 1, stories: [{ story: story(201), status: "selected" }] },
+    { key: "tools", label: "Tools", max: 1, stories: [{ story: story(301), status: "fill-in" }] },
+    { key: "quickHits", label: "Quick Hits", max: 3, stories: [{ story: story(401), status: "selected" }] },
+  ];
+  const candidateMap: Record<string, ReturnType<typeof boardCandidate>> = {
+    "101": boardCandidate(101, "Industry"),
+    "102": boardCandidate(102, "Industry"),
+    "103": boardCandidate(103, "Policy"),
+    "201": boardCandidate(201, "Research"),
+    "301": boardCandidate(301, "Tools"),
+    "401": boardCandidate(401, "Industry"),
+  };
+  const notesOverrides: Record<number, string> = { 101: "Lead with the numbers." };
+  const urlOverrides: Record<number, string> = { 201: "https://example.com/paper-201" };
+  const excludeState: Record<number, { excluded: boolean; reason: string }> = {
+    103: { excluded: true, reason: "Duplicate of 101" },
+  };
+  const headlineStoryId = 101;
+
+  const toOption = (slot: BoardSlot) => ({
+    id: slot.story.id,
+    headline: slot.story.headline,
+    summary: slot.story.summary,
+    note: notesOverrides[slot.story.id] ?? "",
+  });
+  const candidateSections = sections.map((section) => ({
+    key: section.key,
+    label: section.label,
+    max: section.max,
+    selected: section.stories.filter((slot) => slot.status === "selected").map(toOption),
+    fill_ins: section.stories.filter((slot) => slot.status === "fill-in").map(toOption),
+  }));
+  const allVisibleStories = sections.flatMap((section) =>
+    section.stories.map((slot) => ({
+      slot,
+      section,
+      candidate: candidateMap[String(slot.story.id)],
+      exclude: excludeState[slot.story.id],
+    })),
+  );
+  const selectedStoryIds = candidateSections.flatMap((section) => section.selected.map((s) => s.id));
+
+  return {
+    date: "2026-05-21",
+    approved_ids_by_section: Object.fromEntries(
+      candidateSections.map((section) => [section.key, section.selected.map((s) => s.id)]),
+    ),
+    excluded_stories: allVisibleStories
+      .filter(({ exclude }) => exclude?.excluded)
+      .map(({ slot, section, exclude }) => ({
+        id: slot.story.id,
+        headline: slot.story.headline,
+        summary: slot.story.summary,
+        note: notesOverrides[slot.story.id] ?? "",
+        reason: exclude?.reason ?? "",
+        newsletter_category: section.key,
+      })),
+    newsletter_headline: headlineStoryId,
+    candidate_sections: candidateSections,
+    candidate_map: Object.fromEntries(
+      allVisibleStories.map(({ slot, candidate }) => [
+        String(slot.story.id),
+        {
+          id: candidate.id,
+          guid: candidate.guid ?? null,
+          day: candidate.day ?? null,
+          headline: slot.story.headline,
+          url: urlOverrides[slot.story.id] ?? candidate.url ?? null,
+          summary: slot.story.summary,
+          note: notesOverrides[slot.story.id] ?? "",
+          category: candidate.category ?? null,
+          source: candidate.source ?? null,
+          story_details: candidate.story_details ?? null,
+          importance_score: candidate.importance_score ?? null,
+          keyword_score: candidate.keyword_score,
+          combined_score: candidate.combined_score,
+        },
+      ]),
+    ),
+    selected_story_ids: selectedStoryIds,
+    stories: allVisibleStories.map(({ slot, section, candidate }) => ({
+      id: candidate.id,
+      guid: candidate.guid ?? null,
+      day: candidate.day ?? null,
+      headline: slot.story.headline,
+      url: urlOverrides[slot.story.id] ?? candidate.url ?? null,
+      summary: slot.story.summary,
+      note: notesOverrides[slot.story.id] ?? "",
+      source: candidate.source ?? null,
+      story_details: candidate.story_details ?? null,
+      importance_score: candidate.importance_score ?? null,
+      keyword_score: candidate.keyword_score,
+      combined_score: candidate.combined_score,
+      source_category: candidate.category ?? null,
+      newsletter_category: section.key,
+    })),
+    queue_update_count: selectedStoryIds.length,
+  };
+}
 
 describe("POST /api/newsletters/commit", () => {
   const fetchMock = vi.fn();
@@ -94,6 +237,50 @@ describe("POST /api/newsletters/commit", () => {
       "https://n8n.velocityalpha.com/webhook-test/story/approval",
       expect.anything(),
     );
+  });
+
+  it.each([
+    ["no webhook", undefined],
+    ["the production webhook", "https://n8n.velocityalpha.com/webhook/story/approval"],
+  ])("refuses to commit when APP_ENV is unset and %s is set", async (_label, webhookUrl) => {
+    delete process.env.APP_ENV;
+    if (webhookUrl) process.env.OUTLINE_COMMIT_WEBHOOK_URL = webhookUrl;
+    else delete process.env.OUTLINE_COMMIT_WEBHOOK_URL;
+
+    const { response, json } = await commit(boardCommitPayload());
+
+    expect(response.status).toBe(503);
+    expect(json.success).toBe(false);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("forwards a full board commit to n8n byte for byte, signed with the webhook secret", async () => {
+    webhookAccepts();
+    const payload = boardCommitPayload();
+
+    const { response } = await commit(payload);
+
+    expect(response.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("https://n8n.velocityalpha.com/webhook/story/approval");
+    expect(init.method).toBe("POST");
+    expect(init.headers["Content-Type"]).toBe("application/json");
+    // The board already sends YYYY-MM-DD, so n8n must get exactly what the board sent.
+    expect(init.body).toBe(JSON.stringify(payload));
+
+    const authorization: string = init.headers.Authorization;
+    expect(authorization.startsWith("Bearer ")).toBe(true);
+    const secret = process.env.N8N_WEBHOOK_JWT_SECRET ?? "";
+    const claims = jwt.verify(authorization.slice("Bearer ".length), secret, {
+      algorithms: ["HS256"],
+    }) as jwt.JwtPayload;
+    expect(claims).toMatchObject({
+      scope: "story-approval",
+      payloadType: "object",
+      issuedFor: "n8n-story-approval-webhook",
+    });
+    expect(Number(claims.exp) - Number(claims.iat)).toBe(3600);
   });
 
   it("forwards only the normalised YYYY-MM-DD date", async () => {
