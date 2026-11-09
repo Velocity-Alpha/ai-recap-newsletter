@@ -130,7 +130,7 @@ Later: pre-send review in the app before the GHL template (#117)
   <tr><td><code>ingest-stories-background</code></td><td>none (called by the above)</td><td>valid token</td><td><code>runIngest()</code> in <code>src/pipeline/ingest/run-ingest.ts</code></td></tr>
   <tr><td><code>detect-publish</code></td><td><code>*/5 0,1,13-23 * * *</code></td><td>weekdays 09:00–21:00 New York</td><td>Reads the seed inbox, 20-minute lookback, publishes</td></tr>
   <tr><td><code>detect-publish-catch-up</code></td><td><code>0 3 * * *</code></td><td>daily</td><td>Same, 3-day lookback</td></tr>
-  <tr><td><code>draft-issue</code></td><td>none (on commit)</td><td colspan="2"><span class="plan">planned</span> Phase 5</td></tr>
+  <tr><td><code>draft-issue-background</code></td><td>none (on commit)</td><td>valid token; the draft is waiting to run</td><td><code>runDraftJob()</code> in <code>src/pipeline/draft/run-draft.ts</code>. Built (#76); nothing starts it until the commit route calls <code>startDraftJob()</code> (#79)</td></tr>
   <tr><td>outcome checks, digest</td><td>fixed times</td><td colspan="2"><span class="plan">planned</span> Phase 1 (#50–#52)</td></tr>
 </table>
 <p>Each run writes <code>pipeline_runs</code> (job, trigger, status, stats) and <code>pipeline_events</code> (step log). Job tokens: <code>src/server/job-token.ts</code>, format <code>&lt;expiresAtMs&gt;.&lt;sig&gt;</code>, HMAC key derived from <code>SESSION_SECRET</code> per purpose.</p>
@@ -176,11 +176,12 @@ Later: pre-send review in the app before the GHL template (#117)
   <tr><td><code>subscribers</code>, <code>auth_codes</code></td><td>Site subscriber records and one-time codes</td><td>app</td></tr>
   <tr><td><code>pipeline_settings</code></td><td>Owner switches and thresholds</td><td>owner, by SQL</td></tr>
   <tr><td><code>pipeline_runs</code>, <code>pipeline_events</code></td><td>Job runs and their step logs</td><td>native jobs</td></tr>
-  <tr><td><code>publish_events</code></td><td>Each seed email seen by publish detection and the decision</td><td>native publish</td></tr>
+  <tr><td><code>publish_events</code></td><td>Each seed email seen by publish detection and the decision, and which draft was sent (<code>draft_id</code>)</td><td>native publish</td></tr>
+  <tr><td><code>issue_drafts</code></td><td>Each draft of an issue, version 1, 2, ... (one per commit): status, current or failed step, content, html, image, GHL template</td><td>native <code>draft-issue</code> (not live yet)</td></tr>
   <tr><td><code>alerts</code></td><td>Open and resolved incidents, one open row per <code>incident_key</code></td><td><code>raiseAlert()</code> (no callers yet)</td></tr>
   <tr><td><code>public.schema_migrations</code></td><td>Legacy migration record</td><td>none</td></tr>
 </table>
-<p><span class="plan">Planned:</span> <code>approval_outlines</code> (#75), <code>issue_drafts</code> (#76), saved article text per story (#120), and skipped dates (#52). After n8n is off (#82): an issue <code>status</code> (draft or published), a unique issue date, and an index on <code>stories(day)</code>. Later: the issue-to-story link and a stable story key (#118), and raw items for ingestion (#111). The runtime DB role is <code>newsletter_web</code> (<code>prisma/bootstrap/001_grant_newsletter_web.sql</code>).</p>
+<p><span class="plan">Planned:</span> <code>approval_outlines</code> (#75), saved article text per story (#120), and skipped dates (#52). After n8n is off (#82): an issue <code>status</code> (draft or published), a unique issue date, and an index on <code>stories(day)</code>. Later: the issue-to-story link and a stable story key (#118), and raw items for ingestion (#111). The runtime DB role is <code>newsletter_web</code> (<code>prisma/bootstrap/001_grant_newsletter_web.sql</code>).</p>
 
 <h2 id="code">9. Code map</h2>
 <pre>
@@ -203,7 +204,8 @@ src/server/                  prisma client, job-token, approval and cache-refres
 src/trigger/                 dormant Trigger.dev adapters
 netlify/functions/           thin wrappers: ingest-stories(.mts, -background.mts), detect-publish(.mts, -catch-up.mts)
 prisma/                      schema.prisma, migrations/, bootstrap/
-scripts/                     reset-dev-branch.mjs, run-prisma-prod.mjs, import-subscribers-from-csv.mjs
+scripts/                     reset-dev-branch.mjs, run-prisma-prod.mjs, import-subscribers-from-csv.mjs,
+                             replay-drafts.mts (native draft vs n8n, side by side)
 <span class="plan">planned</span> src/pipeline/{draft,llm,checks,notify,side-effects,sources}/ and /admin pages
 </pre>
 

@@ -163,10 +163,13 @@ model PublishEvent {
   contentJson    Json?    @map("content_json")
   problems       String[] @default([])
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  /// The native draft the sent email was made from (its data-draft-id). NULL for n8n's emails.
+  draftId        BigInt?  @map("draft_id")
 
   @@unique([mode, gmailMessageId])
   @@index([issueId])
   @@index([createdAt(sort: Desc)])
+  @@index([draftId])
   @@map("publish_events")
   @@schema("newsletter")
 }
@@ -205,5 +208,35 @@ model ApprovalOutline {
 
   @@index([issueDate, committedAt(sort: Desc)])
   @@map("approval_outlines")
+  @@schema("newsletter")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// One row per draft of an issue (#76, ADR 0002). Each commit makes the next version, counting from 1 per issue.
+/// status is running, ready, or failed (CHECK constraint in the migration). current_step is the step running now,
+/// for the board's live progress. started_at is when the current attempt began (a retry clears it).
+/// No foreign keys: issues are still deleted by hand while n8n drafts.
+model IssueDraft {
+  id               BigInt    @id @default(autoincrement())
+  issueId          BigInt    @map("issue_id")
+  version          Int
+  outlineId        BigInt    @map("outline_id")
+  status           String    @default("running")
+  currentStep      String?   @map("current_step")
+  failedStep       String?   @map("failed_step")
+  error            String?
+  content          Json?
+  html             String?
+  featuredImageUrl String?   @map("featured_image_url")
+  scenePrompt      String?   @map("scene_prompt")
+  ghlTemplateId    String?   @map("ghl_template_id")
+  ghlPreviewUrl    String?   @map("ghl_preview_url")
+  unreadStoryIds   Int[]     @default([]) @map("unread_story_ids")
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  startedAt        DateTime? @map("started_at") @db.Timestamptz(6)
+  finishedAt       DateTime? @map("finished_at") @db.Timestamptz(6)
+
+  @@unique([issueId, version])
+  @@map("issue_drafts")
   @@schema("newsletter")
 }

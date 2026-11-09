@@ -28,6 +28,7 @@ function eventData(event: PublishEventInput): Prisma.PublishEventCreateManyInput
     storyIds: event.storyIds,
     contentJson: (event.contentJson ?? undefined) as Prisma.InputJsonValue | undefined,
     problems: event.problems,
+    draftId: event.draftId === null ? null : BigInt(event.draftId),
   };
 }
 

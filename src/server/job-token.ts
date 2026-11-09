@@ -2,7 +2,8 @@ import crypto from "node:crypto";
 
 /**
  * Short-lived tokens one part of the system uses to ask another to do a job: the publish job asks the site
- * to refresh its cache, and the ingest schedule starts the background ingest function.
+ * to refresh its cache, the ingest schedule starts the background ingest function, and a commit starts the
+ * background draft function.
  *
  * They reuse SESSION_SECRET, so no new credential is needed. Each purpose signs with its own key derived
  * from that secret, so a token for one purpose never verifies for another, or as a subscriber session
@@ -10,7 +11,7 @@ import crypto from "node:crypto";
  * few minutes, for its one purpose.
  */
 
-export type JobTokenPurpose = "cache-refresh" | "ingest-stories";
+export type JobTokenPurpose = "cache-refresh" | "ingest-stories" | "draft-issue";
 
 export const JOB_TOKEN_TTL_MS = 5 * 60 * 1000;
 const CLOCK_SKEW_MS = 60 * 1000;
