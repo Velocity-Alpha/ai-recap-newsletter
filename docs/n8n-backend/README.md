@@ -21,7 +21,7 @@ changed. No secret values appear in these docs; credentials are named, never sho
 | [60-ops-errors-secrets.md](./60-ops-errors-secrets.md) | Error handling, failures, schedules, credentials map, hardcoded secrets, retention, instance facts, ops checklist |
 | [70-migration-plan.md](./70-migration-plan.md) | **The agreed piece-by-piece migration plan**: safety rules, environments, phases with cutover and rollback steps, outcome checks, alerts |
 | [80-approval-and-source-analysis.md](./80-approval-and-source-analysis.md) | Data analysis: what the reviewer edits on the approval board, when each newsletter arrives, and which sources reach published issues |
-| [../research/](../research/) | Research on free job runners and live AI-news search APIs, checked 2026-11-04 |
+| [../research/](../research/) | Research on free job runners and live AI-news search APIs (checked 2026-11-04), and on how drafting reads a story's article (checked 2026-11-09) |
 
 Each doc starts with an "At a glance" section and a diagram. LLM prompts, output schemas, SQL, and key
 Code-node logic are copied verbatim inside the docs.
