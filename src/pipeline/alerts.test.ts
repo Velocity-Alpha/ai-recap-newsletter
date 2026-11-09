@@ -11,7 +11,14 @@ const prismaMock = vi.hoisted(() => ({
 
 vi.mock("@/src/server/prisma", () => ({ prisma: prismaMock }));
 
-import { listOpenAlerts, markAlertNotified, raiseAlert, resolveAlert } from "@/src/pipeline/alerts";
+import {
+  listInfoAlertsSince,
+  listOpenAlerts,
+  listOpenCriticalsNotSentSince,
+  markAlertNotified,
+  raiseAlert,
+  resolveAlert,
+} from "@/src/pipeline/alerts";
 
 function uniqueViolation() {
   return Object.assign(new Error("Unique constraint failed"), { code: "P2002" });
@@ -47,18 +54,18 @@ describe("raiseAlert", () => {
       },
     });
     expect(prismaMock.alert.update).not.toHaveBeenCalled();
-    expect(result).toEqual({ opened: true, alert: { id: 1n, ...input } });
+    expect(result).toEqual({ opened: true, alert: { id: 1n, ...input }, previousSeverity: null });
   });
 
   it("refreshes the open alert instead of opening a second one", async () => {
-    prismaMock.alert.findUnique.mockResolvedValueOnce({ id: 1n });
+    prismaMock.alert.findUnique.mockResolvedValueOnce({ id: 1n, severity: "warning" });
     prismaMock.alert.update.mockResolvedValueOnce({ id: 1n, ...input });
 
     const result = await raiseAlert(input, now);
 
     expect(prismaMock.alert.findUnique).toHaveBeenCalledWith({
       where: { openIncidentKey: "source-stale:tldr" },
-      select: { id: true },
+      select: { id: true, severity: true },
     });
     expect(prismaMock.alert.create).not.toHaveBeenCalled();
     expect(prismaMock.alert.update).toHaveBeenCalledWith({
@@ -66,6 +73,8 @@ describe("raiseAlert", () => {
       data: { severity: "critical", lastSeen: now, message: "No TLDR stories today", context: { count: 0 } },
     });
     expect(result.opened).toBe(false);
+    // The caller needs the severity before the refresh to see an escalation (warning -> critical).
+    expect(result.previousSeverity).toBe("warning");
   });
 
   it("falls back to a refresh when another run opened the alert first", async () => {
@@ -77,6 +86,7 @@ describe("raiseAlert", () => {
 
     expect(prismaMock.alert.update).toHaveBeenCalledTimes(1);
     expect(result.opened).toBe(false);
+    expect(result.previousSeverity).toBeNull();
   });
 
   it("rethrows any other database error", async () => {
@@ -129,6 +139,32 @@ describe("listOpenAlerts", () => {
 
     expect(prismaMock.alert.findMany).toHaveBeenCalledWith({
       where: { status: "open" },
+      orderBy: { firstSeen: "asc" },
+    });
+  });
+});
+
+describe("listOpenCriticalsNotSentSince", () => {
+  it("lists open critical alerts never sent, or last sent before the cutoff", async () => {
+    prismaMock.alert.findMany.mockResolvedValueOnce([]);
+
+    await listOpenCriticalsNotSentSince(now);
+
+    expect(prismaMock.alert.findMany).toHaveBeenCalledWith({
+      where: { status: "open", severity: "critical", OR: [{ notifiedAt: null }, { notifiedAt: { lt: now } }] },
+      orderBy: { firstSeen: "asc" },
+    });
+  });
+});
+
+describe("listInfoAlertsSince", () => {
+  it("lists info alerts seen since the given time, open or resolved, oldest first", async () => {
+    prismaMock.alert.findMany.mockResolvedValueOnce([]);
+
+    await listInfoAlertsSince(now);
+
+    expect(prismaMock.alert.findMany).toHaveBeenCalledWith({
+      where: { severity: "info", lastSeen: { gte: now } },
       orderBy: { firstSeen: "asc" },
     });
   });
