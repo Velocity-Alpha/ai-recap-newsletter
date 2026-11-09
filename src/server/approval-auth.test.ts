@@ -31,6 +31,14 @@ describe("getApprovalAuthConfig", () => {
     expect(getApprovalAuthConfig({ APPROVAL_PASSWORD: "p" })).toBeNull();
     expect(getApprovalAuthConfig({ APPROVAL_PASSWORD: "p", SESSION_SECRET: "  " })).toBeNull();
   });
+
+  it("trims both values and treats a blank password as not set", () => {
+    expect(getApprovalAuthConfig({ APPROVAL_PASSWORD: " p\n", SESSION_SECRET: "\ts " })).toEqual({
+      password: "p",
+      sessionSecret: "s",
+    });
+    expect(getApprovalAuthConfig({ APPROVAL_PASSWORD: " \n\t", SESSION_SECRET: "s" })).toBeNull();
+  });
 });
 
 describe("approval session tokens", () => {

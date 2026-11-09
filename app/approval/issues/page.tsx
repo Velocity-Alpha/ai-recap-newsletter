@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import MarkPublishedButton from "@/src/components/approval/MarkPublishedButton";
 import { createPrismaPublishStore } from "@/src/pipeline/publish/publish-store";
+import { requireApprovalSession } from "@/src/server/approval-page-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -33,8 +34,8 @@ function formatPublishedAt(value: Date): string {
   }).format(value);
 }
 
-// Only the approval login reaches this page (proxy.ts matches /approval/*).
 export default async function ApprovalIssuesPage() {
+  await requireApprovalSession("/approval/issues");
   const issues = await createPrismaPublishStore().listRecentIssues(RECENT_ISSUES);
 
   return (
