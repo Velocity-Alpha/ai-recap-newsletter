@@ -1,0 +1,78 @@
+import { describe, expect, it, vi } from "vitest";
+
+import { checkPaywall } from "@/src/pipeline/ingest/paywall";
+
+function page(html: string, status = 200) {
+  return vi.fn(async () => new Response(html, { status }));
+}
+
+describe("checkPaywall", () => {
+  it("marks known paywalled sites without fetching them", async () => {
+    const fetch = vi.fn();
+    await expect(checkPaywall("https://www.wsj.com/tech/ai/story", { fetch })).resolves.toEqual({ status: "yes", error: "" });
+    await expect(checkPaywall("https://ft.com/content/1", { fetch })).resolves.toEqual({ status: "yes", error: "" });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("marks known free sites without fetching them (Product Hunt always blocked n8n's fetch)", async () => {
+    const fetch = vi.fn();
+    for (const url of [
+      "https://www.producthunt.com/products/gadget",
+      "https://huggingface.co/papers/2611.00001",
+      "https://github.com/org/repo",
+      "https://arxiv.org/abs/2611.00001",
+      "https://www.youtube.com/watch?v=1",
+    ]) {
+      await expect(checkPaywall(url, { fetch })).resolves.toEqual({ status: "no", error: "" });
+    }
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("reads the publisher's isAccessibleForFree markup", async () => {
+    const locked = '<script type="application/ld+json">{"@type":"NewsArticle","isAccessibleForFree":false}</script>';
+    const lockedString = '<script type="application/ld+json">{"isAccessibleForFree": "False"}</script>';
+    const free = '<script type="application/ld+json">{"isAccessibleForFree":true}</script>';
+    const microdata = '<meta itemprop="isAccessibleForFree" content="false">';
+
+    await expect(checkPaywall("https://news.example/a", { fetch: page(locked) })).resolves.toEqual({ status: "yes", error: "" });
+    await expect(checkPaywall("https://news.example/b", { fetch: page(lockedString) })).resolves.toEqual({ status: "yes", error: "" });
+    await expect(checkPaywall("https://news.example/c", { fetch: page(free) })).resolves.toEqual({ status: "no", error: "" });
+    await expect(checkPaywall("https://news.example/d", { fetch: page(microdata) })).resolves.toEqual({ status: "yes", error: "" });
+  });
+
+  it("reads the content tier tag and clear subscriber-only wording", async () => {
+    await expect(
+      checkPaywall("https://news.example/e", { fetch: page('<meta property="article:content_tier" content="locked">') }),
+    ).resolves.toEqual({ status: "yes", error: "" });
+    await expect(
+      checkPaywall("https://news.example/f", { fetch: page('<meta property="article:content_tier" content="free">') }),
+    ).resolves.toEqual({ status: "no", error: "" });
+    await expect(
+      checkPaywall("https://news.example/g", { fetch: page("<p>This article is available to subscribers only.</p>") }),
+    ).resolves.toEqual({ status: "yes", error: "" });
+  });
+
+  it("does not treat a footer 'Already a subscriber?' link as a paywall", async () => {
+    await expect(
+      checkPaywall("https://news.example/h", { fetch: page("<article>Full text</article><footer>Already a subscriber? Sign in</footer>") }),
+    ).resolves.toEqual({ status: "unknown", error: "" });
+  });
+
+  it("reports blocked and failed fetches as errors", async () => {
+    await expect(checkPaywall("https://news.example/i", { fetch: page("denied", 403) })).resolves.toEqual({
+      status: "error",
+      error: "HTTP 403",
+    });
+    const failing = vi.fn(async () => {
+      throw Object.assign(new Error("timed out"), { name: "TimeoutError" });
+    });
+    await expect(checkPaywall("https://news.example/j", { fetch: failing })).resolves.toEqual({
+      status: "error",
+      error: "TimeoutError",
+    });
+  });
+
+  it("returns unknown for a link it cannot read", async () => {
+    await expect(checkPaywall("", { fetch: vi.fn() })).resolves.toEqual({ status: "unknown", error: "" });
+  });
+});

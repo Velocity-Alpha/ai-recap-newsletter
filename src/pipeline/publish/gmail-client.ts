@@ -1,7 +1,8 @@
 /**
- * Read-only Gmail REST client for publish detection (scope `gmail.readonly`). It exchanges the stored
- * refresh token for an access token, lists message ids for a search query, and reads one message's
- * subject, send time, and HTML body. Error messages never include credential values.
+ * Read-only Gmail REST client (scope `gmail.readonly`) for publish detection and story ingestion. It
+ * exchanges the stored refresh token for an access token, lists message ids for a search query, and reads
+ * one message's subject, times, and HTML and plain-text bodies. Error messages never include credential
+ * values.
  */
 
 export interface GmailCredentials {
@@ -15,7 +16,11 @@ export interface GmailMessage {
   subject: string;
   /** The `Date` header (what n8n used for `published_at`), or Gmail's received time if it is unreadable. */
   sentAt: Date;
+  /** When Gmail received the message (`internalDate`). Ingestion bookmarks use it. */
+  receivedAt: Date;
   html: string;
+  /** The `text/plain` part, or "" when there is none. */
+  text: string;
 }
 
 export interface GmailReader {
@@ -51,11 +56,11 @@ export function readGmailCredentials(env: Record<string, string | undefined>): G
   };
 }
 
-function findHtmlPart(part: GmailPart | undefined): GmailPart | null {
+function findPart(part: GmailPart | undefined, mimeType: string): GmailPart | null {
   if (!part) return null;
-  if (part.mimeType === "text/html") return part;
+  if (part.mimeType === mimeType) return part;
   for (const child of part.parts ?? []) {
-    const found = findHtmlPart(child);
+    const found = findPart(child, mimeType);
     if (found) return found;
   }
   return null;
@@ -130,19 +135,20 @@ export function createGmailReader(
       const message = await get<{ id: string; internalDate?: string; payload?: GmailPart }>(`messages/${id}`, {
         format: "full",
       });
-      const htmlPart = findHtmlPart(message.payload);
-      let html = "";
-      if (htmlPart?.body?.data) {
-        html = decode(htmlPart.body.data);
-      } else if (htmlPart?.body?.attachmentId) {
-        const attachment = await get<{ data?: string }>(`messages/${id}/attachments/${htmlPart.body.attachmentId}`);
-        html = attachment.data ? decode(attachment.data) : "";
+      async function body(part: GmailPart | null): Promise<string> {
+        if (part?.body?.data) return decode(part.body.data);
+        if (!part?.body?.attachmentId) return "";
+        const attachment = await get<{ data?: string }>(`messages/${id}/attachments/${part.body.attachmentId}`);
+        return attachment.data ? decode(attachment.data) : "";
       }
+      const html = await body(findPart(message.payload, "text/html"));
+      const text = await body(findPart(message.payload, "text/plain"));
 
+      const receivedAt = new Date(Number(message.internalDate ?? 0));
       const dateHeader = new Date(header(message.payload, "date"));
-      const sentAt = Number.isNaN(dateHeader.getTime()) ? new Date(Number(message.internalDate ?? 0)) : dateHeader;
+      const sentAt = Number.isNaN(dateHeader.getTime()) ? receivedAt : dateHeader;
 
-      return { id: message.id, subject: header(message.payload, "subject"), sentAt, html };
+      return { id: message.id, subject: header(message.payload, "subject"), sentAt, receivedAt, html, text };
     },
   };
 }

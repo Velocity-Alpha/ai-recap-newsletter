@@ -178,7 +178,8 @@ The homepage and archive lists, individual issue lookups, and sitemap entries sh
 Jobs run as Netlify functions in `netlify/functions/` (see `docs/adr/0001-job-runner.md`). The adapters stay thin; the logic lives in `src/pipeline/`. `src/trigger/` holds dormant Trigger.dev adapters for the same jobs. The `pipeline.runner` key in `newsletter.pipeline_settings` picks the runner that acts: `netlify` (the default) or `trigger`. The migration plan is in `docs/n8n-backend/70-migration-plan.md`.
 
 - `detect-publish` reads the seed inbox (read-only) every 5 minutes on weekdays, 09:00–20:59 New York time, and `detect-publish-catch-up` looks back 3 days once a day. Each run checks Gmail first and opens the database only when an issue email arrived. The `publish.owner` key decides what happens next: `n8n` (the default) does nothing, `shadow` only records `publish_events` rows, and `native` publishes. The functions need `DATABASE_URL`, `GMAIL_OAUTH_CLIENT_ID`, `GMAIL_OAUTH_CLIENT_SECRET`, and `GMAIL_OAUTH_REFRESH_TOKEN` as secret Netlify env vars, plus `PUBLISH_SEED_RECIPIENTS`. Set that to the one monitor seed address. Each send also reaches the owner's `+` alias in the same inbox; without the filter, the job reads every send twice. Secret vars use the scopes builds, functions, and runtime; the Free plan cannot narrow them further.
-- Scheduled functions fire only on the production deploy. To try one on a deploy preview (Neon `dev`), use "Run now" on the preview's function page in the Netlify UI.
+- `ingest-stories` collects the day's candidate stories at 09:55 New York time on weekdays. It reads 5 newsletters from the seed inbox (read-only) and the Product Hunt and Hugging Face feeds, extracts stories with `gpt-6-luna`, and saves them to `newsletter.stories` for the approval board. Then it sends the "stories are ready" message to the AI Recap Review Telegram group (production only; elsewhere the run log records the text). The scheduled function only starts `ingest-stories-background`, which does the work in up to 15 minutes; the call carries a 5-minute token signed with a key derived from `SESSION_SECRET`. The `ingest.owner` key decides who ingests: `n8n` (the default) or `native`. The job needs the Gmail variables above, `OPENAI_API_KEY`, and `TELEGRAM_REVIEW_BOT_TOKEN` (production only). Sources live in `src/pipeline/ingest/sources.ts`; each has a bookmark in `newsletter.scraper_bookmarks`, and a failed email is tried again on the next run. Each run is in `pipeline_runs` and `pipeline_events`.
+- Scheduled functions fire only on the production deploy. To try one on a deploy preview (Neon `dev`), use "Run now" on the preview's function page in the Netlify UI. On a preview, `ingest-stories` runs at any time.
 - Do this before merging a new job. A local bundle can still load packages from the repo's `node_modules`, so it can pass while the Netlify bundle fails. `netlify.toml` ships `@prisma/client-runtime-utils` with the jobs for this reason.
 
 ## Deploying to Netlify
@@ -189,7 +190,9 @@ Required environment variables:
 
 - `APP_ENV` — `development`, `preview`, or `production`. Set per deploy context in `netlify.toml` (`production` for production, `preview` for deploy previews and branch deploys). `next build` fails without it.
 - `DATABASE_URL` — production in the production context; the Neon `dev` branch for deploy previews and branch deploys
-- `SESSION_SECRET` — signs subscriber sessions and, through a derived key, the cache refresh tokens of the publish job
+- `SESSION_SECRET` — signs subscriber sessions and, through derived keys, the job tokens (cache refresh, ingest start)
+- `OPENAI_API_KEY` — story extraction in the ingest job
+- `TELEGRAM_REVIEW_BOT_TOKEN` — production only; the ingest job's "stories are ready" message
 - `RESEND_API_KEY`
 - `RESEND_FROM_NAME`
 - `RESEND_FROM_EMAIL`

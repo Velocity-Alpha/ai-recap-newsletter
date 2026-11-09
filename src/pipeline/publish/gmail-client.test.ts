@@ -77,7 +77,7 @@ describe("createGmailReader", () => {
     await expect(gmail.listMessageIds("from:x", 10)).resolves.toEqual([]);
   });
 
-  it("reads the subject, the Date header, and the HTML part of a multipart message", async () => {
+  it("reads the subject, the Date header, the received time, and both body parts of a multipart message", async () => {
     const gmail = createGmailReader(CREDENTIALS, {
       fetch: fakeFetch(tokenRoute, (url) =>
         url.pathname.endsWith("/messages/m1")
@@ -104,7 +104,9 @@ describe("createGmailReader", () => {
       id: "m1",
       subject: "Today’s issue ✨",
       sentAt: new Date("2026-11-03T17:48:22.000Z"),
+      receivedAt: new Date(1793728100000),
       html: '<div data-issue-id="268">Café</div>',
+      text: "plain",
     });
   });
 
@@ -138,7 +140,9 @@ describe("createGmailReader", () => {
       id: "m2",
       subject: "",
       sentAt: new Date(1793728102000),
+      receivedAt: new Date(1793728102000),
       html: "<p>big</p>",
+      text: "",
     });
   });
 

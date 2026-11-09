@@ -19,3 +19,6 @@
 # with "Cannot find module". Ship it explicitly.
 [functions."detect-publish*"]
   included_files = ["node_modules/@prisma/client-runtime-utils/**"]
+
+[functions."ingest-stories*"]
+  included_files = ["node_modules/@prisma/client-runtime-utils/**"]

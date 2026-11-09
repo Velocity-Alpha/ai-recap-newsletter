@@ -37,7 +37,7 @@ function gmail(ids: string[], fail = false): GmailReader {
     listMessageIds: vi.fn(async () => ids),
     getMessage: vi.fn(async (id: string) => {
       if (fail) throw new Error("Gmail request failed with HTTP 500.");
-      return { id, subject: "Promo", sentAt: NOW, html: "<p>promo</p>" };
+      return { id, subject: "Promo", sentAt: NOW, receivedAt: NOW, html: "<p>promo</p>", text: "promo" };
     }),
   };
 }
@@ -205,7 +205,9 @@ describe("site refresh after a native publish", () => {
         id,
         subject: "Issue",
         sentAt: new Date(NOW.getTime() - (id === "first" ? 2000 : 1000)),
+        receivedAt: NOW,
         html: ISSUE_HTML,
+        text: "",
       })),
     };
   }
