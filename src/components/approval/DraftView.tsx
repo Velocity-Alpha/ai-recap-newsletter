@@ -155,7 +155,11 @@ export default function DraftView({ draft, retryBusy, retryError, onRetry }: Dra
         ) : null}
 
         {running && draft.retryable ? (
-          <p className={`mt-4 ${WARM_NOTE}`}>This draft has not moved for 20 minutes. Its job has probably stopped.</p>
+          <p className={`mt-4 ${WARM_NOTE}`}>
+            {draft.startedAt
+              ? "This draft has not moved for 20 minutes. Its job has probably stopped."
+              : "This draft is still waiting. Its job has not started after 5 minutes, so it probably never got the request."}
+          </p>
         ) : null}
 
         {draft.status !== "ready" ? <Steps draft={draft} /> : null}

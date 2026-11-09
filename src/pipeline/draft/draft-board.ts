@@ -51,7 +51,7 @@ export interface DraftBoardView {
   ghlPreviewUrl: string | null;
   /** Feature stories whose article the writer could not read ("source not read"). */
   unreadStories: UnreadStory[];
-  /** Failed, or stuck in running: the same rule as `retryDraft`. */
+  /** Failed, or stuck in running (or never started): the same rule as `retryDraft`. */
   retryable: boolean;
   createdAt: string;
   startedAt: string | null;

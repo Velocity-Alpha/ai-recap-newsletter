@@ -76,6 +76,14 @@ describe("DraftView", () => {
     expect(html).toContain("Retry");
   });
 
+  it("offers Retry on a draft whose job never started, and says so", () => {
+    const html = render(draft({ retryable: true, stepLabel: null, startedAt: null, steps: steps([]) }));
+
+    expect(html).toContain("Its job has not started after 5 minutes");
+    expect(html).not.toContain("20 minutes");
+    expect(html).toContain("Retry");
+  });
+
   it("shows a ready draft's email in a sandboxed frame, with its GHL link", () => {
     const html = render(
       draft({

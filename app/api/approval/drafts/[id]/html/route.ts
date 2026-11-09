@@ -7,9 +7,21 @@ import { positiveIdParam, type IdRouteContext } from "@/src/server/route-params"
 
 export const runtime = "nodejs";
 
+const NEW_TAB_BASE = '<base target="_blank">';
+
+/**
+ * The email with `<base target="_blank">` first in its head, so its links open in a new tab: most sites refuse to
+ * load inside the frame. For the preview only; the email saved for GHL stays as it is.
+ */
+function withLinksInNewTab(html: string): string {
+  const opening = /<head\b[^>]*>/i.exec(html) ?? /<html\b[^>]*>/i.exec(html) ?? /<!doctype\b[^>]*>/i.exec(html);
+  const at = opening ? opening.index + opening[0].length : 0;
+  return `${html.slice(0, at)}${NEW_TAB_BASE}${html.slice(at)}`;
+}
+
 /**
  * A draft's email HTML, for the board's preview frame. The frame is sandboxed, and so is this response
- * (`Content-Security-Policy: sandbox`): no scripts, and no access to the board's origin. Links may open a new tab.
+ * (`Content-Security-Policy: sandbox`): no scripts, and no access to the board's origin. Links open a new tab.
  */
 export async function GET(request: Request, context: IdRouteContext) {
   if (!(await hasValidApprovalSession(request))) {
@@ -21,7 +33,7 @@ export async function GET(request: Request, context: IdRouteContext) {
   try {
     const html = await getDraftHtml(draftId);
     if (!html) return NextResponse.json({ error: `Draft ${draftId} has no email yet.` }, { status: 404 });
-    return new Response(html, {
+    return new Response(withLinksInNewTab(html), {
       headers: {
         "Content-Type": "text/html; charset=utf-8",
         "Content-Security-Policy": "sandbox allow-popups allow-popups-to-escape-sandbox",

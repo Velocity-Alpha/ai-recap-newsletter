@@ -511,6 +511,23 @@ describe("POST /api/newsletters/commit", () => {
     errorLog.mockRestore();
   });
 
+  it("stops an n8n-mode commit before saving anything when N8N_WEBHOOK_JWT_SECRET is unset", async () => {
+    // A failed save is soft in n8n mode (above), but a missing secret is not: n8n could never accept the commit.
+    delete process.env.N8N_WEBHOOK_JWT_SECRET;
+    webhookAccepts();
+    const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const { response, json } = await commit(boardCommitPayload());
+
+    expect(response.status).toBe(500);
+    expect(json).toMatchObject({ success: false, error: expect.stringContaining("N8N_WEBHOOK_JWT_SECRET") });
+    expect(outlineStore.saveOutline).not.toHaveBeenCalled();
+    expect(storyChanges.applyStoryChanges).not.toHaveBeenCalled();
+    expect(draftStore.createDraft).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+    errorLog.mockRestore();
+  });
+
   it("marks the saved outline forwarded after n8n answers 2xx", async () => {
     webhookAccepts();
 

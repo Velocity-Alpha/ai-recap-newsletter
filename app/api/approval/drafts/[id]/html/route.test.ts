@@ -42,16 +42,39 @@ describe("GET /api/approval/drafts/[id]/html", () => {
   });
 
   it("serves the email HTML for the preview frame, sandboxed and never cached", async () => {
-    draftStore.getDraftHtml.mockResolvedValue("<html><body>Hello</body></html>");
+    draftStore.getDraftHtml.mockResolvedValue("<html><head><title>Hi</title></head><body>Hello</body></html>");
 
     const response = await get("41");
 
     expect(response.status).toBe(200);
     expect(draftStore.getDraftHtml).toHaveBeenCalledWith(41);
     expect(response.headers.get("content-type")).toBe("text/html; charset=utf-8");
-    expect(response.headers.get("content-security-policy")).toContain("sandbox");
+    // Exact, so allow-scripts or allow-same-origin can never slip in.
+    expect(response.headers.get("content-security-policy")).toBe("sandbox allow-popups allow-popups-to-escape-sandbox");
     expect(response.headers.get("cache-control")).toBe("no-store");
     expect(response.headers.get("x-frame-options")).toBe("SAMEORIGIN");
-    expect(await response.text()).toBe("<html><body>Hello</body></html>");
+  });
+
+  it("opens the email's links in a new tab, since most sites refuse to load inside the frame", async () => {
+    draftStore.getDraftHtml.mockResolvedValue(
+      '<!DOCTYPE html>\n<html>\n  <head lang="en">\n    <title>Hi</title>\n  </head>\n  <body><a href="https://example.test/a">A</a></body>\n</html>',
+    );
+
+    const response = await get("41");
+
+    expect(await response.text()).toBe(
+      '<!DOCTYPE html>\n<html>\n  <head lang="en"><base target="_blank">\n    <title>Hi</title>\n  </head>\n  <body><a href="https://example.test/a">A</a></body>\n</html>',
+    );
+  });
+
+  it("adds the new-tab base even when the email has no head", async () => {
+    draftStore.getDraftHtml.mockResolvedValueOnce("<html><body>Hello</body></html>");
+    expect(await (await get("41")).text()).toBe('<html><base target="_blank"><body>Hello</body></html>');
+
+    draftStore.getDraftHtml.mockResolvedValueOnce("<!doctype html><p>Hello</p>");
+    expect(await (await get("41")).text()).toBe('<!doctype html><base target="_blank"><p>Hello</p>');
+
+    draftStore.getDraftHtml.mockResolvedValueOnce("<header>Hello</header>");
+    expect(await (await get("41")).text()).toBe('<base target="_blank"><header>Hello</header>');
   });
 });

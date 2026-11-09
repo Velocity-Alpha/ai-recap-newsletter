@@ -6,12 +6,11 @@ import { useSearchParams } from "next/navigation";
 
 import DraftList from "@/components/approval/DraftList";
 import DraftView from "@/components/approval/DraftView";
+import { nextDraftPoll, type DraftPollOutcome } from "@/src/features/newsletter/draft-polling";
 import type { DraftBoardView, DraftListEntry } from "@/src/pipeline/draft/draft-board";
 
 // The draft view (#79): one draft's live progress, preview, or failure, and every draft for the date.
 // proxy.ts keeps it behind the approval login, like the rest of /approval.
-
-const POLL_MS = 3_000;
 
 type DraftListState = { owner: "n8n" | "native"; drafts: DraftListEntry[] };
 
@@ -74,30 +73,39 @@ function DraftsForDate({ date, requestedId }: { date: string; requestedId: numbe
     };
   }, [date, draftStatus]);
 
-  // The shown draft, every few seconds while it runs.
+  // The shown draft, every few seconds while it runs. Errors slow the polling down; see nextDraftPoll.
   useEffect(() => {
     if (!selectedId) return;
     let active = true;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let errors = 0;
 
     const load = async () => {
+      let outcome: DraftPollOutcome;
+      let message: string | null = null;
       try {
         const response = await fetch(`/api/approval/drafts/${selectedId}`, { cache: "no-store" });
         const body = await readJson(response);
         if (!active) return;
-        if (!response.ok || !body.draft) {
-          setDraftError(String(body.error ?? `Could not read draft ${selectedId}.`));
-          return;
+        if (response.ok && body.draft) {
+          const next = body.draft as DraftBoardView;
+          errors = 0;
+          outcome = { kind: "draft", status: next.status };
+          setDraft(next);
+        } else {
+          errors += 1;
+          outcome = { kind: "error", httpStatus: response.status };
+          message = String(body.error ?? `Could not read draft ${selectedId}.`);
         }
-        const next = body.draft as DraftBoardView;
-        setDraft(next);
-        setDraftError(null);
-        if (next.status === "running") timer = setTimeout(load, POLL_MS);
       } catch {
         if (!active) return;
-        setDraftError("Could not reach the server. Trying again…");
-        timer = setTimeout(load, POLL_MS * 2);
+        errors += 1;
+        outcome = { kind: "network" };
+        message = "Could not reach the server.";
       }
+      const delay = nextDraftPoll(outcome, errors);
+      setDraftError(message && delay !== null ? `${message} Trying again…` : message);
+      if (delay !== null) timer = setTimeout(load, delay);
     };
     void load();
 
