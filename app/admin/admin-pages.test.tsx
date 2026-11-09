@@ -27,6 +27,7 @@ const prismaMock = vi.hoisted(() => ({
 
 vi.mock("@/src/server/prisma", () => ({ prisma: prismaMock }));
 
+import AdminErrorPage from "@/app/admin/error";
 import AdminOverviewPage from "@/app/admin/page";
 import AdminIncidentsPage from "@/app/admin/incidents/page";
 import AdminRunPage from "@/app/admin/runs/[id]/page";
@@ -111,6 +112,7 @@ describe("admin pages render", () => {
         { id: 1n, runId: 9n, level: "info", step: "source", message: "Source A: ok", data: null, createdAt: later(5_000) },
         { id: 2n, runId: 9n, level: "error", step: "source", message: "Source B: failed.", data: { tries: 2 }, createdAt: later(9_000) },
       ],
+      _count: { events: 2 },
     });
 
     const html = await render(AdminRunPage({ params: Promise.resolve({ id: "9" }) }));
@@ -119,6 +121,39 @@ describe("admin pages render", () => {
     expect(html).toContain("1 source(s) had errors: Source B.");
     expect(html.indexOf("Source A: ok")).toBeLessThan(html.indexOf("Source B: failed."));
     expect(html).toContain("&quot;tries&quot;: 2");
+    expect(html).toContain("2 in order");
+    expect(html).not.toContain("not shown");
+  });
+
+  it("/admin/runs/[id] shows the first 500 steps and says how many more there are", async () => {
+    const events = Array.from({ length: 500 }, (_, index) => ({
+      id: BigInt(index + 1),
+      runId: 9n,
+      level: "info",
+      step: "poll",
+      message: "Poll " + (index + 1),
+      data: null,
+      createdAt: later(index * 1_000),
+    }));
+    prismaMock.pipelineRun.findUnique.mockResolvedValueOnce({ ...RUNS[0], events, _count: { events: 1234 } });
+
+    const html = await render(AdminRunPage({ params: Promise.resolve({ id: "9" }) }));
+
+    expect(html).toContain("Poll 500");
+    expect(html).toContain("first 500 of 1,234");
+    expect(html).toContain("734 more steps not shown.");
+  });
+
+  it("the admin error page offers a retry and prints no error details", () => {
+    const error = Object.assign(new Error("connect ECONNREFUSED db.internal:5432"), { digest: "abc123" });
+
+    const html = renderToStaticMarkup(<AdminErrorPage error={error} reset={() => {}} />);
+
+    expect(html).toContain("This page could not load. Try again in a moment.");
+    expect(html).toContain("Try again");
+    expect(html).not.toContain("ECONNREFUSED");
+    expect(html).not.toContain("db.internal");
+    expect(html).not.toContain("abc123");
   });
 
   it("/admin/incidents shows key, severity, times, message, evidence, and a local link", async () => {

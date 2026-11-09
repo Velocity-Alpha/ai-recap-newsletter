@@ -73,7 +73,7 @@ describe("admin proxy", () => {
   });
 
   it("runs on every admin page and admin API path", () => {
-    expect(config.matcher).toEqual(expect.arrayContaining(["/admin/:path*", "/api/admin/:path*"]));
+    expect(config.matcher).toEqual(expect.arrayContaining(["/admin", "/admin/:path*", "/api/admin", "/api/admin/:path*"]));
   });
 
   it("sends a visitor without a session from an admin page to the login page", async () => {

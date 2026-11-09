@@ -1,13 +1,16 @@
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 
+// Next's own matcher check. Imported from its file: the "next/experimental/testing/server" entry also loads
+// config-testing-utils, which breaks route handler calls later in this file (AsyncLocalStorage invariant).
+import { unstable_doesMiddlewareMatch } from "next/dist/experimental/testing/server/middleware-testing-utils";
 import { NextRequest } from "next/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
  * Acceptance check for #54: no admin page or admin API works without the approval login.
- * It finds every page under app/admin and every route under app/api/admin on disk, so a new page or route
- * is covered without editing this file.
+ * It finds every file under app/admin and every route under app/api/admin on disk, so a new page or route
+ * is covered without editing this file, and an unreviewed kind of file fails the test.
  */
 
 const cookieJar = vi.hoisted(() => ({ token: undefined as string | undefined }));
@@ -66,11 +69,17 @@ import { APPROVAL_SESSION_COOKIE_NAME, createApprovalSessionToken } from "@/src/
 
 const ROOT = path.resolve(__dirname, "../..");
 const HTTP_METHODS = ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"] as const;
+const SOURCE = "[cm]?[jt]sx?";
 
 function filesUnder(dir: string): string[] {
   return readdirSync(path.join(ROOT, dir), { recursive: true, withFileTypes: true })
     .filter((entry) => entry.isFile())
     .map((entry) => path.relative(ROOT, path.join(entry.parentPath, entry.name)).split(path.sep).join("/"));
+}
+
+/** Matches a Next special file such as `page.tsx` or `route.ts` (not `route.test.ts`). */
+function named(name: string): RegExp {
+  return new RegExp(`/${name}\\.${SOURCE}$`);
 }
 
 /** app/admin/runs/[id]/page.tsx -> { url: "/admin/runs/1", params: { id: "1" } } */
@@ -88,16 +97,44 @@ function routeOf(file: string) {
   return { file, url, params };
 }
 
-const PAGES = filesUnder("app/admin").filter((file) => /\/page\.(t|j)sx?$/.test(file)).map(routeOf);
-const ROUTES = filesUnder("app/api/admin").filter((file) => /\/route\.(t|j)s$/.test(file)).map(routeOf);
+const APP_ADMIN_FILES = filesUnder("app/admin");
+const PAGES = APP_ADMIN_FILES.filter((file) => named("page").test(file)).map(routeOf);
+const LAYOUTS = APP_ADMIN_FILES.filter((file) => named("layout").test(file)).map(routeOf);
+// A route handler under app/admin is as reachable as one under app/api/admin, so both trees are checked.
+const ROUTES = [...APP_ADMIN_FILES, ...filesUnder("app/api/admin")]
+  .filter((file) => named("route").test(file))
+  .map(routeOf);
 
-type PageModule = { default: (props: unknown) => unknown };
-type RouteModule = Partial<Record<(typeof HTTP_METHODS)[number], (request: Request, context: unknown) => Promise<Response>>>;
+/**
+ * The only files allowed under app/admin, each with the check that covers it. Any other special file
+ * (loading, template, not-found, default, opengraph-image, sitemap...) or plain module fails the test until
+ * it is reviewed and a check is added here.
+ */
+const ALLOWED_IN_APP_ADMIN: Array<{ pattern: RegExp; coveredBy: string }> = [
+  { pattern: named("page"), coveredBy: "redirects to the login without a session" },
+  { pattern: named("layout"), coveredBy: "reads no data" },
+  { pattern: named("route"), coveredBy: "answers 401 without a session" },
+  { pattern: named("error"), coveredBy: "client error boundary; admin-pages.test.tsx shows it prints no error details" },
+  { pattern: new RegExp(`\\.test\\.${SOURCE}$`), coveredBy: "tests" },
+];
 
-async function renderPage(page: (typeof PAGES)[number]): Promise<{ redirectedTo: string | null; error: unknown }> {
-  const mod = (await import(/* @vite-ignore */ path.join(ROOT, page.file))) as PageModule;
+type Props = { params: Promise<Record<string, string>>; searchParams: Promise<Record<string, string>> };
+type PageModule = {
+  default: (props: unknown) => unknown;
+  generateMetadata?: (props: Props, parent: unknown) => unknown;
+};
+type RouteModule = Partial<
+  Record<(typeof HTTP_METHODS)[number], (request: Request, context: unknown) => Promise<Response>>
+>;
+
+function propsFor(entry: { params: Record<string, string> }): Props {
+  return { params: Promise.resolve(entry.params), searchParams: Promise.resolve({}) };
+}
+
+/** Runs a server function and says whether it redirected (and where) or threw something else. */
+async function outcome(run: () => unknown): Promise<{ redirectedTo: string | null; error: unknown }> {
   try {
-    await mod.default({ params: Promise.resolve(page.params), searchParams: Promise.resolve({}) });
+    await run();
     return { redirectedTo: null, error: null };
   } catch (error) {
     const digest = (error as { digest?: unknown }).digest;
@@ -107,6 +144,15 @@ async function renderPage(page: (typeof PAGES)[number]): Promise<{ redirectedTo:
     }
     return { redirectedTo: null, error };
   }
+}
+
+async function load(file: string): Promise<PageModule> {
+  return (await import(/* @vite-ignore */ path.join(ROOT, file))) as PageModule;
+}
+
+async function renderPage(page: (typeof PAGES)[number]) {
+  const mod = await load(page.file);
+  return outcome(() => mod.default(propsFor(page)));
 }
 
 async function callRoute(route: (typeof ROUTES)[number]) {
@@ -176,7 +222,16 @@ describe("admin access (#54)", () => {
     expect(PAGES.map((page) => page.url)).toEqual(
       expect.arrayContaining(["/admin", "/admin/runs", "/admin/runs/1", "/admin/incidents", "/admin/settings"]),
     );
+    expect(LAYOUTS.map((layout) => layout.url)).toEqual(["/admin"]);
     expect(ROUTES.map((route) => route.url)).toEqual(expect.arrayContaining(["/api/admin/stage-switches"]));
+  });
+
+  it("allows only reviewed kinds of file under app/admin", () => {
+    const unreviewed = APP_ADMIN_FILES.filter(
+      (file) => !ALLOWED_IN_APP_ADMIN.some(({ pattern }) => pattern.test(file)),
+    );
+
+    expect(unreviewed).toEqual([]);
   });
 
   describe.each(NO_SESSION_CASES)("with $name", ({ arrange }) => {
@@ -190,7 +245,30 @@ describe("admin access (#54)", () => {
       expect(db.calls).toEqual([]);
     });
 
-    it.each(ROUTES)("API $url answers 401 for every method and touches no data", async (route) => {
+    it.each([...PAGES, ...LAYOUTS])("$file: generateMetadata, if exported, reads no data", async (entry) => {
+      await arrange();
+      const mod = await load(entry.file);
+      if (typeof mod.generateMetadata !== "function") return;
+
+      const { redirectedTo, error } = await outcome(() => mod.generateMetadata!(propsFor(entry), {}));
+
+      // Either it is guarded (redirects to the login) or it stays away from the database.
+      if (redirectedTo === null) expect(error).toBeNull();
+      else expect(redirectedTo).toMatch(/^\/approval\/login\?/);
+      expect(db.calls).toEqual([]);
+    });
+
+    it.each(LAYOUTS)("layout $url reads no data", async (layout) => {
+      await arrange();
+      const mod = await load(layout.file);
+
+      const { error } = await outcome(() => mod.default({ children: null, params: Promise.resolve(layout.params) }));
+
+      expect(error).toBeNull();
+      expect(db.calls).toEqual([]);
+    });
+
+    it.each(ROUTES)("route $url answers 401 for every method and touches no data", async (route) => {
       await arrange();
 
       const results = await callRoute(route);
@@ -212,31 +290,35 @@ describe("admin access (#54)", () => {
       if (error) expect((error as { digest?: string }).digest).toMatch(/^NEXT_HTTP_ERROR_FALLBACK;404/);
     });
 
-    it.each(ROUTES)("API $url does not answer 401", async (route) => {
+    it.each(ROUTES)("route $url does not answer 401", async (route) => {
       cookieJar.token = await createApprovalSessionToken();
 
       for (const result of await callRoute(route)) expect(result.status).not.toBe(401);
     });
   });
 
-  it("the proxy also stops every admin URL without a session", async () => {
-    expect(proxyConfig.matcher).toEqual(expect.arrayContaining(["/admin/:path*", "/api/admin/:path*"]));
+  it("the proxy runs on every admin URL and stops it without a session", async () => {
+    const urls = ["/admin", "/api/admin", ...PAGES.map((page) => page.url), ...ROUTES.map((route) => route.url)];
 
-    for (const page of PAGES) {
-      const response = await proxy(new NextRequest(`http://localhost${page.url}`));
-      expect(response.status).toBe(307);
-      expect(new URL(response.headers.get("location")!).pathname).toBe("/approval/login");
-    }
-    for (const route of ROUTES) {
-      const response = await proxy(new NextRequest(`http://localhost${route.url}`, { method: "POST" }));
-      expect(response.status).toBe(401);
+    for (const url of urls) {
+      expect(unstable_doesMiddlewareMatch({ config: proxyConfig, url }), url).toBe(true);
+
+      const response = await proxy(new NextRequest(`http://localhost${url}`, { method: "POST" }));
+      if (url.startsWith("/api/")) {
+        expect(response.status, url).toBe(401);
+      } else {
+        expect(response.status, url).toBe(307);
+        expect(new URL(response.headers.get("location")!).pathname).toBe("/approval/login");
+      }
     }
   });
 
   it("has no server actions: they are public POST endpoints, so admin changes go through /api/admin routes", () => {
     const adminCode = ["app/admin", "app/api/admin", "src/features/admin", "src/components/admin"].flatMap(filesUnder);
     const withActions = adminCode.filter(
-      (file) => /\.(t|j)sx?$/.test(file) && /^\s*["']use server["']/m.test(readFileSync(path.join(ROOT, file), "utf8")),
+      (file) =>
+        new RegExp(`\\.${SOURCE}$`).test(file) &&
+        /^\s*["']use server["']/m.test(readFileSync(path.join(ROOT, file), "utf8")),
     );
 
     expect(withActions).toEqual([]);

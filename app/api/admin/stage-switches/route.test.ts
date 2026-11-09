@@ -98,6 +98,31 @@ describe("POST /api/admin/stage-switches", () => {
     expect(db.tx.pipelineRun.create).toHaveBeenCalledTimes(1);
   });
 
+  it("changes publish.owner away from shadow: 200, and the log says from shadow", async () => {
+    db.tx.pipelineSetting.findUnique.mockResolvedValueOnce({ key: "publish.owner", value: "shadow" });
+
+    const response = await post({ key: "publish.owner", value: "native" });
+
+    expect(response.status).toBe(200);
+    expect((await response.json()).change).toMatchObject({ key: "publish.owner", from: "shadow", to: "native" });
+    const data = db.tx.pipelineRun.create.mock.calls[0][0].data;
+    expect(data.stats).toEqual({ key: "publish.owner", from: "shadow", to: "native", by: "approval login" });
+    expect(data.events.create.data).toEqual(data.stats);
+  });
+
+  it("answers 409 when a concurrent change wins (Prisma P2034), and says nothing was saved", async () => {
+    db.prisma.$transaction.mockRejectedValueOnce(
+      Object.assign(new Error("Transaction failed due to a write conflict or a deadlock."), { code: "P2034" }),
+    );
+
+    const response = await post({ key: "ingest.owner", value: "n8n" });
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({
+      error: "Another change to ingest.owner happened at the same time. Nothing was saved. Reload the page and try again.",
+    });
+  });
+
   it("answers 500 when the database fails", async () => {
     db.tx.pipelineSetting.findUnique.mockRejectedValueOnce(new Error("connection lost"));
 

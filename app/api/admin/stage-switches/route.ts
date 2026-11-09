@@ -14,7 +14,9 @@ export const POST = withAdminApi(async (request, session) => {
   try {
     const result = await changeStageOwner({ key: body.key, value: body.value }, session);
     if (result.status === "invalid") return NextResponse.json({ error: result.reason }, { status: 400 });
-    if (result.status === "unchanged") return NextResponse.json({ error: result.reason }, { status: 409 });
+    if (result.status === "unchanged" || result.status === "conflict") {
+      return NextResponse.json({ error: result.reason }, { status: 409 });
+    }
 
     const { key, from, to, by } = result;
     const change = { key, from, to, by, at: result.at.toISOString(), runId: result.runId.toString() };

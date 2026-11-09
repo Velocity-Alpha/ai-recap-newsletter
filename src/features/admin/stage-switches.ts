@@ -18,6 +18,8 @@ export type StageOption = {
   label: string;
   /** Shown when the owner confirms the change: what will happen, in plain words. */
   consequence: string;
+  /** Replaces `consequence` when the current value is the key, e.g. publish.owner = "shadow". */
+  consequenceFrom?: Partial<Record<string, string>>;
   /** Set to show the value but refuse it. */
   disabledReason?: string;
 };
@@ -83,12 +85,20 @@ export const STAGE_SWITCHES: readonly StageSwitch[] = [
         label: "n8n",
         consequence:
           "This app will stop marking sent issues as published. They appear on the site only if you also turn the n8n Gmail Listen workflow back on, or use Mark as published.",
+        consequenceFrom: {
+          shadow:
+            "This app will stop recording what it would publish (shadow). n8n keeps marking sent issues as published, if its Gmail Listen workflow is on.",
+        },
       },
       {
         value: "native",
         label: "Native",
         consequence:
           "This app will mark each sent issue as published when its email reaches the seed inbox, not n8n. Turn the n8n Gmail Listen workflow off so it does not do the same.",
+        consequenceFrom: {
+          shadow:
+            "This app will start marking each sent issue as published, instead of only recording what it would do. Turn the n8n Gmail Listen workflow off so it does not do the same.",
+        },
       },
     ],
   },
@@ -132,7 +142,7 @@ export type StageSwitchView = {
   /** False when no row exists and the jobs use the default. */
   isSet: boolean;
   updatedAt: string | null;
-  options: Array<StageOption & { isCurrent: boolean }>;
+  options: Array<Omit<StageOption, "consequenceFrom"> & { isCurrent: boolean }>;
 };
 
 export function toStageSwitchView(
@@ -147,6 +157,10 @@ export function toStageSwitchView(
     current,
     isSet: row !== null,
     updatedAt: row?.updatedAt.toISOString() ?? null,
-    options: stage.options.map((option) => ({ ...option, isCurrent: option.value === current })),
+    options: stage.options.map(({ consequenceFrom, ...option }) => ({
+      ...option,
+      consequence: consequenceFrom?.[current] ?? option.consequence,
+      isCurrent: option.value === current,
+    })),
   };
 }

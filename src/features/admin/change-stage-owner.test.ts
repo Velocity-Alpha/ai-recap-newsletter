@@ -125,6 +125,44 @@ describe("changeStageOwner", () => {
     expect(data.stats).toEqual({ key: "ingest.owner", from: null, to: "native", by: "approval login" });
     expect(data.events.create.message).toBe("ingest.owner changed from not set (n8n) to native by approval login.");
   });
+
+  it("runs the read and the write in one serializable transaction", async () => {
+    db.tx.pipelineSetting.findUnique.mockResolvedValueOnce({ key: "ingest.owner", value: "n8n" });
+
+    await changeStageOwner({ key: "ingest.owner", value: "native" }, SESSION, NOW);
+
+    expect(db.prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), { isolationLevel: "Serializable" });
+  });
+
+  it("reports a conflict when another change wins the race (Prisma P2034)", async () => {
+    db.prisma.$transaction.mockRejectedValueOnce(
+      Object.assign(new Error("Transaction failed due to a write conflict or a deadlock."), { code: "P2034" }),
+    );
+
+    await expect(changeStageOwner({ key: "ingest.owner", value: "native" }, SESSION, NOW)).resolves.toEqual({
+      status: "conflict",
+      reason: "Another change to ingest.owner happened at the same time. Nothing was saved. Reload the page and try again.",
+    });
+  });
+
+  it("lets other database errors through", async () => {
+    db.prisma.$transaction.mockRejectedValueOnce(new Error("connection lost"));
+
+    await expect(changeStageOwner({ key: "ingest.owner", value: "native" }, SESSION, NOW)).rejects.toThrow(
+      "connection lost",
+    );
+  });
+
+  it("changes publish.owner away from shadow and logs from: shadow", async () => {
+    db.tx.pipelineSetting.findUnique.mockResolvedValueOnce({ key: "publish.owner", value: "shadow" });
+
+    const result = await changeStageOwner({ key: "publish.owner", value: "n8n" }, SESSION, NOW);
+
+    expect(result).toMatchObject({ status: "changed", from: "shadow", to: "n8n" });
+    const data = db.tx.pipelineRun.create.mock.calls[0][0].data;
+    expect(data.stats).toEqual({ key: "publish.owner", from: "shadow", to: "n8n", by: "approval login" });
+    expect(data.events.create.message).toBe("publish.owner changed from shadow to n8n by approval login.");
+  });
 });
 
 describe("listStageChanges", () => {
@@ -145,7 +183,7 @@ describe("listStageChanges", () => {
 
     expect(db.prisma.pipelineRun.findMany).toHaveBeenCalledWith({
       where: { job: "admin-setting" },
-      orderBy: { id: "desc" },
+      orderBy: [{ startedAt: "desc" }, { id: "desc" }],
       take: 10,
     });
     expect(changes).toEqual([

@@ -123,6 +123,29 @@ describe("toStageSwitchView", () => {
     ]);
   });
 
+  it("words the publish confirmations for shadow, where this app only records and n8n publishes", () => {
+    const publish = findStageSwitch("publish.owner")!;
+
+    const fromShadow = toStageSwitchView(publish, { value: "shadow", updatedAt: new Date() });
+    const fromNative = toStageSwitchView(publish, { value: "native", updatedAt: new Date() });
+
+    expect(fromShadow.current).toBe("shadow");
+    expect(fromShadow.options.map((option) => [option.value, option.isCurrent, option.consequence])).toEqual([
+      [
+        "n8n",
+        false,
+        "This app will stop recording what it would publish (shadow). n8n keeps marking sent issues as published, if its Gmail Listen workflow is on.",
+      ],
+      [
+        "native",
+        false,
+        "This app will start marking each sent issue as published, instead of only recording what it would do. Turn the n8n Gmail Listen workflow off so it does not do the same.",
+      ],
+    ]);
+    expect(fromNative.options[0].consequence).toBe(publish.options[0].consequence);
+    expect(fromShadow.options[0]).not.toHaveProperty("consequenceFrom");
+  });
+
   it("marks a missing row as not set", () => {
     const view = toStageSwitchView(findStageSwitch("publish.owner")!, null);
 

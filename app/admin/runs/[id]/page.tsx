@@ -19,7 +19,8 @@ export default async function AdminRunPage({ params }: Props) {
   const runId = parseRunId(id);
   const detail = runId ? await getRunDetail(runId) : null;
   if (!detail) notFound();
-  const { run, stats, events } = detail;
+  const { run, stats, events, moreEvents } = detail;
+  const totalEvents = events.length + moreEvents;
 
   const facts = [
     { label: "Status", value: <RunStatusBadge status={run.status} /> },
@@ -61,7 +62,15 @@ export default async function AdminRunPage({ params }: Props) {
       )}
 
       <section className="mt-10">
-        <SectionTitle aside={`${events.length} in order`}>Steps</SectionTitle>
+        <SectionTitle
+          aside={
+            moreEvents > 0
+              ? `first ${events.length.toLocaleString("en-US")} of ${totalEvents.toLocaleString("en-US")}, in order`
+              : `${events.length} in order`
+          }
+        >
+          Steps
+        </SectionTitle>
         {events.length === 0 ? (
           <EmptyNote>This run logged no steps.</EmptyNote>
         ) : (
@@ -85,6 +94,11 @@ export default async function AdminRunPage({ params }: Props) {
               </li>
             ))}
           </ol>
+        )}
+        {moreEvents > 0 && (
+          <p className="mt-4 text-sm text-[var(--text-secondary)]">
+            {`${moreEvents.toLocaleString("en-US")} more ${moreEvents === 1 ? "step" : "steps"} not shown.`}
+          </p>
         )}
       </section>
     </>

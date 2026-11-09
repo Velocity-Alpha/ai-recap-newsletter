@@ -4,6 +4,8 @@ import { prisma } from "@/src/server/prisma";
 /** Runs and their events for /admin/runs. Ids are strings here: BigInt does not cross into JSON or props. */
 
 export const RUNS_PAGE_SIZE = 50;
+/** A long poll can log thousands of steps; the run page shows this many and counts the rest. */
+export const EVENTS_SHOWN = 500;
 const STATS_SUMMARY_VALUES = 6;
 
 export type RunRow = {
@@ -88,13 +90,28 @@ export async function listRecentRuns(
   return { runs, olderBefore: rows.length > limit ? runs[runs.length - 1].id : null };
 }
 
-export async function getRunDetail(
-  id: bigint,
-): Promise<{ run: RunRow; stats: string | null; events: EventRow[] } | null> {
+export type RunDetail = {
+  run: RunRow;
+  stats: string | null;
+  /** The first EVENTS_SHOWN steps, in order. */
+  events: EventRow[];
+  /** Steps after those, not loaded. */
+  moreEvents: number;
+};
+
+export async function getRunDetail(id: bigint): Promise<RunDetail | null> {
   const run = await prisma.pipelineRun.findUnique({
     where: { id },
-    include: { events: { orderBy: [{ createdAt: "asc" }, { id: "asc" }] } },
+    include: {
+      events: { orderBy: [{ createdAt: "asc" }, { id: "asc" }], take: EVENTS_SHOWN },
+      _count: { select: { events: true } },
+    },
   });
   if (!run) return null;
-  return { run: toRunRow(run), stats: prettyJson(run.stats), events: run.events.map(toEventRow) };
+  return {
+    run: toRunRow(run),
+    stats: prettyJson(run.stats),
+    events: run.events.map(toEventRow),
+    moreEvents: Math.max(0, run._count.events - run.events.length),
+  };
 }

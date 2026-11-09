@@ -7,6 +7,7 @@ const prismaMock = vi.hoisted(() => ({
 vi.mock("@/src/server/prisma", () => ({ prisma: prismaMock }));
 
 import {
+  EVENTS_SHOWN,
   getRunDetail,
   listRecentRuns,
   parseRunId,
@@ -140,14 +141,20 @@ describe("getRunDetail", () => {
           createdAt: new Date("2026-11-09T14:55:09Z"),
         },
       ],
+      _count: { events: 2 },
     });
 
     const detail = await getRunDetail(5n);
 
     expect(prismaMock.pipelineRun.findUnique).toHaveBeenCalledWith({
       where: { id: 5n },
-      include: { events: { orderBy: [{ createdAt: "asc" }, { id: "asc" }] } },
+      include: {
+        events: { orderBy: [{ createdAt: "asc" }, { id: "asc" }], take: 500 },
+        _count: { select: { events: true } },
+      },
     });
+    expect(EVENTS_SHOWN).toBe(500);
+    expect(detail?.moreEvents).toBe(0);
     expect(detail?.run).toMatchObject({ id: "5", status: "failed", error: "1 source(s) had errors: TLDR AI." });
     expect(detail?.stats).toBe('{\n  "storiesSaved": 3\n}');
     expect(detail?.events).toEqual([
@@ -161,6 +168,24 @@ describe("getRunDetail", () => {
       },
       { id: "41", at: new Date("2026-11-09T14:55:09Z"), level: "error", step: "source", message: "TLDR AI: failed.", data: null },
     ]);
+  });
+
+  it("shows the first 500 events and counts the rest", async () => {
+    const events = Array.from({ length: EVENTS_SHOWN }, (_, index) => ({
+      id: BigInt(index + 1),
+      runId: 5n,
+      level: "info",
+      step: "poll",
+      message: `poll ${index + 1}`,
+      data: null,
+      createdAt: STARTED,
+    }));
+    prismaMock.pipelineRun.findUnique.mockResolvedValueOnce({ ...run(5), events, _count: { events: 750 } });
+
+    const detail = await getRunDetail(5n);
+
+    expect(detail?.events).toHaveLength(500);
+    expect(detail?.moreEvents).toBe(250);
   });
 
   it("returns null for a missing run", async () => {
