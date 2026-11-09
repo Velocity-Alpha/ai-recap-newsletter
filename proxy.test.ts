@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { proxy } from "@/proxy";
+import { config, proxy } from "@/proxy";
 import { APPROVAL_SESSION_COOKIE_NAME, createApprovalSessionToken } from "@/src/server/approval-auth";
 
 function visit(path: string, token?: string) {
@@ -59,5 +59,43 @@ describe("approval proxy", () => {
 
     expect((await visit("/approval")).status).toBe(307);
     expect((await visit("/approval", token)).status).toBe(307);
+  });
+});
+
+describe("admin proxy", () => {
+  beforeEach(() => {
+    vi.stubEnv("APPROVAL_PASSWORD", "approval-secret");
+    vi.stubEnv("SESSION_SECRET", "test-session-secret");
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("runs on every admin page and admin API path", () => {
+    expect(config.matcher).toEqual(expect.arrayContaining(["/admin/:path*", "/api/admin/:path*"]));
+  });
+
+  it("sends a visitor without a session from an admin page to the login page", async () => {
+    const response = await visit("/admin/runs?before=40");
+
+    expect(response.status).toBe(307);
+    const location = new URL(response.headers.get("location") ?? "");
+    expect(location.pathname).toBe("/approval/login");
+    expect(location.searchParams.get("redirect")).toBe("/admin/runs?before=40");
+  });
+
+  it("answers 401 for an admin API call without a session, instead of a redirect", async () => {
+    const response = await visit("/api/admin/stage-switches", "a".repeat(64));
+
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ error: "Unauthorized." });
+  });
+
+  it("lets a signed-in owner reach the admin pages and API", async () => {
+    const token = await createApprovalSessionToken();
+
+    expect(isPassedThrough(await visit("/admin", token))).toBe(true);
+    expect(isPassedThrough(await visit("/api/admin/stage-switches", token))).toBe(true);
   });
 });

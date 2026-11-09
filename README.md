@@ -159,11 +159,16 @@ Mutation routes:
 - `POST /api/subscriber/unsubscribe/webhook` with `Authorization: Bearer <GHL_UNSUBSCRIBE_WEBHOOK_SECRET>` or `x-webhook-secret`
 - `POST /api/newsletters/commit` to commit an approved outline to the generation webhook
 - `POST /api/approval/issues/[id]/publish` publishes an unpublished draft from its stored email HTML (approval session). Used by the "Mark as published" button on `/approval/issues`. It sends no email.
+- `POST /api/admin/stage-switches` with `{ key, value }` sets `ingest.owner`, `draft.owner`, or `publish.owner` to `n8n` or `native` (approval session). Used by `/admin/settings`. It refuses other keys and values, native drafting until #79, and changes to the current value. Each change is logged as a `pipeline_runs` row with job `admin-setting`.
 - `POST /api/revalidate` refreshes the cached issue lists, issue pages, and sitemap. It needs `Authorization: Bearer <token>`, a 5-minute token signed with a key derived from `SESSION_SECRET` (`src/server/cache-refresh-auth.ts`). The publish job calls it after it publishes an issue.
 
 Public unsubscribe page:
 
 - `GET /unsubscribe?token=...`
+
+Admin pages (approval login; `proxy.ts` and `requireAdminPage()` in `src/server/admin-auth.ts` both check it):
+
+- `/admin` overview, `/admin/runs` and `/admin/runs/[id]`, `/admin/incidents`, `/admin/settings` (every `pipeline_settings` row and the stage owner switches)
 
 ## Architecture
 
