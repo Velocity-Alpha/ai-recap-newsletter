@@ -76,7 +76,12 @@ export async function POST(request: Request) {
       );
     }
 
-    const webhook = resolveCommitWebhook(process.env);
+    // Name each key: Next inlines `process.env.APP_ENV` at build time (next.config.mjs `env`), but only when
+    // it is written out like this. Passing `process.env` whole would read the runtime value instead.
+    const webhook = resolveCommitWebhook({
+      APP_ENV: process.env.APP_ENV,
+      OUTLINE_COMMIT_WEBHOOK_URL: process.env.OUTLINE_COMMIT_WEBHOOK_URL,
+    });
     if (!webhook.ok) {
       return jsonWithRequestId(context, { success: false, error: webhook.error }, { status: 503 });
     }
