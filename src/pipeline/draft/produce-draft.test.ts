@@ -7,9 +7,11 @@ import { FeaturedImageError } from "@/src/pipeline/draft/image/featured-image";
 import {
   DRAFT_STEPS,
   DraftStepError,
+  NEW_IMAGE_STEPS,
   produceDraft,
   readNoArticles,
   type DraftStep,
+  type NewImageDraftInput,
   type ProduceDraftDeps,
   type ProduceDraftInput,
   type ReadArticles,
@@ -190,5 +192,83 @@ describe("produceDraft", () => {
     expect(error.partial.content).toEqual(SAMPLE_CONTENT);
     expect(steps).toEqual(["read_articles", "write", "validate", "image"]);
     expect(deps.createTemplate).not.toHaveBeenCalled();
+  });
+});
+
+describe("produceDraft for a new image (#116)", () => {
+  const NEW_IMAGE = { imageUrl: "https://assets.example.test/newsletter-dev/2027-01-04-def.jpg", scenePrompt: "A pretend lighthouse." };
+  const NEW_IMAGE_INPUT: NewImageDraftInput = {
+    issue: { id: 301, date: "2027-01-04" },
+    draft: { id: 42, version: 3 },
+    source: { content: SAMPLE_CONTENT, unreadStoryIds: [502] },
+    image: NEW_IMAGE,
+  };
+
+  it("runs only image, html, and GHL: it re-uses the written content and makes no image of its own", async () => {
+    const readArticles = vi.fn<ReadArticles>(readNoArticles);
+    const checkImage = vi.fn(async (image: { imageUrl: string; scenePrompt: string }) => image);
+    const { deps, steps } = fakeDeps({ readArticles, checkImage });
+
+    const draft = await produceDraft(NEW_IMAGE_INPUT, deps);
+
+    expect(NEW_IMAGE_STEPS).toEqual(["image", "html", "ghl"]);
+    expect(steps).toEqual(NEW_IMAGE_STEPS);
+    expect(readArticles).not.toHaveBeenCalled();
+    expect(deps.writer).not.toHaveBeenCalled();
+    expect(deps.makeImage).not.toHaveBeenCalled();
+    expect(checkImage).toHaveBeenCalledWith(NEW_IMAGE, "2027-01-04");
+    expect(draft).toMatchObject({
+      content: SAMPLE_CONTENT,
+      featuredImageUrl: NEW_IMAGE.imageUrl,
+      scenePrompt: NEW_IMAGE.scenePrompt,
+      unreadStoryIds: [502],
+      ghlTemplateId: "tpl-1",
+    });
+    expect(Object.keys(draft.stepMs)).toEqual(NEW_IMAGE_STEPS);
+  });
+
+  it("renders the same content with the new image, and makes a GHL template for the new version", async () => {
+    const { deps } = fakeDeps();
+
+    const draft = await produceDraft(NEW_IMAGE_INPUT, deps);
+
+    const parsed = parseSentEmail(draft.html);
+    expect(parsed?.draftId).toBe(42);
+    expect(draft.html).toContain(NEW_IMAGE.imageUrl);
+    expect(draft.html).not.toContain(IMAGE_URL);
+    expect(draft.html).toContain(SAMPLE_CONTENT.headlines[0].headline);
+    expect(deps.createTemplate).toHaveBeenCalledWith({ issueDate: "2027-01-04", version: 3, subject: SAMPLE_CONTENT.title, html: draft.html });
+  });
+
+  it("does not change the source content it was given", async () => {
+    const content = structuredClone(SAMPLE_CONTENT);
+    const { deps } = fakeDeps();
+
+    const draft = await produceDraft({ ...NEW_IMAGE_INPUT, source: { content, unreadStoryIds: [] } }, deps);
+
+    expect(content).toEqual(SAMPLE_CONTENT);
+    expect(draft.content).toEqual(SAMPLE_CONTENT);
+  });
+
+  it("fails at image when the chosen image does not pass its check, and runs no later step", async () => {
+    const checkImage = vi.fn(async () => Promise.reject(new Error("The chosen image is not one of ours.")));
+    const { deps, steps } = fakeDeps({ checkImage });
+
+    const error = await failure(produceDraft(NEW_IMAGE_INPUT, deps));
+
+    expect(error.step).toBe("image");
+    expect(error.message).toBe("The chosen image is not one of ours.");
+    expect(error.partial.content).toEqual(SAMPLE_CONTENT);
+    expect(steps).toEqual(["image"]);
+    expect(deps.createTemplate).not.toHaveBeenCalled();
+  });
+
+  it("fails at image, even without a check, when the chosen image is missing", async () => {
+    const { deps } = fakeDeps();
+
+    const error = await failure(produceDraft({ ...NEW_IMAGE_INPUT, image: { imageUrl: "", scenePrompt: "" } }, deps));
+
+    expect(error.step).toBe("image");
+    expect(error.message).toContain("no chosen image");
   });
 });

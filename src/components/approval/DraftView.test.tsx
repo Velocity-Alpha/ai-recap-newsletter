@@ -37,6 +37,10 @@ function draft(data: Partial<DraftBoardView> = {}): DraftBoardView {
     ghlPreviewUrl: null,
     unreadStories: [],
     retryable: false,
+    newImageAllowed: false,
+    featuredImageUrl: null,
+    scenePrompt: null,
+    sourceVersion: null,
     createdAt: "2026-05-21T14:00:00.000Z",
     startedAt: "2026-05-21T14:00:01.000Z",
     finishedAt: null,
@@ -152,6 +156,30 @@ describe("DraftView", () => {
     expect(html).toContain("Vertex returned no image.");
     expect(html).toMatch(/data-step="image" data-state="failed"/);
     expect(html).toMatch(/<button[^>]*>Retry<\/button>/);
+  });
+
+  describe("New image (#116)", () => {
+    const ready = (data: Partial<DraftBoardView> = {}) =>
+      draft({ status: "ready", stepLabel: null, hasHtml: true, steps: steps(Array(8).fill("done")), ghlTemplateId: "tpl-1", ...data });
+    const NEW_IMAGE_BUTTON = /<button[^>]*>(<svg[^>]*>.*?<\/svg>)?New image<\/button>/;
+
+    it("offers New image on a ready draft whose issue is not published", () => {
+      expect(render(ready({ newImageAllowed: true }))).toMatch(NEW_IMAGE_BUTTON);
+    });
+
+    it("does not offer it once the issue is published", () => {
+      expect(render(ready({ newImageAllowed: false }))).not.toMatch(NEW_IMAGE_BUTTON);
+    });
+
+    it("does not offer it on a running or failed draft", () => {
+      expect(render(draft({ newImageAllowed: true }))).not.toMatch(NEW_IMAGE_BUTTON);
+      expect(render(draft({ status: "failed", retryable: true, newImageAllowed: true }))).not.toMatch(NEW_IMAGE_BUTTON);
+    });
+
+    it("says which draft a new-image draft came from", () => {
+      expect(render(ready({ version: 3, sourceVersion: 2 }))).toContain("New image of v2");
+      expect(render(ready())).not.toContain("New image of");
+    });
   });
 
   it("shows Retry as busy, and a retry error", () => {

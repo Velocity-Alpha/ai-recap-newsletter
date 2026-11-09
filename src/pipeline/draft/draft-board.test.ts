@@ -37,6 +37,11 @@ function view(data: Partial<DraftView> = {}): DraftView {
     queuedAt: new Date("2027-01-04T14:58:00.000Z"),
     startedAt: null,
     finishedAt: null,
+    featuredImageUrl: null,
+    scenePrompt: null,
+    sourceDraftId: null,
+    sourceVersion: null,
+    issuePublished: false,
     ...data,
   };
 }
@@ -80,6 +85,23 @@ describe("draftSteps", () => {
     expect(Object.values(states({ status: "ready" }))).toEqual(Array(8).fill("done"));
     expect(Object.values(states({ status: "failed", failedStep: DRAFT_START_STEP }))).toEqual(Array(8).fill("waiting"));
   });
+
+  it("lists only the steps a new image draft runs (#116)", () => {
+    expect(states({ sourceDraftId: 6, sourceVersion: 1, currentStep: "html", startedAt: NOW })).toEqual({
+      load: "done",
+      image: "done",
+      html: "current",
+      ghl: "waiting",
+      save: "waiting",
+    });
+    expect(states({ sourceDraftId: 6, status: "failed", failedStep: "image" })).toEqual({
+      load: "done",
+      image: "failed",
+      html: "waiting",
+      ghl: "waiting",
+      save: "waiting",
+    });
+  });
 });
 
 describe("draftStepLabel", () => {
@@ -115,6 +137,21 @@ describe("toDraftBoardView", () => {
     expect(toDraftBoardView(fresh, { now: NOW })).toMatchObject({ retryable: false, stepLabel: "writing" });
     expect(toDraftBoardView(stuck, { now: NOW }).retryable).toBe(true);
     expect(toDraftBoardView(view({ status: "ready" }), { now: NOW }).retryable).toBe(false);
+  });
+
+  it("offers New image only on a ready draft whose issue is not published (#116)", () => {
+    const ready = view({ status: "ready", hasHtml: true, featuredImageUrl: "https://img.example.test/a.jpg", scenePrompt: "A lamp." });
+
+    expect(toDraftBoardView(ready, { now: NOW })).toMatchObject({
+      newImageAllowed: true,
+      featuredImageUrl: "https://img.example.test/a.jpg",
+      scenePrompt: "A lamp.",
+      sourceVersion: null,
+    });
+    expect(toDraftBoardView({ ...ready, issuePublished: true }, { now: NOW }).newImageAllowed).toBe(false);
+    expect(toDraftBoardView({ ...ready, status: "running" }, { now: NOW }).newImageAllowed).toBe(false);
+    expect(toDraftBoardView({ ...ready, status: "failed" }, { now: NOW }).newImageAllowed).toBe(false);
+    expect(toDraftBoardView({ ...ready, sourceDraftId: 6, sourceVersion: 1 }, { now: NOW })).toMatchObject({ newImageAllowed: true, sourceVersion: 1 });
   });
 
   it("allows Retry on a draft whose job never started, once it has waited 5 minutes", () => {
@@ -167,7 +204,22 @@ describe("listDraftsForBoard", () => {
       [2, "failed", false, false],
       [1, "ready", true, true],
     ]);
-    expect(drafts[0]).toMatchObject({ failedStepLabel: "making the image", subject: null });
+    expect(drafts[0]).toMatchObject({ failedStepLabel: "making the image", subject: null, sourceVersion: null });
     expect(drafts[1]).toMatchObject({ subject: "First Take", ghlTemplateId: "tpl-1", createdAt: expect.any(String) });
+  });
+
+  it("says which draft a new image draft came from", async () => {
+    const issue = (await fakeDb.client.issue.create({ data: { title: "t", issueDate: DAY } })) as { id: bigint };
+    const v1 = (await fakeDb.client.issueDraft.create({
+      data: { issueId: issue.id, version: 1, outlineId: 1n, status: "ready", content: { title: "First Take" } },
+    })) as { id: bigint };
+    await fakeDb.client.issueDraft.create({ data: { issueId: issue.id, version: 2, outlineId: 1n, sourceDraftId: v1.id } });
+
+    const drafts = await listDraftsForBoard("2027-01-04");
+
+    expect(drafts.map((draft) => [draft.version, draft.sourceVersion])).toEqual([
+      [2, 1],
+      [1, null],
+    ]);
   });
 });

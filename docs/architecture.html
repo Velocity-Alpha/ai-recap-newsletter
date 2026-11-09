@@ -113,7 +113,9 @@ Terms: GLOSSARY.md. One issue per date; each commit makes a new draft with its o
             new GHL template "&lt;date&gt; v&lt;n&gt;: &lt;subject&gt;"; never overwrites an old one   #78
             issue row takes the current draft's title, HTML, image, excerpt, content_json
          -> board: live steps, error + Retry, email preview, "Open in GHL", list of drafts  #79 (/approval/drafts)
-         -> "New image": edit the scene prompt, 3 suggestions, then a new draft          #116
+         -> "New image": edit the scene prompt, 3 suggestions, Generate, then a new draft #116 (built)
+            the new draft copies the source draft's text (source_draft_id), so the job
+            runs only image check -> HTML -> new GHL template -> save; no writing
          n8n "2. Public approval page" is switched off the day native drafting goes live  #80
 12:00  run-checks: no commit yet -> warning                                              <span class="plan">planned</span> #52
        Owner sends in GHL (unchanged)
@@ -181,7 +183,7 @@ Later: pre-send review in the app before the GHL template (#117)
   <tr><td><code>pipeline_runs</code>, <code>pipeline_events</code></td><td>Job runs and their step logs</td><td>native jobs</td></tr>
   <tr><td><code>publish_events</code></td><td>Each seed email seen by publish detection and the decision, and which draft was sent (<code>draft_id</code>)</td><td>native publish</td></tr>
   <tr><td><code>approval_outlines</code></td><td>Each board commit: the normalised outline, its hash, the draft owner, and when n8n accepted it (<code>forwarded_at</code>)</td><td>commit route (migration not applied yet)</td></tr>
-  <tr><td><code>issue_drafts</code></td><td>Each draft of an issue, version 1, 2, ... (one per commit): status, current or failed step, content, html, image, GHL template</td><td>native <code>draft-issue</code> (not live yet)</td></tr>
+  <tr><td><code>issue_drafts</code></td><td>Each draft of an issue, version 1, 2, ... (one per commit, or per "New image"): status, current or failed step, content, html, image, GHL template; <code>source_draft_id</code> on a "New image" draft</td><td>native <code>draft-issue</code> (not live yet)</td></tr>
   <tr><td><code>alerts</code></td><td>Open and resolved incidents, one open row per <code>incident_key</code></td><td><code>raiseAlert()</code> (no callers yet)</td></tr>
   <tr><td><code>public.schema_migrations</code></td><td>Legacy migration record</td><td>none</td></tr>
 </table>
@@ -246,7 +248,7 @@ scripts/                     reset-dev-branch.mjs, run-prisma-prod.mjs, import-s
   <tr><td>2. Create Issue Draft</td><td><code>QLPaj244TM7azSAH</code></td><td>active</td></tr>
   <tr><td>2.2.1 Sub: Create Image Prompt</td><td><code>j2B4f4kFJs6sBdog</code></td><td>active</td></tr>
   <tr><td>2.2.2 Sub: Generate Stylized Image From Prompt</td><td><code>0Gd3lzvwITBnd8om</code></td><td>active</td></tr>
-  <tr><td>Agent: Change Featured Image</td><td><code>Ixc1D30eBAT0Mauf</code></td><td>active</td></tr>
+  <tr><td>Agent: Change Featured Image</td><td><code>Ixc1D30eBAT0Mauf</code></td><td>active; replaced by "New image" on /approval/drafts (#116), deactivate after native drafting is live</td></tr>
   <tr><td>Error Handler</td><td><code>kmX0qX1GOqSfPmjD</code></td><td>active</td></tr>
   <tr><td>2.2 Sub: Generate Issue Featured Image (deprecated), 2.1 / 2.1.1 (legacy), Extract Page for LLM (unused)</td><td><code>OPjiGtzSNgCkQdG8</code> <code>rsHDKdELUG59wZzX</code> <code>m6oCt1cUcJHuPgeR</code> <code>VOZgpsTDYAPJCDuR</code></td><td>no live use</td></tr>
   <tr><td>Switched off: <code>1. Fetch Stories</code> and 8 helpers (2026-11-09), <code>3. Gmail Listen - Publish</code> (2026-11-08)</td><td>see migration plan</td><td>rollback only</td></tr>

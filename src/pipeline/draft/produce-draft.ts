@@ -13,6 +13,7 @@ import {
   type DraftTemplateResult,
 } from "@/src/pipeline/draft/ghl-template";
 import {
+  checkOwnImage,
   makeFeaturedImage,
   type FeaturedImage,
   type FeaturedImageInput,
@@ -35,24 +36,45 @@ import type { SideEffectRecord } from "@/src/pipeline/side-effects";
 export const DRAFT_STEPS = ["read_articles", "write", "validate", "image", "html", "ghl"] as const;
 export type DraftStep = (typeof DRAFT_STEPS)[number];
 
-export interface ProduceDraftInput {
+/** A "New image" draft's steps (#116): the content is copied from its source draft, so nothing is read or written. */
+export const NEW_IMAGE_STEPS = ["image", "html", "ghl"] as const satisfies readonly DraftStep[];
+
+interface DraftTarget {
+  issue: { id: number; /** YYYY-MM-DD */ date: string };
+  draft: { id: number; version: number };
+}
+
+/** A commit's draft: every step, from the outline. */
+export interface ProduceDraftInput extends DraftTarget {
   outline: ApprovalOutline;
   /** The approved stories by section, with the board's link and note edits applied (approved-stories.ts). */
   stories: ApprovedSections;
-  issue: { id: number; /** YYYY-MM-DD */ date: string };
-  draft: { id: number; version: number };
+}
+
+/** A "New image" draft (#116): the source draft's written content, with the image the owner chose. */
+export interface NewImageDraftInput extends DraftTarget {
+  source: { content: WrittenIssueContent; unreadStoryIds: number[] };
+  image: FeaturedImage;
+}
+
+export function isNewImageInput(input: ProduceDraftInput | NewImageDraftInput): input is NewImageDraftInput {
+  return "source" in input;
 }
 
 /** Reads the articles of feature-section stories. */
 export type ReadArticles = (stories: ApprovedStory[]) => Promise<ArticleText[]>;
 export type MakeImage = (input: FeaturedImageInput) => Promise<FeaturedImage>;
 export type CreateTemplate = (input: DraftTemplateInput) => Promise<DraftTemplateResult>;
+/** Checks the image a "New image" draft was given before it goes into the email. Throws a plain error. */
+export type CheckImage = (image: FeaturedImage, issueDate: string) => Promise<FeaturedImage> | FeaturedImage;
 
 export interface ProduceDraftDeps {
   /** Defaults to `readNoArticles`. */
   readArticles?: ReadArticles;
   writer: IssueWriter;
   makeImage: MakeImage;
+  /** "New image" drafts only. Without it, the image only has to be there. */
+  checkImage?: CheckImage;
   createTemplate: CreateTemplate;
   /** Called as each step starts. */
   onStep?: (step: DraftStep) => void | Promise<void>;
@@ -127,7 +149,22 @@ function featureStories(sections: ApprovedSections): ApprovedStory[] {
   return (FEATURE_SECTIONS as readonly SectionKey[]).flatMap((key) => sections[key]);
 }
 
-export async function produceDraft(input: ProduceDraftInput, deps: ProduceDraftDeps): Promise<ProducedDraft> {
+/** What the scene prompt and the scene ideas are based on: the subject line and the top stories. */
+export function imageContextFor(content: WrittenIssueContent): FeaturedImageInput["context"] {
+  return {
+    subjectLine: content.title,
+    topStories: content.headlines.map((story) => ({ headline: story.headline, detail: story.story_detail })),
+  };
+}
+
+function chosenImage(image: FeaturedImage): FeaturedImage {
+  if (!image.imageUrl.trim() || !image.scenePrompt.trim()) {
+    throw new Error("This draft has no chosen image. Make a new image from the ready draft again.");
+  }
+  return image;
+}
+
+export async function produceDraft(input: ProduceDraftInput | NewImageDraftInput, deps: ProduceDraftDeps): Promise<ProducedDraft> {
   const now = deps.now ?? (() => Date.now());
   const readArticles = deps.readArticles ?? readNoArticles;
   const partial: PartialDraft = {};
@@ -146,25 +183,35 @@ export async function produceDraft(input: ProduceDraftInput, deps: ProduceDraftD
     }
   }
 
-  const { stories: sections, issue, draft } = input;
+  const { issue, draft } = input;
 
-  const articles = await step("read_articles", () => readArticles(featureStories(sections)));
-  partial.unreadStoryIds = unreadArticleStoryIds(sections, articles);
+  /** Reads, writes, and checks the content: a commit's draft only. */
+  const write = async (outline: ProduceDraftInput) => {
+    const sections = outline.stories;
+    const articles = await step("read_articles", () => readArticles(featureStories(sections)));
+    partial.unreadStoryIds = unreadArticleStoryIds(sections, articles);
 
-  const content = await step("write", () => deps.writer({ sections, leadStoryId: input.outline.leadStoryId, articles }));
-  partial.content = content;
+    const written = await step("write", () => deps.writer({ sections, leadStoryId: outline.outline.leadStoryId, articles }));
+    partial.content = written;
 
-  await step("validate", () => assertValidContent(content, sections));
+    await step("validate", () => assertValidContent(written, sections));
+    return written;
+  };
 
-  const image = await step("image", () =>
-    deps.makeImage({
-      issueDate: issue.date,
-      context: {
-        subjectLine: content.title,
-        topStories: content.headlines.map((story) => ({ headline: story.headline, detail: story.story_detail })),
-      },
-    }),
-  );
+  let content: WrittenIssueContent;
+  if (isNewImageInput(input)) {
+    content = structuredClone(input.source.content);
+    partial.content = content;
+    partial.unreadStoryIds = [...input.source.unreadStoryIds];
+  } else {
+    content = await write(input);
+  }
+
+  const image = await step("image", async () => {
+    if (!isNewImageInput(input)) return deps.makeImage({ issueDate: issue.date, context: imageContextFor(content) });
+    const chosen = chosenImage(input.image);
+    return deps.checkImage ? deps.checkImage(chosen, issue.date) : chosen;
+  });
   partial.featuredImageUrl = image.imageUrl;
   partial.scenePrompt = image.scenePrompt;
 
@@ -191,7 +238,7 @@ export async function produceDraft(input: ProduceDraftInput, deps: ProduceDraftD
     ghlTemplateId: template.templateId,
     ghlPreviewUrl: template.previewUrl ?? null,
     ghlMode: template.mode,
-    unreadStoryIds: partial.unreadStoryIds,
+    unreadStoryIds: partial.unreadStoryIds ?? [],
     stepMs,
   };
 }
@@ -212,6 +259,7 @@ export function createDraftDeps(
         scene: { apiKey: env.OPENAI_API_KEY },
         image: { apiKey: env.VERTEX_API_KEY },
       }),
+    checkImage: (image, issueDate) => checkOwnImage(image, issueDate, { appEnv: env.APP_ENV, bucket: env.S3_BUCKET }),
     createTemplate: (input) => createDraftTemplate(input, { env, record: options.record }),
   };
 }

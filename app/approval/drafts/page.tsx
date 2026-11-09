@@ -2,10 +2,11 @@
 
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import DraftList from "@/components/approval/DraftList";
 import DraftView from "@/components/approval/DraftView";
+import { draftViewHref } from "@/src/features/newsletter/draft-links";
 import { nextDraftPoll, type DraftPollOutcome } from "@/src/features/newsletter/draft-polling";
 import type { DraftBoardView, DraftListEntry } from "@/src/pipeline/draft/draft-board";
 
@@ -42,6 +43,7 @@ function Message({ children }: { children: React.ReactNode }) {
 }
 
 function DraftsForDate({ date, requestedId }: { date: string; requestedId: number | null }) {
+  const router = useRouter();
   const [list, setList] = useState<DraftListState | null>(null);
   const [listError, setListError] = useState<string | null>(null);
   const [draft, setDraft] = useState<DraftBoardView | null>(null);
@@ -148,7 +150,13 @@ function DraftsForDate({ date, requestedId }: { date: string; requestedId: numbe
         <div className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
           <div>
             {draft && draft.id === selectedId ? (
-              <DraftView draft={draft} retryBusy={retryBusy} retryError={retryError} onRetry={handleRetry} />
+              <DraftView
+                draft={draft}
+                retryBusy={retryBusy}
+                retryError={retryError}
+                onRetry={handleRetry}
+                onNewImageDraft={(draftId) => router.push(draftViewHref(date, draftId))}
+              />
             ) : draftError ? (
               <Message>{draftError}</Message>
             ) : selectedId ? (

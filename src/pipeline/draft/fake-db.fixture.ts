@@ -154,6 +154,7 @@ export function createFakeDb() {
         queuedAt: now(),
         startedAt: null,
         finishedAt: null,
+        sourceDraftId: null,
       }),
     }),
     approvalOutline: table(state.outlines, { nextId: id, defaults: () => ({ committedAt: now(), forwardedAt: null }) }),

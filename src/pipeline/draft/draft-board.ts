@@ -7,16 +7,18 @@ import {
   type DraftStatus,
   type DraftView,
 } from "@/src/pipeline/draft/draft-store";
-import { DRAFT_STEPS } from "@/src/pipeline/draft/produce-draft";
+import { DRAFT_STEPS, NEW_IMAGE_STEPS } from "@/src/pipeline/draft/produce-draft";
 import { DRAFT_STEP_LABELS, type DraftJobStep } from "@/src/pipeline/draft/run-draft";
 import { prisma } from "@/src/server/prisma";
 
 /**
  * What the board's draft view shows (#79): the draft store's rows, with plain step labels, dates as text, and
- * whether "Retry" is allowed. Server only; the board's components import the types.
+ * whether "Retry" and "New image" are allowed. Server only; the board's components import the types.
  */
 
 export const DRAFT_JOB_STEPS: readonly DraftJobStep[] = ["load", ...DRAFT_STEPS, "save"];
+/** A "New image" draft (#116) copies its content, so it skips reading, writing, and checking. */
+export const NEW_IMAGE_JOB_STEPS: readonly DraftJobStep[] = ["load", ...NEW_IMAGE_STEPS, "save"];
 
 export type DraftStepState = "done" | "current" | "failed" | "waiting";
 
@@ -53,6 +55,12 @@ export interface DraftBoardView {
   unreadStories: UnreadStory[];
   /** Failed, or stuck in running (or never started): the same rule as `retryDraft`. */
   retryable: boolean;
+  /** "New image" (#116): a ready draft whose issue is not published. */
+  newImageAllowed: boolean;
+  featuredImageUrl: string | null;
+  scenePrompt: string | null;
+  /** Set on a "New image" draft: the version whose content it re-uses. */
+  sourceVersion: number | null;
   createdAt: string;
   startedAt: string | null;
   finishedAt: string | null;
@@ -70,6 +78,8 @@ export interface DraftListEntry {
   sent: boolean;
   /** The newest ready draft, which the issue holds. */
   current: boolean;
+  /** Set on a "New image" draft: the version whose content it re-uses. */
+  sourceVersion: number | null;
   createdAt: string;
 }
 
@@ -81,10 +91,11 @@ export function draftStepLabel(step: string | null): string | null {
   return DRAFT_STEP_LABELS[step as DraftJobStep] ?? step;
 }
 
-export function draftSteps(view: Pick<DraftView, "status" | "currentStep" | "failedStep">): DraftStepView[] {
+export function draftSteps(view: Pick<DraftView, "status" | "currentStep" | "failedStep" | "sourceDraftId">): DraftStepView[] {
+  const plan = view.sourceDraftId === null ? DRAFT_JOB_STEPS : NEW_IMAGE_JOB_STEPS;
   const marker = view.status === "failed" ? view.failedStep : view.currentStep;
-  const at = marker ? DRAFT_JOB_STEPS.indexOf(marker as DraftJobStep) : -1;
-  return DRAFT_JOB_STEPS.map((key, index) => {
+  const at = marker ? plan.indexOf(marker as DraftJobStep) : -1;
+  return plan.map((key, index) => {
     let state: DraftStepState = "waiting";
     if (view.status === "ready" || (at >= 0 && index < at)) state = "done";
     else if (index === at) state = view.status === "failed" ? "failed" : "current";
@@ -118,6 +129,10 @@ export function toDraftBoardView(view: DraftView, options: { now: Date; unreadSt
     ghlPreviewUrl: view.ghlPreviewUrl,
     unreadStories: options.unreadStories ?? [],
     retryable: isRetryable(view, options.now),
+    newImageAllowed: view.status === "ready" && !view.issuePublished,
+    featuredImageUrl: view.featuredImageUrl,
+    scenePrompt: view.scenePrompt,
+    sourceVersion: view.sourceVersion,
     createdAt: view.createdAt.toISOString(),
     startedAt: iso(view.startedAt),
     finishedAt: iso(view.finishedAt),
@@ -135,6 +150,7 @@ export function toDraftListEntry(item: DraftListItem): DraftListEntry {
     ghlPreviewUrl: item.ghlPreviewUrl,
     sent: item.sent,
     current: item.current,
+    sourceVersion: item.sourceVersion,
     createdAt: item.createdAt.toISOString(),
   };
 }

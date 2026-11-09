@@ -4,6 +4,7 @@ import {
   claimDraft,
   findDraftToRun,
   loadDraftInputs,
+  loadNewImageInputs,
   saveFailedDraft,
   saveReadyDraft,
   setDraftStep,
@@ -16,8 +17,10 @@ import {
   produceDraft,
   untilAborted,
   type DraftStep,
+  type NewImageDraftInput,
   type PartialDraft,
   type ProduceDraftDeps,
+  type ProduceDraftInput,
   type ProducedDraft,
 } from "@/src/pipeline/draft/produce-draft";
 import { raiseIncident, resolveIncident } from "@/src/pipeline/notify";
@@ -136,6 +139,7 @@ export async function runDraftJob(draftId: bigint | number | string, options: Ru
   if (!(await claimDraft(draft.id, now()))) return { status: "skipped", draftId: id, reason: `Draft ${draftId} is running already.` };
 
   const date = draft.issueDate ?? `issue-${draft.issueId}`;
+  const newImageOf = draft.sourceDraftId === null ? {} : { sourceDraftId: Number(draft.sourceDraftId) };
   const incidentKey = draftIncidentKey(date);
   const stepMs: Partial<Record<DraftJobStep, number>> = {};
   let runId: bigint | null = null;
@@ -188,7 +192,11 @@ export async function runDraftJob(draftId: bigint | number | string, options: Ru
       await bestEffort("run", "log the failure", () => log({ level: "error", step: failedStep, message })),
       await bestEffort("run", "finish the run", async () => {
         if (runId === null) throw new Error("The run log was never started.");
-        await finishRun(runId, { status: "failed", error: message, stats: { draftId: id, version: draft.version, issueDate: date, failedStep, stepMs } }, now());
+        await finishRun(
+          runId,
+          { status: "failed", error: message, stats: { draftId: id, version: draft.version, issueDate: date, ...newImageOf, failedStep, stepMs } },
+          now(),
+        );
       }),
     ].filter((problem): problem is string => problem !== null);
 
@@ -225,20 +233,26 @@ export async function runDraftJob(draftId: bigint | number | string, options: Ru
     runId = await startRun({ job: DRAFT_JOB, trigger: options.trigger ?? "event" }, now());
     await enter("load");
     const loadStarted = Date.now();
-    const { outline, issue, stories } = await untilAborted(
+    const target = { draft: { id, version: draft.version } };
+    const input: ProduceDraftInput | NewImageDraftInput = await untilAborted(
       (async () => {
         if ((await readDraftOwner()) !== "native") throw new Error("draft.owner is n8n, so native drafting is off.");
         const inputs = await loadDraftInputs(draft);
-        return { ...inputs, stories: await loadApprovedSections(inputs.outline) };
+        // A "New image" draft (#116) copies its source draft's content, so it needs no stories.
+        if (draft.sourceDraftId !== null) return { ...target, issue: inputs.issue, ...(await loadNewImageInputs(draft)) };
+        return { ...target, ...inputs, stories: await loadApprovedSections(inputs.outline) };
       })(),
       deadline.signal,
     );
+    const issue = input.issue;
     stepMs.load = Date.now() - loadStarted;
 
-    produced = await produceDraft(
-      { outline, stories, issue, draft: { id, version: draft.version } },
-      { ...createDraftDeps(env, { record }), ...options.deps, onStep: enter, signal: deadline.signal },
-    );
+    produced = await produceDraft(input, {
+      ...createDraftDeps(env, { record }),
+      ...options.deps,
+      onStep: enter,
+      signal: deadline.signal,
+    });
     Object.assign(stepMs, produced.stepMs);
 
     // Not cut short by the deadline: a save that commits after the draft was marked failed would contradict it.
@@ -254,6 +268,7 @@ export async function runDraftJob(draftId: bigint | number | string, options: Ru
   const { issue, issueUpdate } = saved;
   const stats = {
     draftId: id,
+    ...newImageOf,
     issueId: issue.id,
     version: draft.version,
     issueDate: issue.date,

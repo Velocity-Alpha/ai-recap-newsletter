@@ -1,6 +1,7 @@
 import { Check, ExternalLink, Loader2, TriangleAlert, X } from "lucide-react";
 
 import { capitalize, DraftStatusPill, formatDraftTime } from "@/src/components/approval/draft-status";
+import NewImage from "@/src/components/approval/NewImagePanel";
 import { draftHtmlSrc } from "@/src/features/newsletter/draft-links";
 import type { DraftBoardView, DraftStepState } from "@/src/pipeline/draft/draft-board";
 
@@ -14,6 +15,8 @@ type DraftViewProps = {
   retryBusy: boolean;
   retryError: string | null;
   onRetry: () => void;
+  /** After "New image" makes a draft: show that draft. */
+  onNewImageDraft?: (draftId: number) => void;
 };
 
 const CARD = "rounded-[20px] border border-[var(--border-light)] bg-[var(--bg-card)] px-5 py-5 sm:px-6";
@@ -108,7 +111,7 @@ function UnreadStories({ draft }: { draft: DraftBoardView }) {
   );
 }
 
-export default function DraftView({ draft, retryBusy, retryError, onRetry }: DraftViewProps) {
+export default function DraftView({ draft, retryBusy, retryError, onRetry, onNewImageDraft }: DraftViewProps) {
   const running = draft.status === "running";
   const failed = draft.status === "failed";
   const showPreview = draft.hasHtml && !running;
@@ -121,6 +124,7 @@ export default function DraftView({ draft, retryBusy, retryError, onRetry }: Dra
             <p className={KICKER}>
               Draft v{draft.version}
               {draft.issueDate ? ` · ${draft.issueDate}` : ""}
+              {draft.sourceVersion !== null ? ` · New image of v${draft.sourceVersion}` : ""}
             </p>
             <h2 className="mt-2 font-serif text-[clamp(22px,3vw,30px)] leading-tight text-[var(--text-primary)]">
               {draft.subject ?? (running ? "Writing the issue…" : "No subject yet")}
@@ -175,7 +179,7 @@ export default function DraftView({ draft, retryBusy, retryError, onRetry }: Dra
         {draft.status === "ready" ? (
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <GhlLink draft={draft} />
-            {/* #116: the "New image" button goes here. It opens the image panel for this ready draft. */}
+            {draft.newImageAllowed ? <NewImage draft={draft} onCreated={onNewImageDraft} /> : null}
           </div>
         ) : null}
       </div>

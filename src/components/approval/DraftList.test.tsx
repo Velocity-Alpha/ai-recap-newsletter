@@ -23,6 +23,7 @@ function entry(data: Partial<DraftListEntry>): DraftListEntry {
     ghlPreviewUrl: null,
     sent: false,
     current: false,
+    sourceVersion: null,
     createdAt: "2026-05-21T14:00:00.000Z",
     ...data,
   };
@@ -52,6 +53,15 @@ describe("DraftList", () => {
     expect(html).toContain('href="https://preview.example.test/1"');
     expect(html).toContain('href="/approval/drafts?date=2026-05-21&amp;draft=42"');
     expect(html).toMatch(/aria-current="true"[^>]*href="\/approval\/drafts\?date=2026-05-21&amp;draft=41"|href="\/approval\/drafts\?date=2026-05-21&amp;draft=41"[^>]*aria-current="true"/);
+  });
+
+  it("marks a draft made by New image with the draft it came from (#116)", () => {
+    const html = renderToStaticMarkup(
+      <DraftList date="2026-05-21" selectedId={null} drafts={[entry({ id: 42, version: 3, sourceVersion: 2 }), entry({ id: 41, version: 2 })]} />,
+    );
+
+    expect(html).toContain("New image of v2");
+    expect(html.match(/New image of/g)).toHaveLength(1);
   });
 
   it("says when there are no drafts yet", () => {

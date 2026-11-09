@@ -41,6 +41,10 @@ export interface GenerateImageOptions {
   fetch?: typeof fetch;
   /** Wait between attempts. n8n waits 5 s. */
   retryDelayMs?: number;
+  /** Attempts after the first. Defaults to `IMAGE_RETRIES`; the board's Generate button uses 0. */
+  retries?: number;
+  /** Per attempt. Defaults to `IMAGE_TIMEOUT_MS`. A route must finish inside Netlify's 60 s. */
+  timeoutMs?: number;
 }
 
 /** 2.2.2's request body. The text is `<style>\n - <scene>`, as n8n sends it. */
@@ -110,11 +114,11 @@ export async function generateImage(scenePrompt: string, options: GenerateImageO
         method: "POST",
         headers: { "content-type": "application/json", "x-goog-api-key": apiKey },
         body,
-        signal: AbortSignal.timeout(IMAGE_TIMEOUT_MS),
+        signal: AbortSignal.timeout(options.timeoutMs ?? IMAGE_TIMEOUT_MS),
       });
       if (!response.ok) throw new Error(`Vertex returned HTTP ${response.status}: ${await vertexErrorMessage(response)}`);
       return readImage((await response.json()) as VertexResponse);
     },
-    { retries: IMAGE_RETRIES, delayMs: options.retryDelayMs ?? 5_000 },
+    { retries: options.retries ?? IMAGE_RETRIES, delayMs: options.retryDelayMs ?? 5_000 },
   );
 }

@@ -29,6 +29,7 @@ export default function DraftList({ date, drafts, selectedId }: { date: string; 
               >
                 <p className="text-xs uppercase tracking-[0.14em] text-[var(--text-secondary)]">
                   v{draft.version} · {formatDraftTime(draft.createdAt)}
+                  {draft.sourceVersion !== null ? ` · New image of v${draft.sourceVersion}` : ""}
                 </p>
                 <p className="mt-1 truncate font-serif text-base text-[var(--text-primary)]">
                   {draft.subject ?? (draft.status === "failed" ? `Failed at ${draft.failedStepLabel ?? "an unknown step"}` : "No subject yet")}

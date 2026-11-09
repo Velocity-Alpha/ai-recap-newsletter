@@ -241,6 +241,8 @@ model IssueDraft {
   queuedAt         DateTime  @default(now()) @map("queued_at") @db.Timestamptz(6)
   startedAt        DateTime? @map("started_at") @db.Timestamptz(6)
   finishedAt       DateTime? @map("finished_at") @db.Timestamptz(6)
+  /// A "New image" draft (#116): the ready draft whose written content it re-uses. Null for a commit's draft.
+  sourceDraftId    BigInt?   @map("source_draft_id")
 
   @@unique([issueId, version])
   @@map("issue_drafts")

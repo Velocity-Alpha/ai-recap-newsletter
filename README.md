@@ -161,6 +161,9 @@ Mutation routes:
 - `POST /api/subscriber/unsubscribe/webhook` with `Authorization: Bearer <GHL_UNSUBSCRIBE_WEBHOOK_SECRET>` or `x-webhook-secret`
 - `POST /api/newsletters/commit` to commit an approved outline. With `draft.owner` = `n8n` (default) it posts to the n8n webhook. With `native` it saves the story changes, makes the next draft, and starts `draft-issue-background`; it never calls n8n
 - `POST /api/approval/drafts/[id]/retry` runs a failed or stuck draft again from the start (approval session)
+- `POST /api/approval/drafts/[id]/image/ideas` three scene ideas for "New image" on a ready draft, from one GPT-6 Luna call (approval session)
+- `POST /api/approval/drafts/[id]/image/generate` makes one image from `{ scenePrompt }` plus the fixed style prompt and uploads it to S3; it makes no draft (approval session)
+- `POST /api/approval/drafts/[id]/image` "Use this image": `{ imageUrl, scenePrompt }` from "generate" becomes the issue's next draft, with the same text, new HTML, and a new GHL template; it starts `draft-issue-background` (approval session)
 - `POST /api/approval/issues/[id]/publish` publishes an unpublished draft from its stored email HTML (approval session). Used by the "Mark as published" button on `/approval/issues`. It sends no email.
 - `POST /api/revalidate` refreshes the cached issue lists, issue pages, and sitemap. It needs `Authorization: Bearer <token>`, a 5-minute token signed with a key derived from `SESSION_SECRET` (`src/server/cache-refresh-auth.ts`). The publish job calls it after it publishes an issue.
 

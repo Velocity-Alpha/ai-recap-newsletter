@@ -29,10 +29,10 @@ vi.mock("@/src/pipeline/notify", () => notify);
 
 import { toIssueContentJson, type WrittenIssueContent } from "@/src/pipeline/draft/content";
 import { SAMPLE_APPROVED, SAMPLE_CONTENT, SAMPLE_OUTLINE } from "@/src/pipeline/draft/draft.fixture";
-import { createDraft, retryDraft } from "@/src/pipeline/draft/draft-store";
+import { createDraft, createImageDraft, retryDraft } from "@/src/pipeline/draft/draft-store";
 import { emailImageUrl } from "@/src/pipeline/draft/email-html";
 import { fakeDb } from "@/src/pipeline/draft/fake-db.fixture";
-import { DRAFT_STEPS, readNoArticles, type ProduceDraftDeps } from "@/src/pipeline/draft/produce-draft";
+import { DRAFT_STEPS, NEW_IMAGE_STEPS, readNoArticles, type ProduceDraftDeps } from "@/src/pipeline/draft/produce-draft";
 import { boardLink, runDraftJob } from "@/src/pipeline/draft/run-draft";
 import { finishRun, startRun } from "@/src/pipeline/runs";
 
@@ -406,6 +406,137 @@ describe("runDraftJob", () => {
 
     expect(result).toMatchObject({ status: "failed", step: "write" });
     expect(runLog.events.at(-1)).toMatchObject({ level: "warn", step: "alert" });
+  });
+});
+
+describe("runDraftJob for a new image (#116)", () => {
+  const IMAGE_ENV = { APP_ENV: "development", S3_BUCKET: "example-bucket" };
+  const NEW_IMAGE = {
+    imageUrl: `https://example-bucket.s3.amazonaws.com/newsletter-dev/${DATE}-def456.jpg`,
+    scenePrompt: "A pretend lighthouse on a rock.",
+  };
+
+  async function readyV1() {
+    const v1 = await commit();
+    await runDraftJob(v1.draftId, { env: IMAGE_ENV, now: () => NOW, deps: deps() });
+    expect(draftRow(v1.draftId).status).toBe("ready");
+    fakeDb.state.drafts.updates.length = 0;
+    runLog.events.length = 0;
+    runLog.finished.length = 0;
+    notify.raiseIncident.mockClear();
+    notify.resolveIncident.mockClear();
+    return { v1, v1Row: structuredClone(draftRow(v1.draftId)) };
+  }
+
+  const tpl2 = () => vi.fn(async () => ({ templateId: "tpl-2", previewUrl: "https://preview.example.test/tpl-2", mode: "sent" as const }));
+
+  it("copies the source's content, runs only image, html, and GHL, and makes a new GHL template", async () => {
+    const { v1, v1Row } = await readyV1();
+    const v2 = await createImageDraft(v1.draftId, NEW_IMAGE, { now: () => NOW });
+    const second = deps({ createTemplate: tpl2() });
+
+    const result = await runDraftJob(v2.draftId, { env: IMAGE_ENV, now: () => NOW, deps: second });
+
+    expect(result).toEqual({ status: "ready", draftId: v2.draftId, runId: "7", issue: "updated" });
+    expect(stepHistory()).toEqual(["load", ...NEW_IMAGE_STEPS, "save", null]);
+    expect(runLog.events.map((event) => event.step)).toEqual(["load", ...NEW_IMAGE_STEPS, "save"]);
+    expect(second.writer).not.toHaveBeenCalled();
+    expect(second.makeImage).not.toHaveBeenCalled();
+    expect(second.createTemplate).toHaveBeenCalledWith(
+      expect.objectContaining({ issueDate: DATE, version: 2, subject: SAMPLE_CONTENT.title }),
+    );
+    expect(draftRow(v2.draftId)).toMatchObject({
+      version: 2,
+      status: "ready",
+      content: v1Row.content,
+      unreadStoryIds: v1Row.unreadStoryIds,
+      featuredImageUrl: NEW_IMAGE.imageUrl,
+      scenePrompt: NEW_IMAGE.scenePrompt,
+      ghlTemplateId: "tpl-2",
+    });
+    expect(draftRow(v2.draftId).html).toContain(`data-draft-id="${v2.draftId}"`);
+    expect(draftRow(v2.draftId).html).toContain(NEW_IMAGE.imageUrl);
+    // v1 and its GHL template stay as they were (ADR 0002).
+    expect(draftRow(v1.draftId)).toEqual(v1Row);
+    expect(runLog.finished).toEqual([
+      expect.objectContaining({ status: "succeeded", stats: expect.objectContaining({ sourceDraftId: v1.draftId, version: 2 }) }),
+    ]);
+  });
+
+  it("puts the new image on the unpublished issue, with the same title and text", async () => {
+    const { v1 } = await readyV1();
+    const v2 = await createImageDraft(v1.draftId, NEW_IMAGE, { now: () => NOW });
+
+    await runDraftJob(v2.draftId, { env: IMAGE_ENV, now: () => NOW, deps: deps({ createTemplate: tpl2() }) });
+
+    expect(issueRow(v1.issueId)).toMatchObject({
+      title: SAMPLE_CONTENT.title,
+      excerpt: SAMPLE_CONTENT.excerpt,
+      html: draftRow(v2.draftId).html,
+      featureImageUrl: NEW_IMAGE.imageUrl,
+      promptFeaturedImage: NEW_IMAGE.scenePrompt,
+      contentJson: toIssueContentJson(SAMPLE_CONTENT, { issueId: v1.issueId, issueDate: DATE, featuredImageUrl: emailImageUrl(NEW_IMAGE.imageUrl) }),
+      publishedAt: null,
+    });
+  });
+
+  it("fails at image when the chosen image is not one this site uploaded, and the issue keeps v1", async () => {
+    const { v1 } = await readyV1();
+    const issueBefore = structuredClone(issueRow(v1.issueId));
+    const v2 = await createImageDraft(v1.draftId, { ...NEW_IMAGE, imageUrl: "https://elsewhere.example.test/picture.jpg" }, { now: () => NOW });
+    const second = deps({ createTemplate: tpl2() });
+
+    const result = await runDraftJob(v2.draftId, { env: IMAGE_ENV, now: () => NOW, deps: second });
+
+    expect(result).toMatchObject({ status: "failed", draftId: v2.draftId, step: "image" });
+    expect(draftRow(v2.draftId)).toMatchObject({ status: "failed", failedStep: "image" });
+    expect(draftRow(v2.draftId).error).toContain("is not an image this site uploaded");
+    expect(second.createTemplate).not.toHaveBeenCalled();
+    expect(issueRow(v1.issueId)).toEqual(issueBefore);
+    expect(notify.raiseIncident).toHaveBeenCalledWith(
+      expect.objectContaining({ what: `Draft v2 for ${DATE} failed at making the image.` }),
+      expect.anything(),
+    );
+  });
+
+  it("retries a failed new image draft with the same image and content, and still writes nothing", async () => {
+    const { v1 } = await readyV1();
+    const v2 = await createImageDraft(v1.draftId, NEW_IMAGE, { now: () => NOW });
+    const ghlDown = vi.fn(async () => Promise.reject(new Error("GHL create template failed with HTTP 502.")));
+    await runDraftJob(v2.draftId, { env: IMAGE_ENV, now: () => NOW, deps: deps({ createTemplate: ghlDown }) });
+    expect(draftRow(v2.draftId)).toMatchObject({ status: "failed", failedStep: "ghl" });
+
+    await retryDraft(v2.draftId, { now: () => NOW });
+    const again = deps({ createTemplate: tpl2() });
+    const result = await runDraftJob(v2.draftId, { env: IMAGE_ENV, now: () => NOW, deps: again });
+
+    expect(result).toMatchObject({ status: "ready", draftId: v2.draftId });
+    expect(again.writer).not.toHaveBeenCalled();
+    expect(stepHistory().filter((step) => step === "write")).toEqual([]);
+    expect(stepHistory().filter((step) => step === "image")).toHaveLength(2);
+    expect(draftRow(v2.draftId)).toMatchObject({
+      version: 2,
+      status: "ready",
+      content: SAMPLE_CONTENT,
+      featuredImageUrl: NEW_IMAGE.imageUrl,
+      scenePrompt: NEW_IMAGE.scenePrompt,
+      ghlTemplateId: "tpl-2",
+    });
+  });
+
+  it("stops at load when the issue was published after the image was chosen, and never changes the published issue", async () => {
+    const { v1 } = await readyV1();
+    const v2 = await createImageDraft(v1.draftId, NEW_IMAGE, { now: () => NOW });
+    await fakeDb.client.issue.update({ where: { id: BigInt(v1.issueId) }, data: { publishedAt: NOW } });
+    const published = structuredClone(issueRow(v1.issueId));
+    const second = deps({ createTemplate: tpl2() });
+
+    const result = await runDraftJob(v2.draftId, { env: IMAGE_ENV, now: () => NOW, deps: second });
+
+    expect(result).toMatchObject({ status: "failed", step: "load", error: expect.stringContaining("already published") });
+    expect(second.createTemplate).not.toHaveBeenCalled();
+    expect(issueRow(v1.issueId)).toEqual(published);
+    await expect(createImageDraft(v1.draftId, NEW_IMAGE)).rejects.toThrow("already published");
   });
 });
 

@@ -130,6 +130,15 @@ describe("generateImage", () => {
     );
   });
 
+  it("makes one attempt when the caller asks for no retries (the board's Generate button)", async () => {
+    const fetchMock = fakeFetch(new Response('{"error":{"message":"Busy"}}', { status: 503 }), vertexResponse([IMAGE_PART]));
+
+    await expect(generateImage(SCENE, { apiKey: "k", fetch: fetchMock, retries: 0, timeoutMs: 40_000 })).rejects.toThrow(
+      "Image failed after 1 attempts: Vertex returned HTTP 503: Busy",
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it("refuses an image that is not a JPEG", async () => {
     const png = { inlineData: { mimeType: "image/png", data: "iVBORw0KGgo=" } };
     const fetchMock = fakeFetch(vertexResponse([png]), vertexResponse([png]), vertexResponse([png]));

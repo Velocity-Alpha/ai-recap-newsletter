@@ -85,7 +85,7 @@ Internal requirements (do not output):
 Output discipline:
 Return JSON only. No preface. No markdown. No explanations.`;
 
-const SCENE_REQUIREMENTS = `Dynamic scene requirements for image_prompt:
+export const SCENE_REQUIREMENTS = `Dynamic scene requirements for image_prompt:
 
 * Stage the scene as a vignetted central cluster within a 16:9 frame.
 * Describe foreground, midground, background.
