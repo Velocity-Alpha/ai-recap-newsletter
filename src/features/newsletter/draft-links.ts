@@ -17,6 +17,14 @@ export function draftHtmlSrc(draftId: number): string {
   return `/api/approval/drafts/${draftId}/html`;
 }
 
+/**
+ * Fetch options for a write to the approval API. Always JSON, even with no body: the Origin check (#128)
+ * answers a write without `Content-Type: application/json` with 415.
+ */
+export function jsonPost(body: unknown = {}): RequestInit {
+  return { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) };
+}
+
 /** Shown before a commit when the date already has drafts. */
 export function secondCommitNotice(drafting: DraftingSummary | null): string | null {
   if (drafting?.owner !== "native" || drafting.drafts.length === 0) return null;

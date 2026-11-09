@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 
 import DraftList from "@/components/approval/DraftList";
 import DraftView from "@/components/approval/DraftView";
-import { draftViewHref } from "@/src/features/newsletter/draft-links";
+import { draftViewHref, jsonPost } from "@/src/features/newsletter/draft-links";
 import { nextDraftPoll, type DraftPollOutcome } from "@/src/features/newsletter/draft-polling";
 import type { DraftBoardView, DraftListEntry } from "@/src/pipeline/draft/draft-board";
 
@@ -122,7 +122,7 @@ function DraftsForDate({ date, requestedId }: { date: string; requestedId: numbe
     setRetryBusy(true);
     setRetryError(null);
     try {
-      const response = await fetch(`/api/approval/drafts/${draft.id}/retry`, { method: "POST" });
+      const response = await fetch(`/api/approval/drafts/${draft.id}/retry`, jsonPost());
       const body = await readJson(response);
       if (!response.ok) setRetryError(String(body.error ?? "Could not retry the draft."));
     } catch {

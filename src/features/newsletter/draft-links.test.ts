@@ -3,9 +3,22 @@ import { describe, expect, it } from "vitest";
 import {
   draftHtmlSrc,
   draftViewHref,
+  jsonPost,
   nativeCommitTarget,
   secondCommitNotice,
 } from "@/src/features/newsletter/draft-links";
+
+describe("jsonPost", () => {
+  // The approval API refuses writes that are not JSON (415) once the Origin check (#128) is on.
+  it("sends a JSON POST, with an empty object when there is no body", () => {
+    expect(jsonPost()).toEqual({ method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+    expect(jsonPost({ scenePrompt: "A lamp." })).toEqual({
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ scenePrompt: "A lamp." }),
+    });
+  });
+});
 
 describe("draft links", () => {
   it("points at the draft view and the preview HTML", () => {
