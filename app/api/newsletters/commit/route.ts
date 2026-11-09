@@ -7,6 +7,7 @@ import {
 } from "@/src/server/observability";
 import { hasValidApprovalSession } from "@/src/server/approval-auth";
 import { fetchLastPublishedIssueDateOnOrBefore } from "@/src/features/newsletter/repository";
+import { parseCommitDate, resolveCommitWebhook } from "@/src/pipeline/side-effects/commit-webhook";
 import jwt from "jsonwebtoken";
 
 export const runtime = "nodejs";
@@ -22,19 +23,6 @@ function normalizeCommitPayload(payload: unknown): Record<string, unknown> {
     }
   }
   throw new Error("Approval commit payload must be a JSON object.");
-}
-
-function parseDateOnly(value: unknown): string | null {
-  if (typeof value !== "string") {
-    return null;
-  }
-
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    return null;
-  }
-
-  return parsed.toISOString().slice(0, 10);
 }
 
 export async function POST(request: Request) {
@@ -77,13 +65,18 @@ export async function POST(request: Request) {
       );
     }
 
-    const targetDate = parseDateOnly(normalizedPayload.date);
+    const targetDate = parseCommitDate(normalizedPayload.date);
     if (!targetDate) {
       return jsonWithRequestId(
         context,
         { success: false, error: "Commit payload is missing a valid date." },
         { status: 400 }
       );
+    }
+
+    const webhook = resolveCommitWebhook(process.env);
+    if (!webhook.ok) {
+      return jsonWithRequestId(context, { success: false, error: webhook.error }, { status: 503 });
     }
 
     const publishStatus = await fetchLastPublishedIssueDateOnOrBefore(targetDate);
@@ -111,9 +104,7 @@ export async function POST(request: Request) {
       expiresIn: "1h", // Token expires in 1 hour
     });
 
-    const webhookUrl =
-      process.env.OUTLINE_COMMIT_WEBHOOK_URL ??
-      "https://n8n.velocityalpha.com/webhook/story/approval";
+    const webhookUrl = webhook.url;
     const webhookHostname = new URL(webhookUrl).hostname;
     const webhookResponse = await fetch(webhookUrl, {
       method: "POST",
@@ -121,7 +112,8 @@ export async function POST(request: Request) {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify(normalizedPayload),
+      // n8n gets the calendar date only, never the client's raw value.
+      body: JSON.stringify({ ...normalizedPayload, date: targetDate }),
     });
 
     if (!webhookResponse.ok) {
