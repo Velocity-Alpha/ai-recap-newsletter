@@ -1,4 +1,5 @@
 import type { Prisma, PrismaClient } from "@/src/generated/prisma";
+import { sentDraftIssueFields } from "@/src/pipeline/draft/draft-store";
 import type { PublishEventInput, PublishStore } from "@/src/pipeline/publish/detect-publish";
 import type { PublishMode } from "@/src/pipeline/publish/publish-decision";
 import { prisma } from "@/src/server/prisma";
@@ -28,6 +29,9 @@ function eventData(event: PublishEventInput): Prisma.PublishEventCreateManyInput
     storyIds: event.storyIds,
     contentJson: (event.contentJson ?? undefined) as Prisma.InputJsonValue | undefined,
     problems: event.problems,
+    // Only a native email carries a draft id. An n8n email leaves the column out of the insert, so publishing
+    // keeps working on a database that does not have the issue_drafts migration yet.
+    ...(event.draftId === null ? {} : { draftId: BigInt(event.draftId) }),
   };
 }
 
@@ -66,13 +70,17 @@ export function createPrismaPublishStore(client: PrismaClient = prisma): PrismaP
 
     async publish({ issueId, content, storyIds, publishedAt, event }) {
       return client.$transaction(async (tx) => {
+        // A native email names its draft. The issue takes that draft, which may be older than the newest one.
+        const sentDraft = event.draftId === null ? null : await sentDraftIssueFields(tx, issueId, event.draftId);
         // Only an unpublished issue changes, so a second copy or a later resend never moves published_at.
         const updated = await tx.issue.updateMany({
           where: { id: BigInt(issueId), publishedAt: null },
           data: {
             publishedAt,
-            contentJson: content as unknown as Prisma.InputJsonValue,
-            ...(content.title ? { title: content.title } : {}),
+            ...(sentDraft ?? {
+              contentJson: content as unknown as Prisma.InputJsonValue,
+              ...(content.title ? { title: content.title } : {}),
+            }),
           },
         });
         const outcome = updated.count === 1 ? "published" : "already_published";

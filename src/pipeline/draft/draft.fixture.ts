@@ -2,6 +2,7 @@
  * Test helper: a made-up outline and the written content that matches it. Placeholder text only.
  */
 import type { ApprovedSections, WrittenIssueContent } from "@/src/pipeline/draft/content";
+import type { ApprovalOutline } from "@/src/pipeline/draft/outline";
 
 export const SAMPLE_APPROVED: ApprovedSections = {
   headlines: [
@@ -140,3 +141,21 @@ export const SAMPLE_CONTENT: WrittenIssueContent = {
 export const SAMPLE_ISSUE = { id: 301, issueDate: "2027-01-04" };
 
 export const SAMPLE_DRAFT = { id: 41, featuredImageUrl: "https://assets.example.test/newsletter/2027-01-04-abc.jpg" };
+
+/** The committed outline behind SAMPLE_APPROVED: board order, the lead story, a note, and a hidden fill-in. */
+export const SAMPLE_OUTLINE: ApprovalOutline = {
+  date: SAMPLE_ISSUE.issueDate,
+  sections: [
+    { key: "headlines", storyIds: [501, 502] },
+    { key: "research", storyIds: [503, 504] },
+    { key: "tools", storyIds: [505, 506] },
+    { key: "quickHits", storyIds: [507, 508] },
+  ],
+  leadStoryId: 501,
+  stories: [
+    { id: 501, section: "headlines", url: "https://news.example.test/planner?ref=feed&id=1", note: "" },
+    { id: 502, section: "headlines", url: null, note: "Keep this one light." },
+    { id: 509, section: "quickHits", url: null, note: "" },
+  ],
+  excluded: [{ id: 510, section: "tools", reason: "Duplicate" }],
+};

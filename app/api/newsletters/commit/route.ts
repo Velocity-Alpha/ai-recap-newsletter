@@ -4,12 +4,15 @@ import {
   logRequestError,
   logRequestStart,
   logRequestSuccess,
+  type RequestLogContext,
 } from "@/src/server/observability";
 import { hasValidApprovalSession } from "@/src/server/approval-auth";
 import { fetchLastPublishedIssueDateOnOrBefore } from "@/src/features/newsletter/repository";
 import { parseCommitDate, resolveCommitWebhook } from "@/src/pipeline/side-effects/commit-webhook";
 import { normalizeOutline, type ApprovalOutline } from "@/src/pipeline/draft/outline";
 import { markOutlineForwarded, readDraftOwner, saveOutline } from "@/src/pipeline/draft/outline-store";
+import { IssuePublishedError } from "@/src/pipeline/draft/draft-store";
+import { commitNativeDraft } from "@/src/pipeline/draft/native-commit";
 import jwt from "jsonwebtoken";
 
 export const runtime = "nodejs";
@@ -50,9 +53,12 @@ export async function POST(request: Request) {
       );
     }
 
+    // `native` drafts here and never calls n8n (#79). `n8n` works exactly as before.
+    const draftOwner = await readDraftOwner();
+
     // Validate N8N_WEBHOOK_JWT_SECRET exists
-    const webhookSecret = process.env.N8N_WEBHOOK_JWT_SECRET;
-    if (!webhookSecret) {
+    const webhookSecret = process.env.N8N_WEBHOOK_JWT_SECRET ?? "";
+    if (draftOwner === "n8n" && !webhookSecret) {
       throw new Error("N8N_WEBHOOK_JWT_SECRET is not defined in environment variables");
     }
 
@@ -76,14 +82,18 @@ export async function POST(request: Request) {
       );
     }
 
-    // Name each key: Next inlines `process.env.APP_ENV` at build time (next.config.mjs `env`), but only when
-    // it is written out like this. Passing `process.env` whole would read the runtime value instead.
-    const webhook = resolveCommitWebhook({
-      APP_ENV: process.env.APP_ENV,
-      OUTLINE_COMMIT_WEBHOOK_URL: process.env.OUTLINE_COMMIT_WEBHOOK_URL,
-    });
-    if (!webhook.ok) {
-      return jsonWithRequestId(context, { success: false, error: webhook.error }, { status: 503 });
+    let webhookUrl = "";
+    if (draftOwner === "n8n") {
+      // Name each key: Next inlines `process.env.APP_ENV` at build time (next.config.mjs `env`), but only when
+      // it is written out like this. Passing `process.env` whole would read the runtime value instead.
+      const webhook = resolveCommitWebhook({
+        APP_ENV: process.env.APP_ENV,
+        OUTLINE_COMMIT_WEBHOOK_URL: process.env.OUTLINE_COMMIT_WEBHOOK_URL,
+      });
+      if (!webhook.ok) {
+        return jsonWithRequestId(context, { success: false, error: webhook.error }, { status: 503 });
+      }
+      webhookUrl = webhook.url;
     }
 
     let outline: ApprovalOutline;
@@ -110,17 +120,12 @@ export async function POST(request: Request) {
       );
     }
 
-    // Native drafting starts here in #79. Until then a commit under `native` would draft nothing.
-    const draftOwner = await readDraftOwner();
     if (draftOwner === "native") {
-      return jsonWithRequestId(
-        context,
-        { success: false, error: "draft.owner is native, but native drafting is not built yet. Set it back to n8n." },
-        { status: 503 },
-      );
+      return await commitNative(context, outline, new URL(request.url).origin);
     }
     // n8n drafts from the forwarded body, not the saved row, so in n8n mode a failed save is logged and the
     // commit still goes through. The owner commits every weekday; a missing table must not stop that.
+    // (Native mode saves in commitNativeDraft, where a failed save is a 500 and nothing starts.)
     let savedOutline: { id: bigint; hash: string } | null = null;
     try {
       savedOutline = await saveOutline(outline, draftOwner);
@@ -143,7 +148,6 @@ export async function POST(request: Request) {
       expiresIn: "1h", // Token expires in 1 hour
     });
 
-    const webhookUrl = webhook.url;
     const webhookHostname = new URL(webhookUrl).hostname;
     const webhookResponse = await fetch(webhookUrl, {
       method: "POST",
@@ -205,4 +209,53 @@ export async function POST(request: Request) {
       { status: 500 },
     );
   }
+}
+
+/**
+ * Saves the outline, applies the story changes, and starts the draft job on this deploy. The board then follows
+ * the draft. A draft whose job did not start is already marked failed, so the board can retry it.
+ */
+async function commitNative(
+  context: RequestLogContext,
+  outline: ApprovalOutline,
+  siteUrl: string,
+) {
+  let result: Awaited<ReturnType<typeof commitNativeDraft>>;
+  try {
+    result = await commitNativeDraft(outline, { siteUrl });
+  } catch (error) {
+    if (!(error instanceof IssuePublishedError)) throw error;
+    return jsonWithRequestId(
+      context,
+      { success: false, error: error.message, target_date: outline.date },
+      { status: 409 },
+    );
+  }
+
+  const { draft, start } = result;
+  if (!start.started) {
+    logRequestError(context, "Native draft job did not start", new Error(start.error), { draftId: draft.draftId });
+    return jsonWithRequestId(
+      context,
+      { success: false, owner: "native", error: start.error, draft },
+      { status: 502 },
+    );
+  }
+
+  logRequestSuccess(context, {
+    draftOwner: "native",
+    outlineId: result.outlineId.toString(),
+    outlineHash: result.outlineHash,
+    draftId: draft.draftId,
+    draftVersion: draft.version,
+    storyChanges: result.storyChanges,
+  });
+
+  return jsonWithRequestId(context, {
+    success: true,
+    owner: "native",
+    message: `Draft v${draft.version} for ${draft.issueDate} started.`,
+    receivedAt: new Date().toISOString(),
+    draft,
+  });
 }

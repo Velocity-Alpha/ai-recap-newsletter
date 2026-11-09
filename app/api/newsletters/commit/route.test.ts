@@ -17,7 +17,22 @@ const outlineStore = vi.hoisted(() => ({
 
 vi.mock("@/src/pipeline/draft/outline-store", () => outlineStore);
 
+const draftStore = vi.hoisted(() => ({
+  createDraft: vi.fn(),
+  markDraftStartFailed: vi.fn(),
+}));
+
+vi.mock("@/src/pipeline/draft/draft-store", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/src/pipeline/draft/draft-store")>()),
+  ...draftStore,
+}));
+
+const storyChanges = vi.hoisted(() => ({ applyStoryChanges: vi.fn() }));
+
+vi.mock("@/src/pipeline/draft/story-changes", () => storyChanges);
+
 import { POST } from "@/app/api/newsletters/commit/route";
+import { IssuePublishedError } from "@/src/pipeline/draft/draft-store";
 
 type BoardStory = { id: number; headline: string; summary: string };
 type BoardSlot = { story: BoardStory; status: "selected" | "fill-in" };
@@ -175,6 +190,10 @@ describe("POST /api/newsletters/commit", () => {
     outlineStore.readDraftOwner.mockResolvedValue("n8n");
     outlineStore.saveOutline.mockResolvedValue({ id: BigInt(5), hash: "a".repeat(64) });
     outlineStore.markOutlineForwarded.mockResolvedValue(undefined);
+    draftStore.createDraft.mockResolvedValue({ draftId: 41, issueId: 3, version: 2, issueDate: "2026-05-21" });
+    draftStore.markDraftStartFailed.mockResolvedValue(true);
+    storyChanges.applyStoryChanges.mockResolvedValue({ excluded: 1, queued: 2, edited: 1 });
+    process.env.SESSION_SECRET = "s".repeat(32);
     process.env.APPROVAL_PASSWORD = "approval-secret";
     process.env.N8N_WEBHOOK_JWT_SECRET = "n8n-webhook-jwt-secret";
     process.env.APP_ENV = "production";
@@ -492,6 +511,23 @@ describe("POST /api/newsletters/commit", () => {
     errorLog.mockRestore();
   });
 
+  it("stops an n8n-mode commit before saving anything when N8N_WEBHOOK_JWT_SECRET is unset", async () => {
+    // A failed save is soft in n8n mode (above), but a missing secret is not: n8n could never accept the commit.
+    delete process.env.N8N_WEBHOOK_JWT_SECRET;
+    webhookAccepts();
+    const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const { response, json } = await commit(boardCommitPayload());
+
+    expect(response.status).toBe(500);
+    expect(json).toMatchObject({ success: false, error: expect.stringContaining("N8N_WEBHOOK_JWT_SECRET") });
+    expect(outlineStore.saveOutline).not.toHaveBeenCalled();
+    expect(storyChanges.applyStoryChanges).not.toHaveBeenCalled();
+    expect(draftStore.createDraft).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+    errorLog.mockRestore();
+  });
+
   it("marks the saved outline forwarded after n8n answers 2xx", async () => {
     webhookAccepts();
 
@@ -530,15 +566,132 @@ describe("POST /api/newsletters/commit", () => {
     errorLog.mockRestore();
   });
 
-  it("refuses a commit while draft.owner is native, without saving or calling n8n", async () => {
-    outlineStore.readDraftOwner.mockResolvedValue("native");
+  it("leaves drafts and stories to n8n while draft.owner is n8n", async () => {
+    webhookAccepts();
 
-    const { response, json } = await commit({ date: "2026-05-21", approved_ids_by_section: { top_stories: [1] } });
+    await commit({ date: "2026-05-21", approved_ids_by_section: { top_stories: [1] }, excluded_stories: [{ id: 9 }] });
 
-    expect(response.status).toBe(503);
-    expect(json.error).toContain("native drafting is not built yet");
-    expect(outlineStore.saveOutline).not.toHaveBeenCalled();
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(storyChanges.applyStoryChanges).not.toHaveBeenCalled();
+    expect(draftStore.createDraft).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][0]).toBe("https://n8n.velocityalpha.com/webhook/story/approval");
+  });
+
+  describe("while draft.owner is native", () => {
+    const BACKGROUND_URL = "http://localhost/.netlify/functions/draft-issue-background";
+    const BODY = {
+      date: "2026-05-21",
+      approved_ids_by_section: { top_stories: [3, 1] },
+      newsletter_headline: 3,
+      excluded_stories: [{ id: 9, reason: "off topic", newsletter_category: "top_stories" }],
+      stories: [{ id: 3, url: "https://example.com/edited", note: "n", newsletter_category: "top_stories" }],
+    };
+    const OUTLINE = {
+      date: "2026-05-21",
+      sections: [{ key: "top_stories", storyIds: [3, 1] }],
+      leadStoryId: 3,
+      stories: [{ id: 3, section: "top_stories", url: "https://example.com/edited", note: "n" }],
+      excluded: [{ id: 9, section: "top_stories", reason: "off topic" }],
+    };
+
+    beforeEach(() => {
+      outlineStore.readDraftOwner.mockResolvedValue("native");
+      fetchMock.mockResolvedValue(new Response(null, { status: 202 }));
+    });
+
+    it("saves the outline as native, applies the story changes, creates the draft, and starts its job", async () => {
+      const { response, json } = await commit(BODY);
+
+      expect(response.status).toBe(200);
+      expect(json).toMatchObject({
+        success: true,
+        owner: "native",
+        draft: { draftId: 41, issueId: 3, version: 2, issueDate: "2026-05-21" },
+      });
+      expect(outlineStore.saveOutline).toHaveBeenCalledWith(OUTLINE, "native");
+      expect(storyChanges.applyStoryChanges).toHaveBeenCalledWith(OUTLINE);
+      expect(draftStore.createDraft).toHaveBeenCalledWith(BigInt(5), expect.anything());
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      const [url, init] = fetchMock.mock.calls[0];
+      expect(url).toBe(BACKGROUND_URL);
+      expect(JSON.parse(init.body)).toEqual({ draftId: 41 });
+      expect(draftStore.markDraftStartFailed).not.toHaveBeenCalled();
+      // forwarded_at is n8n's acceptance only; issue_drafts tracks the native job.
+      expect(outlineStore.markOutlineForwarded).not.toHaveBeenCalled();
+    });
+
+    it("returns 500 and starts nothing when the outline cannot be saved", async () => {
+      outlineStore.saveOutline.mockRejectedValue(new Error('relation "approval_outlines" does not exist'));
+      const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      const { response, json } = await commit(BODY);
+
+      expect(response.status).toBe(500);
+      expect(json).toMatchObject({ success: false, error: 'relation "approval_outlines" does not exist' });
+      expect(storyChanges.applyStoryChanges).not.toHaveBeenCalled();
+      expect(draftStore.createDraft).not.toHaveBeenCalled();
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(outlineStore.markOutlineForwarded).not.toHaveBeenCalled();
+      errorLog.mockRestore();
+    });
+
+    it("never calls n8n, and needs neither its secret nor its webhook", async () => {
+      process.env.APP_ENV = "preview";
+      delete process.env.OUTLINE_COMMIT_WEBHOOK_URL;
+      delete process.env.N8N_WEBHOOK_JWT_SECRET;
+
+      const { response } = await commit(BODY);
+
+      expect(response.status).toBe(200);
+      expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([BACKGROUND_URL]);
+    });
+
+    it("refuses a published date before saving anything", async () => {
+      repositoryFns.fetchLastPublishedIssueDateOnOrBefore.mockResolvedValue({ target_date: "2026-05-21", has_exact_match: true, issue: null });
+
+      const { response, json } = await commit(BODY);
+
+      expect(response.status).toBe(409);
+      expect(json.error).toContain("already published");
+      expect(outlineStore.saveOutline).not.toHaveBeenCalled();
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it("refuses with 409 when the issue was published while committing", async () => {
+      draftStore.createDraft.mockRejectedValue(new IssuePublishedError(3, "2026-05-21"));
+
+      const { response, json } = await commit(BODY);
+
+      expect(response.status).toBe(409);
+      expect(json).toMatchObject({
+        success: false,
+        error: "The issue for 2026-05-21 (id 3) is already published. Drafting stopped.",
+      });
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it("marks the draft failed and returns it when its job does not start", async () => {
+      fetchMock.mockResolvedValue(new Response("down", { status: 500 }));
+
+      const { response, json } = await commit(BODY);
+
+      expect(draftStore.markDraftStartFailed).toHaveBeenCalledWith(41, "Starting the draft job failed with HTTP 500.", expect.any(Date));
+      expect(response.status).toBe(502);
+      expect(json).toMatchObject({
+        success: false,
+        owner: "native",
+        error: "Starting the draft job failed with HTTP 500.",
+        draft: { draftId: 41, version: 2 },
+      });
+    });
+
+    it("rejects an outline with no approved stories", async () => {
+      const { response } = await commit({ date: "2026-05-21", approved_ids_by_section: { top_stories: [] } });
+
+      expect(response.status).toBe(400);
+      expect(outlineStore.saveOutline).not.toHaveBeenCalled();
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
   });
 
   it("rejects an outline with no approved stories", async () => {
