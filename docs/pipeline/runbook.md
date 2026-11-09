@@ -6,8 +6,8 @@ stages.
 
 Each entry says which job raises it and which PR added it. All of those PRs are merged and in production
 since 2026-11-09: #123 (ops alerts), #129 (run checks), #132 (draft job), #133 (native commit), #134
-(article reader). `draft.failed` can only appear once `draft.owner` is `native`; production still drafts in
-n8n until the owner switches it.
+(article reader). `draft.owner` is `native` in production since 2026-11-09 20:34 UTC, so `draft.failed` can
+appear there now.
 
 ## How incidents work
 
