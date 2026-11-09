@@ -1,26 +1,24 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import {
-  APPROVAL_SESSION_COOKIE_NAME,
-  createApprovalSessionToken,
-} from "@/src/server/approval-auth";
+import { hasValidApprovalSession } from "@/src/server/approval-auth";
+import { refuseCrossOriginWrite } from "@/src/server/same-origin";
 
 export async function proxy(request: NextRequest) {
-  // Let the login page and login API through
   const { pathname, search } = request.nextUrl;
-  if (pathname === "/approval/login" || pathname.startsWith("/api/approval/login")) {
+  const isApi = pathname.startsWith("/api/");
+
+  // Writes must come from this site's own pages; API writes must also be JSON.
+  const refusal = refuseCrossOriginWrite(request, { requireJson: isApi });
+  if (refusal) return refusal;
+
+  // API routes check the session themselves and answer 401, so they are not redirected.
+  // Let the login page through.
+  if (isApi || pathname === "/approval/login") {
     return NextResponse.next();
   }
 
-  const password = process.env.APPROVAL_PASSWORD;
-
-  // If no password is configured, allow through (dev convenience)
-  if (!password) return NextResponse.next();
-
-  const expectedToken = await createApprovalSessionToken(password);
-  const sessionCookie = request.cookies.get(APPROVAL_SESSION_COOKIE_NAME);
-
-  if (sessionCookie?.value === expectedToken) {
+  // Fails closed: with APPROVAL_PASSWORD or SESSION_SECRET unset, no session is valid.
+  if (await hasValidApprovalSession(request)) {
     return NextResponse.next();
   }
 
@@ -30,5 +28,6 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/approval/:path*"],
+  // Every path that uses the approval session. `/:path*` also matches the bare prefix.
+  matcher: ["/approval/:path*", "/api/approval/:path*", "/api/newsletters/commit", "/api/admin/:path*"],
 };

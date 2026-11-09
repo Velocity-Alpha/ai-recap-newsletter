@@ -52,6 +52,7 @@ describe("GET /api/approval/outline/status", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.APPROVAL_PASSWORD = "approval-secret";
+    process.env.SESSION_SECRET = "test-session-secret";
   });
 
   it("rejects unauthenticated requests", async () => {
@@ -64,7 +65,7 @@ describe("GET /api/approval/outline/status", () => {
   });
 
   it("returns 400 when response_id is missing", async () => {
-    const token = await createApprovalSessionToken("approval-secret");
+    const token = await createApprovalSessionToken();
     const res = await GET(makeRequest({ date: DATE }, token));
     const json = await res.json();
 
@@ -75,7 +76,7 @@ describe("GET /api/approval/outline/status", () => {
 
   it("returns processing when response status is pending", async () => {
     dedupFns.checkDeduplicationStatus.mockResolvedValue({ status: "pending" });
-    const token = await createApprovalSessionToken("approval-secret");
+    const token = await createApprovalSessionToken();
 
     const res = await GET(makeRequest({ response_id: RESPONSE_ID, date: DATE }, token));
     const json = await res.json();
@@ -90,7 +91,7 @@ describe("GET /api/approval/outline/status", () => {
       status: "failed",
       error: "Response generation failed",
     });
-    const token = await createApprovalSessionToken("approval-secret");
+    const token = await createApprovalSessionToken();
 
     const res = await GET(makeRequest({ response_id: RESPONSE_ID, date: DATE }, token));
     const json = await res.json();
@@ -102,7 +103,7 @@ describe("GET /api/approval/outline/status", () => {
 
   it("returns error with fallback message when response fails without an error string", async () => {
     dedupFns.checkDeduplicationStatus.mockResolvedValue({ status: "failed" });
-    const token = await createApprovalSessionToken("approval-secret");
+    const token = await createApprovalSessionToken();
 
     const res = await GET(makeRequest({ response_id: RESPONSE_ID, date: DATE }, token));
     const json = await res.json();
@@ -118,7 +119,7 @@ describe("GET /api/approval/outline/status", () => {
       result: { kept_story_ids: [1, 3] },
     });
     curationFns.createDedupedOutline.mockResolvedValue(BASE_OUTLINE);
-    const token = await createApprovalSessionToken("approval-secret");
+    const token = await createApprovalSessionToken();
 
     const res = await GET(makeRequest({ response_id: RESPONSE_ID, date: DATE }, token));
     const json = await res.json();
@@ -137,7 +138,7 @@ describe("GET /api/approval/outline/status", () => {
       result: { kept_story_ids: [1, 3] },
     });
     curationFns.createDedupedOutline.mockResolvedValue(BASE_OUTLINE);
-    const token = await createApprovalSessionToken("approval-secret");
+    const token = await createApprovalSessionToken();
 
     await GET(makeRequest({ response_id: RESPONSE_ID, date: DATE, reuse: "2026-04-23" }, token));
 
@@ -149,7 +150,7 @@ describe("GET /api/approval/outline/status", () => {
   it("returns 500 for unknown response status", async () => {
     dedupFns.checkDeduplicationStatus.mockResolvedValue({ status: "completed" }); // completed but no result
     curationFns.createDedupedOutline.mockResolvedValue(BASE_OUTLINE);
-    const token = await createApprovalSessionToken("approval-secret");
+    const token = await createApprovalSessionToken();
 
     const res = await GET(makeRequest({ response_id: RESPONSE_ID, date: DATE }, token));
     const json = await res.json();
@@ -160,7 +161,7 @@ describe("GET /api/approval/outline/status", () => {
 
   it("returns 500 when checkDeduplicationStatus throws", async () => {
     dedupFns.checkDeduplicationStatus.mockRejectedValue(new Error("OpenAI unreachable"));
-    const token = await createApprovalSessionToken("approval-secret");
+    const token = await createApprovalSessionToken();
 
     const res = await GET(makeRequest({ response_id: RESPONSE_ID, date: DATE }, token));
     const json = await res.json();

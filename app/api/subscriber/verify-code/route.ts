@@ -25,6 +25,7 @@ export async function POST(request: Request) {
     const subscriber = await verifySubscriberSignInCode({
       email,
       code: payload.code ?? "",
+      requestIp: context.ip,
     });
 
     const response = jsonWithRequestId<VerifyCodeResponse>(context, {
@@ -49,8 +50,11 @@ export async function POST(request: Request) {
 
       return jsonWithRequestId(
         context,
-        { error: error.message },
-        { status: error.statusCode },
+        { error: error.message, code: error.code },
+        {
+          status: error.statusCode,
+          headers: error.retryAfterSeconds ? { "Retry-After": String(error.retryAfterSeconds) } : undefined,
+        },
       );
     }
 

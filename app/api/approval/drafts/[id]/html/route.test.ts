@@ -8,7 +8,7 @@ vi.mock("@/src/pipeline/draft/draft-store", () => draftStore);
 import { GET } from "@/app/api/approval/drafts/[id]/html/route";
 
 async function get(id: string, signedIn = true) {
-  const token = await createApprovalSessionToken("approval-secret");
+  const token = await createApprovalSessionToken();
   return GET(
     new Request(`http://localhost/api/approval/drafts/${id}/html`, {
       headers: signedIn ? { Cookie: `approval_session=${token}` } : {},
@@ -21,6 +21,7 @@ describe("GET /api/approval/drafts/[id]/html", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.APPROVAL_PASSWORD = "approval-secret";
+    process.env.SESSION_SECRET = "test-session-secret";
   });
 
   it("needs the approval login", async () => {

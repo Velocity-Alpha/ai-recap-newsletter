@@ -157,6 +157,7 @@ Mutation routes:
 - `POST /api/subscriber/subscribe`
 - `POST /api/subscriber/request-code`
 - `POST /api/subscriber/verify-code`
+- The three routes above, and `POST /api/approval/login`, answer `429` with `Retry-After` once a caller passes its limit (per IP, with IPv6 grouped by /64; per email where there is one; and for the approval login, across the whole site). The IP comes from Netlify's `x-nf-client-connection-ip` header. Limits live in `src/server/rate-limit.ts`; counts are in `newsletter.rate_limits`.
 - `POST /api/subscriber/sign-out`
 - `GET|POST /api/subscriber/unsubscribe` with a signed `token`
 - `POST /api/subscriber/unsubscribe/webhook` with `Authorization: Bearer <GHL_UNSUBSCRIBE_WEBHOOK_SECRET>` or `x-webhook-secret`
@@ -166,6 +167,7 @@ Mutation routes:
 - `POST /api/approval/drafts/[id]/image/generate` makes one image from `{ scenePrompt }` plus the fixed style prompt and uploads it to S3; it makes no draft (approval session)
 - `POST /api/approval/drafts/[id]/image` "Use this image": `{ imageUrl, scenePrompt }` from "generate" becomes the issue's next draft, with the same text, new HTML, and a new GHL template; it starts `draft-issue-background` (approval session)
 - `POST /api/approval/issues/[id]/publish` publishes an unpublished draft from its stored email HTML (approval session). Used by the "Mark as published" button on `/approval/issues`. It sends no email.
+- `proxy.ts` refuses writes (any method but GET, HEAD, OPTIONS) to `/approval/*`, `/api/approval/*`, `/api/newsletters/commit`, and `/api/admin/*` unless they come from this site's own origin (`403`), and refuses API writes that are not `Content-Type: application/json` (`415`). See `src/server/same-origin.ts`.
 - `POST /api/revalidate` refreshes the cached issue lists, issue pages, and sitemap. It needs `Authorization: Bearer <token>`, a 5-minute token signed with a key derived from `SESSION_SECRET` (`src/server/cache-refresh-auth.ts`). The publish job calls it after it publishes an issue.
 
 Public unsubscribe page:
@@ -198,7 +200,7 @@ Required environment variables:
 
 - `APP_ENV` — `development`, `preview`, or `production`. Set per deploy context in `netlify.toml` (`production` for production, `preview` for deploy previews and branch deploys). `next build` fails without it.
 - `DATABASE_URL` — production in the production context; the Neon `dev` branch for deploy previews and branch deploys
-- `SESSION_SECRET` — signs subscriber sessions and, through derived keys, the job tokens (cache refresh, ingest start)
+- `SESSION_SECRET` — signs subscriber sessions and, through derived keys, the job tokens (cache refresh, ingest start) and approval board sessions
 - `OPENAI_API_KEY` — story extraction in the ingest job
 - `TELEGRAM_REVIEW_BOT_TOKEN` — production only; the ingest job's "stories are ready" message
 - `TELEGRAM_OPS_CHAT_ID` — production only; the "AI Recap Ops" chat where the review bot posts ops alerts (`src/pipeline/notify/`). Never the review group. Without it, alerts are not sent.
@@ -209,7 +211,7 @@ Required environment variables:
 - `BEEHIIV_API_KEY` and `BEEHIIV_PUBLICATION_ID` when the provider is `beehiiv`
 - `GHL_SUBSCRIBE_WEBHOOK_URL` when the provider is `ghl`
 - `GHL_UNSUBSCRIBE_WEBHOOK_SECRET`
-- `APPROVAL_PASSWORD`
+- `APPROVAL_PASSWORD` — the approval board password. With it or `SESSION_SECRET` unset, `/approval` stays locked in every environment
 - `N8N_WEBHOOK_JWT_SECRET`
 - `OPENROUTER_API_KEY`
 - `FOR_BRANDS_WEBHOOK_URL` if you want to override the default for-brands destination

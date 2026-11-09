@@ -17,7 +17,7 @@ const IMAGE = { imageUrl: "https://example-bucket.s3.amazonaws.com/newsletter-de
 const DRAFT = { draftId: 42, issueId: 3, version: 3, issueDate: "2026-05-21" };
 
 async function useImage(id: string, body: unknown, signedIn = true) {
-  const token = await createApprovalSessionToken("approval-secret");
+  const token = await createApprovalSessionToken();
   const response = await POST(
     new Request(`${SITE}/api/approval/drafts/${id}/image`, {
       method: "POST",
@@ -33,6 +33,7 @@ describe("POST /api/approval/drafts/[id]/image (Use this image)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.APPROVAL_PASSWORD = "approval-secret";
+    process.env.SESSION_SECRET = "test-session-secret";
     newImage.chooseNewImage.mockResolvedValue({ draft: DRAFT, start: { started: true } });
   });
 

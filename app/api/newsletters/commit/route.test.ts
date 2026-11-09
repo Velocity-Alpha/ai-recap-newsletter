@@ -207,7 +207,7 @@ describe("POST /api/newsletters/commit", () => {
   });
 
   async function commit(body: unknown) {
-    const token = await createApprovalSessionToken("approval-secret");
+    const token = await createApprovalSessionToken();
     const response = await POST(
       new Request("http://localhost/api/newsletters/commit", {
         method: "POST",
@@ -350,8 +350,41 @@ describe("POST /api/newsletters/commit", () => {
     expect(json.error).toBe("Unauthorized.");
   });
 
+  it("rejects a session past its server-side expiry", async () => {
+    const dayAndAMinuteAgo = new Date(Date.now() - (24 * 60 + 1) * 60 * 1000);
+    const token = await createApprovalSessionToken(undefined, dayAndAMinuteAgo);
+
+    const response = await POST(
+      new Request("http://localhost/api/newsletters/commit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Cookie: `approval_session=${token}` },
+        body: JSON.stringify({ date: "2026-05-21", selected_story_ids: [1] }),
+      })
+    );
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(response.status).toBe(401);
+  });
+
+  it("rejects every request when APPROVAL_PASSWORD is unset, outside production too", async () => {
+    const token = await createApprovalSessionToken();
+    delete process.env.APPROVAL_PASSWORD;
+
+    for (const headers of [{}, { Cookie: `approval_session=${token}` }] as Record<string, string>[]) {
+      const response = await POST(
+        new Request("http://localhost/api/newsletters/commit", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...headers },
+          body: JSON.stringify({ date: "2026-05-21", selected_story_ids: [1] }),
+        })
+      );
+      expect(response.status).toBe(401);
+    }
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("commits authenticated outline payloads to the configured webhook", async () => {
-    const token = await createApprovalSessionToken("approval-secret");
+    const token = await createApprovalSessionToken();
     fetchMock.mockResolvedValue({
       ok: true,
       status: 200,
@@ -384,7 +417,7 @@ describe("POST /api/newsletters/commit", () => {
   });
 
   it("blocks commit when an issue already exists for the same date", async () => {
-    const token = await createApprovalSessionToken("approval-secret");
+    const token = await createApprovalSessionToken();
     repositoryFns.fetchLastPublishedIssueDateOnOrBefore.mockResolvedValue({
       target_date: "2026-05-21",
       has_exact_match: true,
@@ -416,7 +449,7 @@ describe("POST /api/newsletters/commit", () => {
   });
 
   it("returns 400 when commit payload is missing a date", async () => {
-    const token = await createApprovalSessionToken("approval-secret");
+    const token = await createApprovalSessionToken();
 
     const response = await POST(
       new Request("http://localhost/api/newsletters/commit", {
@@ -438,7 +471,7 @@ describe("POST /api/newsletters/commit", () => {
   });
 
   it("returns 400 when commit payload contains an invalid date", async () => {
-    const token = await createApprovalSessionToken("approval-secret");
+    const token = await createApprovalSessionToken();
 
     const response = await POST(
       new Request("http://localhost/api/newsletters/commit", {

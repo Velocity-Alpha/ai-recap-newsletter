@@ -47,7 +47,10 @@ export async function POST(request: Request) {
       return jsonWithRequestId(
         context,
         { error: error.message, code: error.code },
-        { status: error.statusCode },
+        {
+          status: error.statusCode,
+          headers: error.retryAfterSeconds ? { "Retry-After": String(error.retryAfterSeconds) } : undefined,
+        },
       );
     }
 

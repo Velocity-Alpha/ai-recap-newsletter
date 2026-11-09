@@ -16,7 +16,7 @@ import { NewImageInputError } from "@/src/pipeline/draft/new-image";
 const IMAGE = { imageUrl: "https://example-bucket.s3.amazonaws.com/newsletter-dev/2026-05-21-abc123.jpg", scenePrompt: "A lamp." };
 
 async function generate(id: string, body: unknown, signedIn = true) {
-  const token = await createApprovalSessionToken("approval-secret");
+  const token = await createApprovalSessionToken();
   const response = await POST(
     new Request(`https://deploy-preview-9--ai-recap.netlify.app/api/approval/drafts/${id}/image/generate`, {
       method: "POST",
@@ -32,6 +32,7 @@ describe("POST /api/approval/drafts/[id]/image/generate", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.APPROVAL_PASSWORD = "approval-secret";
+    process.env.SESSION_SECRET = "test-session-secret";
     newImage.generateImageForDraft.mockResolvedValue(IMAGE);
   });
 

@@ -197,6 +197,18 @@ model Alert {
   @@schema("newsletter")
 }
 
+/// Fixed-window counters for login and sign-up limits (#53). key is "<rule>:<sha256 of the IP, email, or
+/// code id>", so no address is stored. The app deletes rows a day after their window starts.
+model RateLimit {
+  key             String   @id
+  count           Int      @default(0)
+  windowStartedAt DateTime @default(now()) @map("window_started_at") @db.Timestamptz(6)
+
+  @@index([windowStartedAt])
+  @@map("rate_limits")
+  @@schema("newsletter")
+}
+
 /// One row per board commit (#75): the normalised outline, its sha256, and who drafted it.
 /// draft_owner is 'n8n' or 'native' (CHECK constraint in the migration).
 /// forwarded_at is when n8n answered 2xx to the forwarded commit. It stays null under native drafting

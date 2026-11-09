@@ -24,7 +24,7 @@ const ENTRY = {
 };
 
 async function get(query: string, signedIn = true) {
-  const token = await createApprovalSessionToken("approval-secret");
+  const token = await createApprovalSessionToken();
   const response = await GET(
     new Request(`http://localhost/api/approval/drafts${query}`, {
       headers: signedIn ? { Cookie: `approval_session=${token}` } : {},
@@ -37,6 +37,7 @@ describe("GET /api/approval/drafts", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.APPROVAL_PASSWORD = "approval-secret";
+    process.env.SESSION_SECRET = "test-session-secret";
     outlineStore.readDraftOwner.mockResolvedValue("native");
     board.listDraftsForBoard.mockResolvedValue([ENTRY, { ...ENTRY, id: 40, version: 1 }]);
   });

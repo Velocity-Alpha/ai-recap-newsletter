@@ -15,7 +15,7 @@ import { NewImageServiceError } from "@/src/pipeline/draft/new-image";
 const IDEAS = [{ label: "Lighthouse", scene: "A pretend lighthouse on a rock." }];
 
 async function ideas(id: string, signedIn = true) {
-  const token = await createApprovalSessionToken("approval-secret");
+  const token = await createApprovalSessionToken();
   const response = await POST(
     new Request(`https://deploy-preview-9--ai-recap.netlify.app/api/approval/drafts/${id}/image/ideas`, {
       method: "POST",
@@ -30,6 +30,7 @@ describe("POST /api/approval/drafts/[id]/image/ideas", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.APPROVAL_PASSWORD = "approval-secret";
+    process.env.SESSION_SECRET = "test-session-secret";
     newImage.suggestIdeasForDraft.mockResolvedValue(IDEAS);
   });
 

@@ -14,7 +14,7 @@ import { POST } from "@/app/api/approval/drafts/[id]/retry/route";
 const DRAFT = { draftId: 41, issueId: 3, version: 2, issueDate: "2026-05-21" };
 
 async function retry(id: string, signedIn = true) {
-  const token = await createApprovalSessionToken("approval-secret");
+  const token = await createApprovalSessionToken();
   const response = await POST(
     new Request(`https://deploy-preview-9--ai-recap.netlify.app/api/approval/drafts/${id}/retry`, {
       method: "POST",
@@ -29,6 +29,7 @@ describe("POST /api/approval/drafts/[id]/retry", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.APPROVAL_PASSWORD = "approval-secret";
+    process.env.SESSION_SECRET = "test-session-secret";
     outlineStore.readDraftOwner.mockResolvedValue("native");
     nativeCommit.retryNativeDraft.mockResolvedValue({ draft: DRAFT, start: { started: true } });
   });
