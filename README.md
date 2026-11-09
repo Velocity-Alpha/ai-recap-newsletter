@@ -207,6 +207,7 @@ Required environment variables:
 - `FOR_BRANDS_WEBHOOK_URL` if you want to override the default for-brands destination
 - `NEXT_PUBLIC_SITE_URL`
 - `GHL_PRIVATE_INTEGRATION_TOKEN`, `GHL_LOCATION_ID`, `GHL_USER_ID` — production only; native drafting creates a new GHL email template per draft. Outside production the GHL calls are recorded, not sent.
+- `VERTEX_API_KEY`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_REGION`, `S3_BUCKET` — the draft job's featured image (`src/pipeline/draft/image`). Outside production the image still uploads, but only under `newsletter-dev/`; the prefix comes from `APP_ENV`.
 
 Optional:
 
