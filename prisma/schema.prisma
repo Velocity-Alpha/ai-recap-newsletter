@@ -246,3 +246,31 @@ model IssueDraft {
   @@map("issue_drafts")
   @@schema("newsletter")
 }
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// The article reader's saved copy (#120): one row per story and link it tried. A later commit reuses a row whose
+/// status is read; a link edited on the board is a new row and is read again. status is read, paywalled, blocked,
+/// or failed (CHECK constraint in the migration). text is the article's plain text, cut to 50,000 characters.
+/// attempts is each method's outcome (method, ms, chars, outcome, httpStatus, error). issue_id is the issue whose
+/// draft last saved the row. The draft job clears text (keeping the rest) once that issue was published over 14 days
+/// ago, or the copy is over 30 days old; a row with no text is read again if needed. No foreign key, like the other
+/// pipeline tables.
+model StoryArticle {
+  id       BigInt   @id @default(autoincrement())
+  storyId  Int      @map("story_id")
+  url      String
+  issueId  BigInt?  @map("issue_id")
+  status   String
+  method   String?
+  finalUrl String?  @map("final_url")
+  text     String?
+  chars    Int      @default(0)
+  error    String?
+  attempts Json?
+  readMs   Int?     @map("read_ms")
+  readAt   DateTime @default(now()) @map("read_at") @db.Timestamptz(6)
+
+  @@unique([storyId, url])
+  @@map("story_articles")
+  @@schema("newsletter")
+}

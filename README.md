@@ -218,5 +218,6 @@ Optional:
 - `PRODUCTION_DATABASE_URL` for running Prisma production migration commands from your local machine
 - `OUTLINE_COMMIT_WEBHOOK_URL` sets where the approval board's commit goes. In production it defaults to the production n8n story approval webhook. Outside production it has no default, and the production webhook is refused, so a preview cannot create a production issue.
 - `NEWSLETTER_RUNTIME_DB_ROLE` to override the runtime role name used by the bootstrap scripts. Defaults to `newsletter_web`.
+- `JINA_API_KEY` and `GITHUB_TOKEN` for the draft job's article reader (`src/pipeline/draft/articles`). Both work without a key: Jina Reader is the last fallback and is sent the key as a Bearer header only if set (higher rate limit); the GitHub token only raises the README API's rate limit.
 
 Google Analytics IDs and `APP_ENV` are configured per deploy context in `netlify.toml`.

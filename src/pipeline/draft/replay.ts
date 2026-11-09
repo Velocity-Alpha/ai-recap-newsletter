@@ -1,3 +1,9 @@
+import {
+  articleReadLogData,
+  createDraftArticleReader,
+  readerOptionsFromEnv,
+  type ReadArticlesOptions,
+} from "@/src/pipeline/draft/articles";
 import type { ApprovedSections, WrittenIssueContent } from "@/src/pipeline/draft/content";
 import { renderIssueEmailHtml } from "@/src/pipeline/draft/email-html";
 import { createDraftTemplate } from "@/src/pipeline/draft/ghl-template";
@@ -13,20 +19,27 @@ import { parseCommitDate } from "@/src/pipeline/side-effects/commit-webhook";
  */
 
 export const REPLAY_USAGE = `Usage: npx vite-node --config vitest.config.ts scripts/replay-drafts.mts -- \\
-  --out <dir> --commit <commit.json> --reuse-image-from <n8n-issue.json> [--commit ... --reuse-image-from ...]`;
+  --out <dir> [--no-read] --commit <commit.json> --reuse-image-from <n8n-issue.json> [--commit ... --reuse-image-from ...]`;
 
 export interface ReplayArgs {
   out: string;
   pairs: Array<{ commit: string; issue: string }>;
+  /** False with --no-read: the writer gets the summaries only. */
+  read: boolean;
 }
 
 export function parseReplayArgs(argv: string[]): ReplayArgs {
   let out = "";
+  let read = true;
   const pairs: Array<{ commit: string; issue: string }> = [];
   const args = argv.filter((arg) => arg !== "--");
   for (let index = 0; index < args.length; index += 1) {
     const flag = args[index];
     const value = args[index + 1];
+    if (flag === "--no-read") {
+      read = false;
+      continue;
+    }
     if (flag !== "--out" && flag !== "--commit" && flag !== "--reuse-image-from") {
       throw new Error(`Unknown argument "${flag}".\n${REPLAY_USAGE}`);
     }
@@ -44,7 +57,7 @@ export function parseReplayArgs(argv: string[]): ReplayArgs {
   if (pairs.length === 0) throw new Error(`Give at least one --commit.\n${REPLAY_USAGE}`);
   const unpaired = pairs.find((pair) => !pair.issue);
   if (unpaired) throw new Error(`${unpaired.commit} has no --reuse-image-from <n8n-issue.json>.\n${REPLAY_USAGE}`);
-  return { out, pairs };
+  return { out, pairs, read };
 }
 
 type Json = Record<string, unknown>;
@@ -103,12 +116,38 @@ export interface ReplayReport {
   /** The content checks' findings (empty when the checks pass). */
   problems: string[];
   unreadStoryIds: number[];
+  /** Each feature story's read outcome, without the text. The script adds it; empty with --no-read. */
+  articles?: ArticleReadLog[];
   scenePrompt: string;
   ghlTemplate: string | null;
   /** Milliseconds per step. */
   timings: Partial<Record<DraftStep, number>>;
   totalMs: number;
   content: WrittenIssueContent | null;
+}
+
+export type ArticleReadLog = ReturnType<typeof articleReadLogData>;
+
+/**
+ * The replay's article reader: reads every feature story from the web (#120) and keeps each outcome for the
+ * report. It uses no saved copy and saves nothing, so a replay writes no row. `read: false` (--no-read) reads none.
+ */
+export function replayArticleReader(options: {
+  read: boolean;
+  env: Record<string, string | undefined>;
+  /** Replaces the network (tests). */
+  readOptions?: ReadArticlesOptions;
+}): { readArticles: ReadArticles; reads: () => ArticleReadLog[] } {
+  let reads: ArticleReadLog[] = [];
+  if (!options.read) return { readArticles: readNoArticles, reads: () => reads };
+  const readArticles = createDraftArticleReader({
+    store: null,
+    readOptions: { ...readerOptionsFromEnv(options.env), ...options.readOptions },
+    onReads: (reports) => {
+      reads = reports.map(articleReadLogData);
+    },
+  });
+  return { readArticles, reads: () => reads };
 }
 
 export interface ReplayResult {

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { fakeWeb, htmlPage, jinaError, jinaUrl, prose } from "@/src/pipeline/draft/articles/fake-web.fixture";
 import { SAMPLE_APPROVED, SAMPLE_CONTENT, SAMPLE_OUTLINE } from "@/src/pipeline/draft/draft.fixture";
 import type { IssueWriter } from "@/src/pipeline/draft/writer";
 import {
@@ -7,6 +8,7 @@ import {
   parseReplayArgs,
   readN8nIssue,
   renderReplayIndex,
+  replayArticleReader,
   replayDraft,
   type ReplayReport,
 } from "@/src/pipeline/draft/replay";
@@ -38,7 +40,12 @@ describe("parseReplayArgs", () => {
         { commit: "a.json", issue: "a-issue.json" },
         { commit: "b.json", issue: "b-issue.json" },
       ],
+      read: true,
     });
+  });
+
+  it("skips reading articles with --no-read", () => {
+    expect(parseReplayArgs(["--out", "o", "--no-read", "--commit", "a.json", "--reuse-image-from", "i.json"])).toMatchObject({ read: false });
   });
 
   it("explains what is missing", () => {
@@ -121,6 +128,40 @@ describe("replayDraft", () => {
 
     expect(result.report).toMatchObject({ status: "failed", failedStep: "write", error: "The writer refused: <no>." });
     expect(result.nativeHtml).toContain("The writer refused: &lt;no&gt;.");
+  });
+});
+
+describe("replayArticleReader", () => {
+  const [planner, laundry] = SAMPLE_APPROVED.headlines;
+
+  it("reads every feature story from the web, with no saved copies, and keeps each outcome without the text", async () => {
+    const web = fakeWeb({
+      [planner.url]: htmlPage(prose("planner")),
+      [laundry.url]: htmlPage("Forbidden", 403),
+      [jinaUrl(laundry.url)]: jinaError(451, "Unavailable for legal reasons"),
+    });
+    const reader = replayArticleReader({ read: true, env: { JINA_API_KEY: "jina-test-key" }, readOptions: { fetch: web.fetch } });
+
+    const articles = await reader.readArticles([planner, laundry]);
+
+    expect(articles).toEqual([
+      { storyId: planner.id, text: expect.stringContaining("planner pretend lab") },
+      { storyId: laundry.id, unread: true },
+    ]);
+    expect(reader.reads().map((read) => [read.storyId, read.status, read.method, read.reused])).toEqual([
+      [planner.id, "read", "fetch", false],
+      [laundry.id, "blocked", null, false],
+    ]);
+    expect(JSON.stringify(reader.reads())).not.toContain("planner pretend lab");
+    const jinaCall = web.fetch.mock.calls.find(([url]) => url === jinaUrl(laundry.url)) as [string, { headers: Record<string, string> }];
+    expect(jinaCall[1].headers.Authorization).toBe("Bearer jina-test-key");
+  });
+
+  it("reads nothing with --no-read", async () => {
+    const reader = replayArticleReader({ read: false, env: {} });
+
+    await expect(reader.readArticles([planner])).resolves.toEqual([{ storyId: planner.id, unread: true }]);
+    expect(reader.reads()).toEqual([]);
   });
 });
 
