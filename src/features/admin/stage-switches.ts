@@ -1,4 +1,5 @@
 import type { Prisma } from "@/src/generated/prisma";
+import { DRAFT_OWNER_KEY } from "@/src/pipeline/draft/outline-store";
 import { INGEST_OWNER_KEY } from "@/src/pipeline/ingest/run-ingest";
 import { PUBLISH_OWNER_KEY } from "@/src/pipeline/publish/run-detect-publish";
 
@@ -6,10 +7,6 @@ import { PUBLISH_OWNER_KEY } from "@/src/pipeline/publish/run-detect-publish";
  * The stage owner switches on /admin/settings (#54), and the only place their allowed values live. The page,
  * the POST route, and the tests all read this list.
  */
-
-// draft.owner is defined in src/pipeline/draft/outline-store.ts on an unmerged branch (#124).
-// After #124 merges, replace this line with: import { DRAFT_OWNER_KEY } from "@/src/pipeline/draft/outline-store";
-const DRAFT_OWNER_KEY = "draft.owner";
 
 export type StageOwnerValue = "n8n" | "native";
 
@@ -69,8 +66,6 @@ export const STAGE_SWITCHES: readonly StageSwitch[] = [
         value: "native",
         label: "Native",
         consequence: "This app will draft the issue each time you commit an outline, not n8n.",
-        // #79: delete this line to allow native drafting.
-        disabledReason: "Native drafting is not built yet (#79)",
       },
     ],
   },
@@ -119,9 +114,13 @@ export type StageChangeCheck =
   | { ok: false; reason: string };
 
 /** Validates a requested change against the config. It does not know the current value. */
-export function checkStageChange(key: unknown, value: unknown): StageChangeCheck {
+export function checkStageChange(
+  key: unknown,
+  value: unknown,
+  switches: readonly StageSwitch[] = STAGE_SWITCHES,
+): StageChangeCheck {
   if (typeof key !== "string" || !key) return { ok: false, reason: "Choose a stage switch." };
-  const stage = findStageSwitch(key);
+  const stage = switches.find((candidate) => candidate.key === key);
   if (!stage) return { ok: false, reason: `${key} is not a stage switch.` };
 
   const option = stage.options.find((candidate) => candidate.value === value);

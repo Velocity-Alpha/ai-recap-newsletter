@@ -42,12 +42,20 @@ describe("changeStageOwner", () => {
     expect(db.prisma.$transaction).not.toHaveBeenCalled();
   });
 
-  it("refuses native drafting while it is disabled", async () => {
-    await expect(changeStageOwner({ key: "draft.owner", value: "native" }, SESSION, NOW)).resolves.toEqual({
-      status: "invalid",
-      reason: "Native drafting is not built yet (#79)",
+  it("switches drafting to native", async () => {
+    db.tx.pipelineSetting.findUnique.mockResolvedValueOnce({ key: "draft.owner", value: "n8n" });
+
+    await expect(changeStageOwner({ key: "draft.owner", value: "native" }, SESSION, NOW)).resolves.toMatchObject({
+      status: "changed",
+      key: "draft.owner",
+      from: "n8n",
+      to: "native",
     });
-    expect(db.prisma.$transaction).not.toHaveBeenCalled();
+    expect(db.tx.pipelineSetting.upsert).toHaveBeenCalledWith({
+      where: { key: "draft.owner" },
+      create: { key: "draft.owner", value: "native" },
+      update: { value: "native" },
+    });
   });
 
   it("refuses a change to the value already set, and writes nothing", async () => {

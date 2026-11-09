@@ -5,15 +5,18 @@ import {
   currentOwner,
   findStageSwitch,
   STAGE_SWITCHES,
+  type StageSwitch,
   toStageSwitchView,
 } from "@/src/features/admin/stage-switches";
+import { DRAFT_OWNER_KEY } from "@/src/pipeline/draft/outline-store";
 import { INGEST_OWNER_KEY } from "@/src/pipeline/ingest/run-ingest";
 import { PUBLISH_OWNER_KEY } from "@/src/pipeline/publish/run-detect-publish";
 
 describe("stage switches config", () => {
   it("lists the three stages in pipeline order, using the jobs' own keys", () => {
-    expect(STAGE_SWITCHES.map((stage) => stage.key)).toEqual([INGEST_OWNER_KEY, "draft.owner", PUBLISH_OWNER_KEY]);
+    expect(STAGE_SWITCHES.map((stage) => stage.key)).toEqual([INGEST_OWNER_KEY, DRAFT_OWNER_KEY, PUBLISH_OWNER_KEY]);
     expect(INGEST_OWNER_KEY).toBe("ingest.owner");
+    expect(DRAFT_OWNER_KEY).toBe("draft.owner");
     expect(PUBLISH_OWNER_KEY).toBe("publish.owner");
   });
 
@@ -31,15 +34,9 @@ describe("stage switches config", () => {
     expect(native?.consequence).toContain("not by n8n");
   });
 
-  it("shows native drafting but keeps it disabled until #79", () => {
-    const draft = findStageSwitch("draft.owner");
-
-    expect(draft?.options.find((option) => option.value === "native")?.disabledReason).toBe(
-      "Native drafting is not built yet (#79)",
-    );
-    expect(draft?.options.find((option) => option.value === "n8n")?.disabledReason).toBeUndefined();
-    for (const key of ["ingest.owner", "publish.owner"]) {
-      expect(findStageSwitch(key)?.options.every((option) => option.disabledReason === undefined)).toBe(true);
+  it("disables no option: native drafting is built (#79)", () => {
+    for (const stage of STAGE_SWITCHES) {
+      expect(stage.options.every((option) => option.disabledReason === undefined)).toBe(true);
     }
   });
 });
@@ -74,11 +71,24 @@ describe("checkStageChange", () => {
     });
   });
 
+  it("accepts native drafting", () => {
+    const check = checkStageChange("draft.owner", "native");
+
+    expect(check.ok).toBe(true);
+    if (check.ok) expect(check.option.value).toBe("native");
+  });
+
   it("refuses a disabled value with its reason", () => {
-    expect(checkStageChange("draft.owner", "native")).toEqual({
-      ok: false,
-      reason: "Native drafting is not built yet (#79)",
-    });
+    const draft = findStageSwitch("draft.owner")!;
+    const locked: StageSwitch = {
+      ...draft,
+      options: draft.options.map((option) =>
+        option.value === "native" ? { ...option, disabledReason: "Not ready yet (#999)" } : option,
+      ),
+    };
+
+    expect(checkStageChange("draft.owner", "native", [locked])).toEqual({ ok: false, reason: "Not ready yet (#999)" });
+    expect(checkStageChange("draft.owner", "n8n", [locked]).ok).toBe(true);
   });
 });
 
@@ -115,12 +125,9 @@ describe("toStageSwitchView", () => {
     });
     expect(view.options).toEqual([
       expect.objectContaining({ value: "n8n", isCurrent: true }),
-      expect.objectContaining({
-        value: "native",
-        isCurrent: false,
-        disabledReason: "Native drafting is not built yet (#79)",
-      }),
+      expect.objectContaining({ value: "native", isCurrent: false }),
     ]);
+    expect(view.options[1]).not.toHaveProperty("disabledReason");
   });
 
   it("words the publish confirmations for shadow, where this app only records and n8n publishes", () => {

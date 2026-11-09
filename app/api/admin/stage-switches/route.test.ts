@@ -61,11 +61,13 @@ describe("POST /api/admin/stage-switches", () => {
     expect(db.prisma.$transaction).not.toHaveBeenCalled();
   });
 
-  it("answers 400 for native drafting while it is disabled", async () => {
+  it("switches drafting to native: 200", async () => {
+    db.tx.pipelineSetting.findUnique.mockResolvedValueOnce({ key: "draft.owner", value: "n8n" });
+
     const response = await post({ key: "draft.owner", value: "native" });
 
-    expect(response.status).toBe(400);
-    expect(await response.json()).toEqual({ error: "Native drafting is not built yet (#79)" });
+    expect(response.status).toBe(200);
+    expect((await response.json()).change).toMatchObject({ key: "draft.owner", from: "n8n", to: "native" });
   });
 
   it("answers 409 for a no-op change and writes nothing", async () => {

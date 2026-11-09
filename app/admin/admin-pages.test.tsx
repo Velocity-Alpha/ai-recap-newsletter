@@ -176,8 +176,8 @@ describe("admin pages render", () => {
     for (const key of ["ingest.owner", "pipeline.runner", "publish.owner", "draft.owner"]) expect(html).toContain(key);
     expect(html).toContain("&quot;netlify&quot;");
     expect(html).toContain("Switch to n8n");
-    expect(html).toContain("Native drafting is not built yet (#79)");
-    expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Switch to Native<\/button>/);
+    expect(html).not.toContain("not built yet");
+    expect(html).not.toMatch(/<button[^>]*disabled=""/);
     expect(html).toContain("Not set. The jobs use n8n.");
     expect(html).toContain("not set → <strong>native</strong>");
     // The confirmation appears only after a click.
