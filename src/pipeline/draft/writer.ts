@@ -36,6 +36,8 @@ export interface WriterInput {
   leadStoryId: number | null;
   /** Article text for feature-section stories. A story with no entry counts as not read. */
   articles?: ArticleText[];
+  /** A rewrite: the draft that failed the checks (validate.ts), and the problems to fix. */
+  revision?: { previous: WrittenIssueContent; problems: string[] };
 }
 
 export type IssueWriter = (input: WriterInput) => Promise<WrittenIssueContent>;
@@ -186,7 +188,22 @@ export function buildWriterPrompt(input: WriterInput): string {
       ),
     ])
   );
-  return `${USER_PROMPT_HEAD}${JSON.stringify(payload, null, 2)}\nlead_story_id: ${input.leadStoryId ?? "null"}`;
+  const prompt = `${USER_PROMPT_HEAD}${JSON.stringify(payload, null, 2)}\nlead_story_id: ${input.leadStoryId ?? "null"}`;
+  return input.revision ? `${prompt}${revisionPrompt(input.revision)}` : prompt;
+}
+
+/** Comes after the stories, so the model sees the same input as before plus what to fix. */
+function revisionPrompt({ previous, problems }: NonNullable<WriterInput["revision"]>): string {
+  return [
+    "",
+    "",
+    "Your previous draft failed these checks:",
+    ...problems.map((problem) => `- ${problem}`),
+    "Fix every problem and keep everything else that passed. Return the full JSON object again.",
+    "",
+    "Previous draft:",
+    JSON.stringify(previous),
+  ].join("\n");
 }
 
 /** Feature-section stories whose article was not read, in board order. The draft saves these. */

@@ -162,6 +162,25 @@ describe("buildWriterPrompt", () => {
     expect(prompt).toContain("Every feature item (headlines and research_and_analysis) must have exactly 3 bullets.");
     expect(prompt).not.toMatch(/web.search/i);
   });
+
+  it("asks for no fixes on a first draft", () => {
+    expect(prompt).not.toMatch(/previous draft/i);
+  });
+
+  it("on a rewrite, adds the previous draft and every problem it had, after the same stories", () => {
+    const problems = ["Story 504 (Research & Analysis) is missing.", 'The title has 2 words; it needs 4 to 8: "Too short".'];
+    const previous = { ...SAMPLE_CONTENT, title: "Too short" };
+
+    const revised = buildWriterPrompt({ ...INPUT, revision: { previous, problems } });
+
+    expect(revised.startsWith(prompt)).toBe(true);
+    const fixes = revised.slice(prompt.length);
+    expect(fixes).toContain("Your previous draft failed these checks:");
+    expect(fixes).toContain("- Story 504 (Research & Analysis) is missing.");
+    expect(fixes).toContain('- The title has 2 words; it needs 4 to 8: "Too short".');
+    expect(fixes).toContain("Fix every problem and keep everything else");
+    expect(fixes).toContain(JSON.stringify(previous));
+  });
 });
 
 describe("unreadArticleStoryIds", () => {

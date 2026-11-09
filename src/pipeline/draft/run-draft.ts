@@ -73,7 +73,7 @@ export interface RunDraftJobOptions {
   /** Defaults to `event`: a commit or a retry started it. */
   trigger?: RunTrigger;
   /** Replaces the real services (tests). */
-  deps?: Partial<Omit<ProduceDraftDeps, "onStep" | "signal">>;
+  deps?: Partial<Omit<ProduceDraftDeps, "onStep" | "onRewrite" | "signal">>;
   /** Defaults to `DRAFT_DEADLINE_MS`. */
   deadlineMs?: number;
   /** For the job's own checks, such as the chosen image's HEAD request to S3. Defaults to the global fetch (tests replace it). */
@@ -158,6 +158,15 @@ export async function runDraftJob(draftId: bigint | number | string, options: Ru
     step = next;
     if (next !== "load") await setDraftStep(draft.id, next);
     await log({ level: "info", step: next, message: `Started ${DRAFT_STEP_LABELS[next]}.` });
+  };
+  // The count only: the problems quote the written text.
+  const onRewrite = async (problemCount: number) => {
+    await log({
+      level: "warn",
+      step: "write",
+      message: `The written issue failed ${problemCount} ${problemCount === 1 ? "check" : "checks"}. Writing it once more with the problems listed.`,
+      data: { problems: problemCount },
+    });
   };
   const record = async (entry: SideEffectRecord) => {
     await log({
@@ -275,6 +284,7 @@ export async function runDraftJob(draftId: bigint | number | string, options: Ru
       ...createDraftDeps(env, { record, fetch: options.fetch, onArticleReads, onArticleWarning, onArticleInfo }),
       ...options.deps,
       onStep: enter,
+      onRewrite,
       signal: deadline.signal,
     });
     Object.assign(stepMs, produced.stepMs);

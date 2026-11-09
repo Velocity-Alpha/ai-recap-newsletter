@@ -26,12 +26,13 @@ import {
   type FeaturedImageInput,
 } from "@/src/pipeline/draft/image/featured-image";
 import type { ApprovalOutline } from "@/src/pipeline/draft/outline";
-import { assertValidContent } from "@/src/pipeline/draft/validate";
+import { assertValidContent, findContentProblems } from "@/src/pipeline/draft/validate";
 import {
   createOpenAIIssueWriter,
   unreadArticleStoryIds,
   type ArticleText,
   type IssueWriter,
+  type WriterInput,
 } from "@/src/pipeline/draft/writer";
 import type { SideEffectRecord } from "@/src/pipeline/side-effects";
 
@@ -83,8 +84,10 @@ export interface ProduceDraftDeps {
   /** "New image" drafts only. Without it, the image only has to be there. */
   checkImage?: CheckImage;
   createTemplate: CreateTemplate;
-  /** Called as each step starts. */
+  /** Called as each step starts. A rewrite runs `write` and `validate` a second time. */
   onStep?: (step: DraftStep) => void | Promise<void>;
+  /** Called as the rewrite starts, with how many problems the first draft had. */
+  onRewrite?: (problemCount: number) => void | Promise<void>;
   /** Milliseconds clock for step timings. */
   now?: () => number;
   /** Once aborted, the running step fails with the signal's reason (the job's deadline). */
@@ -179,14 +182,16 @@ export async function produceDraft(input: ProduceDraftInput | NewImageDraftInput
 
   async function step<T>(name: DraftStep, run: () => Promise<T> | T): Promise<T> {
     const started = now();
+    // A step that runs twice (the rewrite) reports its total time.
+    const elapsed = () => (stepMs[name] ?? 0) + now() - started;
     try {
       deps.signal?.throwIfAborted();
       await deps.onStep?.(name);
       return await untilAborted(Promise.resolve().then(run), deps.signal);
     } catch (error) {
-      throw new DraftStepError(name, error, { ...partial }, { ...stepMs, [name]: now() - started });
+      throw new DraftStepError(name, error, { ...partial }, { ...stepMs, [name]: elapsed() });
     } finally {
-      stepMs[name] = now() - started;
+      stepMs[name] = elapsed();
     }
   }
 
@@ -198,10 +203,21 @@ export async function produceDraft(input: ProduceDraftInput | NewImageDraftInput
     const articles = await step("read_articles", () => readArticles(featureStories(sections), { issueId: issue.id }));
     partial.unreadStoryIds = unreadArticleStoryIds(sections, articles);
 
-    const written = await step("write", () => deps.writer({ sections, leadStoryId: outline.outline.leadStoryId, articles }));
+    const writerInput: WriterInput = { sections, leadStoryId: outline.outline.leadStoryId, articles };
+    let written = await step("write", () => deps.writer(writerInput));
     partial.content = written;
 
-    await step("validate", () => assertValidContent(written, sections));
+    const problems = await step("validate", () => findContentProblems(written, sections));
+    if (problems.length > 0) {
+      // The writer varies from run to run, so one rewrite with the problems listed often fixes a miss.
+      const previous = written;
+      written = await step("write", async () => {
+        await deps.onRewrite?.(problems.length);
+        return deps.writer({ ...writerInput, revision: { previous, problems } });
+      });
+      partial.content = written;
+      await step("validate", () => assertValidContent(written, sections));
+    }
     return written;
   };
 
