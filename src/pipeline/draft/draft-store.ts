@@ -95,7 +95,8 @@ async function publishedIssueFor(client: Client, date: string): Promise<{ id: bi
  * for a date. When n8n left several, it uses the latest unpublished one. Throws `DraftOwnerError` unless
  * `draft.owner` is native, and `IssuePublishedError` if any issue for the date is published.
  */
-export async function createDraft(outlineId: Id): Promise<CreatedDraft> {
+export async function createDraft(outlineId: Id, options: { now?: () => Date } = {}): Promise<CreatedDraft> {
+  const now = (options.now ?? (() => new Date()))();
   if ((await readDraftOwner()) !== "native") throw new DraftOwnerError();
   const outline = await prisma.approvalOutline.findUnique({
     where: { id: BigInt(outlineId) },
@@ -124,7 +125,7 @@ export async function createDraft(outlineId: Id): Promise<CreatedDraft> {
     const version = (last?.version ?? 0) + 1;
     const draft = await tx.issueDraft.create({
       // queuedAt from here, not the column default: retryDraft matches on it, and JS dates have no microseconds.
-      data: { issueId, version, outlineId: outline.id, status: "running", queuedAt: new Date() },
+      data: { issueId, version, outlineId: outline.id, status: "running", queuedAt: now },
       select: { id: true },
     });
     return { draftId: Number(draft.id), issueId: Number(issueId), version, issueDate };

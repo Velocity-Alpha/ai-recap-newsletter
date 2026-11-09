@@ -104,6 +104,12 @@ describe("createDraft", () => {
     await expect(createDraft(42)).rejects.toThrow("Outline 42 does not exist.");
   });
 
+  it("queues the draft at the given time", async () => {
+    await createDraft(await outline(), { now: () => NOW });
+
+    expect(fakeDb.state.drafts.rows[0]).toMatchObject({ queuedAt: NOW, startedAt: null });
+  });
+
   it("refuses while n8n owns drafting, and creates nothing", async () => {
     fakeDb.state.settings.rows[0].value = "n8n";
 
