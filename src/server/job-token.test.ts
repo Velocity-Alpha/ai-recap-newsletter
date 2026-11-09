@@ -20,6 +20,14 @@ describe("job tokens", () => {
     expect(isValidJobToken("ingest-stories", createCacheRefreshToken(SECRET, NOW), SECRET, NOW)).toBe(false);
   });
 
+  it("binds a token to its subject, when it has one", () => {
+    const draft41 = createJobToken("draft-issue", SECRET, NOW, "41");
+    expect(isValidJobToken("draft-issue", draft41, SECRET, NOW, "41")).toBe(true);
+    expect(isValidJobToken("draft-issue", draft41, SECRET, NOW, "42")).toBe(false);
+    expect(isValidJobToken("draft-issue", draft41, SECRET, NOW)).toBe(false);
+    expect(isValidJobToken("draft-issue", createJobToken("draft-issue", SECRET, NOW), SECRET, NOW, "41")).toBe(false);
+  });
+
   it("keeps cache refresh tokens identical to the job token for that purpose", () => {
     expect(createCacheRefreshToken(SECRET, NOW)).toBe(createJobToken("cache-refresh", SECRET, NOW));
   });

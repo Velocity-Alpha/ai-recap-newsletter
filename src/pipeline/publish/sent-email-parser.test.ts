@@ -65,6 +65,30 @@ describe("parseSentEmail", () => {
     expect(result?.problems).toEqual([]);
   });
 
+  it("has no draft id for an email from n8n's template", () => {
+    expect(parseSentEmail(renderIssueEmail(PLACEHOLDER_ISSUE))?.draftId).toBeNull();
+  });
+
+  it("reads the draft id when the issue wrapper carries one", () => {
+    const html = renderIssueEmail(PLACEHOLDER_ISSUE).replace('data-issue-id="268"', 'data-issue-id="268" data-draft-id="17"');
+
+    const result = parseSentEmail(html);
+
+    expect(result?.draftId).toBe(17);
+    expect(result?.content).toEqual(EXPECTED_CONTENT);
+    expect(result?.problems).toEqual([]);
+  });
+
+  it("ignores a draft id that is not a positive whole number", () => {
+    for (const value of ["", "abc", "0", "-3", "4.5"]) {
+      const html = renderIssueEmail(PLACEHOLDER_ISSUE).replace(
+        'data-issue-id="268"',
+        `data-issue-id="268" data-draft-id="${value}"`
+      );
+      expect(parseSentEmail(html)?.draftId).toBeNull();
+    }
+  });
+
   it("returns null for an email that is not an issue", () => {
     expect(parseSentEmail("<html><body><p>Unrelated newsletter</p></body></html>")).toBeNull();
     expect(parseSentEmail("")).toBeNull();

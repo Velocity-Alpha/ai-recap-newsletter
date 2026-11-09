@@ -194,7 +194,7 @@ export function renderIssueEmail(issue: FixtureIssue, options: RenderOptions = {
     : "";
   const summary = issue.summary?.trim() ?? "";
 
-  let html = `
+  const html = `
 <!DOCTYPE html>
 <html>
   <head><meta charset="utf-8"></head>
@@ -248,31 +248,32 @@ export function renderIssueEmail(issue: FixtureIssue, options: RenderOptions = {
   </body>
 </html>`.trim();
 
-  if (options.received) {
-    let link = 0;
-    html = html
-      .replace("{{contact.first_name}}", "Reader")
-      // GHL adds a hidden preview line right after <body>.
-      .replace(
-        /<body([^>]*)>/,
-        '<body$1><div style="display:none;font-size:1px;max-height:0px;overflow:hidden;">Preview text</div>'
-      )
-      // Mailgun rewrites every link to a tracking redirect.
-      .replace(/href="[^"]*"/g, () => `href="https://email.mg.example.test/c/track-${(link += 1)}"`)
-      // GHL wraps link text in Outlook-only comments.
-      .replace(/(<a\b[^>]*>)/g, '$1<!--[if mso]><font color="#B7410E"><![endif]-->')
-      .replace(/<\/a>/g, "<!--[if mso]></font><![endif]--></a>")
-      // The HTML serializer adds tbody around table rows.
-      .replace(/<table([^>]*)>/g, "<table$1><tbody>")
-      .replace(/<\/table>/g, "</tbody></table>")
-      // Appended GHL footer with an unsubscribe link outside the issue wrapper.
-      .replace(
-        "</body>",
-        '<div><a href="https://services.example.test/unsubscribe/abc">Unsubscribe</a></div></body>'
-      );
-  }
+  return options.received ? asReceivedCopy(html) : html;
+}
 
-  return html;
+/** Applies what GHL and Mailgun do to an issue email before it reaches the seed inbox. */
+export function asReceivedCopy(html: string): string {
+  let link = 0;
+  return html
+    .replace("{{contact.first_name}}", "Reader")
+    // GHL adds a hidden preview line right after <body>.
+    .replace(
+      /<body([^>]*)>/,
+      '<body$1><div style="display:none;font-size:1px;max-height:0px;overflow:hidden;">Preview text</div>'
+    )
+    // Mailgun rewrites every link to a tracking redirect.
+    .replace(/href="[^"]*"/g, () => `href="https://email.mg.example.test/c/track-${(link += 1)}"`)
+    // GHL wraps link text in Outlook-only comments.
+    .replace(/(<a\b[^>]*>)/g, '$1<!--[if mso]><font color="#B7410E"><![endif]-->')
+    .replace(/<\/a>/g, "<!--[if mso]></font><![endif]--></a>")
+    // The HTML serializer adds tbody around table rows.
+    .replace(/<table([^>]*)>/g, "<table$1><tbody>")
+    .replace(/<\/table>/g, "</tbody></table>")
+    // Appended GHL footer with an unsubscribe link outside the issue wrapper.
+    .replace(
+      "</body>",
+      '<div><a href="https://services.example.test/unsubscribe/abc">Unsubscribe</a></div></body>'
+    );
 }
 
 /** A complete placeholder issue that covers every section. */

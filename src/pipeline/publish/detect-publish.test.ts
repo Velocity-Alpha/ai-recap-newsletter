@@ -101,6 +101,7 @@ describe("detectPublish", () => {
         storyIds: [11023, 11007, 10996, 11009, 11010, 10998],
         contentJson: stored,
         problems: [],
+        draftId: null,
       },
     ]);
     expect(summary.results).toEqual([
@@ -137,6 +138,16 @@ describe("detectPublish", () => {
     expect(gmail.reads).toEqual(["promo"]);
     expect(summary.skipped).toBe(1);
     expect(events).toMatchObject([{ gmailMessageId: "promo", outcome: "not_an_issue", issueId: null, storyIds: [] }]);
+  });
+
+  it("records which native draft was sent when the email carries a draft id", async () => {
+    const html = ISSUE_HTML.replace('data-issue-id="268"', 'data-issue-id="268" data-draft-id="41"');
+    const { store, events } = fakeStore([{ id: 268, publishedAt: null, contentJson: null }]);
+
+    const gmail = fakeGmail([message("m1", html)]);
+    await detectPublish({ gmail, store }, { mode: "native", messageIds: await newestFirst(gmail) });
+
+    expect(events).toMatchObject([{ gmailMessageId: "m1", outcome: "published", draftId: 41 }]);
   });
 
   it("keeps going after one message fails, and reports the failure", async () => {

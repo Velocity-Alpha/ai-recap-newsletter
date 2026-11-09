@@ -56,6 +56,11 @@ export interface ApprovalOutlineData {
   selected_story_ids: number[];
   /** Earlier drafts that were never sent, and whether their stories are back in this board's pool. */
   unsent_drafts: UnsentDraftNotice[];
+  /**
+   * Highest story id in the candidate window when the board was built, or null if the window was empty.
+   * The board compares it with `getCandidateMarker` to spot stories that arrived later.
+   */
+  candidate_marker: number | null;
 }
 
 export interface UnsentDraftNotice {
@@ -358,16 +363,52 @@ async function getReferencedStories(date: Date): Promise<StoryRecord[]> {
 }
 
 /**
- * Loads eligible unpublished candidate stories for the approval outline.
+ * The candidate window: eligible unpublished candidate stories for the approval outline.
  *
  * The SQL filter keeps the candidate pool recent, sufficiently important,
  * usable as a source link, and not already consumed by a publication.
  */
-async function getCandidateStories(date: Date): Promise<StoryRecord[]> {
-  const dateOnly = toDateOnlyIso(date);
-  const targetDate = toUtcDateFromDateOnly(dateOnly);
+function candidateStoriesWhere(date: Date) {
+  const targetDate = toUtcDateFromDateOnly(toDateOnlyIso(date));
   const candidateWindowStartDate = new Date(targetDate);
   candidateWindowStartDate.setUTCDate(candidateWindowStartDate.getUTCDate() - 3);
+
+  return {
+    importanceScore: {
+      gte: 2,
+    },
+    day: {
+      not: null,
+      lte: targetDate,
+      gte: candidateWindowStartDate,
+    },
+    usedInPublicationDate: null,
+    excludeFromCandidates: false,
+    AND: [
+      {
+        url: {
+          not: null,
+        },
+      },
+      {
+        url: {
+          not: "",
+        },
+      },
+    ],
+    NOT: {
+      OR: [
+        { url: { contains: "tldr", mode: "insensitive" as const } },
+        { url: { contains: "rundown", mode: "insensitive" as const } },
+        { url: { contains: "beehiiv", mode: "insensitive" as const } },
+      ],
+    },
+  };
+}
+
+/** Loads the stories in the candidate window for the approval outline. */
+async function getCandidateStories(date: Date): Promise<StoryRecord[]> {
+  const dateOnly = toDateOnlyIso(date);
 
   logServerInfo("approval.outline.fetch.candidates.query", {
     requestedDateIso: date.toISOString(),
@@ -375,37 +416,7 @@ async function getCandidateStories(date: Date): Promise<StoryRecord[]> {
   });
 
   const candidateStories = await prisma.story.findMany({
-    where: {
-      importanceScore: {
-        gte: 2,
-      },
-      day: {
-        not: null,
-        lte: targetDate,
-        gte: candidateWindowStartDate,
-      },
-      usedInPublicationDate: null,
-      excludeFromCandidates: false,
-      AND: [
-        {
-          url: {
-            not: null,
-          },
-        },
-        {
-          url: {
-            not: "",
-          },
-        },
-      ],
-      NOT: {
-        OR: [
-          { url: { contains: "tldr", mode: "insensitive" } },
-          { url: { contains: "rundown", mode: "insensitive" } },
-          { url: { contains: "beehiiv", mode: "insensitive" } },
-        ],
-      },
-    },
+    where: candidateStoriesWhere(date),
     select: {
       id: true,
       guid: true,
@@ -445,6 +456,25 @@ async function getCandidateStories(date: Date): Promise<StoryRecord[]> {
   });
 
   return candidateStoryRecords;
+}
+
+/**
+ * The current candidate marker for a date: the highest story id in the candidate window, or null.
+ * A light read the board uses to check whether a cached board missed newer stories.
+ */
+export async function getCandidateMarker(date: Date): Promise<number | null> {
+  const result = await prisma.story.aggregate({
+    where: candidateStoriesWhere(date),
+    _max: { id: true },
+  });
+  return result._max.id ?? null;
+}
+
+function highestStoryId(stories: StoryRecord[]): number | null {
+  return stories.reduce<number | null>(
+    (max, story) => (max === null || story.id > max ? story.id : max),
+    null
+  );
 }
 
 /**
@@ -606,7 +636,8 @@ function createSectionBlueprints(
 export function buildApprovalOutline(
   rankedStories: ProcessedStory[],
   referencedStories: StoryRecord[],
-  unsentDrafts: UnsentDraftNotice[] = []
+  unsentDrafts: UnsentDraftNotice[] = [],
+  candidateMarker: number | null = null
 ): ApprovalOutlineData {
   const grouped = groupStoriesByCategory(rankedStories);
 
@@ -658,6 +689,7 @@ export function buildApprovalOutline(
     candidate_map,
     selected_story_ids: Array.from(selected_story_ids),
     unsent_drafts: unsentDrafts,
+    candidate_marker: candidateMarker,
   };
 }
 
@@ -744,6 +776,7 @@ async function loadRankedCandidates(
   referencedStories: StoryRecord[];
   rankedCandidates: ProcessedStory[];
   unsentDrafts: UnsentDraftNotice[];
+  candidateMarker: number | null;
 }> {
   logServerInfo("approval.outline.create.start", { date: date.toISOString() });
 
@@ -798,7 +831,10 @@ async function loadRankedCandidates(
     publishedUrlCount,
   });
 
-  return { referencedStories, rankedCandidates, unsentDrafts };
+  // Taken before holds and duplicate checks, so stories the board does not show never look new.
+  const candidateMarker = highestStoryId(candidateStories);
+
+  return { referencedStories, rankedCandidates, unsentDrafts, candidateMarker };
 }
 
 /**
@@ -816,13 +852,11 @@ export async function createOutlineCandidateStories(
   referencedStories: StoryRecord[];
   rankedCandidates: ProcessedStory[];
 }> {
-  const { referencedStories, rankedCandidates, unsentDrafts } = await loadRankedCandidates(
-    date,
-    options
-  );
+  const { referencedStories, rankedCandidates, unsentDrafts, candidateMarker } =
+    await loadRankedCandidates(date, options);
 
   return {
-    outline: buildApprovalOutline(rankedCandidates, referencedStories, unsentDrafts),
+    outline: buildApprovalOutline(rankedCandidates, referencedStories, unsentDrafts, candidateMarker),
     referencedStories,
     rankedCandidates,
   };
@@ -839,10 +873,8 @@ export async function createDedupedOutline(
   keptStoryIds: Iterable<number>,
   options: OutlineOptions = {}
 ): Promise<ApprovalOutlineData> {
-  const { referencedStories, rankedCandidates, unsentDrafts } = await loadRankedCandidates(
-    date,
-    options
-  );
+  const { referencedStories, rankedCandidates, unsentDrafts, candidateMarker } =
+    await loadRankedCandidates(date, options);
   const kept = new Set(keptStoryIds);
   const keptCandidates = rankedCandidates.filter((story) => kept.has(story.id));
 
@@ -851,7 +883,7 @@ export async function createDedupedOutline(
     keptCount: keptCandidates.length,
   });
 
-  return buildApprovalOutline(keptCandidates, referencedStories, unsentDrafts);
+  return buildApprovalOutline(keptCandidates, referencedStories, unsentDrafts, candidateMarker);
 }
 
 /**

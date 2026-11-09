@@ -43,6 +43,8 @@ export type ApprovalOutlineData = {
   selected_story_ids: number[];
   // Optional: boards cached before this field existed do not have it.
   unsent_drafts?: UnsentDraftNotice[];
+  // Highest candidate story id the server saw when it built the board. Missing on older cached boards.
+  candidate_marker?: number | null;
 };
 
 export type UnsentDraftNotice = {
@@ -56,6 +58,8 @@ type CacheStorage = Pick<Storage, "getItem" | "removeItem" | "setItem">;
 type CachedEntry = {
   data: ApprovalOutlineData;
   cachedAt: number;
+  // Set once the owner changes anything on this board. A rebuilt board starts without it.
+  edited?: boolean;
 };
 
 export function normalizeApprovalOutlineData(data: ApprovalOutlineData): ApprovalOutlineData {
@@ -135,4 +139,69 @@ export function writeApprovalOutlineCache(
   } catch {
     // localStorage may be full or unavailable; this should not block approval.
   }
+}
+
+function readEntry(dateKey: string, storage: CacheStorage): CachedEntry | null {
+  try {
+    const raw = storage.getItem(getApprovalOutlineCacheKey(dateKey));
+    return raw ? (JSON.parse(raw) as CachedEntry) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function isApprovalOutlineCacheEdited(
+  dateKey: string,
+  storage: CacheStorage = localStorage
+): boolean {
+  return readEntry(dateKey, storage)?.edited === true;
+}
+
+/** Records that the owner changed the cached board, so newer stories do not rebuild it unasked. */
+export function markApprovalOutlineCacheEdited(
+  dateKey: string,
+  storage: CacheStorage = localStorage
+): void {
+  const entry = readEntry(dateKey, storage);
+  if (!entry || entry.edited) return;
+  try {
+    storage.setItem(getApprovalOutlineCacheKey(dateKey), JSON.stringify({ ...entry, edited: true }));
+  } catch {
+    // localStorage may be full or unavailable; this should not block approval.
+  }
+}
+
+export function clearApprovalOutlineCache(
+  dateKey: string,
+  storage: CacheStorage = localStorage
+): void {
+  try {
+    storage.removeItem(getApprovalOutlineCacheKey(dateKey));
+  } catch {
+    // localStorage may be unavailable; nothing to clear then.
+  }
+}
+
+export type CachedOutlineAction = "keep" | "rebuild" | "offer-rebuild";
+
+/**
+ * What to do with a cached board once the server reports its current candidate marker.
+ * Newer stories rebuild an unchanged board; a changed board keeps the owner's work and offers a rebuild.
+ * `cachedMarker` is undefined for boards cached before markers existed: those rebuild only when unchanged.
+ */
+export function cachedOutlineAction({
+  cachedMarker,
+  currentMarker,
+  edited,
+}: {
+  cachedMarker: number | null | undefined;
+  currentMarker: number | null;
+  edited: boolean;
+}): CachedOutlineAction {
+  if (cachedMarker === undefined) return edited ? "keep" : "rebuild";
+
+  const hasNewerStories =
+    currentMarker !== null && (cachedMarker === null || currentMarker > cachedMarker);
+  if (!hasNewerStories) return "keep";
+  return edited ? "offer-rebuild" : "rebuild";
 }
