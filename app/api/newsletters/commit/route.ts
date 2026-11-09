@@ -8,6 +8,8 @@ import {
 import { hasValidApprovalSession } from "@/src/server/approval-auth";
 import { fetchLastPublishedIssueDateOnOrBefore } from "@/src/features/newsletter/repository";
 import { parseCommitDate, resolveCommitWebhook } from "@/src/pipeline/side-effects/commit-webhook";
+import { normalizeOutline, type ApprovalOutline } from "@/src/pipeline/draft/outline";
+import { markOutlineForwarded, readDraftOwner, saveOutline } from "@/src/pipeline/draft/outline-store";
 import jwt from "jsonwebtoken";
 
 export const runtime = "nodejs";
@@ -84,6 +86,17 @@ export async function POST(request: Request) {
       return jsonWithRequestId(context, { success: false, error: webhook.error }, { status: 503 });
     }
 
+    let outline: ApprovalOutline;
+    try {
+      outline = normalizeOutline(normalizedPayload, targetDate);
+    } catch (err) {
+      return jsonWithRequestId(
+        context,
+        { success: false, error: err instanceof Error ? err.message : "Invalid outline." },
+        { status: 400 },
+      );
+    }
+
     const publishStatus = await fetchLastPublishedIssueDateOnOrBefore(targetDate);
     if (publishStatus.has_exact_match) {
       return jsonWithRequestId(
@@ -95,6 +108,27 @@ export async function POST(request: Request) {
         },
         { status: 409 }
       );
+    }
+
+    // Native drafting starts here in #79. Until then a commit under `native` would draft nothing.
+    const draftOwner = await readDraftOwner();
+    if (draftOwner === "native") {
+      return jsonWithRequestId(
+        context,
+        { success: false, error: "draft.owner is native, but native drafting is not built yet. Set it back to n8n." },
+        { status: 503 },
+      );
+    }
+    // n8n drafts from the forwarded body, not the saved row, so in n8n mode a failed save is logged and the
+    // commit still goes through. The owner commits every weekday; a missing table must not stop that.
+    let savedOutline: { id: bigint; hash: string } | null = null;
+    try {
+      savedOutline = await saveOutline(outline, draftOwner);
+    } catch (error) {
+      logRequestError(context, "Outline save failed; forwarding to n8n anyway", error, {
+        date: targetDate,
+        draftOwner,
+      });
     }
 
     const authClaims = {
@@ -130,12 +164,27 @@ export async function POST(request: Request) {
 
     const webhookData = await webhookResponse.json();
 
+    if (savedOutline) {
+      try {
+        await markOutlineForwarded(savedOutline.id);
+      } catch (error) {
+        // n8n is already drafting. Failing now would invite a second commit, so log it and carry on.
+        logRequestError(context, "Could not record that n8n accepted the outline", error, {
+          date: targetDate,
+          outlineId: savedOutline.id.toString(),
+        });
+      }
+    }
+
     logRequestSuccess(context, {
       hasPayload: true,
       payloadType: "object",
       webhookStatus: webhookResponse.status,
       webhookHostname,
       forwardedSuccessfully: true,
+      outlineSaved: savedOutline !== null,
+      outlineId: savedOutline?.id.toString() ?? null,
+      outlineHash: savedOutline?.hash ?? null,
     });
 
     return jsonWithRequestId(context, {
