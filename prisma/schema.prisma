@@ -74,6 +74,7 @@ model Story {
   error                    String?
 
   @@index([queuedForPublicationDate], map: "queued_for_publication_date_idx")
+  @@index([day], map: "stories_day_idx")
   @@map("stories")
   @@schema("newsletter")
 }
