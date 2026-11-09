@@ -4,7 +4,8 @@ import { HTMLElement, NodeType, parse, type Node } from "node-html-parser";
  * Turns an AI Recap issue email (the draft template HTML, or the copy received in a seed inbox) into the
  * `content_json` v2 object the website renders. No AI: it reads the IDs and structure that n8n's
  * "Build Clean HTML Email" node writes. `data-issue-id` names the issue; each story wrapper carries
- * `data-story-id` and `data-src-url`, which survive Mailgun's link tracking.
+ * `data-story-id` and `data-src-url`, which survive Mailgun's link tracking. Native drafts also put
+ * `data-draft-id` next to `data-issue-id` (src/pipeline/draft/email-html.ts).
  */
 
 export interface PublishedBullet {
@@ -55,6 +56,8 @@ export interface SentEmailParseResult {
   storyIds: number[];
   /** Anything the parser could not read cleanly. Empty means the email matched the template. */
   problems: string[];
+  /** The native draft this email was made from; null for n8n's emails, which carry no draft id. */
+  draftId: number | null;
 }
 
 type SectionKey = "overview" | "headlines" | "research_and_analysis" | "tools" | "quick_hits";
@@ -104,6 +107,13 @@ function parseHeaderDate(text: string): string {
   const date = new Date(Date.UTC(Number(match[3]), month, Number(match[2])));
   if (date.getUTCDate() !== Number(match[2])) return "";
   return date.toISOString().slice(0, 10);
+}
+
+function positiveId(value: string | undefined): number | null {
+  const trimmed = value?.trim() ?? "";
+  if (!/^\d+$/.test(trimmed)) return null;
+  const id = Number(trimmed);
+  return Number.isSafeInteger(id) && id > 0 ? id : null;
 }
 
 function storyId(element: HTMLElement): number {
@@ -235,5 +245,5 @@ export function parseSentEmail(html: string): SentEmailParseResult | null {
     new Set(issueElement.querySelectorAll("[data-story-id]").map(storyId).filter(Number.isSafeInteger))
   );
 
-  return { content, storyIds, problems };
+  return { content, storyIds, problems, draftId: positiveId(issueElement.getAttribute("data-draft-id")) };
 }
