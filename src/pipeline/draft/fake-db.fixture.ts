@@ -147,7 +147,7 @@ export function createFakeDb() {
         finishedAt: null,
       }),
     }),
-    approvalOutline: table(state.outlines, { nextId: id, defaults: () => ({ committedAt: now() }) }),
+    approvalOutline: table(state.outlines, { nextId: id, defaults: () => ({ committedAt: now(), forwardedAt: null }) }),
     story: table(state.stories, { nextId: id, defaults: () => ({}) }),
     publishEvent: table(state.publishEvents, { nextId: id, defaults: () => ({ draftId: null }) }),
     $executeRaw: async (strings: TemplateStringsArray, ...values: unknown[]) => {
