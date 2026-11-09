@@ -124,11 +124,20 @@ Eight keys. The date in each key is the issue date in New York time.
   writing, making the image, building the email, creating the GHL template, or saving. The alert names the
   step. If the draft has no issue date, the key ends in `issue-<id>` instead of a date. A duplicate issue
   title is one known cause; the message then says so.
-- **Do (check, fix, retry):** Read the evidence in the alert and the run's events. Fix the cause if it is
-  outside the code, for example an API key or a quota. Then press "Retry" on the board. A retry resets the
-  draft and runs it again with a new GHL template; the old template stays in GHL. The incident closes when
-  a draft is ready. `run-checks` does not close this key at the end of the day, so it stays open until a
-  draft succeeds or you resolve it.
+- **Do (check, fix, retry):** The incident message links to the approval board for the date
+  (`/approval?date=<date>`), not to the drafts page. Steps (from PR #133):
+  1. Open `/approval/drafts?date=<YYYY-MM-DD>`. It lists every draft for the date.
+  2. Read the failed step and the error on the failed draft. Fix the cause if it is outside the code, for
+     example an API key or a quota.
+  3. Press "Retry". The page offers it for a draft that failed, and for a draft stuck in running: one that
+     started over 20 minutes ago, or was queued and never started after 5 minutes. A retry runs the same
+     draft version again from the start, with a new GHL template; the old template stays in GHL. It is
+     refused when the issue is already published, and when `draft.owner` is `n8n`.
+  4. Or commit again from the board. That makes a new draft version with its own GHL template
+     ([ADR 0002](../adr/0002-new-draft-per-commit.md)).
+
+  The incident closes when a draft is ready. `run-checks` does not close this key at the end of the day,
+  so it stays open until a draft succeeds.
 
 ## A run that fails to report
 
