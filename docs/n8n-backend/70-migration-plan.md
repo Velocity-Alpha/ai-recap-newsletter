@@ -369,6 +369,14 @@ no shadow week. Extras (raw items, hourly runs, alerts, `ingested_by`, source mo
   4. After the first run: check the run in `pipeline_runs`, the board, and the Telegram message.
 - **Rollback:** set `ingest.owner = n8n` and reactivate the n8n workflows. The bookmarks the native job
   moved are newer than n8n's, so set them back to the native run's start first, or n8n skips that day's mail.
+- **Done 2026-11-09 about 04:05 UTC (Sunday night in New York), owner's "go":** the preview "Run now" passed (dev run 6,
+  16 s). Then: `TELEGRAM_REVIEW_BOT_TOKEN` set (production, secret), #112 merged (production deploy `6af1462f`,
+  `ingest-stories` scheduled `55 13,14 * * 1-5`), production `the_signal` bookmark = `tldr_ai` (2026-11-06
+  14:55 UTC), `ingest.owner = native`, and all 9 n8n ingestion workflows deactivated (including
+  `Scrape Beehiiv`). The first native run is Monday 2026-11-09 09:55 New York. Known gap: n8n never stored
+  Friday 2026-11-06's TLDR email (it was a day behind), and the 72-hour window does not reach it.
+- Lesson: Netlify reads a function's `schedule` from its source text. An imported constant deployed the
+  function unscheduled on the first preview. `src/pipeline/netlify-functions-bundle.test.ts` now checks it.
 
 **4a. Source modules and the engine.**
 - Each source is a module in `src/pipeline/sources/` that exports a `SourceDefinition`: `key` (matches
