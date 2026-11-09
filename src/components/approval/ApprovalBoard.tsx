@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { hasBoardEdits } from "@/components/approval/board-edits";
 import {
   ChevronDown,
   ChevronLeft,
@@ -85,6 +86,10 @@ type ApprovalBoardProps = {
   dateKey: string;
   unsentDrafts: UnsentDraft[];
   onToggleDraftReuse: (draftDate: string) => void;
+  /** Called once the owner has changed anything on the board. */
+  onEdit?: () => void;
+  /** Extra notice shown at the bottom of the sticky header. */
+  headerNotice?: ReactNode;
   outlineDateLabel: string;
   referenceStories: ReferenceStory[];
   candidateSections: CandidateSection[];
@@ -210,6 +215,8 @@ export default function ApprovalBoard({
   dateKey,
   unsentDrafts,
   onToggleDraftReuse,
+  onEdit,
+  headerNotice,
   outlineDateLabel,
   referenceStories,
   candidateSections,
@@ -241,6 +248,18 @@ export default function ApprovalBoard({
   useEffect(() => {
     setSections(initSections(candidateSections));
   }, [candidateSections]);
+
+  const edited = hasBoardEdits({
+    candidateSections,
+    sections,
+    headlineStoryId,
+    excludeState,
+    urlOverrides,
+    notesOverrides,
+  });
+  useEffect(() => {
+    if (edited) onEdit?.();
+  }, [edited, onEdit]);
 
   const toggleExpand = (id: number) =>
     setExpandedIds((prev) => {
@@ -741,6 +760,7 @@ export default function ApprovalBoard({
             </p>
           </div>
         ) : null}
+        {headerNotice}
       </header>
 
       <div className="flex flex-1">

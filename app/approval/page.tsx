@@ -1,11 +1,17 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import ApprovalBoard from "@/components/approval/ApprovalBoard";
+import NewStoriesNotice from "@/components/approval/NewStoriesNotice";
+import { approvalDateKey } from "@/features/newsletter/approval-date";
 import {
   approvalOutlineCacheId,
+  cachedOutlineAction,
+  clearApprovalOutlineCache,
+  isApprovalOutlineCacheEdited,
+  markApprovalOutlineCacheEdited,
   normalizeApprovalOutlineData,
   type ApprovalOutlineData,
   readApprovalOutlineCache,
@@ -18,9 +24,7 @@ import {
 import type { DraftingSummary } from "@/features/newsletter/draft-links";
 
 function parseDateKey(value: string | null): string {
-  const candidate = value ? new Date(value) : new Date();
-  const date = Number.isNaN(candidate.getTime()) ? new Date() : candidate;
-  return date.toISOString().slice(0, 10);
+  return approvalDateKey(value);
 }
 
 function formatOutlineDate(dateKey: string): string {
@@ -91,6 +95,16 @@ function ApprovalPageForDate({ dateKey, reuseKey }: { dateKey: string; reuseKey:
   const router = useRouter();
   const cacheId = approvalOutlineCacheId(dateKey, reuseKey ? reuseKey.split(",") : []);
   const [outlineData, setOutlineData] = useState<ApprovalOutlineData | null>(null);
+  // Bumped to build the board again from the latest stories.
+  const [buildCount, setBuildCount] = useState(0);
+  const [hasNewStories, setHasNewStories] = useState(false);
+  const rebuildBoard = useCallback(() => {
+    clearApprovalOutlineCache(cacheId);
+    setHasNewStories(false);
+    setOutlineData(null);
+    setBuildCount((count) => count + 1);
+  }, [cacheId]);
+  const handleBoardEdit = useCallback(() => markApprovalOutlineCacheEdited(cacheId), [cacheId]);
   const [isDedupPending, setIsDedupPending] = useState(false);
   const [dedupFailureReason, setDedupFailureReason] = useState<string | null>(null);
   const [publishStatus, setPublishStatus] = useState<{
@@ -177,6 +191,27 @@ function ApprovalPageForDate({ dateKey, reuseKey }: { dateKey: string; reuseKey:
       queueMicrotask(() => {
         if (active) setOutlineData(cached);
       });
+      // Show the cached board at once, then check whether newer stories arrived since it was built.
+      fetch(`/api/approval/outline/marker?${new URLSearchParams({ date: dateKey })}`, {
+        cache: "no-store",
+      })
+        .then((res) => (res.ok ? (res.json() as Promise<{ candidate_marker: number | null }>) : null))
+        .then((marker) => {
+          if (!active || !marker) return;
+          const action = cachedOutlineAction({
+            cachedMarker: cached.candidate_marker,
+            currentMarker: marker.candidate_marker,
+            edited: isApprovalOutlineCacheEdited(cacheId),
+          });
+          console.log("[approval:cache] marker checked", { dateKey, action });
+          if (action === "rebuild") rebuildBoard();
+          if (action === "offer-rebuild") setHasNewStories(true);
+        })
+        .catch((err: unknown) => {
+          // The cached board stays usable when the check fails.
+          const message = err instanceof Error ? err.message : "Unknown error";
+          console.error("[approval:cache] marker check failed", { dateKey, message });
+        });
       return () => {
         active = false;
       };
@@ -295,7 +330,11 @@ function ApprovalPageForDate({ dateKey, reuseKey }: { dateKey: string; reuseKey:
               timestamp: new Date().toISOString(),
             });
             setIsDedupPending(false);
-            writeApprovalOutlineCache(cacheId, statusPayload.outline);
+            // The deduplicated board only holds stories from the first build, so keep that build's marker.
+            writeApprovalOutlineCache(cacheId, {
+              ...statusPayload.outline,
+              candidate_marker: fallbackOutline.candidate_marker,
+            });
             setOutlineData(normalizeApprovalOutlineData(statusPayload.outline));
             setDedupFailureReason(null);
             return;
@@ -346,7 +385,7 @@ function ApprovalPageForDate({ dateKey, reuseKey }: { dateKey: string; reuseKey:
       active = false;
       clearTimeout(timeoutId);
     };
-  }, [dateKey, reuseKey, cacheId]);
+  }, [dateKey, reuseKey, cacheId, buildCount, rebuildBoard]);
 
   const handleToggleDraftReuse = (draftDate: string) => {
     const reuse = toggleReuseDraftDate(reuseKey ? reuseKey.split(",") : [], draftDate);
@@ -363,6 +402,8 @@ function ApprovalPageForDate({ dateKey, reuseKey }: { dateKey: string; reuseKey:
       dateKey={dateKey}
       unsentDrafts={outlineData.unsent_drafts ?? []}
       onToggleDraftReuse={handleToggleDraftReuse}
+      onEdit={handleBoardEdit}
+      headerNotice={hasNewStories ? <NewStoriesNotice onRebuild={rebuildBoard} /> : null}
       outlineDateLabel={formatOutlineDate(dateKey)}
       referenceStories={outlineData.reference_stories}
       candidateSections={outlineData.candidate_sections}

@@ -1,3 +1,4 @@
+import { approvalDateKey } from "@/src/features/newsletter/approval-date";
 import { createApprovalOutlineData } from "@/src/features/newsletter/curation.service";
 import {
   createRequestLogContext,
@@ -11,17 +12,7 @@ import { hasValidApprovalSession } from "@/src/server/approval-auth";
 export const runtime = "nodejs";
 
 function getDateFromQuery(searchParams: URLSearchParams): Date {
-  const dateParam = searchParams.get("date");
-  if (!dateParam) {
-    return new Date();
-  }
-
-  const date = new Date(dateParam);
-  if (isNaN(date.getTime())) {
-    return new Date();
-  }
-
-  return date;
+  return new Date(approvalDateKey(searchParams.get("date")));
 }
 
 export async function GET(request: Request) {

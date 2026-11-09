@@ -144,6 +144,7 @@ Read routes:
 - `GET /api/issues/[slug]`
 - `GET /api/ticker`
 - `GET /api/approval/outline?date=` for the password-protected approval board outline
+- `GET /api/approval/outline/marker?date=` the highest story id in the board's candidate window; the board reads it to spot stories newer than its cached copy (approval session)
 - `GET /api/newsletters/outline?date=` for the authenticated newsletter outline API
 - `GET /api/approval/issues/[id]/publish` previews what "Mark as published" would publish (approval session)
 - `GET /api/approval/drafts?date=` lists a date's native drafts for the board; none while `draft.owner` is `n8n` (approval session)
