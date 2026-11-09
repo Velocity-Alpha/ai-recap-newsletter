@@ -66,3 +66,22 @@ The five default labels, used as-is: `needs-triage`, `needs-info`, `ready-for-ag
 ### Domain docs
 
 Single-context: one `GLOSSARY.md` and `docs/adr/` at the repo root, created when needed. See `docs/agents/domain.md`.
+
+## Pipeline
+
+The pipeline jobs (ingest, checks, drafting, publish detection) run as Netlify functions, not npm scripts.
+Run and test them with these commands:
+
+- `npx vitest run src/pipeline` runs the pipeline tests. `npm test` runs all tests.
+- `APP_ENV=development npm run verify` runs lint, tests and build. Run it before every push.
+- `npm run db:reset-dev` resets the Neon `dev` branch. `npm run prisma:migrate:status` shows migration state.
+- `npm run prisma:migrate:deploy` applies migrations to the database in `DATABASE_URL`;
+  `npm run prisma:migrate:prod:deploy` applies them to production. Do not run the production one without the owner.
+
+References:
+
+- [docs/architecture.html](./docs/architecture.html): stages, jobs, data, env vars.
+- [GLOSSARY.md](./GLOSSARY.md): the project's words.
+- [docs/adr/](./docs/adr/): decisions.
+- [docs/pipeline/runbook.md](./docs/pipeline/runbook.md): what each incident means and what to do.
+- [docs/pipeline/adding-a-source.md](./docs/pipeline/adding-a-source.md): how to add a news source.

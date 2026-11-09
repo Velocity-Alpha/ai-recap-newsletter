@@ -29,7 +29,7 @@
 <body>
 
 <h1>AI Recap architecture: current and target</h1>
-<p class="meta">Updated <strong>2026-11-09 (UTC)</strong>, after the native ingestion cutover. Labels: <span class="now">native</span> = code in this repo, <span class="n8n">n8n</span> = legacy n8n workflow, <span class="plan">planned</span> = not built yet.</p>
+<p class="meta">Updated <strong>2026-11-09 (UTC)</strong>, after that day's production deploy: native ingestion, checks, ops alerts and admin pages are live; native drafting is built but not switched on. Labels: <span class="now">native</span> = code in this repo, <span class="n8n">n8n</span> = legacy n8n workflow, <span class="plan">planned</span> = not built yet.</p>
 
 <nav>
   <a href="#glance">At a glance</a> <a href="#owners">Who owns each stage</a> <a href="#flow-now">Daily flow now</a> <a href="#flow-target">Target flow</a>
@@ -41,9 +41,10 @@
 <ul>
   <li>One repo holds the website and the backend jobs. It is a Next.js App Router app on Netlify. Jobs are Netlify functions in <code>netlify/functions/</code>, and their logic is in <code>src/pipeline/</code>.</li>
   <li>The data is in Postgres on Neon (Free plan), schema <code>newsletter</code>. Prisma is the client.</li>
-  <li>Native now: story ingestion, the approval board, and publish detection. <span class="n8n">n8n</span> still does one stage: drafting (issue text, featured image, GHL email template).</li>
+  <li>Native now: story ingestion, the approval board, publish detection, the <code>run-checks</code> job, ops alerts to Telegram, and the <code>/admin</code> pages. <span class="n8n">n8n</span> still does one stage: drafting (issue text, featured image, GHL email template).</li>
+  <li>Native drafting (Phase 5) is built and merged, but <code>draft.owner</code> is still <code>n8n</code> in production. The owner switches it on <code>/admin/settings</code> after the #80 preview test.</li>
   <li>The owner sends each campaign by hand in GoHighLevel (GHL). GHL emails the subscribers. The site publishes the issue when the sent email reaches a seed inbox.</li>
-  <li>Target: drafting moves to native code (Phase 5). Then n8n is switched off and the schema is cleaned up (Phase 6).</li>
+  <li>Target: native drafting becomes the owner (Phase 5). Then n8n is switched off and the schema is cleaned up (Phase 6).</li>
 </ul>
 
 <h2 id="owners">2. Who owns each stage (production)</h2>
@@ -53,11 +54,11 @@
   <tr><td>Ingest stories from newsletters and feeds</td><td><span class="now">native</span> since 2026-11-09 04:05 UTC</td><td>native, hourly runs and more sources later</td><td><code>ingest.owner</code> = <code>"native"</code></td><td>#39, extras #111</td></tr>
   <tr><td>"Board is ready" Telegram ping to the review group</td><td><span class="now">native</span> (end of the ingest run)</td><td>native</td><td>same as ingest</td><td>#39</td></tr>
   <tr><td>Approval board proposal (sections, dedup)</td><td><span class="now">native</span> (app)</td><td>native; later "accept or swap"</td><td>none</td><td>#37, #56, #58, #59, #89</td></tr>
-  <tr><td>Draft issue, featured image, GHL template</td><td><span class="n8n">n8n</span></td><td>native <code>draft-issue</code> background job; a new draft and GHL template per commit (ADR 0002)</td><td><code>draft.owner</code> = <code>"n8n"</code> (default) or <code>"native"</code>, settable on <code>/admin/settings</code>: the commit route reads it (#79)</td><td>#40, #74–#80, #115, #116, #120</td></tr>
+  <tr><td>Draft issue, featured image, GHL template</td><td><span class="n8n">n8n</span>. The native code is built and merged (2026-11-09) but not switched on; the owner switches <code>draft.owner</code> after the #80 preview test</td><td>native <code>draft-issue-background</code> job; a new draft and GHL template per commit (ADR 0002)</td><td><code>draft.owner</code> = <code>"n8n"</code> (default) or <code>"native"</code>, settable on <code>/admin/settings</code>: the commit route reads it (#79)</td><td>#40, #74–#80, #115, #116, #120</td></tr>
   <tr><td>Send the campaign</td><td>owner, by hand in GHL</td><td>owner (optional: schedule through the GHL API)</td><td>none</td><td>#91</td></tr>
   <tr><td>Publish detection (mark issue published on the site)</td><td><span class="now">native</span> since 2026-11-08 22:47 UTC</td><td>native; later a Resend listener instead of Gmail</td><td><code>publish.owner</code> = <code>"native"</code> (also <code>"shadow"</code>, <code>"n8n"</code>)</td><td>#38, #107</td></tr>
   <tr><td>Job runner</td><td><span class="now">Netlify functions</span></td><td>Netlify functions</td><td><code>pipeline.runner</code> = <code>"netlify"</code> (default) or <code>"trigger"</code></td><td>ADR 0001</td></tr>
-  <tr><td>Alerts and outcome checks</td><td><code>alerts</code> table; <span class="now">native</span> <code>run-checks</code> job: checks at 10:05, 12:00, 18:00, daily summary, Healthchecks.io heartbeat</td><td>same; alerts from the review bot to an ops chat</td><td>none</td><td>#36, #48, #50, #52</td></tr>
+  <tr><td>Alerts and outcome checks</td><td><span class="now">native</span>: <code>alerts</code> table; the review bot posts alerts to the "AI Recap Ops" Telegram chat (production only); <code>run-checks</code> job: checks at 10:05, 12:00, 18:00, daily summary, Healthchecks.io heartbeat. Incident keys: <a href="./pipeline/runbook.md">runbook</a></td><td>same; Slack may replace Telegram (#119)</td><td>none</td><td>#36, #48, #50, #52</td></tr>
   <tr><td>Admin pages</td><td><span class="now">native</span> <code>/admin</code> behind the approval login: runs, incidents, settings, and stage switches</td><td>same; per-user login later (#83)</td><td>none</td><td>#54</td></tr>
 </table>
 
@@ -70,10 +71,11 @@
          -> paywall check -> INSERT newsletter.stories -> update scraper_bookmarks
          -> pipeline_runs / pipeline_events rows -> Telegram "board ready" to the review group
 
-~10:00 Owner opens /approval?date=YYYY-MM-DD (shared password login)
+~10:00 Owner opens /approval (defaults to today's New York date; shared password login, rate limited)
          board proposal: src/features/newsletter/curation.service.ts + openai-dedup.ts (gpt-6-luna)
-         owner edits, then commits -> POST /api/newsletters/commit
-         -> HS256 JWT -> n8n webhook story/approval                                  [hand-off to n8n]
+         owner edits, then commits -> POST /api/newsletters/commit  ("No issue today" marks a skipped date)
+         draft.owner = n8n: approval_outlines row -> HS256 JWT -> n8n webhook story/approval  [hand-off to n8n]
+         -> forwarded_at is set when n8n answers 2xx
 
 n8n      2. Public approval page -> 2. Create Issue Draft
          -> gpt-5.5 + web_search writes the issue JSON -> JS template renders the email HTML
@@ -81,6 +83,10 @@ n8n      2. Public approval page -> 2. Create Issue Draft
          -> upload to S3 velocity-alpha-public-assets/newsletter/
          -> INSERT issues row (draft: published_at NULL) -> create GHL email-builder template
          (not idempotent: a second commit makes a second draft)
+
+10:05  run-checks: an ingest run happened, story count vs 8-week median, per source
+         -> incidents in alerts -> the review bot posts them to the "AI Recap Ops" chat
+12:00  run-checks: no commit yet -> warning
 
 owner    Reviews the template in GHL and sends the campaign by hand
 GHL      Emails all subscribers, plus the seed inbox
@@ -91,6 +97,9 @@ every 5 min, 09:00-21:00 weekdays
          -> publish_events row -> POST /api/revalidate (cache tag published-issues) -> issue is live
 03:00 UTC daily: detect-publish-catch-up does the same over the last 3 days
 If the issue is missing after a send: /approval/issues -> "Mark as published"
+
+18:00  run-checks: draft ready, issue published, issue page and home page OK
+         -> daily summary to the ops chat -> Healthchecks.io ping
 </pre>
 
 <h2 id="flow-target">4. Target daily flow</h2>
@@ -108,10 +117,10 @@ Terms: GLOSSARY.md. One issue per date; each commit makes a new draft with its o
             find or create the issue for the date; new issue_drafts row, version n+1     #76
             read articles of feature-section stories (saved per story; methods from #115) #120
               (pages are parsed in a worker thread with a 256 MB heap, stopped at the method timeout)
-            gpt-6-luna writes the issue (fixed n8n prompt, no web search unless #115 says so)
+            gpt-6-luna writes the issue (n8n's prompt; no web search, #115 chose saved article text)
             gpt-6-luna scene prompt -> Vertex Gemini image (fixed style) -> S3            #77
             TypeScript email template (data-issue-id, data-story-id, data-src-url, data-draft-id)
-            new GHL template "&lt;date&gt; v&lt;n&gt;: &lt;subject&gt;"; never overwrites an old one   #78
+            new GHL template "&lt;date&gt; v&lt;n&gt;: &lt;subject&gt;"; never overwrites an old one   #78 (built)
             issue row takes the current draft's title, HTML, image, excerpt, content_json
          -> board: live steps, error + Retry, email preview, "Open in GHL", list of drafts  #79 (/approval/drafts)
          -> "New image": edit the scene prompt, 3 suggestions, Generate, then a new draft #116 (built)
@@ -126,7 +135,7 @@ Terms: GLOSSARY.md. One issue per date; each commit makes a new draft with its o
 18:00  run-checks: ready draft exists, issue published, issue page and home page OK;
        daily summary to the ops chat -> Healthchecks.io ping                              <span class="now">native</span> #52
 Alerts: the review bot posts to the "AI Recap Ops" chat, production only, no email;
-        one incident per incident key; Slack may replace Telegram later (#119)           #48
+        one incident per incident key; Slack may replace Telegram later (#119)           <span class="now">native</span> #48
 Later: pre-send review in the app before the GHL template (#117)
 </pre>
 
@@ -138,10 +147,11 @@ Later: pre-send review in the app before the GHL template (#117)
   <tr><td><code>ingest-stories-background</code></td><td>none (called by the above)</td><td>valid token</td><td><code>runIngest()</code> in <code>src/pipeline/ingest/run-ingest.ts</code></td></tr>
   <tr><td><code>detect-publish</code></td><td><code>*/5 0,1,13-23 * * *</code></td><td>weekdays 09:00–21:00 New York</td><td>Reads the seed inbox, 20-minute lookback, publishes</td></tr>
   <tr><td><code>detect-publish-catch-up</code></td><td><code>0 3 * * *</code></td><td>daily</td><td>Same, 3-day lookback</td></tr>
-  <tr><td><code>draft-issue-background</code></td><td>none (on commit)</td><td>valid token signed for the draft; the draft is waiting to run</td><td><code>runDraftJob()</code> in <code>src/pipeline/draft/run-draft.ts</code>; gives up at 13 min. Built (#76). The commit route and "Retry" start it with <code>startDraftJob()</code> when <code>draft.owner</code> is <code>"native"</code> (#79)</td></tr>
+  <tr><td><code>draft-issue-background</code></td><td>none (on commit)</td><td>valid token signed for the draft; the draft is waiting to run</td><td><code>runDraftJob()</code> in <code>src/pipeline/draft/run-draft.ts</code>; gives up at 13 min. Built (#76). The commit route, "Retry" and "New image" start it with <code>startDraftJob()</code> when <code>draft.owner</code> is <code>"native"</code> (#79, #116). Not used in production yet: <code>draft.owner</code> is <code>"n8n"</code></td></tr>
   <tr><td><code>run-checks</code></td><td><code>0,5 14,15,16,17,22,23 * * 1-5</code></td><td>10:05, 12:00, 18:00 New York on weekdays (1 min early to 4 min late); outside production, a run at any other time ("Run now") is a full 18:00 pass</td><td>Outcome checks raise or resolve incidents; at 18:00 the daily summary to the ops chat, then the Healthchecks.io ping. Each outside call gets 5 s; Telegram and site calls stop 20 s into the run. <code>runChecks()</code> in <code>src/pipeline/checks/run-checks.ts</code></td></tr>
 </table>
 <p>Each run writes <code>pipeline_runs</code> (job, trigger, status, stats) and <code>pipeline_events</code> (step log). Job tokens: <code>src/server/job-token.ts</code>, format <code>&lt;expiresAtMs&gt;.&lt;sig&gt;</code>, HMAC key derived from <code>SESSION_SECRET</code> per purpose.</p>
+<p>Incidents: <code>run-checks</code> raises <code>ingest-run-missing</code>, <code>stories-thin</code>, <code>source-empty:&lt;source&gt;</code>, <code>commit-missing</code>, <code>draft-missing</code>, <code>publish-pending</code> and <code>site-check-failed</code>, each ending in the New York date (<code>CHECK_INCIDENT_PREFIXES</code> in <code>src/pipeline/checks/checks.ts</code>). The draft job raises <code>draft.failed:&lt;date&gt;</code>. Both go through <code>src/pipeline/notify/</code> (<code>raiseIncident</code>, which calls <code>raiseAlert</code>): one open <code>alerts</code> row per key, posted to the ops chat in production only. What each key means and what to do: <a href="./pipeline/runbook.md">pipeline runbook</a>. Open incidents are on <code>/admin/incidents</code>.</p>
 
 <h2 id="stack">6. Tech stack</h2>
 <table>
@@ -150,7 +160,7 @@ Later: pre-send review in the app before the GHL template (#117)
   <tr><td>Styling</td><td>Tailwind CSS 4, framer-motion</td><td>none</td></tr>
   <tr><td>Database</td><td>Neon Postgres (Free), Prisma 7 + <code>@prisma/adapter-pg</code>, client in <code>src/generated/prisma</code></td><td>least-privilege pipeline role (Phase 6)</td></tr>
   <tr><td>Hosting and jobs</td><td>Netlify (Free, credit-based). Netlify Functions v2 (<code>.mts</code>)</td><td>none. Trigger.dev adapters stay dormant in <code>src/trigger/</code></td></tr>
-  <tr><td>LLM</td><td><code>openai</code> SDK: <code>gpt-6-luna</code> for extraction and dedup. n8n uses <code>gpt-5.5</code> for drafting.</td><td><code>gpt-6-luna</code> for every text step. Vertex Gemini for images.</td></tr>
+  <tr><td>LLM</td><td><code>openai</code> SDK: <code>gpt-6-luna</code> for extraction and dedup, and for the native writer and scene prompt (built, not switched on). Vertex <code>gemini-3.1-flash-image</code> by <code>fetch</code>, no SDK. n8n uses <code>gpt-5.5</code> for drafting.</td><td><code>gpt-6-luna</code> for every text step. Vertex Gemini for images.</td></tr>
   <tr><td>Tests and lint</td><td>Vitest 3 (unit tests next to source; <code>*.integration.test.ts</code> needs <code>PIPELINE_IT=1</code> and refuses the production DB), ESLint 9</td><td>none</td></tr>
   <tr><td>Checks</td><td><code>npm run verify</code> = lint + test + build. <code>.githooks/pre-push</code> runs it.</td><td>none</td></tr>
   <tr><td>Unused dependencies</td><td><code>@openrouter/sdk</code> (no use in <code>src</code>), <code>@trigger.dev/sdk</code> (dormant)</td><td>remove OpenRouter if still unused</td></tr>
@@ -161,18 +171,18 @@ Later: pre-send review in the app before the GHL template (#117)
   <tr><th>Service</th><th>Used for</th><th>Called by now</th><th>Target</th></tr>
   <tr><td>Netlify</td><td>Site hosting, functions, env vars, deploy previews</td><td>all</td><td>same</td></tr>
   <tr><td>Neon</td><td>Postgres: production branch and <code>dev</code> branch</td><td>app, native jobs, n8n</td><td>n8n's DB credential revoked (Phase 6)</td></tr>
-  <tr><td>OpenAI</td><td>Extraction, dedup (app); drafting and image prompt (n8n)</td><td>app, native jobs, n8n</td><td>native only; n8n key revoked</td></tr>
+  <tr><td>OpenAI</td><td>Extraction, dedup (app); drafting and image prompt (n8n; native code built)</td><td>app, native jobs, n8n</td><td>native only; n8n key revoked</td></tr>
   <tr><td>Gmail API (read-only)</td><td>Newsletter emails for ingestion; sent-campaign copies for publish detection</td><td>native jobs</td><td>same; publish may move to a Resend listener (#107)</td></tr>
-  <tr><td>Telegram</td><td>Review bot: "board ready" ping to the review group</td><td>native ingest (production only)</td><td>the same bot also posts alerts to an "AI Recap Ops" chat; Slack may replace it (#119)</td></tr>
-  <tr><td>GoHighLevel (GHL)</td><td>Subscriber list, campaign emails, email templates; subscribe and unsubscribe webhooks</td><td>app (subscribe, unsubscribe webhook), n8n (templates), owner (send)</td><td>native code creates templates, reusing n8n's token</td></tr>
-  <tr><td>Resend</td><td>One-time sign-in codes for subscribers</td><td>app (<code>fetch</code>, no SDK)</td><td>also critical alert email</td></tr>
+  <tr><td>Telegram</td><td>Review bot: "board ready" ping to the review group; ops alerts and the daily summary to the "AI Recap Ops" chat (<code>TELEGRAM_OPS_CHAT_ID</code>)</td><td>native ingest, <code>run-checks</code>, native draft job (production only)</td><td>same; Slack may replace it (#119)</td></tr>
+  <tr><td>GoHighLevel (GHL)</td><td>Subscriber list, campaign emails, email templates; subscribe and unsubscribe webhooks</td><td>app (subscribe, unsubscribe webhook), n8n (templates), owner (send). Native template code is built (<code>src/pipeline/draft/ghl-template.ts</code>), not switched on</td><td>native code creates templates (<code>GHL_PRIVATE_INTEGRATION_TOKEN</code>)</td></tr>
+  <tr><td>Resend</td><td>One-time sign-in codes for subscribers</td><td>app (<code>fetch</code>, no SDK)</td><td>same; alerts use Telegram, no email</td></tr>
   <tr><td>Beehiiv</td><td>Old subscriber provider, still supported in code</td><td><code>SUBSCRIBER_PROVIDER=beehiiv</code> only (production uses <code>ghl</code>)</td><td>unchanged</td></tr>
-  <tr><td>AWS S3</td><td>Featured images, bucket <code>velocity-alpha-public-assets</code>, prefix <code>newsletter/</code></td><td>n8n only</td><td>native; dev uses prefix <code>newsletter-dev/</code></td></tr>
-  <tr><td>Google Vertex AI</td><td>Featured image, <code>gemini-3.1-flash-image</code></td><td>n8n only</td><td>native</td></tr>
+  <tr><td>AWS S3</td><td>Featured images, bucket <code>velocity-alpha-public-assets</code>, prefix <code>newsletter/</code></td><td>n8n. Native upload is built (<code>src/pipeline/draft/image/</code>), not switched on</td><td>native; dev uses prefix <code>newsletter-dev/</code></td></tr>
+  <tr><td>Google Vertex AI</td><td>Featured image, <code>gemini-3.1-flash-image</code></td><td>n8n. Native call is built (<code>VERTEX_API_KEY</code>), not switched on</td><td>native</td></tr>
   <tr><td>n8n (self-hosted)</td><td>Drafting chain (section 12)</td><td>commit route webhook</td><td>switched off (Phase 6)</td></tr>
-  <tr><td>Article sources: arXiv HTML, GitHub README API, Hugging Face READMEs, story sites, Jina Reader</td><td>Reading feature-section articles for the writer (#120), in the #115 order; Jina Reader is the last fallback, keyless unless <code>JINA_API_KEY</code> is set</td><td>native <code>draft-issue</code> (not live yet)</td><td>same</td></tr>
+  <tr><td>Article sources: arXiv HTML, GitHub README API, Hugging Face READMEs, story sites, Jina Reader</td><td>Reading feature-section articles for the writer (#120), in the #115 order; Jina Reader is the last fallback, keyless unless <code>JINA_API_KEY</code> is set</td><td>native <code>draft-issue</code> (built; runs once <code>draft.owner</code> is native)</td><td>same</td></tr>
   <tr><td>Google Analytics</td><td>Site analytics</td><td>site</td><td>same</td></tr>
-  <tr><td>Healthchecks.io</td><td>Dead-man switch for the daily digest</td><td><code>run-checks</code> pings after the 18:00 summary (production only, needs <code>HEALTHCHECKS_PING_URL</code>)</td><td>same</td></tr>
+  <tr><td>Healthchecks.io</td><td>Dead-man switch for the daily summary</td><td><code>run-checks</code> pings after the 18:00 summary (production only, needs <code>HEALTHCHECKS_PING_URL</code>)</td><td>same</td></tr>
   <tr><td>Trigger.dev</td><td>Alternative job runner</td><td>dormant (vendor blocks production deploys)</td><td>dormant</td></tr>
 </table>
 
@@ -186,23 +196,26 @@ Later: pre-send review in the app before the GHL template (#117)
   <tr><td><code>pipeline_settings</code></td><td>Owner switches and thresholds</td><td>owner, on <code>/admin/settings</code> (stage owners) or by SQL</td></tr>
   <tr><td><code>pipeline_runs</code>, <code>pipeline_events</code></td><td>Job runs and their step logs; stage owner changes as job <code>admin-setting</code></td><td>native jobs, <code>/admin/settings</code></td></tr>
   <tr><td><code>publish_events</code></td><td>Each seed email seen by publish detection and the decision, and which draft was sent (<code>draft_id</code>)</td><td>native publish</td></tr>
-  <tr><td><code>approval_outlines</code></td><td>Each board commit: the normalised outline, its hash, the draft owner, and when n8n accepted it (<code>forwarded_at</code>)</td><td>commit route (migration not applied yet)</td></tr>
-  <tr><td><code>issue_drafts</code></td><td>Each draft of an issue, version 1, 2, ... (one per commit, or per "New image"): status, current or failed step, content, html, image, GHL template; <code>source_draft_id</code> on a "New image" draft</td><td>native <code>draft-issue</code> (not live yet)</td></tr>
-  <tr><td><code>story_articles</code></td><td>The saved copy of each story's article, per story and link: status (read, paywalled, blocked, failed), method, text (at most 50,000 characters), read time, and the issue whose draft read it. A read copy is reused by later drafts; an edited link is read again. Each draft job first clears the text (not the row) of up to 200 copies whose issue was published over 14 days ago or that were read over 30 days ago.</td><td>native <code>draft-issue</code> (not live yet; migration not applied yet)</td></tr>
-  <tr><td><code>alerts</code></td><td>Open and resolved incidents, one open row per <code>incident_key</code></td><td><code>run-checks</code>, through the ops alert module</td></tr>
+  <tr><td><code>approval_outlines</code></td><td>Each board commit: the normalised outline, its hash, the draft owner, and when n8n accepted it (<code>forwarded_at</code>)</td><td>commit route, for either <code>draft.owner</code></td></tr>
+  <tr><td><code>issue_drafts</code></td><td>Each draft of an issue, version 1, 2, ... (one per commit, or per "New image"): status, current or failed step, content, html, image, GHL template; <code>source_draft_id</code> on a "New image" draft</td><td>native commit, "Retry", "New image" and the <code>draft-issue</code> job; no production rows until <code>draft.owner</code> is native</td></tr>
+  <tr><td><code>story_articles</code></td><td>The saved copy of each story's article, per story and link: status (read, paywalled, blocked, failed), method, text (at most 50,000 characters), read time, and the issue whose draft read it. A read copy is reused by later drafts; an edited link is read again. Each draft job first clears the text (not the row) of up to 200 copies whose issue was published over 14 days ago or that were read over 30 days ago.</td><td>native <code>draft-issue</code> (runs once <code>draft.owner</code> is native)</td></tr>
+  <tr><td><code>alerts</code></td><td>Open and resolved incidents, one open row per <code>incident_key</code></td><td><code>run-checks</code> and the native draft job, through <code>src/pipeline/notify/</code></td></tr>
   <tr><td><code>skipped_dates</code></td><td>Dates the owner marked "No issue today"; that date's checks are off</td><td>app (<code>/approval</code>)</td></tr>
+  <tr><td><code>rate_limits</code></td><td>Fixed-window counters for login and sign-up limits; keys hold a hash, never an address. Rows are deleted a day after their window starts</td><td>app (approval login, subscriber sign-up and sign-in codes)</td></tr>
   <tr><td><code>public.schema_migrations</code></td><td>Legacy migration record</td><td>none</td></tr>
 </table>
-<p><span class="plan">Planned:</span> After n8n is off (#82): an issue <code>status</code> (draft or published), a unique issue date, and an index on <code>stories(day)</code>. Later: the issue-to-story link and a stable story key (#118), and raw items for ingestion (#111). The runtime DB role is <code>newsletter_web</code> (<code>prisma/bootstrap/001_grant_newsletter_web.sql</code>).</p>
+<p>The 2026-11-09 migrations are applied to production: <code>rate_limits</code>, <code>approval_outlines</code>, <code>issue_drafts</code> (with <code>publish_events.draft_id</code>), <code>skipped_dates</code>, <code>story_articles</code>, <code>issue_drafts.source_draft_id</code>, and <code>stories_day_idx</code> on <code>stories(day)</code> (#137). <span class="plan">Planned:</span> After n8n is off (#82): an issue <code>status</code> (draft or published) and a unique issue date. Later: the issue-to-story link and a stable story key (#118), and raw items for ingestion (#111). The runtime DB role is <code>newsletter_web</code> (<code>prisma/bootstrap/001_grant_newsletter_web.sql</code>).</p>
 
 <h2 id="code">9. Code map</h2>
 <pre>
 app/                         Next.js routes
   page.tsx, archive/, issue/[slug]/, newsletter/[id]/, for-brands/, unsubscribe/, privacy/, terms/
-  approval/                  board (page.tsx), login/, issues/ ("Mark as published"), submitted/
+  approval/                  board (page.tsx), login/, issues/ ("Mark as published"), submitted/,
+                             drafts/ (drafts for a date: live steps, Retry, email preview, "New image")
   admin/                     overview, runs/ (+ [id]), incidents/, settings/ (stage switches); guard: src/server/admin-auth.ts
-  api/newsletters/           list, [id], outline, commit (-> n8n), publish-status
-  api/approval/              login, outline (+ status), issues/[id]/publish, skipped-dates
+  api/newsletters/           list, [id], outline, commit (-> n8n, or the native draft job), publish-status
+  api/approval/              login, outline (+ status, marker), issues/[id]/publish, skipped-dates,
+                             drafts (+ [id], html, retry, image, image/ideas, image/generate)
   api/admin/                 stage-switches (POST)
   api/subscriber/            subscribe, request-code, verify-code, sign-out, unsubscribe (+ webhook from GHL)
   api/issues/[slug], api/ticker, api/for-brands, api/revalidate (job token)
@@ -216,14 +229,22 @@ src/pipeline/                runner-neutral job logic
                              site-refresh, manual-publish, publish-schedule, detect-publish, run-detect-publish
   checks/                    schedule, day-facts (the only DB reads), checks (pure), site, summary, heartbeat,
                              skipped-dates, run-checks
+  draft/                     outline, outline-store, native-commit, start-draft, run-draft, produce-draft, writer,
+                             validate, email-html, ghl-template, new-image, draft-store, draft-board;
+                             articles/ (article reader, #120), image/ (scene prompt, Vertex, S3)
+  notify/                    ops alerts: raiseIncident / resolveIncident, Telegram ops channel, message text
+  side-effects/              the guard for GHL, S3 and the review group; commit-webhook (no production n8n
+                             outside production)
   settings.ts, runs.ts, alerts.ts
-src/server/                  prisma client, job-token, approval and cache-refresh auth, observability
+src/server/                  prisma client, job-token, approval, admin and cache-refresh auth, rate-limit (+ store),
+                             client-ip, same-origin, safe-compare, observability
 src/trigger/                 dormant Trigger.dev adapters
-netlify/functions/           thin wrappers: ingest-stories(.mts, -background.mts), detect-publish(.mts, -catch-up.mts), run-checks.mts
+netlify/functions/           thin wrappers: ingest-stories(.mts, -background.mts), detect-publish(.mts, -catch-up.mts),
+                             run-checks.mts, draft-issue-background.mts
 prisma/                      schema.prisma, migrations/, bootstrap/
 scripts/                     reset-dev-branch.mjs, run-prisma-prod.mjs, import-subscribers-from-csv.mjs,
                              replay-drafts.mts (native draft vs n8n, side by side)
-<span class="plan">planned</span> src/pipeline/{draft,llm,notify,side-effects,sources}/
+<span class="plan">planned</span> src/pipeline/{llm,sources}/
 </pre>
 
 <h2 id="envs">10. Environments</h2>
@@ -233,23 +254,24 @@ scripts/                     reset-dev-branch.mjs, run-prisma-prod.mjs, import-s
   <tr><td>Database</td><td>Neon <code>dev</code> branch, fake subscribers (<code>npm run db:reset-dev</code>)</td><td>Neon production branch</td></tr>
   <tr><td>Jobs</td><td>No schedules act. Use "Run now" on the deploy preview.</td><td>Scheduled on the <code>main</code> deploy</td></tr>
   <tr><td>Gmail</td><td colspan="2">Same mailbox, read-only scope in both</td></tr>
-  <tr><td>Telegram</td><td>Not sent; the text is recorded in the run</td><td>Review group</td></tr>
+  <tr><td>Telegram</td><td>Not sent; the text is recorded in the run</td><td>Review group ("board ready") and the ops chat (alerts, daily summary)</td></tr>
   <tr><td>n8n</td><td>The commit route needs <code>OUTLINE_COMMIT_WEBHOOK_URL</code> and refuses the production webhook</td><td>One production instance; the commit route defaults to its webhook</td></tr>
 </table>
 <p><code>APP_ENV</code> is set in <code>netlify.toml</code> and also as a Netlify env var with the same value per context, because functions cannot read <code>netlify.toml</code> values at runtime. Next routes get the build's value inlined (<code>next.config.mjs</code> <code>env</code>), so they must read <code>process.env.APP_ENV</code> by name, never <code>process.env</code> whole.</p>
-<p>Guards (#49): <code>src/pipeline/side-effects/</code> gates GHL, S3, and the review group (record-only outside production; S3 only under <code>newsletter-dev/</code>). The commit route refuses production n8n outside production.</p>
+<p>Guards (#49): <code>src/pipeline/side-effects/</code> gates GHL, S3, and the review group (record-only outside production; S3 only under <code>newsletter-dev/</code>). <code>src/pipeline/notify/</code> sends ops alerts only in production. The commit route refuses production n8n outside production.</p>
 
 <h2 id="vars">11. Env var names (values live in Netlify and <code>.env.local</code>, never in git)</h2>
 <table>
   <tr><th>Group</th><th>Names</th></tr>
   <tr><td>Core</td><td><code>APP_ENV</code> <code>DATABASE_URL</code> <code>NEXT_PUBLIC_SITE_URL</code> <code>SESSION_SECRET</code> <code>APPROVAL_PASSWORD</code> <code>NEWSLETTER_RUNTIME_DB_ROLE</code></td></tr>
   <tr><td>Production DB scripts (local only)</td><td><code>PRODUCTION_DATABASE_URL</code> <code>NEON_PROJECT_ID</code></td></tr>
-  <tr><td>Pipeline</td><td><code>OPENAI_API_KEY</code> <code>GMAIL_OAUTH_CLIENT_ID</code> <code>GMAIL_OAUTH_CLIENT_SECRET</code> <code>GMAIL_OAUTH_REFRESH_TOKEN</code> <code>PUBLISH_SEED_RECIPIENTS</code> <code>TELEGRAM_REVIEW_BOT_TOKEN</code> (production only) <code>TELEGRAM_REVIEW_CHAT_ID</code> (optional) <code>HEALTHCHECKS_PING_URL</code> (production only) <code>JINA_API_KEY</code> <code>GITHUB_TOKEN</code> (both optional, article reader)</td></tr>
+  <tr><td>Pipeline</td><td><code>OPENAI_API_KEY</code> <code>GMAIL_OAUTH_CLIENT_ID</code> <code>GMAIL_OAUTH_CLIENT_SECRET</code> <code>GMAIL_OAUTH_REFRESH_TOKEN</code> <code>PUBLISH_SEED_RECIPIENTS</code> <code>TELEGRAM_REVIEW_BOT_TOKEN</code> (production only) <code>TELEGRAM_REVIEW_CHAT_ID</code> (optional) <code>TELEGRAM_OPS_CHAT_ID</code> <code>HEALTHCHECKS_PING_URL</code> (both production only)</td></tr>
+  <tr><td>Native drafting</td><td><code>VERTEX_API_KEY</code> <code>S3_ACCESS_KEY_ID</code> <code>S3_SECRET_ACCESS_KEY</code> <code>S3_REGION</code> <code>S3_BUCKET</code> (featured image; the S3 prefix comes from <code>APP_ENV</code>) <code>GHL_PRIVATE_INTEGRATION_TOKEN</code> <code>GHL_LOCATION_ID</code> <code>GHL_USER_ID</code> (production only, GHL templates) <code>JINA_API_KEY</code> <code>GITHUB_TOKEN</code> (both optional, article reader)</td></tr>
   <tr><td>Subscribers</td><td><code>SUBSCRIBER_PROVIDER</code> <code>GHL_SUBSCRIBE_WEBHOOK_URL</code> <code>GHL_UNSUBSCRIBE_WEBHOOK_SECRET</code> <code>RESEND_API_KEY</code> <code>RESEND_FROM_EMAIL</code> <code>RESEND_FROM_NAME</code> <code>BEEHIIV_API_KEY</code> <code>BEEHIIV_PUBLICATION_ID</code></td></tr>
   <tr><td>n8n hand-off (removed in Phase 6)</td><td><code>OUTLINE_COMMIT_WEBHOOK_URL</code> <code>N8N_WEBHOOK_JWT_SECRET</code></td></tr>
   <tr><td>Other</td><td><code>FOR_BRANDS_WEBHOOK_URL</code> <code>NEXT_PUBLIC_GA_MEASUREMENT_ID</code> (set in <code>netlify.toml</code>), <code>OPENROUTER_API_KEY</code> (unused)</td></tr>
-  <tr><td><span class="plan">Planned</span></td><td>S3 (<code>AWS_ACCESS_KEY_ID</code> <code>AWS_SECRET_ACCESS_KEY</code> <code>AWS_REGION</code> <code>S3_BUCKET</code> <code>S3_PREFIX</code>), GHL template token, Vertex credentials, ops bot token and chat ids</td></tr>
 </table>
+<p>Set on Netlify production since 2026-11-09: <code>TELEGRAM_OPS_CHAT_ID</code>, <code>HEALTHCHECKS_PING_URL</code>, and every name in the "Native drafting" row. The ops alerts reuse the review bot's <code>TELEGRAM_REVIEW_BOT_TOKEN</code>.</p>
 <p>Netlify Free plan: a secret must use scopes builds, functions, and runtime. Functions read env vars at deploy time, so a changed value needs a new deploy.</p>
 
 <h2 id="n8n">12. What n8n still does</h2>
@@ -270,11 +292,11 @@ scripts/                     reset-dev-branch.mjs, run-prisma-prod.mjs, import-s
 <table>
   <tr><th>Phase</th><th>State</th><th>Issue</th></tr>
   <tr><td>0. Security fix</td><td>done</td><td>#35</td></tr>
-  <tr><td>1. Foundation: environments, job runner, base tables (done); checks, ops bot, heartbeat, admin, login hardening (open)</td><td>partly done</td><td>#36</td></tr>
+  <tr><td>1. Foundation: environments, job runner, base tables, side-effect guard, login limits, ops alerts, checks, heartbeat, admin pages</td><td>built and live 2026-11-09; open until the exit checks pass (a real production alert, two weeks of checks)</td><td>#36</td></tr>
   <tr><td>2. Better board proposals</td><td>open (dedup #57 done)</td><td>#37</td></tr>
   <tr><td>3. Native publish detection</td><td>live</td><td>#38</td></tr>
   <tr><td>4. Native ingestion</td><td>live; extras in #111</td><td>#39</td></tr>
-  <tr><td>5. Native drafting: article reading, a new draft per commit, "New image"; no shadow mode</td><td><strong>next</strong> (start with #115)</td><td>#40</td></tr>
+  <tr><td>5. Native drafting: article reading, a new draft per commit, "New image"; no shadow mode</td><td>built and merged 2026-11-09, <strong>not switched on</strong>: <code>draft.owner</code> stays <code>n8n</code> until the #80 preview test, then the owner switches it on <code>/admin/settings</code></td><td>#40</td></tr>
   <tr><td>6. Retire n8n (30-day backup after 10 clean issues, then delete) and a small schema cleanup</td><td>after 5</td><td>#41</td></tr>
   <tr><td>Later: live search sources, early edition, sources in the DB, accept or swap, embeddings</td><td>unscheduled</td><td>#42, #86–#91</td></tr>
 </table>
@@ -283,7 +305,7 @@ scripts/                     reset-dev-branch.mjs, run-prisma-prod.mjs, import-s
 <ul>
   <li><strong>Literal schedules.</strong> Netlify reads <code>config.schedule</code> from the function's source text. An imported constant deploys the function with no schedule. <code>src/pipeline/netlify-functions-bundle.test.ts</code> checks this and <code>included_files</code>.</li>
   <li><strong>Production DB.</strong> Never run tests or jobs against it. Use the Neon <code>dev</code> branch. Production schema changes go through <code>scripts/run-prisma-prod.mjs</code>, additive only while n8n reads the tables.</li>
-  <li><strong>n8n is frozen.</strong> Read-only, except cutover or emergency fixes with the owner's OK. Do not trigger its webhooks. Do not commit on the board from a preview or local build: the commit route calls production n8n.</li>
+  <li><strong>n8n is frozen.</strong> Read-only, except cutover or emergency fixes with the owner's OK. Do not trigger its webhooks. Outside production the commit route refuses the production n8n webhook (#122), so a preview or local commit fails unless <code>OUTLINE_COMMIT_WEBHOOK_URL</code> names another webhook or <code>draft.owner</code> is native on Neon <code>dev</code>.</li>
   <li><strong>Netlify credits.</strong> Each production deploy costs 15 of 300 credits a month. Run <code>npm run verify</code> before you push. Docs-only merges put <code>[skip netlify]</code> in the squash subject.</li>
   <li><strong>Builds need <code>APP_ENV</code>.</strong> Local: <code>APP_ENV=development npm run build</code>. No secrets, subscriber data, or security details in the repo; it is public.</li>
 </ul>
@@ -292,6 +314,8 @@ scripts/                     reset-dev-branch.mjs, run-prisma-prod.mjs, import-s
 <ul>
   <li><a href="./n8n-backend/70-migration-plan.md">Migration plan</a>: phases, cutover steps, rollbacks.</li>
   <li><a href="./n8n-backend/README.md">n8n backend map</a> and its numbered docs (10 ingestion, 20 drafting, 30 approval, 40 publishing, 50 app and DB, 60 ops). Parts about ingestion and publishing describe the old n8n path.</li>
+  <li><a href="./pipeline/runbook.md">Pipeline runbook</a>: what each incident key means and what to do. <a href="./pipeline/adding-a-source.md">Adding a source</a>: how to add a news source to ingestion.</li>
+  <li><a href="./research/article-reading.md">Article-reading research</a> (#115): the read order and limits the article reader uses.</li>
   <li><a href="../GLOSSARY.md">Glossary</a>: the words to use for issues, drafts, commits, checks, and incidents.</li>
   <li><a href="./adr/0001-job-runner.md">ADR 0001: job runner</a>. <a href="./adr/0002-new-draft-per-commit.md">ADR 0002: a new draft per commit</a>.</li>
   <li><a href="../README.md">README</a>: setup, env vars, deploy, API list. <a href="../prisma/schema.prisma">Prisma schema</a>.</li>
