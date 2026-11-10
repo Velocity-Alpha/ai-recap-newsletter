@@ -71,7 +71,8 @@ draft-issue-background (15 min limit)
          -> gpt-6-luna scene prompt -> Vertex gemini-3.1-flash-image -> S3 velocity-alpha-public-assets/newsletter/
          -> TypeScript email template (no call to GHL)
          -> issue_drafts row ready -> issues row takes the draft's title, HTML, image, content_json
-         -> Telegram "draft is ready for review" with the link, to the review group
+         -> Telegram "draft is ready for review" with the link, to the review group (only for the
+            issue's newest draft)
 
 owner    Reviews the draft on /approval/drafts: live steps, Retry, the email preview
          title field and "New image" change the same draft and the issue row (no new draft, no call to GHL)
@@ -105,7 +106,7 @@ If the issue is missing after a send: /approval/issues -> "Mark as published"
   <tr><td><code>ingest-stories-background</code></td><td>none (called by the above)</td><td>valid token</td><td><code>runIngest()</code> in <code>src/pipeline/ingest/run-ingest.ts</code></td></tr>
   <tr><td><code>detect-publish</code></td><td><code>*/5 0,1,13-23 * * *</code></td><td>weekdays 09:00–21:00 New York</td><td>Reads the seed inbox (only <code>PUBLISH_SEED_RECIPIENTS</code>, the monitor seed address, so each send is read once), 20-minute lookback, publishes. It checks Gmail first and opens the database only when an issue email arrived</td></tr>
   <tr><td><code>detect-publish-catch-up</code></td><td><code>0 3 * * *</code></td><td>daily</td><td>Same, 3-day lookback</td></tr>
-  <tr><td><code>draft-issue-background</code></td><td>none (on commit)</td><td>valid token signed for the draft; the draft is waiting to run</td><td><code>runDraftJob()</code> in <code>src/pipeline/draft/run-draft.ts</code>; gives up at 13 min. The commit route, "Retry" and "New image" start it with <code>startDraftJob()</code></td></tr>
+  <tr><td><code>draft-issue-background</code></td><td>none (on commit)</td><td>valid token signed for the draft; the draft is waiting to run</td><td><code>runDraftJob()</code> in <code>src/pipeline/draft/run-draft.ts</code>; gives up at 13 min. The commit route and "Retry" start it with <code>startDraftJob()</code></td></tr>
   <tr><td><code>run-checks</code></td><td><code>0,5 14,15,16,17,22,23 * * 1-5</code></td><td>10:05, 12:00, 18:00 New York on weekdays (1 min early to 4 min late); outside production, a run at any other time ("Run now") is a full 18:00 pass</td><td>Outcome checks raise or resolve incidents; at 18:00 the daily summary to the ops chat, then the Healthchecks.io ping. Each outside call gets 5 s; Telegram and site calls stop 20 s into the run. <code>runChecks()</code> in <code>src/pipeline/checks/run-checks.ts</code></td></tr>
 </table>
 <p>Each run writes <code>pipeline_runs</code> (job, trigger, status, stats) and <code>pipeline_events</code> (step log). Job tokens: <code>src/server/job-token.ts</code>, format <code>&lt;expiresAtMs&gt;.&lt;sig&gt;</code>, HMAC key derived from <code>SESSION_SECRET</code> per purpose.</p>
@@ -171,7 +172,8 @@ If the issue is missing after a send: /approval/issues -> "Mark as published"
 app/                         Next.js routes
   page.tsx, archive/, issue/[slug]/, newsletter/[id]/, for-brands/, unsubscribe/, privacy/, terms/
   approval/                  board (page.tsx), login/, issues/ ("Mark as published"), submitted/,
-                             drafts/ (drafts for a date: live steps, Retry, email preview, "New image")
+                             drafts/ (drafts for a date: live steps, Retry, email preview, the title field, "New image",
+                             "Stage for sending")
   admin/                     overview, runs/ (+ [id]), incidents/, settings/ (read only); guard: src/server/admin-auth.ts
   api/newsletters/           list, [id], outline, commit (starts the draft job), publish-status
   api/approval/              login, outline (+ status, marker), issues/[id]/publish, skipped-dates,
@@ -184,7 +186,7 @@ src/features/subscriber/     subscriber sessions, provider switch (ghl | beehiiv
 src/features/admin/          admin page data
 src/pipeline/                runner-neutral job logic
   ingest/                    sources.ts, feeds, email-text, redirects, url, extract (gpt-6-luna), paywall,
-                             ingest-store, telegram, schedule, start-ingest, run-ingest
+                             ingest-store, schedule, start-ingest, run-ingest
   publish/                   gmail-client, sent-email-parser, publish-decision, publish-store, content-diff,
                              site-refresh, manual-publish, publish-schedule, detect-publish, run-detect-publish
   checks/                    schedule, day-facts (the only DB reads), checks (pure), site, summary, heartbeat,
@@ -197,6 +199,7 @@ src/pipeline/                runner-neutral job logic
   distribution/              service (the distribution service: GHL today), ghl, stage-draft ("Stage for sending"),
                              staged-version (pure rules), staged-version-store
   side-effects/              the guard for the distribution service, S3 and the review group
+  review-group.ts            Telegram messages to the review group, from the ingest job and the draft job
   settings.ts, runs.ts, alerts.ts
 src/server/                  prisma client, job-token, approval, admin and cache-refresh auth, rate-limit (+ store),
                              client-ip, same-origin, safe-compare, observability

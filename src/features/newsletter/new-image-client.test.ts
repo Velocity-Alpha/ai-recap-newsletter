@@ -77,8 +77,20 @@ describe("requestUseImage", () => {
       "The issue for 2026-05-21 is already published.",
     );
     await expect(
-      requestUseImage(41, IMAGE, answer(409, { success: false, error: "Draft v1 is not the newest draft for 2026-05-21: v2 is ready. Reload the page." })),
+      requestUseImage(41, IMAGE, answer(409, { success: false, error: "This is not the newest draft for 2026-05-21. Reload the page." })),
     ).rejects.toThrow("Reload the page.");
+  });
+
+  it("carries the HTTP status on the error, so the page can read the draft again after a refusal", async () => {
+    await expect(requestUseImage(41, IMAGE, answer(409, { success: false, error: "The issue is already published." }))).rejects.toMatchObject({
+      name: "DraftRequestError",
+      status: 409,
+    });
+    await expect(requestUseImage(41, IMAGE, answer(500, {}))).rejects.toMatchObject({ status: 500 });
+    await expect(requestImage(41, "x", answer(429, { error: "Too many images this hour." }))).rejects.toMatchObject({ status: 429 });
+    await expect(requestUseImage(41, IMAGE, vi.fn<typeof fetch>(async () => Promise.reject(new TypeError("offline"))))).rejects.toMatchObject({
+      status: null,
+    });
   });
 
   it("throws a plain fallback when the server gives no reason", async () => {

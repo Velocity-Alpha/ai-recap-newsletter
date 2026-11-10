@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useReducer } from "react";
 import { ExternalLink, Send } from "lucide-react";
 
 import { formatDraftTime } from "@/src/components/approval/draft-status";
-import { requestStage } from "@/src/features/newsletter/draft-edit-client";
+import { confirmVersionFor, INITIAL_STAGE_STATE, shownStaged, stageDraft, stageReducer } from "@/src/features/newsletter/draft-view-state";
 import type { DraftBoardView, StagedSummary } from "@/src/pipeline/draft/draft-board";
 
 /**
@@ -35,22 +35,30 @@ const LIGHT_BUTTON =
   "inline-flex items-center gap-1.5 rounded-full border border-[var(--border-light)] px-3 py-1.5 text-sm font-medium text-[var(--text-primary)] transition hover:border-[var(--accent-primary)] hover:text-[var(--accent-primary)] disabled:cursor-not-allowed disabled:opacity-60";
 const WARM_NOTE = "rounded-xl border border-[rgba(184,133,110,0.28)] bg-[rgba(255,244,236,0.92)] px-4 py-3 text-sm text-[var(--accent-warm)]";
 
-/** Why a draft cannot be staged, in plain words. Null when it can. */
-export function stageDisabledReason(draft: Pick<DraftBoardView, "status" | "issuePublished" | "hasNewerDraft">): string | null {
+/**
+ * Why a draft cannot be staged, in plain words. Null when it can. `titleDirty`: the title field holds a title
+ * that is not saved, and staging would leave it out without a word.
+ */
+export function stageDisabledReason(
+  draft: Pick<DraftBoardView, "status" | "issuePublished" | "hasNewerDraft">,
+  options: { titleDirty?: boolean } = {},
+): string | null {
   if (draft.issuePublished) return "This issue is published. Nothing more can be staged.";
   if (draft.hasNewerDraft) return "A newer draft exists. Only the newest draft can be staged.";
   if (draft.status === "running") return "The draft is not ready yet.";
   if (draft.status === "failed") return "This draft failed. Retry it first.";
+  if (options.titleDirty) return "Save or cancel the title change first.";
   return null;
 }
 
 export function StagePanel(props: StagePanelProps) {
   const { staged, recorded, disabledReason, busy, confirmVersion, error } = props;
+  const blocked = disabledReason !== null;
 
   return (
     <div className="space-y-3" data-stage-panel>
       <div className="flex flex-wrap items-center gap-3">
-        <button type="button" className={DARK_BUTTON} onClick={props.onStage} disabled={busy || disabledReason !== null || confirmVersion !== null}>
+        <button type="button" className={DARK_BUTTON} onClick={props.onStage} disabled={busy || blocked || confirmVersion !== null}>
           <Send className="h-3.5 w-3.5" aria-hidden />
           {busy ? "Staging…" : "Stage for sending"}
         </button>
@@ -65,7 +73,7 @@ export function StagePanel(props: StagePanelProps) {
             v{confirmVersion} is already staged, and the draft has not changed since. Stage it again?
           </p>
           <div className="mt-2 flex flex-wrap items-center gap-3">
-            <button type="button" className={DARK_BUTTON} onClick={props.onConfirm} disabled={busy}>
+            <button type="button" className={DARK_BUTTON} onClick={props.onConfirm} disabled={busy || blocked}>
               {busy ? "Staging…" : "Stage it again"}
             </button>
             <button type="button" className={LIGHT_BUTTON} onClick={props.onCancel} disabled={busy}>
@@ -101,48 +109,32 @@ export function StagePanel(props: StagePanelProps) {
   );
 }
 
-/** The panel with its state. `onStaged` runs after a staging, so the page reads the draft again. */
-export default function StageForSending({ draft, onStaged }: { draft: DraftBoardView; onStaged?: () => void }) {
-  const [busy, setBusy] = useState(false);
-  const [confirmVersion, setConfirmVersion] = useState<number | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [justStaged, setJustStaged] = useState<{ staged: StagedSummary; recorded: boolean } | null>(null);
+type StageForSendingProps = {
+  draft: DraftBoardView;
+  /** The title field holds a title that is not saved. */
+  titleDirty?: boolean;
+  /** Runs after a staging, and after a refusal, so the page reads the draft again. */
+  onStaged?: () => void;
+};
 
-  async function stage(confirmRepeat: boolean) {
-    setBusy(true);
-    setError(null);
-    try {
-      const reply = await requestStage(draft.id, confirmRepeat);
-      if (reply.kind === "already_staged") {
-        setConfirmVersion(reply.version);
-        return;
-      }
-      setConfirmVersion(null);
-      const { version, stagedAt, serviceName, serviceUrl, mode } = reply.staged;
-      setJustStaged({ staged: { version, stagedAt, serviceName, serviceUrl }, recorded: mode === "recorded" });
-      onStaged?.();
-    } catch (reason) {
-      setConfirmVersion(null);
-      setError(reason instanceof Error ? reason.message : "Could not stage the draft.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  // The page's own staging until the draft read again shows that version or a newer one.
-  const mine = justStaged && (!draft.staged || draft.staged.version <= justStaged.staged.version) ? justStaged : null;
+/** The panel with its state (draft-view-state.ts). */
+export default function StageForSending({ draft, titleDirty = false, onStaged }: StageForSendingProps) {
+  const [state, dispatch] = useReducer(stageReducer, INITIAL_STAGE_STATE);
+  const shown = shownStaged(draft.staged, state.justStaged);
+  const stage = (confirmRepeat: boolean) => void stageDraft(draft, confirmRepeat, { dispatch, onChanged: onStaged });
 
   return (
     <StagePanel
-      staged={mine?.staged ?? draft.staged}
-      recorded={mine?.recorded ?? false}
-      disabledReason={stageDisabledReason(draft)}
-      busy={busy}
-      confirmVersion={confirmVersion}
-      error={error}
-      onStage={() => void stage(false)}
-      onConfirm={() => void stage(true)}
-      onCancel={() => setConfirmVersion(null)}
+      staged={shown.staged}
+      recorded={shown.recorded}
+      disabledReason={stageDisabledReason(draft, { titleDirty })}
+      busy={state.busy}
+      // Gone once the draft has a new title or image: the question is about the draft as it was.
+      confirmVersion={confirmVersionFor(state.confirm, draft.editedAt)}
+      error={state.error}
+      onStage={() => stage(false)}
+      onConfirm={() => stage(true)}
+      onCancel={() => dispatch({ type: "cancelled" })}
     />
   );
 }

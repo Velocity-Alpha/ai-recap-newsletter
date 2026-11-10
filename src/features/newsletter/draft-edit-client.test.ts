@@ -119,11 +119,23 @@ describe("requestStage", () => {
       "The issue for 2026-05-21 is already published.",
     );
     await expect(
-      requestStage(41, false, answer(409, { code: "not_current", error: "Draft v1 is not the newest draft for 2026-05-21: v2 is ready. Reload the page." })),
+      requestStage(41, false, answer(409, { code: "not_current", error: "This is not the newest draft for 2026-05-21. Reload the page." })),
     ).rejects.toThrow("Reload the page.");
     await expect(requestStage(41, false, answer(502, { error: "Staging failed: the distribution service answered HTTP 401." }))).rejects.toThrow(
       "Staging failed: the distribution service answered HTTP 401.",
     );
+  });
+
+  it("carries the HTTP status on the error, so the page can read the draft again after a refusal", async () => {
+    await expect(requestStage(41, false, answer(409, { code: "not_current", error: "Reload the page." }))).rejects.toMatchObject({
+      name: "DraftRequestError",
+      status: 409,
+    });
+    await expect(requestStage(41, false, answer(502, { error: "Staging failed." }))).rejects.toMatchObject({ status: 502 });
+    await expect(requestStage(41, false, offline())).rejects.toMatchObject({ name: "DraftRequestError", status: null });
+    await expect(requestTitleChange(41, "A title", answer(409, { error: "The issue is already published." }))).rejects.toMatchObject({ status: 409 });
+    await expect(requestTitleChange(41, "", answer(400, { error: "The title is empty." }))).rejects.toMatchObject({ status: 400 });
+    await expect(requestTitleChange(41, "A title", offline())).rejects.toMatchObject({ status: null });
   });
 
   it("does not ask for a repeat unless the answer is a 409 that names the staged version", async () => {

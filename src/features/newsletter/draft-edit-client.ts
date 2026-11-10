@@ -1,8 +1,8 @@
-import { jsonPost } from "@/src/features/newsletter/draft-links";
+import { DraftRequestError, jsonPost } from "@/src/features/newsletter/draft-links";
 
 /**
  * The draft view's calls for the title change and "Stage for sending" (#149). Safe for client components. Each
- * throws an Error with a plain message the page can show as is.
+ * throws a `DraftRequestError`: a plain message the page can show as is, and the HTTP status.
  */
 
 const OFFLINE = "Could not reach the server. Try again.";
@@ -15,7 +15,7 @@ async function send(fetcher: Fetch, url: string, init: RequestInit): Promise<{ r
   try {
     response = await fetcher(url, init);
   } catch {
-    throw new Error(OFFLINE);
+    throw new DraftRequestError(OFFLINE, null);
   }
   return { response, body: ((await response.json().catch(() => ({}))) ?? {}) as Body };
 }
@@ -27,7 +27,7 @@ function reason(body: Body, fallback: string): string {
 /** Saves the new title. Returns the title as the server stored it (one line, trimmed). */
 export async function requestTitleChange(draftId: number, title: string, fetcher: Fetch = fetch): Promise<string> {
   const { response, body } = await send(fetcher, `/api/approval/drafts/${draftId}`, { ...jsonPost({ title }), method: "PATCH" });
-  if (!response.ok || typeof body.title !== "string") throw new Error(reason(body, "Could not change the title."));
+  if (!response.ok || typeof body.title !== "string") throw new DraftRequestError(reason(body, "Could not change the title."), response.status);
   return body.title;
 }
 
@@ -58,7 +58,7 @@ export async function requestStage(draftId: number, confirmRepeat: boolean, fetc
   }
   const staged = body.staged as Partial<StagedReply> | undefined;
   if (!response.ok || !staged || typeof staged.version !== "number" || typeof staged.serviceName !== "string") {
-    throw new Error(reason(body, "Could not stage the draft."));
+    throw new DraftRequestError(reason(body, "Could not stage the draft."), response.status);
   }
   return {
     kind: "staged",

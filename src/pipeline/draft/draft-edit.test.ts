@@ -200,7 +200,7 @@ describe("draftEditErrorResponse", () => {
   it("answers 409 once the issue is published", () => {
     expect(draftEditErrorResponse(new IssuePublishedError(3, DATE))).toEqual({
       status: 409,
-      error: `The issue for ${DATE} (id 3) is already published. Drafting stopped.`,
+      error: `The issue for ${DATE} (id 3) is already published.`,
     });
   });
 

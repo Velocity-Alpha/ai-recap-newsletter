@@ -27,7 +27,7 @@ export class IssuePublishedError extends Error {
     readonly issueId: number,
     readonly issueDate: string,
   ) {
-    super(`The issue for ${issueDate} (id ${issueId}) is already published. Drafting stopped.`);
+    super(`The issue for ${issueDate} (id ${issueId}) is already published.`);
     this.name = "IssuePublishedError";
   }
 }
@@ -174,14 +174,14 @@ async function currentDraftOf(client: Client, draft: { id: bigint; issueId: bigi
   const newest = await client.issueDraft.findFirst({
     where: { issueId: draft.issueId },
     orderBy: { version: "desc" },
-    select: { id: true, version: true, status: true, content: true, featuredImageUrl: true, scenePrompt: true },
+    select: { id: true, status: true, content: true, featuredImageUrl: true, scenePrompt: true },
   });
+  // The messages name no draft number: the owner sees only staged version numbers (#149).
   if (!newest || newest.id !== draft.id) {
-    const newer = newest ? `v${newest.version} is ${newest.status}` : "it has no drafts";
-    throw new DraftEditError(`Draft v${draft.version} is not the newest draft for ${draft.issueDate}: ${newer}. Reload the page.`, "not_current");
+    throw new DraftEditError(`This is not the newest draft for ${draft.issueDate}. Reload the page.`, "not_current");
   }
   if (newest.status !== "ready" || !newest.content) {
-    throw new DraftEditError(`Draft v${draft.version} for ${draft.issueDate} is ${newest.status}. Only a ready draft can be changed.`, "not_ready");
+    throw new DraftEditError(`The draft for ${draft.issueDate} is ${newest.status}. Only a ready draft can be changed.`, "not_ready");
   }
   return {
     draftId: Number(draft.id),
@@ -218,12 +218,13 @@ export async function editCurrentDraft(draftId: Id, edit: DraftEdit, options: { 
       const current = await currentDraftOf(tx, draft);
 
       const content: WrittenIssueContent = "title" in edit ? { ...current.content, title: edit.title } : current.content;
-      const featuredImageUrl = "image" in edit ? edit.image.imageUrl : (current.featuredImageUrl ?? "");
-      const scenePrompt = "image" in edit ? edit.image.scenePrompt : (current.scenePrompt ?? "");
+      // A draft with no image or scene prompt keeps null: a title change does not write "" in its place.
+      const featuredImageUrl = "image" in edit ? edit.image.imageUrl : current.featuredImageUrl;
+      const scenePrompt = "image" in edit ? edit.image.scenePrompt : current.scenePrompt;
       const html = renderIssueEmailHtml(
         content,
         { id: current.issueId, issueDate: current.issueDate },
-        { id: current.draftId, featuredImageUrl },
+        { id: current.draftId, featuredImageUrl: featuredImageUrl ?? "" },
       );
 
       await tx.issueDraft.update({
@@ -361,16 +362,24 @@ export async function loadDraftInputs(draft: DraftToRun): Promise<{ outline: App
 
 export type IssueUpdate = "updated" | "newer_draft" | "published";
 
+export interface ReadyDraftSave {
+  /** What happened to the issue row. */
+  issue: IssueUpdate;
+  /** No newer draft of any status exists for the issue, so this is the draft to review. */
+  newest: boolean;
+}
+
 /**
  * Marks the draft ready and, in the same transaction, copies it to the issue row, so the site and publish
  * detection read it as before. The issue keeps a newer ready draft, and nothing changes once any issue for the
- * date is published.
+ * date is published. A newer draft that is running or failed does not stop the copy, but then this draft is not
+ * the `newest`.
  */
 export async function saveReadyDraft(
   draft: DraftToRun & { issueDate: string },
   produced: ProducedDraft,
   now: Date,
-): Promise<IssueUpdate> {
+): Promise<ReadyDraftSave> {
   return prisma.$transaction(async (tx) => {
     // Two drafts finishing together: the second waits here, so it sees the first one's ready row below.
     await lockIssueDate(tx, draft.issueDate);
@@ -388,20 +397,28 @@ export async function saveReadyDraft(
       },
     });
 
-    const newer = await tx.issueDraft.count({ where: { issueId: draft.issueId, version: { gt: draft.version }, status: "ready" } });
-    if (newer > 0) return "newer_draft";
-    if (await publishedIssueFor(tx, draft.issueDate)) return "published";
+    // createDraft takes the same lock, so no newer draft can appear between this read and the commit.
+    const newerDrafts = await tx.issueDraft.findMany({
+      where: { issueId: draft.issueId, version: { gt: draft.version } },
+      select: { status: true },
+    });
+    const newest = newerDrafts.length === 0;
+    if (newerDrafts.some((newer) => newer.status === "ready")) return { issue: "newer_draft", newest };
+    if (await publishedIssueFor(tx, draft.issueDate)) return { issue: "published", newest };
 
     const updated = await tx.issue.updateMany({
       where: { id: draft.issueId, status: ISSUE_DRAFT },
       data: issueFields(produced, { issueId: Number(draft.issueId), issueDate: draft.issueDate }),
     });
-    return updated.count === 1 ? "updated" : "published";
+    return { issue: updated.count === 1 ? "updated" : "published", newest };
   });
 }
 
+/** What a draft gives the issue row. The image and its scene prompt are null on a draft that has none. */
+type IssueSource = Pick<ProducedDraft, "content" | "html"> & { featuredImageUrl: string | null; scenePrompt: string | null };
+
 /** The issue columns a ready draft sets. `slug` is generated from the title. */
-export function issueFields(produced: Pick<ProducedDraft, "content" | "html" | "featuredImageUrl" | "scenePrompt">, meta: { issueId: number; issueDate: string }) {
+export function issueFields(produced: IssueSource, meta: { issueId: number; issueDate: string }) {
   const content: WrittenIssueContent = produced.content;
   return {
     title: content.title,
@@ -412,7 +429,7 @@ export function issueFields(produced: Pick<ProducedDraft, "content" | "html" | "
     contentJson: toIssueContentJson(content, {
       issueId: meta.issueId,
       issueDate: meta.issueDate,
-      featuredImageUrl: emailImageUrl(produced.featuredImageUrl),
+      featuredImageUrl: emailImageUrl(produced.featuredImageUrl ?? ""),
     }) as unknown as Prisma.InputJsonValue,
   };
 }
@@ -478,7 +495,7 @@ export interface DraftView {
 export interface DraftListItem extends DraftView {
   /** A sent email carried this draft's id (publish_events.draft_id). */
   sent: boolean;
-  /** The newest ready draft: the one the issue row holds. */
+  /** The issue's current draft (`CurrentDraft`): its newest draft, and only when that draft is ready. */
   current: boolean;
 }
 
@@ -555,15 +572,14 @@ export async function listDraftsForDate(date: string): Promise<DraftListItem[]> 
     select: { draftId: true },
   });
   const sent = new Set(sentRows.map((row) => String(row.draftId)));
-  const current = rows.find((row) => row.status === "ready")?.id;
-  return rows.map((row) => ({
-    ...toView(row, date, {
-      issuePublished,
-      hasNewerDraft: rows.some((other) => other.issueId === row.issueId && other.version > row.version),
-    }),
-    sent: sent.has(String(row.id)),
-    current: row.id === current,
-  }));
+  return rows.map((row) => {
+    const hasNewerDraft = rows.some((other) => other.issueId === row.issueId && other.version > row.version);
+    return {
+      ...toView(row, date, { issuePublished, hasNewerDraft }),
+      sent: sent.has(String(row.id)),
+      current: row.status === "ready" && !hasNewerDraft,
+    };
+  });
 }
 
 /** One draft's status, for the board's live progress. Null when there is no such draft. */

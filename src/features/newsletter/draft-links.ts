@@ -24,10 +24,40 @@ export function jsonPost(body: unknown = {}): RequestInit {
   return { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) };
 }
 
-/** Shown before a commit when the date already has drafts. */
+/**
+ * A title as it is stored: one line of plain text, where runs of white space (line breaks too) become one space.
+ * The server cleans a new title with it, and the title field compares with it.
+ */
+export function normalizeTitle(title: string): string {
+  return title.replace(/\s+/g, " ").trim();
+}
+
+/**
+ * A call to the approval API that failed. `status` is the HTTP status, or null when the server was not reached.
+ * The message is plain, for the page to show as is.
+ */
+export class DraftRequestError extends Error {
+  constructor(
+    message: string,
+    readonly status: number | null,
+  ) {
+    super(message);
+    this.name = "DraftRequestError";
+  }
+}
+
+/**
+ * The server refused because the draft is not what the page shows (409): the issue is published, a newer draft
+ * exists, or the draft is not ready. The page then reads the draft again.
+ */
+export function isRefusal(error: unknown): boolean {
+  return error instanceof DraftRequestError && error.status === 409;
+}
+
+/** Shown before a commit when the date already has drafts. It names no draft number: the owner never sees one. */
 export function secondCommitNotice(drafting: DraftingSummary | null): string | null {
   if (!drafting || drafting.drafts.length === 0) return null;
-  return `This makes draft v${drafting.nextVersion}. It replaces the current draft as the one to review and stage.`;
+  return "This makes a new draft. It replaces the current draft as the one to review and stage.";
 }
 
 /**

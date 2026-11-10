@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useReducer, useState } from "react";
 import Image from "next/image";
 import { ImageIcon, Loader2, X } from "lucide-react";
 
-import { requestImage, requestSceneIdeas, requestUseImage } from "@/src/features/newsletter/new-image-client";
+import { isRefusal } from "@/src/features/newsletter/draft-links";
+import { chooseImage, initialNewImageState, newImageReducer, type NewImageState } from "@/src/features/newsletter/draft-view-state";
+import { requestImage, requestSceneIdeas } from "@/src/features/newsletter/new-image-client";
 import type { DraftBoardView } from "@/src/pipeline/draft/draft-board";
 import type { FeaturedImage } from "@/src/pipeline/draft/image/featured-image";
 import type { SceneIdea } from "@/src/pipeline/draft/image/scene-ideas";
@@ -17,13 +19,11 @@ import type { SceneIdea } from "@/src/pipeline/draft/image/scene-ideas";
 export type IdeasState = { status: "loading" } | { status: "ready"; ideas: SceneIdea[] } | { status: "error"; error: string };
 
 export type NewImagePanelProps = {
-  /** The version of the draft whose image changes. */
-  version: number;
   currentImageUrl: string | null;
   scene: string;
   ideas: IdeasState;
   generated: FeaturedImage | null;
-  busy: "generate" | "choose" | null;
+  busy: NewImageState["busy"];
   error: string | null;
   onSceneChange: (scene: string) => void;
   onRetryIdeas: () => void;
@@ -75,7 +75,7 @@ function Ideas({ ideas, disabled, onPick, onRetry }: { ideas: IdeasState; disabl
 }
 
 export function NewImagePanel(props: NewImagePanelProps) {
-  const { version, currentImageUrl, scene, ideas, generated, busy, error } = props;
+  const { currentImageUrl, scene, ideas, generated, busy, error } = props;
   const working = busy !== null;
 
   return (
@@ -95,10 +95,10 @@ export function NewImagePanel(props: NewImagePanelProps) {
 
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
         <figure className="space-y-2">
-          <figcaption className={LABEL}>Now, in v{version}</figcaption>
+          <figcaption className={LABEL}>Now</figcaption>
           {currentImageUrl ? (
             <div className={FRAME}>
-              <Picture src={currentImageUrl} alt={`The featured image in draft v${version}`} />
+              <Picture src={currentImageUrl} alt="The featured image the draft has now" />
             </div>
           ) : (
             <p className="text-sm text-[var(--text-secondary)]">This draft has no image.</p>
@@ -165,14 +165,15 @@ function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : "Something went wrong. Try again.";
 }
 
-/** The "New image" button, and its panel once opened. Ideas load when the panel first opens. */
+/**
+ * The "New image" button, and its panel once opened. Ideas load when the panel first opens. Its state is in
+ * draft-view-state.ts. `onChanged` runs after "Use this image", and after a refusal, so the page reads the draft
+ * again.
+ */
 export default function NewImage({ draft, onChanged }: { draft: DraftBoardView; onChanged?: () => void }) {
-  const [open, setOpen] = useState(false);
-  const [scene, setScene] = useState(draft.scenePrompt ?? "");
+  const [state, dispatch] = useReducer(newImageReducer, draft.scenePrompt, initialNewImageState);
   const [ideas, setIdeas] = useState<IdeasState | null>(null);
-  const [generated, setGenerated] = useState<FeaturedImage | null>(null);
-  const [busy, setBusy] = useState<NewImagePanelProps["busy"]>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { generated } = state;
 
   async function loadIdeas() {
     setIdeas({ status: "loading" });
@@ -184,40 +185,21 @@ export default function NewImage({ draft, onChanged }: { draft: DraftBoardView; 
   }
 
   function openPanel() {
-    setOpen(true);
+    dispatch({ type: "opened" });
     if (ideas?.status !== "ready") void loadIdeas();
   }
 
   async function generate() {
-    setBusy("generate");
-    setError(null);
+    dispatch({ type: "generating" });
     try {
-      setGenerated(await requestImage(draft.id, scene));
+      dispatch({ type: "generated", image: await requestImage(draft.id, state.scene) });
     } catch (reason) {
-      setError(messageOf(reason));
-    } finally {
-      setBusy(null);
+      dispatch({ type: "failed", error: messageOf(reason) });
+      if (isRefusal(reason)) onChanged?.();
     }
   }
 
-  async function choose() {
-    if (!generated) return;
-    setBusy("choose");
-    setError(null);
-    try {
-      // The image's own scene goes with it, even if the box was edited after "Generate".
-      await requestUseImage(draft.id, generated);
-      setGenerated(null);
-      setOpen(false);
-      onChanged?.();
-    } catch (reason) {
-      setError(messageOf(reason));
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  if (!open) {
+  if (!state.open) {
     return (
       <button type="button" className={`inline-flex items-center gap-1.5 ${LIGHT_BUTTON}`} onClick={openPanel}>
         <ImageIcon className="h-3.5 w-3.5" aria-hidden />
@@ -229,18 +211,19 @@ export default function NewImage({ draft, onChanged }: { draft: DraftBoardView; 
   return (
     <div className="basis-full">
       <NewImagePanel
-        version={draft.version}
         currentImageUrl={draft.featuredImageUrl}
-        scene={scene}
+        scene={state.scene}
         ideas={ideas ?? { status: "loading" }}
         generated={generated}
-        busy={busy}
-        error={error}
-        onSceneChange={setScene}
+        busy={state.busy}
+        error={state.error}
+        onSceneChange={(scene) => dispatch({ type: "scene_changed", scene })}
         onRetryIdeas={() => void loadIdeas()}
         onGenerate={() => void generate()}
-        onChoose={() => void choose()}
-        onClose={() => setOpen(false)}
+        onChoose={() => {
+          if (generated) void chooseImage(draft.id, generated, { dispatch, onChanged });
+        }}
+        onClose={() => dispatch({ type: "closed" })}
       />
     </div>
   );

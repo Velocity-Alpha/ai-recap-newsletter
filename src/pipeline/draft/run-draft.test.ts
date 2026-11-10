@@ -290,7 +290,7 @@ describe("runDraftJob", () => {
 
     const result = await runDraftJob(draftId, { env: ENV, now: () => NOW, deps: deps() });
 
-    expect(result).toMatchObject({ status: "failed", step: "load", error: expect.stringContaining("already published") });
+    expect(result).toMatchObject({ status: "failed", step: "load", error: `The issue for ${DATE} (id ${issueId}) is already published. Drafting stopped.` });
     expect(issueRow(issueId)).toMatchObject({ title: "Sent issue", html: null });
   });
 
@@ -611,6 +611,35 @@ describe("runDraftJob and the review group's message (#149)", () => {
     expect(sendTelegram).not.toHaveBeenCalled();
     expect(telegramEvents()).toEqual([]);
     expect(runLog.finished[0]).toMatchObject({ status: "succeeded", stats: { issue: "newer_draft", telegram: "skipped" } });
+  });
+
+  it.each(["running", "failed"] as const)("sends nothing for v1 when a newer draft exists and is %s: v1 is not the one to review", async (status) => {
+    const v1 = await commit();
+    const v2 = await commit();
+    await fakeDb.client.issueDraft.update({ where: { id: BigInt(v2.draftId) }, data: { status } });
+    const sendTelegram = telegramSender();
+
+    const result = await runDraftJob(v1.draftId, { env: PRODUCTION_ENV, now: () => NOW, deps: deps(), sendTelegram });
+
+    // The issue still takes v1, as before: no newer draft is ready.
+    expect(result).toMatchObject({ status: "ready", issue: "updated" });
+    expect(issueRow(v1.issueId).html).toBe(draftRow(v1.draftId).html);
+    expect(sendTelegram).not.toHaveBeenCalled();
+    expect(telegramEvents()).toEqual([]);
+    expect(runLog.finished[0]).toMatchObject({ status: "succeeded", stats: { issue: "updated", telegram: "skipped" } });
+  });
+
+  it("sends the message for v2 when it becomes ready after v1", async () => {
+    const v1 = await commit();
+    const v2 = await commit();
+    const sendTelegram = telegramSender();
+
+    await runDraftJob(v1.draftId, { env: PRODUCTION_ENV, now: () => NOW, deps: deps(), sendTelegram });
+    expect(sendTelegram).not.toHaveBeenCalled();
+    await runDraftJob(v2.draftId, { env: PRODUCTION_ENV, now: () => NOW, deps: deps(), sendTelegram });
+
+    expect(sendTelegram).toHaveBeenCalledTimes(1);
+    expect(sendTelegram).toHaveBeenCalledWith(READY_MESSAGE);
   });
 
   it("sends nothing for a draft that finished after the issue was published", async () => {

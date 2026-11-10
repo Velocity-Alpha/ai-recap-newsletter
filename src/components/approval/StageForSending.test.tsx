@@ -69,6 +69,18 @@ describe("stageDisabledReason", () => {
     );
   });
 
+  it("waits for a typed title to be saved or cancelled: staging would leave it out", () => {
+    expect(stageDisabledReason(stageable(), { titleDirty: true })).toBe("Save or cancel the title change first.");
+    expect(stageDisabledReason(stageable(), { titleDirty: false })).toBeNull();
+  });
+
+  it("gives the draft's own reason before the unsaved title", () => {
+    expect(stageDisabledReason(stageable({ issuePublished: true }), { titleDirty: true })).toBe("This issue is published. Nothing more can be staged.");
+    expect(stageDisabledReason(stageable({ hasNewerDraft: true }), { titleDirty: true })).toBe(
+      "A newer draft exists. Only the newest draft can be staged.",
+    );
+  });
+
   it("gives the newer draft as the reason for an old running or failed draft", () => {
     const reason = "A newer draft exists. Only the newest draft can be staged.";
 
@@ -124,6 +136,14 @@ describe("StagePanel", () => {
       expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Staging…<\/button>/);
       expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Cancel<\/button>/);
       expect(html).not.toMatch(AGAIN);
+    });
+
+    it("turns the yes off too while the draft cannot be staged, and leaves Cancel on", () => {
+      const html = render({ confirmVersion: 2, disabledReason: "Save or cancel the title change first." });
+
+      expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Stage it again<\/button>/);
+      expect(html).not.toMatch(/<button[^>]*disabled=""[^>]*>Cancel<\/button>/);
+      expect(html).toContain("Save or cancel the title change first.");
     });
 
     it("does not ask when the draft has changed, or was never staged", () => {
@@ -249,6 +269,14 @@ describe("StageForSending", () => {
     expect(html).toContain("Staged, v3");
     expect(html).toContain("Open in GHL");
     expect(html).not.toContain("Not sent outside production");
+  });
+
+  it("turns the button off while the title field holds a title that is not saved", () => {
+    const html = renderToStaticMarkup(<StageForSending draft={draft()} titleDirty />);
+
+    expect(html).toMatch(STAGE_OFF);
+    expect(html).toContain("Save or cancel the title change first.");
+    expect(html).not.toContain(WHAT_IT_DOES);
   });
 
   it("turns the button off with the draft's reason", () => {

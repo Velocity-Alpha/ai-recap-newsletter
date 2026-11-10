@@ -21,7 +21,7 @@ const SETTING = {
   userId: "GHL_USER_ID",
 } as const;
 
-export interface DraftTemplateResult {
+export interface EmailTemplateResult {
   templateId: string;
   /** GHL's preview link, when it returns one. */
   previewUrl?: string;
@@ -29,7 +29,7 @@ export interface DraftTemplateResult {
   mode: "sent" | "recorded";
 }
 
-export interface DraftTemplateDeps {
+export interface EmailTemplateDeps {
   /** `APP_ENV` and the `GHL_*` settings. */
   env: Record<string, string | undefined>;
   fetch?: typeof fetch;
@@ -134,7 +134,7 @@ function dryRunTemplateId(name: string): string {
  * Creates a new GHL template with this name and sets its HTML. Outside production both calls are recorded,
  * nothing is sent, and the template id is a stand-in.
  */
-export async function createEmailTemplate(input: { name: string; html: string }, deps: DraftTemplateDeps): Promise<DraftTemplateResult> {
+export async function createEmailTemplate(input: { name: string; html: string }, deps: EmailTemplateDeps): Promise<EmailTemplateResult> {
   const { name } = input;
   const effects = createSideEffects({ appEnv: deps.env.APP_ENV, record: deps.record });
   const settings = readSettings(deps.env, effects.live);

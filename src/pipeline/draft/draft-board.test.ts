@@ -331,7 +331,7 @@ describe("readDraftForBoard", () => {
 });
 
 describe("listDraftsForBoard", () => {
-  it("lists the date's drafts, newest first, with subject, status, sent and current", async () => {
+  it("lists the date's drafts, newest first, with subject, status, sent, and current (only the newest draft, when ready)", async () => {
     const issueId = await seedIssue();
     const v1 = await seedDraft(issueId);
     await fakeDb.client.issueDraft.create({
@@ -343,7 +343,7 @@ describe("listDraftsForBoard", () => {
 
     expect(drafts.map((draft) => [draft.version, draft.status, draft.sent, draft.current])).toEqual([
       [2, "failed", false, false],
-      [1, "ready", true, true],
+      [1, "ready", true, false],
     ]);
     expect(drafts[0]).toMatchObject({ failedStepLabel: "making the image", subject: null });
     expect(drafts[1]).toMatchObject({ subject: "First Take", failedStepLabel: null, createdAt: expect.any(String) });

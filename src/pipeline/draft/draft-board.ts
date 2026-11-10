@@ -90,7 +90,7 @@ export interface DraftListEntry {
   failedStepLabel: string | null;
   /** A sent email carried this draft. */
   sent: boolean;
-  /** The newest ready draft, which the issue holds. */
+  /** The issue's current draft: its newest draft, and only when that draft is ready. */
   current: boolean;
   createdAt: string;
 }

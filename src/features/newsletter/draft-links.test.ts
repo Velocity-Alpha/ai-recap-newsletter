@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   draftHtmlSrc,
+  DraftRequestError,
   draftViewHref,
+  isRefusal,
   jsonPost,
   nativeCommitTarget,
   secondCommitNotice,
@@ -31,11 +33,11 @@ describe("draft links", () => {
 describe("secondCommitNotice", () => {
   it("warns before a second native commit for a date that the new draft replaces the current one", () => {
     expect(secondCommitNotice({ drafts: [{ id: 40, version: 1, status: "ready" }], nextVersion: 2 })).toBe(
-      "This makes draft v2. It replaces the current draft as the one to review and stage.",
+      "This makes a new draft. It replaces the current draft as the one to review and stage.",
     );
   });
 
-  it("names the version the commit makes, and no distribution service", () => {
+  it("names no draft number (the owner sees only staged version numbers) and no distribution service", () => {
     const notice = secondCommitNotice({
       drafts: [
         { id: 41, version: 2, status: "failed" },
@@ -44,13 +46,28 @@ describe("secondCommitNotice", () => {
       nextVersion: 3,
     });
 
-    expect(notice).toBe("This makes draft v3. It replaces the current draft as the one to review and stage.");
+    expect(notice).toBe("This makes a new draft. It replaces the current draft as the one to review and stage.");
+    expect(notice).not.toMatch(/v\d/);
     expect(notice).not.toContain("GHL");
   });
 
   it("says nothing for the first commit", () => {
     expect(secondCommitNotice({ drafts: [], nextVersion: 1 })).toBeNull();
     expect(secondCommitNotice(null)).toBeNull();
+  });
+});
+
+describe("DraftRequestError", () => {
+  it("carries the plain message and the HTTP status, and only a 409 is a refusal", () => {
+    const refused = new DraftRequestError("The issue is already published.", 409);
+
+    expect(refused).toBeInstanceOf(Error);
+    expect(refused).toMatchObject({ name: "DraftRequestError", message: "The issue is already published.", status: 409 });
+    expect(isRefusal(refused)).toBe(true);
+    expect(isRefusal(new DraftRequestError("Staging failed.", 502))).toBe(false);
+    expect(isRefusal(new DraftRequestError("Could not reach the server. Try again.", null))).toBe(false);
+    expect(isRefusal(new Error("The issue is already published."))).toBe(false);
+    expect(isRefusal("409")).toBe(false);
   });
 });
 
