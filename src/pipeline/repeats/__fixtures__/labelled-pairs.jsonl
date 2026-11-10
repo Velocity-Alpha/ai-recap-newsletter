@@ -1,0 +1,243 @@
+{"a":9890,"b":10295,"label":"different","confidence":"high","why":"Staff AI use cases roundtable versus Microsoft Copilot redesign; unrelated.","similarity":0.5591,"same":0.01,"news":0.98}
+{"a":10522,"b":10633,"label":"different","confidence":"high","why":"Model release versus a piece on DeepSeek inference infrastructure.","similarity":0.7275,"same":0.24,"news":0.95}
+{"a":9900,"b":10074,"label":"different","confidence":"high","why":"Meta hardware launch versus separate open-source Muse Gadgets code release.","similarity":0.5548,"same":0.06,"news":0.99}
+{"a":11146,"b":11200,"label":"same","confidence":"high","why":"Both report the GPT-6 Cyber launch; later adds test numbers only.","similarity":0.8294,"same":0.95,"news":1}
+{"a":11055,"b":11201,"label":"follow_up","confidence":"low","why":"Earlier says GIF output is coming; later reports the actual launch.","similarity":0.8883,"same":0.93,"news":0.05}
+{"a":10488,"b":10647,"label":"different","confidence":"high","why":"Two different Product Hunt products.","similarity":0.5517,"same":0.12,"news":0.72}
+{"a":10740,"b":10931,"label":"different","confidence":"high","why":"Canva Craft image model and Canva Brush editing model are separate launches.","similarity":0.6917,"same":0.07,"news":0.02}
+{"a":11118,"b":11211,"label":"same","confidence":"high","why":"Both report data centers losing 40 of 41 ballot measures.","similarity":0.8437,"same":0.96,"news":0.02}
+{"a":11179,"b":11269,"label":"same","confidence":"high","why":"Both report OpenAI raising $11B at $1.25T valuation.","similarity":0.8983,"same":0.95,"news":0.4}
+{"a":10064,"b":10327,"label":"different","confidence":"high","why":"Different projects: a 1.58-bit 27B model versus AirLLM.","similarity":0.5362,"same":0,"news":1}
+{"a":10410,"b":10632,"label":"different","confidence":"high","why":"A research paper versus a Vercel product; only share the word harness.","similarity":0.6082,"same":0,"news":0.96}
+{"a":9903,"b":9990,"label":"different","confidence":"high","why":"Antigravity SDK local models versus a Google Cloud tutorial series.","similarity":0.5811,"same":0,"news":1}
+{"a":10511,"b":10581,"label":"different","confidence":"high","why":"Two different video products.","similarity":0.6013,"same":0.06,"news":0.79}
+{"a":10598,"b":10693,"label":"different","confidence":"high","why":"DeepInfer open-sourcing versus an unrelated speculative decoding paper.","similarity":0.5651,"same":0.14,"news":1}
+{"a":10632,"b":10922,"label":"different","confidence":"high","why":"Vercel durable-harness versus Factory Droid 1.0 harness.","similarity":0.609,"same":0,"news":0.95}
+{"a":10029,"b":10159,"label":"different","confidence":"high","why":"Two different papers on LLM memory and context.","similarity":0.6181,"same":0.18,"news":0.92}
+{"a":10862,"b":11173,"label":"different","confidence":"high","why":"Two different world-model papers.","similarity":0.6037,"same":0.05,"news":0.92}
+{"a":10121,"b":10282,"label":"different","confidence":"high","why":"Two different robotics papers.","similarity":0.5311,"same":0,"news":0.98}
+{"a":10410,"b":10727,"label":"different","confidence":"high","why":"Harness research paper versus a Hermes agent robot demo.","similarity":0.5553,"same":0,"news":0.97}
+{"a":10748,"b":10776,"label":"same","confidence":"high","why":"Both report the AI-found critical PHP flaws; CVE details are minor additions.","similarity":0.856,"same":0.95,"news":0}
+{"a":10046,"b":10247,"label":"follow_up","confidence":"high","why":"Later reports the fired researchers public response to the firings.","similarity":0.7756,"same":0.95,"news":0.84}
+{"a":10535,"b":10775,"label":"different","confidence":"high","why":"Mercury 3 and GPT-6.1 Terra are different model releases.","similarity":0.5547,"same":0,"news":1}
+{"a":10591,"b":10913,"label":"different","confidence":"high","why":"Two different robotics papers.","similarity":0.5584,"same":0,"news":0.96}
+{"a":10864,"b":10956,"label":"same","confidence":"high","why":"Both report the Gemini 4 Carbon launch from the same Google post.","similarity":0.7724,"same":0.26,"news":1}
+{"a":10466,"b":10961,"label":"different","confidence":"high","why":"Different Nvidia models: Super VL versus Transcribe.","similarity":0.7361,"same":0,"news":1}
+{"a":9915,"b":10097,"label":"different","confidence":"high","why":"Plugin portal launch versus the separate Claude Mods feature.","similarity":0.6764,"same":0.14,"news":0.94}
+{"a":10954,"b":10993,"label":"same","confidence":"high","why":"Both report Anthropic adding ready-made legal tools to Claude.","similarity":0.8998,"same":0.99,"news":0}
+{"a":10613,"b":10791,"label":"different","confidence":"low","why":"GTC Berlin keynote overview versus a specific Cosmos blueprints announcement.","similarity":0.6012,"same":0.32,"news":0.98}
+{"a":10704,"b":10776,"label":"same","confidence":"high","why":"Both report the PHP bugs disclosure.","similarity":0.7837,"same":0.97,"news":0}
+{"a":10709,"b":10711,"label":"same","confidence":"low","why":"Both appear to cover 1Password agent platform launch, with different angles.","similarity":0.8276,"same":0.2,"news":0.76}
+{"a":10713,"b":10766,"label":"different","confidence":"high","why":"External red-team assessment versus OpenAI no-internet training change.","similarity":0.6066,"same":0.55,"news":0.96}
+{"a":10336,"b":10391,"label":"different","confidence":"high","why":"A benchmark paper versus a CopilotKit tool release.","similarity":0.554,"same":0.04,"news":0.96}
+{"a":10407,"b":10912,"label":"different","confidence":"high","why":"Two different video papers.","similarity":0.5727,"same":0,"news":1}
+{"a":9933,"b":10302,"label":"different","confidence":"high","why":"Agent misbehavior reports versus teen study features.","similarity":0.6184,"same":0,"news":1}
+{"a":10693,"b":10883,"label":"different","confidence":"high","why":"A speculative decoding paper versus the Qwenputer project.","similarity":0.5127,"same":0,"news":1}
+{"a":10337,"b":10349,"label":"same","confidence":"high","why":"Product listing and news story for the same Muse Wonder launch.","similarity":0.7487,"same":0.91,"news":0.52}
+{"a":10308,"b":10473,"label":"different","confidence":"high","why":"d1-3B and d1-ultra are different model releases.","similarity":0.7222,"same":0.21,"news":0.97}
+{"a":10510,"b":10545,"label":"same","confidence":"high","why":"Both report eight states suing OpenAI; same link.","similarity":0.967,"same":0.98,"news":0.01}
+{"a":10241,"b":10401,"label":"same","confidence":"high","why":"Both report Gemini 4 Argon debuting first on APEX-Agents.","similarity":0.8822,"same":0.9,"news":0.49}
+{"a":11016,"b":11265,"label":"different","confidence":"high","why":"Different products from different companies (SUN versus Suno Bark).","similarity":0.557,"same":0.1,"news":0.95}
+{"a":10087,"b":10135,"label":"same","confidence":"high","why":"Both report the Ultrafast launch with the Pro 500 plan; same link.","similarity":0.916,"same":0.98,"news":0}
+{"a":10214,"b":10473,"label":"different","confidence":"high","why":"Open d1 models release versus the later d1-ultra release.","similarity":0.6742,"same":0.15,"news":0.98}
+{"a":11126,"b":11201,"label":"same","confidence":"high","why":"Both report Images 2.6 with GIF creation and new API models.","similarity":0.8178,"same":0.95,"news":0}
+{"a":11096,"b":11126,"label":"same","confidence":"high","why":"Both report the Images 2.6 launch.","similarity":0.9123,"same":0.96,"news":0.03}
+{"a":10452,"b":10539,"label":"same","confidence":"low","why":"Later roundup re-reports Muse Spark Open alongside the Wonder launch.","similarity":0.7606,"same":1,"news":0.34}
+{"a":11042,"b":11206,"label":"same","confidence":"high","why":"Both report Google keeping Search and Gemini off by default for students.","similarity":0.8453,"same":0.95,"news":0.09}
+{"a":10085,"b":10133,"label":"same","confidence":"high","why":"Both report the Dots always-on agents launch.","similarity":0.9352,"same":0.96,"news":0}
+{"a":10050,"b":10057,"label":"same","confidence":"high","why":"Product listing and news story for the same Clef launch.","similarity":0.7344,"same":0.95,"news":0}
+{"a":10192,"b":10654,"label":"different","confidence":"high","why":"Mistral Large 4 and Timestral-5M are different releases.","similarity":0.5091,"same":0,"news":1}
+{"a":10545,"b":10787,"label":"different","confidence":"low","why":"Texas suit appears to be a separate, later lawsuit from the eight states.","similarity":0.8043,"same":0.39,"news":0.1}
+{"a":11037,"b":11202,"label":"same","confidence":"low","why":"Both report OpenAI acquiring Pierre; first also bundles the Meta deal.","similarity":0.7627,"same":0.96,"news":0.01}
+{"a":10782,"b":10989,"label":"same","confidence":"high","why":"Both report the Anthropic S-1 filing; same link.","similarity":0.8975,"same":0.99,"news":0}
+{"a":10881,"b":10961,"label":"same","confidence":"high","why":"Both report the Nemotron 3.5 Transcribe release.","similarity":0.8333,"same":0.9,"news":0}
+{"a":10370,"b":10421,"label":"same","confidence":"high","why":"Both report the broad release of Gemini 4 Argon.","similarity":0.8946,"same":0.45,"news":0.9}
+{"a":10620,"b":10665,"label":"same","confidence":"high","why":"Both report the Eleven Realtime release.","similarity":0.8254,"same":0.95,"news":0}
+{"a":10897,"b":10952,"label":"same","confidence":"high","why":"Product listing and news story for the same Gemini 4 Carbon launch.","similarity":0.788,"same":0.95,"news":0.99}
+{"a":10606,"b":11082,"label":"different","confidence":"high","why":"Nscale deal talks versus amended S-1 revenue disclosure.","similarity":0.7383,"same":0.2,"news":0.99}
+{"a":10739,"b":11097,"label":"same","confidence":"high","why":"Both report the Kimi K3.1 Pro release.","similarity":0.8502,"same":0.97,"news":0.07}
+{"a":11113,"b":11204,"label":"same","confidence":"high","why":"Both report Claude Personal Finance launch; same link.","similarity":0.7442,"same":0.98,"news":0.01}
+{"a":10271,"b":10708,"label":"follow_up","confidence":"high","why":"Decisions API moved from public beta to general availability.","similarity":0.7964,"same":0.58,"news":0.99}
+{"a":10081,"b":10129,"label":"same","confidence":"high","why":"Both report the same executive order; same link.","similarity":0.9015,"same":1,"news":0.02}
+{"a":10343,"b":10504,"label":"same","confidence":"low","why":"Later roundup re-reports Muse Wonder, adding the separate Spark Open release.","similarity":0.8133,"same":0.86,"news":0.98}
+{"a":10300,"b":10492,"label":"different","confidence":"high","why":"GPT-6 default rollout versus the GPT-Live-1.1 voice update.","similarity":0.7031,"same":0,"news":1}
+{"a":10668,"b":10713,"label":"different","confidence":"low","why":"OpenAI incident disclosure versus external METR and Redwood assessment.","similarity":0.7171,"same":0.75,"news":0.89}
+{"a":10660,"b":10748,"label":"same","confidence":"high","why":"Both report the AI-found critical PHP flaws disclosure.","similarity":0.7299,"same":0.94,"news":0.01}
+{"a":10383,"b":10469,"label":"same","confidence":"high","why":"Both report the Pi API beta; same link.","similarity":0.7224,"same":0.95,"news":0.03}
+{"a":10337,"b":10504,"label":"same","confidence":"low","why":"Later roundup re-reports Muse Wonder, adding the separate Spark Open release.","similarity":0.811,"same":0.76,"news":0.49}
+{"a":9897,"b":9952,"label":"different","confidence":"high","why":"Opus 5.5 and Sonnet 5.5 are different model releases.","similarity":0.6602,"same":0.13,"news":0.57}
+{"a":11074,"b":11118,"label":"same","confidence":"high","why":"Both report voters rejecting data centers in ballot measures.","similarity":0.6917,"same":0.95,"news":0.07}
+{"a":10864,"b":10897,"label":"same","confidence":"high","why":"Product listing and news story for the same Gemini 4 Carbon launch.","similarity":0.7995,"same":0.9,"news":0}
+{"a":10864,"b":10952,"label":"same","confidence":"high","why":"Both report the Gemini 4 Carbon launch; same link.","similarity":0.8399,"same":0.72,"news":0.97}
+{"a":9922,"b":10340,"label":"different","confidence":"high","why":"Intelligence explosion paper versus separate self-replication research.","similarity":0.6073,"same":0.05,"news":1}
+{"a":10059,"b":10273,"label":"different","confidence":"high","why":"Claude Code mods launch versus a community compiler rewrite project.","similarity":0.5821,"same":0,"news":1}
+{"a":10079,"b":10127,"label":"same","confidence":"high","why":"Both report the Project Suncatcher TPU launch; same link.","similarity":0.968,"same":1,"news":0}
+{"a":10087,"b":10251,"label":"follow_up","confidence":"low","why":"Later reports Ultrafast expanding to GPT-6.1 Sol in API and Codex.","similarity":0.7174,"same":0.83,"news":0.81}
+{"a":9896,"b":9929,"label":"same","confidence":"high","why":"Identical GPT-6 Sol and Luna release story; same link.","similarity":0.9718,"same":0.99,"news":0}
+{"a":10773,"b":10951,"label":"same","confidence":"high","why":"Both report the Anthropic S-1 filing.","similarity":0.8337,"same":1,"news":0.06}
+{"a":9992,"b":10102,"label":"different","confidence":"high","why":"Different video models from different companies.","similarity":0.5556,"same":0.11,"news":0.5}
+{"a":10026,"b":10251,"label":"same","confidence":"low","why":"Both cover Ultrafast for GPT-6.1 Sol; later may be a rollout step.","similarity":0.8951,"same":0.9,"news":0.04}
+{"a":10540,"b":11000,"label":"different","confidence":"high","why":"Gemini 4 Argon availability versus Computer Use tool reaching GA.","similarity":0.7071,"same":0.02,"news":1}
+{"a":10199,"b":10256,"label":"different","confidence":"high","why":"Two different agent benchmarks.","similarity":0.6147,"same":0.01,"news":0.99}
+{"a":10459,"b":10492,"label":"same","confidence":"high","why":"Both report the GPT-Live-1.1 rollout to ChatGPT voice, Codex and Dots.","similarity":0.8834,"same":0.93,"news":0.23}
+{"a":10088,"b":10136,"label":"same","confidence":"high","why":"Identical Broadcom $42 billion loan to Anthropic story, same link.","similarity":0.9869,"same":1,"news":0}
+{"a":10367,"b":10506,"label":"same","confidence":"high","why":"Both report the charging of the OpenAI engineer over the hidden recorder.","similarity":0.8339,"same":1,"news":0}
+{"a":9971,"b":10268,"label":"different","confidence":"high","why":"Two different MacBook notch products from different makers.","similarity":0.6145,"same":0.41,"news":0.03}
+{"a":9942,"b":9967,"label":"same","confidence":"high","why":"Both report the Reuters-obtained Anthropic IPO prospectus and its losses.","similarity":0.7814,"same":0.92,"news":0.3}
+{"a":10208,"b":10563,"label":"different","confidence":"high","why":"An opinion post on boring tasks versus an unrelated research project.","similarity":0.5603,"same":0.05,"news":0.9}
+{"a":10753,"b":10829,"label":"same","confidence":"high","why":"Both report Madry returning to OpenAI for safety work.","similarity":0.9285,"same":0.98,"news":0}
+{"a":9949,"b":10292,"label":"different","confidence":"high","why":"Two separate Grok bot feature launches: Team Bots versus email and booking.","similarity":0.7531,"same":0.07,"news":0.99}
+{"a":10869,"b":10947,"label":"different","confidence":"high","why":"Election misuse war room versus data-center ballot measures and rebrand.","similarity":0.6055,"same":0,"news":1}
+{"a":9945,"b":9975,"label":"different","confidence":"high","why":"UK safety report on GPT-6 Astra versus the GPT-6.1 Sol release.","similarity":0.7161,"same":0.22,"news":1}
+{"a":10509,"b":10844,"label":"different","confidence":"high","why":"UK safety compute pledge versus a Meta equity investment.","similarity":0.6255,"same":0.01,"news":1}
+{"a":10247,"b":10258,"label":"same","confidence":"high","why":"Both report the three fired researchers public letter on chilled dissent.","similarity":0.7992,"same":0.94,"news":0.17}
+{"a":10659,"b":10970,"label":"different","confidence":"high","why":"A spatial reasoning paper versus an unrelated product listing.","similarity":0.5863,"same":0,"news":0.95}
+{"a":11208,"b":11232,"label":"same","confidence":"high","why":"Both report the Gemini Omni 1.2 Flash release, same link.","similarity":0.7952,"same":1,"news":0}
+{"a":10773,"b":10782,"label":"same","confidence":"high","why":"Both report Anthropic filing its S-1 for a Nasdaq IPO.","similarity":0.9221,"same":0.98,"news":0}
+{"a":10232,"b":10578,"label":"different","confidence":"high","why":"Two different agent phone products from different makers.","similarity":0.7092,"same":0.82,"news":0.04}
+{"a":10325,"b":10650,"label":"different","confidence":"high","why":"Managed agents launch versus a free agents and plugins bundle release.","similarity":0.7345,"same":0,"news":1}
+{"a":10534,"b":10602,"label":"same","confidence":"high","why":"Both report the AI-agent hacking campaign that breached about 100 companies.","similarity":0.8276,"same":0.93,"news":0.03}
+{"a":9963,"b":10089,"label":"different","confidence":"low","why":"Rename executive order versus launch of a task force; related branding only.","similarity":0.7504,"same":0.02,"news":1}
+{"a":10338,"b":10543,"label":"same","confidence":"high","why":"Both cover the same Karpathy sharp funnel post, same link.","similarity":0.7583,"same":0.94,"news":0.05}
+{"a":10078,"b":10401,"label":"different","confidence":"low","why":"Vals Index launch claim versus a separate later APEX-Agents benchmark result.","similarity":0.754,"same":0.21,"news":0.98}
+{"a":10650,"b":10674,"label":"different","confidence":"high","why":"Free plugin bundle release versus an article on Claude Mods.","similarity":0.6003,"same":0.05,"news":0.94}
+{"a":11078,"b":11202,"label":"same","confidence":"high","why":"Both report OpenAI agreeing to acquire Pierre, same link.","similarity":0.9066,"same":0.95,"news":0}
+{"a":10782,"b":10951,"label":"same","confidence":"high","why":"Both report the Anthropic S-1 filing, same SEC link.","similarity":0.8875,"same":0.98,"news":0}
+{"a":10054,"b":10100,"label":"same","confidence":"high","why":"Both report the Ai2 Olmo-core 3 release.","similarity":0.7862,"same":0.94,"news":1}
+{"a":10078,"b":10126,"label":"same","confidence":"high","why":"Same Gemini 4 Argon Vals Index story, same link.","similarity":0.9534,"same":1,"news":0}
+{"a":9966,"b":10135,"label":"same","confidence":"low","why":"Both report the Ultrafast launch with the new $500 plan.","similarity":0.7067,"same":0.9,"news":0.02}
+{"a":11178,"b":11235,"label":"same","confidence":"high","why":"Both report the Inkling 2 Small announcement with weights pending.","similarity":0.8232,"same":0.9,"news":0.82}
+{"a":10522,"b":10582,"label":"same","confidence":"high","why":"Both report the DeepSeek V4.1-Flash-1017 release.","similarity":0.7434,"same":0.87,"news":0.98}
+{"a":10446,"b":10540,"label":"same","confidence":"low","why":"Both report Gemini 4 Argon becoming available; details and dates differ.","similarity":0.8089,"same":0.77,"news":0.89}
+{"a":11000,"b":11051,"label":"different","confidence":"high","why":"Computer Use general availability versus a new Notebook API.","similarity":0.6549,"same":0,"news":1}
+{"a":10046,"b":10090,"label":"different","confidence":"high","why":"Firing of three researchers versus a separate resignation and essay.","similarity":0.6958,"same":0.03,"news":0.99}
+{"a":11182,"b":11232,"label":"same","confidence":"high","why":"Both report the Gemini Omni 1.2 Flash release, same link.","similarity":0.8434,"same":0.97,"news":0.75}
+{"a":10294,"b":10345,"label":"same","confidence":"high","why":"Both report the FT story on Nvidia and Reflection AI talks.","similarity":0.889,"same":0.98,"news":0.01}
+{"a":9896,"b":10204,"label":"different","confidence":"high","why":"GPT-6 Sol and Luna release versus the Intelligent UI rollout.","similarity":0.6753,"same":0.19,"news":0.99}
+{"a":10134,"b":10251,"label":"different","confidence":"low","why":"Model release versus a later separate Ultrafast mode rollout for it.","similarity":0.8145,"same":0.16,"news":1}
+{"a":10482,"b":10496,"label":"same","confidence":"high","why":"Both report the FLUX 3 Image Klein release.","similarity":0.8812,"same":0.98,"news":0}
+{"a":10424,"b":10751,"label":"different","confidence":"high","why":"OCP rack design contribution versus GTC Berlin DSX POD and OpenShell.","similarity":0.6145,"same":0.1,"news":0.96}
+{"a":10298,"b":10376,"label":"follow_up","confidence":"low","why":"One covers the withdrawal; the later-dated adds the full 722-manuscript release details.","similarity":0.7758,"same":0.96,"news":0.03}
+{"a":10986,"b":11081,"label":"same","confidence":"high","why":"Both report the MIT Weight-Space Programming work, same link.","similarity":0.7012,"same":0.99,"news":0.48}
+{"a":9893,"b":9967,"label":"different","confidence":"high","why":"Akamai infrastructure deal versus the leaked IPO prospectus.","similarity":0.6028,"same":0,"news":1}
+{"a":10378,"b":10412,"label":"different","confidence":"high","why":"Recording device arrest versus the Apple trade secret dispute.","similarity":0.6511,"same":0,"news":1}
+{"a":10195,"b":10448,"label":"different","confidence":"high","why":"Two different papers on on-policy distillation.","similarity":0.673,"same":0.06,"news":0.95}
+{"a":10340,"b":10420,"label":"same","confidence":"high","why":"Both report the Anthropic self-replication research, same link.","similarity":0.7987,"same":0.96,"news":0.63}
+{"a":10704,"b":11098,"label":"different","confidence":"high","why":"PHP vulnerability disclosure versus a Linux patching pipeline post.","similarity":0.6703,"same":0.08,"news":1}
+{"a":10819,"b":10920,"label":"different","confidence":"high","why":"Two different multi-agent research works.","similarity":0.5031,"same":0.03,"news":0.94}
+{"a":10710,"b":10955,"label":"follow_up","confidence":"high","why":"Later item reports the funding target cut from $30 billion to $20 billion.","similarity":0.7645,"same":0.78,"news":1}
+{"a":10554,"b":10713,"label":"different","confidence":"high","why":"New incident disclosures versus an external red-team assessment.","similarity":0.6562,"same":0.08,"news":0.94}
+{"a":10207,"b":10414,"label":"different","confidence":"high","why":"Google Labs Playground launch versus Google Play vibe-coded apps.","similarity":0.5579,"same":0.06,"news":0.99}
+{"a":9931,"b":10128,"label":"different","confidence":"high","why":"Live Avatar for Gemini Voice versus saved skills shortcut.","similarity":0.5926,"same":0.02,"news":1}
+{"a":10410,"b":10500,"label":"different","confidence":"high","why":"Two different papers on agent harness improvement.","similarity":0.7538,"same":0.81,"news":0.42}
+{"a":10665,"b":10960,"label":"different","confidence":"high","why":"Eleven Realtime voice agents versus SFX v3 sound effects model.","similarity":0.5806,"same":0,"news":1}
+{"a":10855,"b":10902,"label":"same","confidence":"high","why":"Both report the six LFM3 on-device models from Liquid AI.","similarity":0.7592,"same":0.94,"news":0.07}
+{"a":10354,"b":10650,"label":"different","confidence":"high","why":"Third-party proxy project versus the Anthropic plugin bundle.","similarity":0.629,"same":0,"news":1}
+{"a":9921,"b":10225,"label":"different","confidence":"high","why":"Claude Sonnet 5.5 release versus Claude Haiku 5.5 release.","similarity":0.64,"same":0.01,"news":0.94}
+{"a":10503,"b":10865,"label":"different","confidence":"high","why":"Anthropic workforce study versus a manager essay on junior engineers.","similarity":0.654,"same":0.12,"news":1}
+{"a":9999,"b":10082,"label":"same","confidence":"high","why":"Both report the White House voluntary frontier AI accord signing.","similarity":0.7728,"same":0.94,"news":0.02}
+{"a":10405,"b":10446,"label":"same","confidence":"low","why":"Both report the Gemini 4 Argon coding release and bad-code claims.","similarity":0.8727,"same":0.88,"news":0.21}
+{"a":10548,"b":10750,"label":"different","confidence":"high","why":"Different research batches; the second leads with the Claude Duet launch.","similarity":0.6819,"same":0.17,"news":1}
+{"a":9979,"b":10156,"label":"different","confidence":"high","why":"Meta training method versus an iPhone GPU inference trick.","similarity":0.5062,"same":0,"news":1}
+{"a":10509,"b":10544,"label":"same","confidence":"high","why":"Same Nvidia UK safety compute pledge, same link.","similarity":0.948,"same":1,"news":0}
+{"a":10404,"b":10855,"label":"different","confidence":"high","why":"LFM2.5 24B model versus the later six LFM3 models.","similarity":0.7155,"same":0.16,"news":0.6}
+{"a":9968,"b":10134,"label":"different","confidence":"low","why":"Astra 6.1 cancellation versus the Sol 6.1 release; linked but distinct.","similarity":0.6964,"same":0.01,"news":0.99}
+{"a":10505,"b":10540,"label":"same","confidence":"high","why":"Same Gemini 4 Argon availability story, same headline and link.","similarity":0.9687,"same":0.95,"news":0.56}
+{"a":10881,"b":10937,"label":"same","confidence":"high","why":"Both report the Nemotron 3.5 Transcribe release.","similarity":0.751,"same":0.94,"news":0.1}
+{"a":10800,"b":11049,"label":"different","confidence":"high","why":"Self-training paper versus a budget image model training write-up.","similarity":0.5213,"same":0,"news":1}
+{"a":9896,"b":10086,"label":"different","confidence":"high","why":"GPT-6 Sol release versus the later GPT-6.1 Sol release.","similarity":0.8085,"same":0.67,"news":0.79}
+{"a":10655,"b":11106,"label":"different","confidence":"high","why":"Matrix-Game 4.0 system versus the GameVerse dataset paper.","similarity":0.6191,"same":0,"news":0.91}
+{"a":11182,"b":11208,"label":"same","confidence":"high","why":"Both report the Gemini Omni 1.2 Flash release, same link.","similarity":0.6791,"same":0.96,"news":0.98}
+{"a":9922,"b":10014,"label":"different","confidence":"high","why":"Intelligence explosion paper versus an opinion piece on doom messaging.","similarity":0.6308,"same":0.01,"news":0.9}
+{"a":11095,"b":11121,"label":"same","confidence":"high","why":"Both report Claude Code status updates moving to Haiku 5.5.","similarity":0.7989,"same":0.96,"news":0}
+{"a":10703,"b":10713,"label":"different","confidence":"low","why":"Agent incident reports versus the external assessment; overlapping but distinct main points.","similarity":0.7788,"same":0.69,"news":0.11}
+{"a":9880,"b":9915,"label":"different","confidence":"low","why":"Claude Marketplace launch versus a separate plugin developer portal post.","similarity":0.7907,"same":0.83,"news":0.12}
+{"a":10068,"b":10159,"label":"different","confidence":"high","why":"Two different papers on agent memory.","similarity":0.6017,"same":0,"news":0.91}
+{"a":10952,"b":10956,"label":"same","confidence":"high","why":"Both report the Gemini 4 Carbon launch, same link.","similarity":0.8435,"same":0.97,"news":0.01}
+{"a":10598,"b":10633,"label":"same","confidence":"low","why":"Both cover DeepSeek open-sourcing its DeepInfer inference engine.","similarity":0.8391,"same":0.95,"news":1}
+{"a":10716,"b":10917,"label":"different","confidence":"high","why":"Two unrelated essays, on slowing AI and on AI debt.","similarity":0.558,"same":0,"news":0.92}
+{"a":10750,"b":11281,"label":"different","confidence":"high","why":"Claude Duet launch versus the Project Eve research.","similarity":0.5164,"same":0,"news":0.99}
+{"a":10861,"b":10945,"label":"different","confidence":"high","why":"Two different vision-language papers.","similarity":0.573,"same":0,"news":0.98}
+{"a":10711,"b":10742,"label":"different","confidence":"low","why":"Product launch versus a later how-to guide, not news.","similarity":0.7607,"same":0.06,"news":0}
+{"a":10421,"b":10540,"label":"same","confidence":"low","why":"Both report the broad release of Gemini 4 Argon with the November 30 price change.","similarity":0.9166,"same":0.77,"news":0.78}
+{"a":9906,"b":10022,"label":"different","confidence":"high","why":"Two unrelated product listings: a call copilot and a travel assistant.","similarity":0.5183,"same":0,"news":0.85}
+{"a":10416,"b":10787,"label":"different","confidence":"low","why":"Texas's later suit is a separate lawsuit from the eight-state action.","similarity":0.7568,"same":0.18,"news":0.55}
+{"a":11216,"b":11269,"label":"same","confidence":"high","why":"Both report OpenAI's $11 billion raise at a $1.25 trillion valuation.","similarity":0.8855,"same":0.98,"news":0.01}
+{"a":9897,"b":9930,"label":"same","confidence":"high","why":"Both report the Claude Opus 5.5 release, same link.","similarity":0.8704,"same":1,"news":0}
+{"a":10135,"b":10251,"label":"same","confidence":"low","why":"Both report the Ultrafast speed mode launch; second adds rollout surfaces.","similarity":0.7376,"same":0.93,"news":0.32}
+{"a":10416,"b":10510,"label":"same","confidence":"high","why":"Both report eight states suing OpenAI over ChatGPT safety.","similarity":0.9008,"same":0.84,"news":0.06}
+{"a":10446,"b":10493,"label":"same","confidence":"high","why":"Both report Google's release of Gemini 4 Argon, different angles.","similarity":0.8077,"same":0.81,"news":0.9}
+{"a":10459,"b":10479,"label":"same","confidence":"high","why":"Both report the GPT-Live-1.1 rollout from the same OpenAI post.","similarity":0.8733,"same":0.95,"news":0}
+{"a":10621,"b":11082,"label":"follow_up","confidence":"high","why":"Later amended S-1 adds Q3 revenue and new disclosures to the IPO story.","similarity":0.7482,"same":0.6,"news":0.98}
+{"a":10583,"b":10704,"label":"different","confidence":"high","why":"Anthropic's scanner launch and OpenAI's PHP disclosure are separate events.","similarity":0.6184,"same":0,"news":0.95}
+{"a":10710,"b":11179,"label":"follow_up","confidence":"high","why":"Round was nearing; later item reports $11 billion actually closed.","similarity":0.8419,"same":0.84,"news":1}
+{"a":10708,"b":10874,"label":"different","confidence":"high","why":"Decisions API general availability versus the GPT-6.1 Terra model release.","similarity":0.6543,"same":0.01,"news":1}
+{"a":11076,"b":11124,"label":"same","confidence":"high","why":"Both report the Pangram Image 1.0 launch, same link.","similarity":0.8403,"same":0.95,"news":0}
+{"a":10951,"b":10989,"label":"same","confidence":"high","why":"Both report Anthropic's S-1 filing, same SEC link.","similarity":0.9651,"same":1,"news":0}
+{"a":10337,"b":10343,"label":"same","confidence":"high","why":"Both report Meta's Muse Wonder release, same link.","similarity":0.8331,"same":0.98,"news":0.99}
+{"a":11114,"b":11233,"label":"same","confidence":"low","why":"Both report Perplexity's Teammates agents launch; later adds pricing detail.","similarity":0.7394,"same":0.86,"news":0.28}
+{"a":10710,"b":11269,"label":"follow_up","confidence":"high","why":"Round was nearing; later item reports $11 billion raised, short of target.","similarity":0.8591,"same":0.87,"news":1}
+{"a":10198,"b":10246,"label":"different","confidence":"high","why":"Two different papers: skill evolution versus a deception benchmark.","similarity":0.5356,"same":0,"news":1}
+{"a":10896,"b":11013,"label":"different","confidence":"high","why":"Two different agent tools: Flatbread and Scrawl.","similarity":0.5053,"same":0.13,"news":0.24}
+{"a":10026,"b":10134,"label":"same","confidence":"high","why":"Both report the GPT-6.1 Sol launch; first also mentions Ultrafast.","similarity":0.825,"same":0.76,"news":0.01}
+{"a":10457,"b":10713,"label":"different","confidence":"high","why":"Anthropic's METR access versus METR's red-team of OpenAI monitoring.","similarity":0.657,"same":0.01,"news":0.99}
+{"a":11037,"b":11079,"label":"same","confidence":"low","why":"Both cover Meta acquiring Conductor; first bundles OpenAI's Pierre deal too.","similarity":0.6727,"same":0.96,"news":0}
+{"a":10958,"b":11263,"label":"different","confidence":"high","why":"Two separate OpenAI posts: monitoring stack versus Control Room.","similarity":0.56,"same":0.17,"news":0.92}
+{"a":10453,"b":10508,"label":"different","confidence":"high","why":"Harvard gender study versus Karpathy's opinion on adoption gap.","similarity":0.579,"same":0,"news":0.98}
+{"a":10181,"b":10522,"label":"different","confidence":"low","why":"Benchmark lead report versus a later V4.1-Flash-1017 update release.","similarity":0.716,"same":0.58,"news":0.86}
+{"a":10086,"b":10494,"label":"different","confidence":"high","why":"GPT-6.1 Sol release versus a physics-problem research result.","similarity":0.6377,"same":0.04,"news":0.95}
+{"a":10752,"b":10784,"label":"different","confidence":"high","why":"Different companies and financings: Nebius versus SpaceX.","similarity":0.6781,"same":0,"news":1}
+{"a":10818,"b":10837,"label":"same","confidence":"high","why":"Both list the same StreamVibe paper, same arXiv ID.","similarity":0.8625,"same":0.95,"news":0.08}
+{"a":10221,"b":10247,"label":"same","confidence":"low","why":"Both appear to cover the fired researchers' same public letter.","similarity":0.7024,"same":0.15,"news":0.93}
+{"a":10378,"b":10541,"label":"same","confidence":"low","why":"Both report the arrest and charges over the hidden recording device.","similarity":0.8078,"same":0.98,"news":0.01}
+{"a":10474,"b":10622,"label":"same","confidence":"low","why":"Both cover the same claim that polysemantic neurons were interpretable.","similarity":0.7107,"same":0.83,"news":0.18}
+{"a":10994,"b":11269,"label":"follow_up","confidence":"high","why":"Target was cut; later item reports $11 billion actually raised.","similarity":0.822,"same":0.95,"news":0.8}
+{"a":10162,"b":10342,"label":"different","confidence":"high","why":"OpenAI math manuscripts versus DeepMind's AlphaProof Nexus paper.","similarity":0.6568,"same":0,"news":0.98}
+{"a":9937,"b":10098,"label":"different","confidence":"high","why":"Two unrelated Copilot features: local sandboxing versus computer use.","similarity":0.7214,"same":0.08,"news":1}
+{"a":10733,"b":11099,"label":"same","confidence":"low","why":"Both report Vera Rubin A5X instances now available on Google Cloud.","similarity":0.8504,"same":0.91,"news":0.94}
+{"a":10507,"b":10542,"label":"same","confidence":"high","why":"Both report Baroness Campbell's AI-voiced Lords speech, same link.","similarity":0.9269,"same":0.99,"news":0.08}
+{"a":10376,"b":10377,"label":"different","confidence":"low","why":"Paper withdrawal and the association's boycott call are separate reactions.","similarity":0.671,"same":0.41,"news":0.98}
+{"a":10490,"b":10539,"label":"same","confidence":"low","why":"Both cover the Muse Spark Open release; second bundles Muse Wonder.","similarity":0.8154,"same":0.97,"news":0.97}
+{"a":10378,"b":10426,"label":"same","confidence":"high","why":"Both report the OpenAI engineer's arrest over a hidden recorder.","similarity":0.9136,"same":0.96,"news":0}
+{"a":10082,"b":10130,"label":"same","confidence":"high","why":"Both report the voluntary White House AI accord, same link.","similarity":0.9268,"same":0.98,"news":0.2}
+{"a":9961,"b":10271,"label":"same","confidence":"low","why":"Both cover the Decisions API launch; first bundles other DevDay products.","similarity":0.7423,"same":0.79,"news":0}
+{"a":9929,"b":9954,"label":"different","confidence":"low","why":"Model release versus a separate image-understanding bug patch.","similarity":0.6685,"same":0.14,"news":1}
+{"a":10312,"b":10786,"label":"different","confidence":"high","why":"Different funding rounds by different companies: Arena and Daytona.","similarity":0.6022,"same":0,"news":0.99}
+{"a":10379,"b":10505,"label":"same","confidence":"low","why":"Both report Gemini 4 Argon's broad availability on different Google surfaces.","similarity":0.8489,"same":0.72,"news":0.95}
+{"a":10499,"b":10530,"label":"different","confidence":"high","why":"Two different papers on 3D spatial reasoning.","similarity":0.6266,"same":0.07,"news":0.95}
+{"a":10308,"b":10433,"label":"different","confidence":"high","why":"Different models from different labs: Liquid d1-3B and Ling-3.1-Flash.","similarity":0.528,"same":0,"news":1}
+{"a":11040,"b":11086,"label":"same","confidence":"high","why":"Both report Netflix's AI Discover tab rollout to U.S. TVs.","similarity":0.8874,"same":0.91,"news":0}
+{"a":10421,"b":10822,"label":"different","confidence":"high","why":"Gemini 4 Argon availability versus the Genie 4 world model.","similarity":0.6505,"same":0,"news":1}
+{"a":10773,"b":10989,"label":"same","confidence":"high","why":"Later item only re-reports Anthropic's S-1 filing.","similarity":0.877,"same":1,"news":0.01}
+{"a":11081,"b":11154,"label":"different","confidence":"high","why":"MIT weight-editing research versus Web AI's 8B model release.","similarity":0.63,"same":0,"news":0.98}
+{"a":10412,"b":10460,"label":"different","confidence":"high","why":"Apple trade-secret court fight versus OpenAI's anti-espionage staff training.","similarity":0.6636,"same":0.01,"news":0.99}
+{"a":10558,"b":10802,"label":"different","confidence":"high","why":"Prometheus engineering write-up versus a planned $95 billion stock offering.","similarity":0.6165,"same":0.13,"news":1}
+{"a":10721,"b":10970,"label":"different","confidence":"high","why":"Two different coding-agent products.","similarity":0.5834,"same":0.11,"news":0.62}
+{"a":10743,"b":10745,"label":"different","confidence":"high","why":"Two different SAP topics: tabular models versus Knowledge Graph.","similarity":0.6715,"same":0.11,"news":0.9}
+{"a":10749,"b":10750,"label":"same","confidence":"high","why":"Both report Claude Duet's launch plus the same two research pieces.","similarity":0.8592,"same":0.93,"news":0.01}
+{"a":10203,"b":10225,"label":"same","confidence":"high","why":"News story and product listing for the same Claude Haiku 5.5 launch.","similarity":0.622,"same":0.95,"news":0}
+{"a":10078,"b":10379,"label":"follow_up","confidence":"low","why":"Limited-preview debut, then later general availability on Google Cloud.","similarity":0.7704,"same":0.24,"news":0.99}
+{"a":10405,"b":10421,"label":"same","confidence":"low","why":"Both tied to the same-day Gemini 4 Argon broad release.","similarity":0.7565,"same":0.39,"news":1}
+{"a":10436,"b":10439,"label":"different","confidence":"high","why":"Two unrelated product listings.","similarity":0.5163,"same":0,"news":0.92}
+{"a":10086,"b":10134,"label":"same","confidence":"high","why":"Both report the GPT-6.1 Sol release, same link.","similarity":0.9948,"same":1,"news":0}
+{"a":10710,"b":11216,"label":"follow_up","confidence":"high","why":"Round was nearing; later item reports $11 billion first tranche closed.","similarity":0.8686,"same":0.93,"news":1}
+{"a":10400,"b":10650,"label":"same","confidence":"low","why":"Both report Anthropic's 400+ free Claude agents and skills release.","similarity":0.8779,"same":0.95,"news":0.04}
+{"a":10818,"b":11034,"label":"different","confidence":"high","why":"Two different papers on video agents.","similarity":0.5895,"same":0.06,"news":0.91}
+{"a":10832,"b":10902,"label":"same","confidence":"high","why":"Both report Liquid AI's six-model LFM3 release.","similarity":0.8829,"same":0.98,"news":0.09}
+{"a":10374,"b":10404,"label":"same","confidence":"high","why":"Both report Liquid AI's LFM2.5-24B-A2B release.","similarity":0.7837,"same":0.99,"news":0}
+{"a":10758,"b":11103,"label":"different","confidence":"high","why":"Different tools: agent team manager versus macOS-in-terminal.","similarity":0.6254,"same":0.05,"news":0.96}
+{"a":10775,"b":10874,"label":"same","confidence":"high","why":"Both report the GPT-6.1 Terra release, same link.","similarity":0.8515,"same":0.95,"news":0}
+{"a":10728,"b":11073,"label":"different","confidence":"high","why":"Two separate Grok Bot features: app controls versus phone calling.","similarity":0.696,"same":0.03,"news":0.99}
+{"a":10610,"b":10624,"label":"same","confidence":"high","why":"Both report Google's TorchTPU launch for PyTorch on TPUs.","similarity":0.8028,"same":0.95,"news":0.1}
+{"a":10033,"b":10330,"label":"different","confidence":"high","why":"Different uncensored image models from different publishers.","similarity":0.6817,"same":0.21,"news":0.8}
+{"a":10479,"b":10492,"label":"same","confidence":"high","why":"Both report the GPT-Live-1.1 rollout from the same OpenAI post.","similarity":0.8091,"same":1,"news":0}
+{"a":10713,"b":10958,"label":"different","confidence":"low","why":"External red-team report versus OpenAI's own monitoring stack post.","similarity":0.6298,"same":0.21,"news":0.91}
+{"a":10822,"b":10845,"label":"same","confidence":"high","why":"News story and product listing for the same Genie 4 launch.","similarity":0.6191,"same":0.94,"news":0}
+{"a":10431,"b":10500,"label":"different","confidence":"low","why":"Google's Harness² repo and a separate harness paper, no stated link.","similarity":0.6767,"same":0.64,"news":0.02}
+{"a":10633,"b":11057,"label":"different","confidence":"high","why":"DeepSeek inference deployment piece versus an unrelated inference API product.","similarity":0.5305,"same":0.03,"news":0.43}
+{"a":10221,"b":10258,"label":"same","confidence":"low","why":"Both cover the fired researchers' letter urging chain-of-thought monitorability.","similarity":0.7144,"same":0.88,"news":0.02}
+{"a":10094,"b":10097,"label":"different","confidence":"high","why":"Different Claude Code versions with different changes.","similarity":0.7431,"same":0.06,"news":0.95}
+{"a":10208,"b":10250,"label":"same","confidence":"high","why":"Same article listed twice.","similarity":0.9302,"same":0.97,"news":0.01}
+{"a":11063,"b":11084,"label":"same","confidence":"high","why":"Both report Anthropic's plugin auto-connect via enterprise-managed authorization.","similarity":0.8518,"same":0.91,"news":0.04}
+{"a":10704,"b":10748,"label":"same","confidence":"low","why":"Both report the AI-found critical PHP flaws and their disclosure.","similarity":0.7989,"same":0.96,"news":0.51}
+{"a":10059,"b":10097,"label":"same","confidence":"high","why":"Both report Claude Code adding Claude Mods.","similarity":0.6596,"same":0.96,"news":0}
