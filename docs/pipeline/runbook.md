@@ -68,13 +68,17 @@ Eight keys. The date in each key is the issue date in New York time.
 
 - **Raised by:** `run-checks`, from 10:05 (PR #129).
 - **Severity:** warning.
-- **Meaning:** One source gave zero stories today, and it usually sends on this weekday (at least half of
-  the earlier same weekdays). `<source key>` is the key in `src/pipeline/ingest/sources.ts`, for example
+- **Meaning:** One source gave zero stories today, and today is in its `expectedOn` list in
+  `src/pipeline/ingest/sources.ts`. That list holds the weekdays the 09:55 run usually gets the source's
+  stories. An email sent after 09:55 lands in the next weekday's run, so these are not always the days
+  the newsletter sends. AI Breakfast has an empty list, so it never raises this. `<source key>` is the key
+  in `sources.ts`, for example
   `rundown_ai`. It is not raised when a missing run or a zero total already explains the gap.
 - **Do (check, fix, or ignore):** Open the ingest run and read that source's line. `failed` or `partial`
   means an error: read it, fix the cause (Gmail access, a changed sender, a feed that moved), then run
   ingest again. `no_new` means the sender did not email: ignore it. If the sender changed address, see
-  [adding-a-source.md](./adding-a-source.md).
+  [adding-a-source.md](./adding-a-source.md). If the warning keeps firing on a day the sender skips by
+  habit, take that day out of its `expectedOn` list.
 
 ### `commit-missing:<date>`
 

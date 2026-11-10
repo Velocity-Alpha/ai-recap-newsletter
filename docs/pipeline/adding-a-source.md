@@ -28,7 +28,7 @@ Use this when the source is a newsletter that lands in the owner's Gmail.
 1. Add a `GmailSource` to `STORY_SOURCES`:
 
    ```ts
-   { key: "my_source", name: "My Source", kind: "gmail", sender: "news@example.org", body: "text" }
+   { key: "my_source", name: "My Source", kind: "gmail", sender: "news@example.org", body: "text", expectedOn: ["Mon", "Wed", "Fri"] }
    ```
 
    - `sender` is the exact From address. The Gmail query is `from:<sender> after:<cutoff>`.
@@ -37,6 +37,10 @@ Use this when the source is a newsletter that lands in the owner's Gmail.
    - `trackingLinks` is optional: a global regex for click-tracking links. `resolveTrackingLinks` in
      `redirects.ts` swaps each match for its real target before extraction. Add it when the email's links
      all go through a redirect host.
+   - `expectedOn` lists the weekdays the 09:55 run gets this source's stories. The `source-empty` check
+     warns only on those days. Look at the sender's emails in the inbox. An email that arrives after
+     09:55 counts for the next weekday. List a day only when stories land on it almost every week. Use
+     `[]` when no day is reliable.
 2. Nothing else is needed. Ingestion and the checks read `STORY_SOURCES`, so the new source shows up in
    the run log and gets its own `source-empty` check.
 
@@ -48,7 +52,7 @@ receive the newsletter, so subscribe it first.
 Use this when the source is a web page or feed, like Product Hunt or Hugging Face.
 
 1. Add a `FeedSource` to `sources.ts`. Its `kind` is a fixed union (`"product_hunt" | "hugging_face"`), so
-   add a new kind to it.
+   add a new kind to it. Set `expectedOn` as for a Gmail source; a daily feed uses `EVERY_WEEKDAY`.
 2. In `feeds.ts`, export the feed URL and a function that builds one text block for the extractor from the
    response body. Follow `buildProductHuntText` and `buildHuggingFaceText`: they take the cutoff and the
    target date and return `{ text, count }`. Return `count: 0` when nothing is new.
@@ -70,7 +74,7 @@ Write the test first. The tests use Vitest and fakes, not the network.
 
 ## After it ships
 
-- The next 10:05 check raises `source-empty:<key>:<date>` if the source sends nothing on a day it usually
-  sends. A new source has no history, so every weekday counts until it builds some. See
+- The next 10:05 check raises `source-empty:<key>:<date>` if the source gives no stories on a day in its
+  `expectedOn` list. If it fires on days the sender skips by habit, take those days out. See
   [runbook.md](./runbook.md).
 - To retire a source, remove its entry. Old stories keep their `source` value.

@@ -80,7 +80,6 @@ describe.skipIf(!enabled)("readDayFacts on a real database", () => {
       storiesBySource: { [`${tag}-a`]: 3, [`${tag}-b`]: 1 },
       storyTotal: 4,
       weekdayTotals: [1],
-      sourceWeekdays: { [`${tag}-a`]: 1 },
       queuedStories: 2,
       committed: true,
       // The draft row is older than the queued stories' last update.

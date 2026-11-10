@@ -62,7 +62,7 @@ function fakeFetch(routes: Record<string, () => Response> = {}) {
   });
 }
 
-const RUNDOWN: StorySource = { key: "rundown_ai", name: "The Rundown", kind: "gmail", sender: "news@daily.therundown.ai", body: "text" };
+const RUNDOWN: StorySource = { key: "rundown_ai", name: "The Rundown", kind: "gmail", sender: "news@daily.therundown.ai", body: "text", expectedOn: [] };
 
 describe("ingestStories: email sources", () => {
   it("reads mail since the bookmark, saves cleaned stories, and moves the bookmark to the newest email", async () => {
@@ -152,6 +152,7 @@ describe("ingestStories: email sources", () => {
       kind: "gmail",
       sender: "news@alphasignal.ai",
       body: "html",
+      expectedOn: [],
       trackingLinks: /https:\/\/app\.alphasignal\.ai\/c\?[^"'<> \t\r\n]+/gi,
     };
     const message = mail("a1", new Date("2026-11-09T14:10:00Z"), {
@@ -196,8 +197,8 @@ describe("ingestStories: email sources", () => {
 });
 
 describe("ingestStories: feeds", () => {
-  const PRODUCT_HUNT: StorySource = { key: "product_hunt_ai", name: "Product Hunt", kind: "product_hunt" };
-  const HUGGING_FACE: StorySource = { key: "huggingface", name: "Hugging Face", kind: "hugging_face" };
+  const PRODUCT_HUNT: StorySource = { key: "product_hunt_ai", name: "Product Hunt", kind: "product_hunt", expectedOn: [] };
+  const HUGGING_FACE: StorySource = { key: "huggingface", name: "Hugging Face", kind: "hugging_face", expectedOn: [] };
   const FEED = `<feed><entry><published>2026-11-08T09:00:00-08:00</published>
     <link rel="alternate" href="https://www.producthunt.com/products/gadget"/><title>Gadget</title>
     <content type="html">&lt;p&gt;A tool&lt;/p&gt;</content></entry></feed>`;

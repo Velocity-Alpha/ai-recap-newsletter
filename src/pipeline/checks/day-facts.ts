@@ -22,8 +22,6 @@ export interface DayFacts {
   storyTotal: number;
   /** Stories ingested on the same weekday in the 8 weeks before. Days without stories are left out. */
   weekdayTotals: number[];
-  /** On how many of those days each source had stories. */
-  sourceWeekdays: Record<string, number>;
   /** Stories queued for this date. */
   queuedStories: number;
   committed: boolean;
@@ -71,7 +69,8 @@ function earliest(...dates: Array<Date | null>): Date | null {
  * - stories: counted by ingest time (`createdAt` in the New York day), not by `stories.day`. `day` is the
  *   newsletter's own date, often the day before for late senders, so by `day` several sources look empty
  *   most mornings (on the production copy, AI Breakfast on 7 of 8 Tuesdays; by ingest time, 1 of 8).
- *   The same weekday in the 8 weeks before, by source, gives the thin-day median and the usual senders.
+ *   The same weekday in the 8 weeks before gives the thin-day median. Which sources are expected on a
+ *   weekday is fixed per source (`expectedOn` in sources.ts), not read from this history.
  * - commit: stories whose `queued_for_publication_date` is the date (n8n sets it on commit). n8n stores no
  *   commit time, so it is about the earlier of the first draft row and the queued stories' last update.
  * - drafts: `issues` rows for the date (n8n inserts one per commit). Ready = the row has its email HTML.
@@ -116,12 +115,6 @@ export async function readDayFacts(date: string): Promise<DayFacts> {
   ]);
 
   const historyDays = historyBySource.filter((counts) => sum(Object.values(counts)) > 0);
-  const sourceWeekdays: Record<string, number> = {};
-  for (const counts of historyDays) {
-    for (const [source, count] of Object.entries(counts)) {
-      if (count > 0) sourceWeekdays[source] = (sourceWeekdays[source] ?? 0) + 1;
-    }
-  }
   const issue = readyIssues.find((row) => row.publishedAt) ?? readyIssues[0] ?? null;
   const draftsMade = drafts._count._all;
   const committed = queued._count._all > 0 || draftsMade > 0;
@@ -134,7 +127,6 @@ export async function readDayFacts(date: string): Promise<DayFacts> {
     storiesBySource,
     storyTotal: sum(Object.values(storiesBySource)),
     weekdayTotals: historyDays.map((counts) => sum(Object.values(counts))),
-    sourceWeekdays,
     queuedStories: queued._count._all,
     committed,
     commitTime: committed ? earliest(queued._min.updatedAt ?? null, drafts._min.createdAt ?? null) : null,

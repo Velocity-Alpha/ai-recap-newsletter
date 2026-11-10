@@ -33,8 +33,6 @@ export const CHECK_INCIDENT_PREFIXES = {
 
 /** Under this share of the weekday's 8-week median, the day is thin. */
 const THIN_SHARE = 0.5;
-/** A source is expected on a weekday when it sent on at least this share of the earlier ones. */
-const USUAL_SENDER_SHARE = 0.5;
 
 export interface SiteFacts {
   issueUrl: string;
@@ -135,22 +133,25 @@ function thinCheck(facts: DayFacts, context: CheckContext): Finding {
   };
 }
 
+function listOf(words: string[]): string {
+  return words.length < 2 ? words.join("") : `${words.slice(0, -1).join(", ")} and ${words.at(-1)}`;
+}
+
+/** Only a source expected on this weekday (`expectedOn` in sources.ts) is warned about. */
 function sourceChecks(facts: DayFacts, context: CheckContext): Finding[] {
   const { date } = facts;
-  const weekday = WEEKDAY_NAMES[facts.weekday];
-  const historyDays = facts.weekdayTotals.length;
   return STORY_SOURCES.map((source) => {
     const empty = (facts.storiesBySource[source.key] ?? 0) === 0;
-    const sentOn = facts.sourceWeekdays[source.key] ?? 0;
+    const usualDays = listOf(source.expectedOn.map((day) => WEEKDAY_NAMES[day]));
     return {
       check: "source-empty",
       incidentKey: keyFor("source-empty", date, source.key),
       failure:
-        empty && isUsualSender(sentOn, historyDays)
+        empty && source.expectedOn.includes(facts.weekday)
           ? {
               severity: "warning",
               what: `No stories from ${source.name} today.`,
-              evidence: `0 stories with source ${source.key} ingested on ${date}.${historyDays > 0 ? ` It sent on ${sentOn} of the last ${plural(historyDays, weekday)}.` : ""} ${ingestRunNote(facts)}`,
+              evidence: `0 stories with source ${source.key} ingested on ${date}. ${source.name} stories usually arrive on ${usualDays}. ${ingestRunNote(facts)}`,
               link: context.runLink,
             }
           : null,
@@ -178,15 +179,6 @@ function storyChecks(time: CheckTime, facts: DayFacts, context: CheckContext): {
     return { findings, notes: [`${missing[0].toUpperCase()}${missing.slice(1)} today, so the per-source checks are left to the critical.`] };
   }
   return { findings: [...findings, ...sourceChecks(facts, context)], notes: [] };
-}
-
-/**
- * Some senders skip weekdays as a habit, and a source can be new under its key (n8n stored The Signal as
- * tldr_ai). Only a source that sent on at least half of the earlier same weekdays is expected today.
- * Without any history, every source is.
- */
-function isUsualSender(sentOn: number, historyDays: number): boolean {
-  return historyDays === 0 || sentOn >= historyDays * USUAL_SENDER_SHARE;
 }
 
 function commitCheck(facts: DayFacts, context: CheckContext): Finding {
