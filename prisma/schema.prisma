@@ -278,7 +278,7 @@ model IssueDraft {
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
-/// One row per staged version of an issue (#149, ADR 0004): the exact title, image, content, and HTML the owner
+/// One row per staged version of an issue (#149, ADR 0005): the exact title, image, content, and HTML the owner
 /// staged for sending, numbered from 1 per issue. status is staging (the call to the distribution service is
 /// running) or staged (CHECK constraint in the migration). A staged row never changes. id is the hidden
 /// data-version-id in the staged email. service is the distribution service's key; service_ref is the id that

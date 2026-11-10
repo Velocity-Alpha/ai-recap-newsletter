@@ -7,7 +7,7 @@ import type { PartialDraft, ProducedDraft } from "@/src/pipeline/draft/produce-d
 import { prisma } from "@/src/server/prisma";
 
 /**
- * Issues and their drafts (ADR 0004): one issue per date, and each commit makes the next draft of it. A title or
+ * Issues and their drafts (ADR 0005): one issue per date, and each commit makes the next draft of it. A title or
  * image change edits the newest draft in place. The draft job (run-draft.ts) and the board (#79) read and write
  * drafts only through here.
  */
@@ -202,7 +202,7 @@ export async function readCurrentDraft(draftId: Id): Promise<CurrentDraft> {
 export type DraftEdit = { title: string } | { image: { imageUrl: string; scenePrompt: string } };
 
 /**
- * Changes the current draft's title or image in place (#149, ADR 0004): the same draft row, with its email HTML
+ * Changes the current draft's title or image in place (#149, ADR 0005): the same draft row, with its email HTML
  * built again, and the issue row updated in the same transaction. It makes no new draft and calls no outside
  * service. A staged version keeps its own copy, so it does not change. Same published and per-date lock rules
  * as a commit. The caller gives a clean title (draft-edit.ts) or an image it has checked (new-image.ts).

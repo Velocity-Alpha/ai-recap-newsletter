@@ -1,5 +1,5 @@
 /**
- * Staged versions (GLOSSARY.md, ADR 0004): the pure rules. No database and no clock.
+ * Staged versions (GLOSSARY.md, ADR 0005): the pure rules. No database and no clock.
  */
 
 /** The parts of a draft, and of a staged version's copy, that tell the two apart. */

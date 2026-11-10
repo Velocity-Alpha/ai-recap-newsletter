@@ -2,7 +2,7 @@ import { normalizeTitle } from "@/src/features/newsletter/draft-links";
 import { DraftEditError, editCurrentDraft, IssuePublishedError, type CurrentDraft } from "@/src/pipeline/draft/draft-store";
 
 /**
- * The owner's title change on the draft view (#149, ADR 0004), and the HTTP answers for a draft that cannot be
+ * The owner's title change on the draft view (#149, ADR 0005), and the HTTP answers for a draft that cannot be
  * changed. The title is the email's subject line and the issue's title on the site. `PATCH
  * /api/approval/drafts/[id]` calls this; the image change is in new-image.ts.
  */

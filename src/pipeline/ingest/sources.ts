@@ -1,5 +1,6 @@
 /**
- * The 7 story sources (n8n's `1. Fetch Stories`, minus Aloa, which stopped sending on 2026-04-27).
+ * The 8 story sources: n8n's `1. Fetch Stories` (minus Aloa, which stopped sending on 2026-04-27) and
+ * In the World of AI, read from its beehiiv website.
  * `key` is both the `stories.source` value and the `scraper_bookmarks` key. n8n mixed these up for
  * The Signal (saved as `tldr_ai`, bookmark never advanced) and TLDR (read The Signal's bookmark).
  */
@@ -32,7 +33,10 @@ export type GmailSource = SourceBase & {
 
 export type FeedSource = SourceBase & { kind: "product_hunt" | "hugging_face" };
 
-export type StorySource = GmailSource | FeedSource;
+/** A beehiiv publication read from its public website (sitemap and post pages), not from email. */
+export type BeehiivSiteSource = SourceBase & { kind: "beehiiv_site"; siteUrl: string };
+
+export type StorySource = GmailSource | FeedSource | BeehiivSiteSource;
 
 export const STORY_SOURCES: StorySource[] = [
   {
@@ -84,4 +88,13 @@ export const STORY_SOURCES: StorySource[] = [
   },
   { key: "product_hunt_ai", name: "Product Hunt", kind: "product_hunt", expectedOn: EVERY_WEEKDAY },
   { key: "huggingface", name: "Hugging Face", kind: "hugging_face", expectedOn: EVERY_WEEKDAY },
+  {
+    key: "world_of_ai",
+    name: "In the World of AI",
+    kind: "beehiiv_site",
+    siteUrl: "https://intheworldofai.com",
+    // New source with no run history yet (posts go out around 03:00 UTC on most weekdays). Set
+    // `expectedOn` after a few weeks of data.
+    expectedOn: [],
+  },
 ];

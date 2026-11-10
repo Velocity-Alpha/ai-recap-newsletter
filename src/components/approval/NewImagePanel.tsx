@@ -13,7 +13,7 @@ import type { SceneIdea } from "@/src/pipeline/draft/image/scene-ideas";
 
 /**
  * "New image" on the current draft (#116, #149): the current image and scene prompt, three scene ideas, "Generate"
- * as often as needed, then "Use this image", which puts the image into the same draft (ADR 0004).
+ * as often as needed, then "Use this image", which puts the image into the same draft (ADR 0005).
  */
 
 export type IdeasState = { status: "loading" } | { status: "ready"; ideas: SceneIdea[] } | { status: "error"; error: string };

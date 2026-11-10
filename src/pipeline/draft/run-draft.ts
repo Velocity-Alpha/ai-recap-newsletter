@@ -33,7 +33,7 @@ import { finishRun, logEvent, startRun, type RunTrigger } from "@/src/pipeline/r
  * The `draft-issue` job (#76): runs one draft that `createDraft` (or `retryDraft`) left in `running`. It writes
  * each step to the draft row for the board, logs the run to pipeline_runs and pipeline_events, and on success
  * copies the draft to the issue row and tells the review group that the draft is ready (#149). It never calls
- * the distribution service: only "Stage for sending" does (ADR 0004). A failure marks the draft failed at its
+ * the distribution service: only "Stage for sending" does (ADR 0005). A failure marks the draft failed at its
  * step and raises `draft.failed:<date>`; the next ready draft for that date resolves it.
  */
 
