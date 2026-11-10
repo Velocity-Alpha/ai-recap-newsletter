@@ -3,7 +3,7 @@ import type { WrittenIssueContent } from "@/src/pipeline/draft/content";
 import { dateKey, issueFields } from "@/src/pipeline/draft/draft-store";
 
 /**
- * Reads of staged versions (GLOSSARY.md, ADR 0004) for publish detection. Staging itself is in stage-draft.ts.
+ * Reads of staged versions (GLOSSARY.md, ADR 0005) for publish detection. Staging itself is in stage-draft.ts.
  */
 
 type Client = Prisma.TransactionClient;

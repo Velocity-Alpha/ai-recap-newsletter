@@ -12,7 +12,7 @@ import { imageContextFor } from "@/src/pipeline/draft/produce-draft";
 
 /**
  * "New image" on the draft view (#116, #149). The owner starts from the current draft: scene ideas, then
- * "Generate" as often as needed, then "Use this image", which puts the image into the same draft (ADR 0004).
+ * "Generate" as often as needed, then "Use this image", which puts the image into the same draft (ADR 0005).
  * No new draft, no job, and no call to the distribution service. The routes under
  * /api/approval/drafts/[id]/image call these.
  */

@@ -8,7 +8,7 @@ import { confirmVersionFor, INITIAL_STAGE_STATE, shownStaged, stageDraft, stageR
 import type { DraftBoardView, StagedSummary } from "@/src/pipeline/draft/draft-board";
 
 /**
- * "Stage for sending" on the draft view (#149, ADR 0004): one click copies the current draft into the
+ * "Stage for sending" on the draft view (#149, ADR 0005): one click copies the current draft into the
  * distribution service as the issue's next staged version. The owner sends it from there. A draft that has not
  * changed since the newest staged version needs a second yes.
  */

@@ -389,7 +389,7 @@ describe("runDraftJob", () => {
     expect(stepHistory()).not.toContain("ghl");
     expect(runLog.events.map((event) => event.step)).not.toContain("ghl");
     expect(runLog.finished[0].stats).not.toHaveProperty("ghlMode");
-    // Only "Stage for sending" makes a staged version (ADR 0004).
+    // Only "Stage for sending" makes a staged version (ADR 0005).
     expect(fakeDb.state.stagedVersions.rows).toEqual([]);
   });
 

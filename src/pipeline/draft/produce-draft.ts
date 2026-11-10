@@ -26,7 +26,7 @@ import {
 
 /**
  * Turns a committed outline into a draft's content, featured image, and email HTML. No database, and no call to
- * the distribution service: only "Stage for sending" creates an email there (ADR 0004). The draft job
+ * the distribution service: only "Stage for sending" creates an email there (ADR 0005). The draft job
  * (run-draft.ts) loads the inputs and saves the result, and the replay script calls this directly.
  */
 

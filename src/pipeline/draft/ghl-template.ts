@@ -1,7 +1,7 @@
 import { createSideEffects, type SideEffectRecord } from "@/src/pipeline/side-effects";
 
 /**
- * A new GHL email template for each staged version (ADR 0004). Same two calls as n8n's `2. Create Issue Draft`
+ * A new GHL email template for each staged version (ADR 0005). Same two calls as n8n's `2. Create Issue Draft`
  * (docs/n8n-backend/20-drafting-and-images.md §1.8): create the template, then set its HTML.
  *
  * It never edits or deletes an existing template: the input has no template id, and the second call only

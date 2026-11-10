@@ -1,5 +1,4 @@
 import type { IngestStore, StoryRow } from "@/src/pipeline/ingest/ingest";
-import { logServerError } from "@/src/server/observability";
 import { prisma } from "@/src/server/prisma";
 
 /** n8n's upsert (docs/n8n-backend/10-ingestion.md §4.6): the same columns on insert and on update. */
@@ -27,7 +26,14 @@ async function recordSources(mentions: { storyId: number; source: string }[]): P
   try {
     await prisma.storySource.createMany({ data: mentions, skipDuplicates: true });
   } catch (error) {
-    logServerError("ingest.story_sources.failed", error, { storyCount: mentions.length });
+    // Not logServerError: src/server/observability imports next/server, which Netlify functions do not ship.
+    console.error(
+      JSON.stringify({
+        event: "ingest.story_sources.failed",
+        error: error instanceof Error ? error.message : String(error),
+        storyCount: mentions.length,
+      }),
+    );
   }
 }
 

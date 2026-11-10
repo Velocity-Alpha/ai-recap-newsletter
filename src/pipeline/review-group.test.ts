@@ -8,8 +8,8 @@ function result(overrides: Partial<IngestResult> = {}): IngestResult {
     targetDate: "2026-11-09",
     storiesSaved: 41,
     sources: [
-      { source: "rundown_ai", name: "The Rundown", status: "ok", emails: 2, stories: 9, skippedNoLink: 0, errors: [] },
-      { source: "tldr", name: "TLDR", status: "no_new", emails: 0, stories: 0, skippedNoLink: 0, errors: [] },
+      { source: "rundown_ai", name: "The Rundown", status: "ok", documents: 2, stories: 9, skippedNoLink: 0, errors: [] },
+      { source: "tldr", name: "TLDR", status: "no_new", documents: 0, stories: 0, skippedNoLink: 0, errors: [] },
     ],
     ...overrides,
   };
@@ -35,9 +35,9 @@ describe("buildReadyMessage", () => {
       result({
         storiesSaved: 3,
         sources: [
-          { source: "the_signal", name: "The Signal", status: "failed", emails: 1, stories: 0, skippedNoLink: 0, errors: ["x"] },
-          { source: "tldr", name: "TLDR", status: "partial", emails: 2, stories: 3, skippedNoLink: 0, errors: ["y"] },
-          { source: "huggingface", name: "Hugging Face", status: "ok", emails: 1, stories: 0, skippedNoLink: 0, errors: [] },
+          { source: "the_signal", name: "The Signal", status: "failed", documents: 1, stories: 0, skippedNoLink: 0, errors: ["x"] },
+          { source: "tldr", name: "TLDR", status: "partial", documents: 2, stories: 3, skippedNoLink: 0, errors: ["y"] },
+          { source: "huggingface", name: "Hugging Face", status: "ok", documents: 1, stories: 0, skippedNoLink: 0, errors: [] },
         ],
       }),
     );

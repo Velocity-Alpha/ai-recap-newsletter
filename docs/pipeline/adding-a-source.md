@@ -13,12 +13,12 @@ on its own. One source can fail without stopping the others. For each source it 
 
 1. Reads the bookmark (`IngestStore.readBookmark`). The cutoff is the later of the bookmark and 72 hours ago.
 2. Collects text newer than the cutoff.
-3. Calls the extractor (`Extractor` in `extract.ts`), once per email or feed snapshot.
+3. Calls the extractor (`Extractor` in `extract.ts`), once per email, feed snapshot or beehiiv post.
 4. Turns the stories into rows (`toRows`): cleans the URL (`cleanStoryUrl`), builds the `guid`
    (`storyGuid`), drops stories with no usable link, and checks each URL for a paywall (`checkPaywall`).
 5. Saves the rows (`IngestStore.upsertStories`) and moves the bookmark (`writeBookmark`).
 
-The result is a `SourceResult` with a `SourceStatus`: `ok`, `no_new`, `partial` or `failed`.
+The result is a `SourceResult` with a `documents` count (emails, feed snapshots or posts read) and a `SourceStatus`: `ok`, `no_new`, `partial` or `failed`.
 `run-ingest.ts` writes one run-log line per source.
 
 ## Add an email source
@@ -59,6 +59,49 @@ Use this when the source is a web page or feed, like Product Hunt or Hugging Fac
 3. In `ingestFeedSource` in `ingest.ts`, add the new kind to the URL choice and to the builder choice.
    Feed stories take the run's date (`fixedDay`), because feed items rarely carry a reliable date.
 
+## Add a beehiiv site source
+
+Use this when the source is a beehiiv publication with a public website, like In the World of AI. Pick it
+over email when the mailbox is not subscribed, or when the email is only a digest. Do not add a publication
+both ways. Its stories would be saved twice.
+
+"beehiiv" is a source kind (`beehiiv_site`), never a source key. Each publication gets its own key. Old
+`stories.source` values such as `beehiiv` come from n8n, and `SUBSCRIBER_PROVIDER=beehiiv` is about
+subscriber lists, not sources.
+
+1. Add a `BeehiivSiteSource` to `STORY_SOURCES`:
+
+   ```ts
+   { key: "my_source", name: "My Source", kind: "beehiiv_site", siteUrl: "https://news.example.org", expectedOn: [] }
+   ```
+
+2. Nothing else is needed. `ingestBeehiivSiteSource` in `ingest.ts` does the rest.
+
+What it reads (`beehiiv-site.ts`):
+- `{siteUrl}/sitemap.xml`. Posts are the URLs under `/p/` on the site's host (`www.` or not). A post is
+  read when its `lastmod` day (UTC) is on or after the cutoff day. A sitemap with no posts fails the source.
+- Each post page, newest `lastmod` first, then in sitemap order. The page cap is 30 pages per run
+  (`BEEHIIV_PAGE_LIMIT`). If more posts changed, the run reads that many and records an error. New posts may be
+  among the unread ones; see the [runbook](./runbook.md#a-source-error-in-an-ingest-run).
+- The `Article` ld+json block gives `datePublished` and `isAccessibleForFree`. Only an explicit false
+  means paid. Paid posts and posts at or before the cutoff are skipped before the body is read.
+- The body is the element with id `content-blocks`. A free, new post without it is an error.
+- A post dated after the run's time is an error. It would move the bookmark past every post until then.
+
+Stories that link to the publication's own site are dropped. They count as stories without a link.
+
+How dates work: the source date (`sourceDate`) is the New York date of the post's `datePublished`. Each
+story gets its date from the extractor, with the source date as the fallback.
+
+The bookmark moves to the last post of the unbroken run of successes from the oldest, as for emails. It
+stays strictly before the first failed post's time, so a failed post that shares a time with a good one is
+read again. The bookmark does not move at all in a run where a page fails to load, a page's Article data
+cannot be read, or the page cap is exceeded. A post whose body is missing or whose extraction fails stops
+the bookmark at the last post before it. The good posts are still saved, and the next run reads them again
+harmlessly.
+
+Why this design: [ADR 0004](../adr/0004-beehiiv-site-source.md).
+
 ## Test it
 
 Write the test first. The tests use Vitest and fakes, not the network.
@@ -68,7 +111,8 @@ Write the test first. The tests use Vitest and fakes, not the network.
    source through `deps.sources` and a fake `extract` function. Check the saved rows, the `SourceResult`
    status, and that the bookmark moves only after success.
 2. For a feed, add parser tests in `src/pipeline/ingest/feeds.test.ts` with a small synthetic sample.
-   For tracking links, add a case in `redirects.test.ts`.
+   For tracking links, add a case in `redirects.test.ts`. For beehiiv page parsing, see
+   `beehiiv-site.test.ts`.
 3. Use synthetic text. Do not paste real newsletter content into the repo.
 4. Run `npx vitest run src/pipeline/ingest`, then `APP_ENV=development npm run verify`.
 

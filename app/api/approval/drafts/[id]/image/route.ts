@@ -9,7 +9,7 @@ export const runtime = "nodejs";
 
 /**
  * "New image" (#116, #149) "Use this image": `{ imageUrl, scenePrompt }` from "Generate" goes into the current
- * draft and the issue, and the draft's email HTML is built again (ADR 0004). No new draft, and no call to the
+ * draft and the issue, and the draft's email HTML is built again (ADR 0005). No new draft, and no call to the
  * distribution service.
  */
 export async function POST(request: Request, context: IdRouteContext) {
