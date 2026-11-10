@@ -2,12 +2,16 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const findManyMock = vi.hoisted(() => vi.fn());
 const aggregateMock = vi.hoisted(() => vi.fn());
+const storySourcesMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/src/server/prisma", () => ({
   prisma: {
     story: {
       findMany: findManyMock,
       aggregate: aggregateMock,
+    },
+    storySource: {
+      findMany: storySourcesMock,
     },
   },
 }));
@@ -80,6 +84,8 @@ describe("newsletter curation", () => {
     // Calls in order: recently used stories, candidates, published URL lookup.
     findManyMock.mockResolvedValue([]);
     aggregateMock.mockReset();
+    storySourcesMock.mockReset();
+    storySourcesMock.mockResolvedValue([]);
     findUnsentDraftsMock.mockReset();
     findUnsentDraftsMock.mockResolvedValue([]);
   });
@@ -234,6 +240,92 @@ describe("newsletter curation", () => {
       const outline = await createDedupedOutline(OUTLINE_DATE, [1, 2]);
 
       expect(outline.selected_story_ids).toEqual([1]);
+    });
+  });
+
+  describe("coverage across sources and the proposed lead (#58)", () => {
+    it("credits the kept story with the source of a same-URL copy it replaced", async () => {
+      findManyMock.mockResolvedValueOnce([]).mockResolvedValueOnce([
+        { ...candidateRow(1, "general"), source: "tldr" },
+        { ...candidateRow(2, "general"), url: "https://example.com/1/", source: "rundown_ai" },
+      ]);
+
+      const { outline } = await createOutlineCandidateStories(OUTLINE_DATE);
+
+      expect(outline.candidate_map["1"].sources).toEqual(["rundown_ai", "tldr"]);
+    });
+
+    it("adds every newsletter that ingestion recorded for a story", async () => {
+      findManyMock.mockResolvedValueOnce([]).mockResolvedValueOnce([
+        { ...candidateRow(1, "general"), source: "tldr" },
+        { ...candidateRow(2, "general"), source: "alphasignal" },
+      ]);
+      storySourcesMock.mockResolvedValueOnce([
+        { storyId: 2, source: "rundown_ai" },
+        { storyId: 2, source: "alphasignal" },
+      ]);
+
+      const { outline } = await createOutlineCandidateStories(OUTLINE_DATE);
+
+      expect(storySourcesMock).toHaveBeenCalledWith({
+        where: { storyId: { in: [1, 2] } },
+        select: { storyId: true, source: true },
+      });
+      expect(outline.candidate_map["1"].sources).toEqual(["tldr"]);
+      expect(outline.candidate_map["2"].sources).toEqual(["alphasignal", "rundown_ai"]);
+    });
+
+    it("proposes the Top Story with the best importance and coverage as the lead", async () => {
+      findManyMock.mockResolvedValueOnce([]).mockResolvedValueOnce(POOL_ROWS);
+      // Story 3 ranks third on importance (97 vs 99) but three newsletters covered it.
+      storySourcesMock.mockResolvedValueOnce([
+        { storyId: 3, source: "tldr" },
+        { storyId: 3, source: "rundown_ai" },
+        { storyId: 3, source: "ai_breakfast" },
+      ]);
+
+      const outline = await createDedupedOutline(OUTLINE_DATE, POOL_IDS);
+
+      expect(selectedIds(outline, "headlines")).toEqual([1, 2, 3]);
+      expect(outline.proposed_lead_id).toBe(3);
+    });
+
+    it("moves a lead from another section to the top of Top Stories", async () => {
+      findManyMock.mockResolvedValueOnce([]).mockResolvedValueOnce(POOL_ROWS);
+      // Tool 31 (importance 69) wins on its headline and coverage, so it leads from Top Stories.
+      findManyMock.mockReset();
+      findManyMock
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce(
+          POOL_ROWS.map((row) =>
+            row.id === 31
+              ? { ...row, importanceScore: 99, headline: "Kimi Releases 104B Open-Weight Model", source: "tldr" }
+              : row
+          )
+        )
+        .mockResolvedValue([]);
+      storySourcesMock.mockResolvedValueOnce([{ storyId: 31, source: "alphasignal" }]);
+
+      const outline = await createDedupedOutline(OUTLINE_DATE, POOL_IDS);
+
+      expect(outline.proposed_lead_id).toBe(31);
+      expect(selectedIds(outline, "headlines")).toEqual([31, 1, 2]);
+      expect(selectedIds(outline, "tools")).toEqual([32, 33, 34]);
+      const headlines = outline.candidate_sections.find((section) => section.key === "headlines");
+      expect(headlines?.fill_ins.map((story) => story.id)[0]).toBe(3);
+      expect(outline.selected_story_ids).toContain(31);
+      expect(outline.selected_story_ids).not.toContain(3);
+    });
+
+    it("still builds the board, from each row's own source, when the mentions cannot be read", async () => {
+      findManyMock.mockResolvedValueOnce([]).mockResolvedValueOnce(POOL_ROWS);
+      storySourcesMock.mockRejectedValueOnce(new Error('relation "story_sources" does not exist'));
+
+      const outline = await createDedupedOutline(OUTLINE_DATE, POOL_IDS);
+
+      expect(selectedIds(outline, "headlines")).toEqual([1, 2, 3]);
+      expect(outline.candidate_map["1"].sources).toEqual(["source"]);
+      expect(outline.proposed_lead_id).toBe(1);
     });
   });
 

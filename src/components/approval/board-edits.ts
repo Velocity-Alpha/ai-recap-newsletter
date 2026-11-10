@@ -32,12 +32,14 @@ export function hasBoardEdits(board: {
   candidateSections: BuiltSection[];
   sections: BoardSection[];
   headlineStoryId: number | null;
+  /** The lead the board pre-set (#58). Keeping it is not an edit. */
+  proposedLeadId?: number | null;
   excludeState: Record<number, unknown>;
   urlOverrides: Record<number, string>;
   notesOverrides: Record<number, string>;
 }): boolean {
   return (
-    board.headlineStoryId !== null ||
+    board.headlineStoryId !== (board.proposedLeadId ?? null) ||
     Object.keys(board.excludeState).length > 0 ||
     Object.keys(board.urlOverrides).length > 0 ||
     Object.keys(board.notesOverrides).length > 0 ||

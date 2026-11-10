@@ -32,6 +32,8 @@ export type ApprovalOutlineData = {
       story_details: string | null;
       category: string | null;
       source: string | null;
+      // Every newsletter that covered the story (#58). Missing on older cached boards.
+      sources?: string[];
       url: string | null;
       importance_score: number | null;
       paywall_detected?: "yes" | "no" | "unknown" | "error";
@@ -41,6 +43,8 @@ export type ApprovalOutlineData = {
     }
   >;
   selected_story_ids: number[];
+  // The lead the board pre-sets (#58). Missing on boards cached before it.
+  proposed_lead_id?: number | null;
   // Optional: boards cached before this field existed do not have it.
   unsent_drafts?: UnsentDraftNotice[];
   // Highest candidate story id the server saw when it built the board. Missing on older cached boards.

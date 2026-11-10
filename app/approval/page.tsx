@@ -408,6 +408,7 @@ function ApprovalPageForDate({ dateKey, reuseKey }: { dateKey: string; reuseKey:
       referenceStories={outlineData.reference_stories}
       candidateSections={outlineData.candidate_sections}
       candidateMap={outlineData.candidate_map}
+      proposedLeadId={outlineData.proposed_lead_id ?? null}
       publishStatus={publishStatus}
       dedupFailureReason={dedupFailureReason}
       drafting={drafting}
