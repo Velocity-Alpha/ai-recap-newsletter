@@ -1,4 +1,5 @@
 import type { Prisma, PrismaClient } from "@/src/generated/prisma";
+import { ISSUE_DRAFT } from "@/src/features/newsletter/issue-status";
 import { sentDraftIssueFields } from "@/src/pipeline/draft/draft-store";
 import type { PublishEventInput, PublishStore } from "@/src/pipeline/publish/detect-publish";
 import type { PublishMode } from "@/src/pipeline/publish/publish-decision";
@@ -74,7 +75,7 @@ export function createPrismaPublishStore(client: PrismaClient = prisma): PrismaP
         const sentDraft = event.draftId === null ? null : await sentDraftIssueFields(tx, issueId, event.draftId);
         // Only an unpublished issue changes, so a second copy or a later resend never moves published_at.
         const updated = await tx.issue.updateMany({
-          where: { id: BigInt(issueId), publishedAt: null },
+          where: { id: BigInt(issueId), status: ISSUE_DRAFT },
           data: {
             publishedAt,
             ...(sentDraft ?? {

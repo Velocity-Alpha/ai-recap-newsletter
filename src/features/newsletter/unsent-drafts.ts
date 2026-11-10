@@ -1,4 +1,5 @@
 import { prisma } from "@/src/server/prisma";
+import { ISSUE_PUBLISHED } from "@/src/features/newsletter/issue-status";
 
 /**
  * Matches the board's candidate window. A draft approved further back only
@@ -55,7 +56,7 @@ export async function findUnsentDrafts(targetDateOnly: string): Promise<UnsentDr
 
   const published = await prisma.issue.findMany({
     where: {
-      publishedAt: { not: null },
+      status: ISSUE_PUBLISHED,
       issueDate: { in: Array.from(storyIdsByDate.keys(), fromDateOnly) },
     },
     select: { issueDate: true },

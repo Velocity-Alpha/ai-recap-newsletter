@@ -60,8 +60,16 @@ export interface FakeTable {
 
 function table(
   state: FakeTable,
-  options: { defaults: () => Record<string, unknown>; unique?: string[]; nextId: () => bigint; failUpdate?: () => Error | null },
+  options: {
+    defaults: () => Record<string, unknown>;
+    unique?: string[];
+    nextId: () => bigint;
+    failUpdate?: () => Error | null;
+    /** Columns the database computes from the row (a generated column), set after every write. */
+    generated?: (row: Row) => Record<string, unknown>;
+  },
 ) {
+  const generate = (row: Row) => Object.assign(row, options.generated?.(row));
   const assertUnique = (row: Row) => {
     const keys = options.unique;
     if (keys && state.rows.some((other) => other !== row && keys.every((key) => same(other[key], row[key])))) {
@@ -73,6 +81,7 @@ function table(
     if (failure) throw failure;
     state.updates.push(structuredClone(stored(data)));
     Object.assign(row, stored(data));
+    generate(row);
   };
   return {
     findUnique: async ({ where, select }: { where: Where; select?: Record<string, boolean> }) =>
@@ -84,6 +93,7 @@ function table(
     count: async ({ where }: { where?: Where } = {}) => state.rows.filter((row) => matches(row, where)).length,
     create: async ({ data, select }: { data: Record<string, unknown>; select?: Record<string, boolean> }) => {
       const row = { ...options.defaults(), ...stored(data), id: (data.id as bigint | undefined) ?? options.nextId() } as Row;
+      generate(row);
       assertUnique(row);
       state.rows.push(row);
       return pick(row, select);
@@ -92,7 +102,7 @@ function table(
     createManyCalls: [] as Array<Array<Record<string, unknown>>>,
     async createMany({ data }: { data: Array<Record<string, unknown>>; skipDuplicates?: boolean }) {
       this.createManyCalls.push(structuredClone(data));
-      for (const item of data) state.rows.push({ ...options.defaults(), ...stored(item), id: options.nextId() } as Row);
+      for (const item of data) state.rows.push(generate({ ...options.defaults(), ...stored(item), id: options.nextId() } as Row));
       return { count: data.length };
     },
     update: async ({ where, data, select }: { where: Where; data: Record<string, unknown>; select?: Record<string, boolean> }) => {
@@ -129,6 +139,8 @@ export function createFakeDb() {
     issue: table(state.issues, {
       nextId: id,
       defaults: () => ({ publishedAt: null, html: null, featureImageUrl: null, excerpt: null, contentJson: null, promptFeaturedImage: null, createdAt: now() }),
+      // `issues.status` is a generated column (#82).
+      generated: (row) => ({ status: row.publishedAt ? "published" : "draft" }),
       failUpdate: () => {
         const error = state.issueUpdateError;
         state.issueUpdateError = null;

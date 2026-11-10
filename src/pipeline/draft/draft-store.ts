@@ -1,4 +1,5 @@
 import { Prisma } from "@/src/generated/prisma";
+import { ISSUE_DRAFT, ISSUE_PUBLISHED } from "@/src/features/newsletter/issue-status";
 import { toIssueContentJson, type WrittenIssueContent } from "@/src/pipeline/draft/content";
 import { emailImageUrl } from "@/src/pipeline/draft/email-html";
 import type { ApprovalOutline } from "@/src/pipeline/draft/outline";
@@ -93,7 +94,7 @@ export function isStuckDraft(draft: { status: string; startedAt: Date | null; qu
 
 /**
  * Serialises everything that picks or writes the issue for a date: creating a draft, and copying a ready draft to
- * the issue. Until #82 adds a unique index on the date, this is what keeps one issue per date.
+ * the issue. The unique index on `issues.issue_date` (#82) backs it up.
  */
 async function lockIssueDate(tx: Client, date: string): Promise<void> {
   await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`issue-date:${date}`}))`;
@@ -101,7 +102,7 @@ async function lockIssueDate(tx: Client, date: string): Promise<void> {
 
 /** Any published issue for the date. n8n could leave several issue rows for one date, so check them all. */
 async function publishedIssueFor(client: Client, date: string): Promise<{ id: bigint } | null> {
-  return client.issue.findFirst({ where: { issueDate: day(date), publishedAt: { not: null } }, select: { id: true } });
+  return client.issue.findFirst({ where: { issueDate: day(date), status: ISSUE_PUBLISHED }, select: { id: true } });
 }
 
 /**
@@ -125,10 +126,10 @@ export async function createDraft(outlineId: Id, options: { now?: () => Date } =
 
     const issues = await tx.issue.findMany({
       where: { issueDate: day(issueDate) },
-      select: { id: true, publishedAt: true },
+      select: { id: true, status: true },
       orderBy: { id: "desc" },
     });
-    const published = issues.find((issue) => issue.publishedAt);
+    const published = issues.find((issue) => issue.status === ISSUE_PUBLISHED);
     if (published) throw new IssuePublishedError(Number(published.id), issueDate);
 
     const issueId =
@@ -280,9 +281,9 @@ export async function retryDraft(draftId: Id, options: { now?: () => Date } = {}
     },
   });
   if (!draft) throw new DraftNotRetryableError(`Draft ${draftId} does not exist.`);
-  const issue = await prisma.issue.findUnique({ where: { id: draft.issueId }, select: { issueDate: true, publishedAt: true } });
+  const issue = await prisma.issue.findUnique({ where: { id: draft.issueId }, select: { issueDate: true, status: true } });
   const issueDate = dateKey(issue?.issueDate ?? null) ?? "";
-  if (issue?.publishedAt) throw new IssuePublishedError(Number(draft.issueId), issueDate);
+  if (issue?.status === ISSUE_PUBLISHED) throw new IssuePublishedError(Number(draft.issueId), issueDate);
   const published = issueDate ? await publishedIssueFor(prisma, issueDate) : null;
   if (published) throw new IssuePublishedError(Number(published.id), issueDate);
 
@@ -405,7 +406,7 @@ export async function setDraftStep(draftId: bigint, step: string): Promise<void>
 export async function loadDraftInputs(draft: DraftToRun): Promise<{ outline: ApprovalOutline; issue: { id: number; date: string } }> {
   const outline = await prisma.approvalOutline.findUnique({ where: { id: draft.outlineId }, select: { payload: true } });
   if (!outline) throw new Error(`Outline ${draft.outlineId} does not exist.`);
-  const issue = await prisma.issue.findUnique({ where: { id: draft.issueId }, select: { issueDate: true, publishedAt: true } });
+  const issue = await prisma.issue.findUnique({ where: { id: draft.issueId }, select: { issueDate: true } });
   if (!issue) throw new Error(`Issue ${draft.issueId} does not exist.`);
   const date = dateKey(issue.issueDate);
   if (!date) throw new Error(`Issue ${draft.issueId} has no date.`);
@@ -475,7 +476,7 @@ export async function saveReadyDraft(
     if (await publishedIssueFor(tx, draft.issueDate)) return "published";
 
     const updated = await tx.issue.updateMany({
-      where: { id: draft.issueId, publishedAt: null },
+      where: { id: draft.issueId, status: ISSUE_DRAFT },
       data: issueFields(produced, { issueId: Number(draft.issueId), issueDate: draft.issueDate }),
     });
     return updated.count === 1 ? "updated" : "published";
@@ -651,9 +652,9 @@ function toView(
 
 /** Every draft for a date (YYYY-MM-DD), newest first. */
 export async function listDraftsForDate(date: string): Promise<DraftListItem[]> {
-  const issues = await prisma.issue.findMany({ where: { issueDate: day(date) }, select: { id: true, publishedAt: true } });
+  const issues = await prisma.issue.findMany({ where: { issueDate: day(date) }, select: { id: true, status: true } });
   if (issues.length === 0) return [];
-  const issuePublished = issues.some((issue) => issue.publishedAt);
+  const issuePublished = issues.some((issue) => issue.status === ISSUE_PUBLISHED);
   const rows = await prisma.issueDraft.findMany({
     where: { issueId: { in: issues.map((issue) => issue.id) } },
     orderBy: [{ version: "desc" }, { id: "desc" }],

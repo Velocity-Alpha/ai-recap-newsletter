@@ -1,4 +1,5 @@
 import type { AlertSeverity } from "@/src/pipeline/alerts";
+import { ISSUE_PUBLISHED } from "@/src/features/newsletter/issue-status";
 import type { DayFacts } from "@/src/pipeline/checks/day-facts";
 import { CHECK_TIMES, newYorkClock, WEEKDAY_NAMES, type CheckTime } from "@/src/pipeline/checks/schedule";
 import { STORY_SOURCES } from "@/src/pipeline/ingest/sources";
@@ -219,11 +220,11 @@ function publishCheck(facts: DayFacts, context: CheckContext): Finding {
     check: "publish",
     incidentKey: keyFor("publish", facts.date),
     failure:
-      facts.draftReady && issue && !issue.publishedAt
+      facts.draftReady && issue && issue.status !== ISSUE_PUBLISHED
         ? {
             severity: "warning",
             what: `The draft for ${facts.date} is ready but not published.`,
-            evidence: `Issue ${issue.id} ("${issue.title}") has no published_at at 18:00. Send it from GHL, or mark it published.`,
+            evidence: `Issue ${issue.id} ("${issue.title}") is still a draft at 18:00. Send it from GHL, or mark it published.`,
             link: `${context.siteUrl}/approval/issues`,
           }
         : null,
@@ -246,7 +247,7 @@ function siteProblems(issue: NonNullable<DayFacts["issue"]>, site: SiteFacts | n
 
 function siteCheck(facts: DayFacts, context: CheckContext): Finding {
   const issue = facts.issue;
-  const problems = issue?.publishedAt ? siteProblems(issue, context.site) : [];
+  const problems = issue?.status === ISSUE_PUBLISHED ? siteProblems(issue, context.site) : [];
   return {
     check: "site",
     incidentKey: keyFor("site", facts.date),
@@ -264,7 +265,7 @@ function siteCheck(facts: DayFacts, context: CheckContext): Finding {
 
 /** True when this check time needs the public site: 18:00, with a published issue. */
 export function needsSiteCheck(time: CheckTime, facts: DayFacts): boolean {
-  return !facts.skipped && isDue("site", time) && Boolean(facts.issue?.publishedAt);
+  return !facts.skipped && isDue("site", time) && facts.issue?.status === ISSUE_PUBLISHED;
 }
 
 /** Runs every check due at `time`. A skipped date runs none. */

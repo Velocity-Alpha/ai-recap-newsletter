@@ -1,4 +1,5 @@
 import { newYorkTime, shiftDate, type Weekday } from "@/src/pipeline/checks/schedule";
+import { ISSUE_DRAFT, ISSUE_PUBLISHED, type IssueStatus } from "@/src/features/newsletter/issue-status";
 import { dateOnly, findSkippedDate } from "@/src/pipeline/checks/skipped-dates";
 import { readSetting } from "@/src/pipeline/settings";
 import { prisma } from "@/src/server/prisma";
@@ -32,7 +33,7 @@ export interface DayFacts {
   /** A draft for this date has its email HTML. */
   draftReady: boolean;
   /** The published issue for this date, else the latest ready draft. */
-  issue: { id: string; slug: string | null; title: string; publishedAt: Date | null } | null;
+  issue: { id: string; slug: string | null; title: string; status: IssueStatus; publishedAt: Date | null } | null;
   /** Facts that could not be read and fell back to a default. The run logs them as warnings. */
   warnings: string[];
 }
@@ -74,7 +75,7 @@ function earliest(...dates: Array<Date | null>): Date | null {
  * - commit: stories whose `queued_for_publication_date` is the date (n8n sets it on commit). n8n stores no
  *   commit time, so it is about the earlier of the first draft row and the queued stories' last update.
  * - drafts: `issues` rows for the date (n8n inserts one per commit). Ready = the row has its email HTML.
- * - published: that issue's `published_at`.
+ * - published: that issue's `status`.
  * When native drafting lands, read the commit from `approval_outlines.committed_at` (#75) and the drafts from
  * `issue_drafts` with status `ready` (#76) here. The checks do not change.
  */
@@ -109,13 +110,13 @@ export async function readDayFacts(date: string): Promise<DayFacts> {
     prisma.issue.aggregate({ where: { issueDate: day }, _count: { _all: true }, _min: { createdAt: true } }),
     prisma.issue.findMany({
       where: { issueDate: day, html: { not: null } },
-      select: { id: true, slug: true, title: true, publishedAt: true },
+      select: { id: true, slug: true, title: true, status: true, publishedAt: true },
       orderBy: { createdAt: "desc" },
     }),
   ]);
 
   const historyDays = historyBySource.filter((counts) => sum(Object.values(counts)) > 0);
-  const issue = readyIssues.find((row) => row.publishedAt) ?? readyIssues[0] ?? null;
+  const issue = readyIssues.find((row) => row.status === ISSUE_PUBLISHED) ?? readyIssues[0] ?? null;
   const draftsMade = drafts._count._all;
   const committed = queued._count._all > 0 || draftsMade > 0;
   return {
@@ -132,7 +133,13 @@ export async function readDayFacts(date: string): Promise<DayFacts> {
     commitTime: committed ? earliest(queued._min.updatedAt ?? null, drafts._min.createdAt ?? null) : null,
     draftsMade,
     draftReady: readyIssues.length > 0,
-    issue: issue && { id: issue.id.toString(), slug: issue.slug, title: issue.title, publishedAt: issue.publishedAt },
+    issue: issue && {
+      id: issue.id.toString(),
+      slug: issue.slug,
+      title: issue.title,
+      status: issue.status === ISSUE_PUBLISHED ? ISSUE_PUBLISHED : ISSUE_DRAFT,
+      publishedAt: issue.publishedAt,
+    },
     warnings,
   };
 }

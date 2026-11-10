@@ -35,6 +35,7 @@ export function normalDay(overrides: Partial<DayFacts> = {}): DayFacts {
       id: "270",
       slug: "synthetic-model-ships",
       title: "Synthetic Model Ships & Agents Learn",
+      status: "published",
       publishedAt: new Date("2026-11-10T17:31:00Z"),
     },
     warnings: [],
@@ -53,7 +54,7 @@ export function monday(overrides: Partial<DayFacts> = {}): DayFacts {
     storiesBySource: { rundown_ai: 6, ai_breakfast: 5, the_signal: 4, tldr: 7, alphasignal: 3, product_hunt_ai: 5, huggingface: 5 },
     weekdayTotals: [40, 44, 39, 47, 45, 42, 50, 38], // median 43
     commitTime: new Date("2026-11-09T16:10:00Z"),
-    issue: { id: "269", slug: "synthetic-monday", title: "Synthetic Monday", publishedAt: new Date("2026-11-09T17:05:00Z") },
+    issue: { id: "269", slug: "synthetic-monday", title: "Synthetic Monday", status: "published", publishedAt: new Date("2026-11-09T17:05:00Z") },
     ...overrides,
   });
 }
@@ -110,7 +111,7 @@ export function committedNoDraft(overrides: Partial<DayFacts> = {}): DayFacts {
 /** A ready draft that is not published yet. */
 export function draftNotPublished(overrides: Partial<DayFacts> = {}): DayFacts {
   return normalDay({
-    issue: { id: "270", slug: "synthetic-model-ships", title: "Synthetic Model Ships & Agents Learn", publishedAt: null },
+    issue: { id: "270", slug: "synthetic-model-ships", title: "Synthetic Model Ships & Agents Learn", status: "draft", publishedAt: null },
     ...overrides,
   });
 }

@@ -33,10 +33,14 @@ model Issue {
   featureImageUrl     String?   @map("feature_image_url")
   excerpt             String?
   contentJson         Json?     @map("content_json")
-  issueDate           DateTime? @map("issue_date") @db.Date
+  /// At most one issue per date (#82).
+  issueDate           DateTime? @unique @map("issue_date") @db.Date
   promptFeaturedImage String?   @map("prompt_featured_image")
   slug                String?   @unique @default(dbgenerated("COALESCE(newsletter.slugify_issue_title(title), (id)::text)"))
   note                String?
+  /// 'draft' or 'published' (#82). The database computes it from published_at (a generated column), so never
+  /// write it. Read it to ask "is this issue published?"; read published_at for the time.
+  status              String    @default(dbgenerated())
 
   @@unique([title, publishedAt], map: "issues_title_published_unique")
   @@index([createdAt(sort: Desc)])

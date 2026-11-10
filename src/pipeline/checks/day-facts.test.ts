@@ -43,8 +43,8 @@ beforeEach(() => {
   db.story.aggregate.mockResolvedValue({ _count: { _all: 23 }, _min: { updatedAt: new Date("2026-11-10T16:52:00Z") } });
   db.issue.aggregate.mockResolvedValue({ _count: { _all: 2 }, _min: { createdAt: new Date("2026-11-10T16:48:00Z") } });
   db.issue.findMany.mockResolvedValue([
-    { id: 271n, slug: "second-draft", title: "Second draft", publishedAt: null },
-    { id: 270n, slug: "first-draft", title: "First draft", publishedAt: new Date("2026-11-10T17:31:00Z") },
+    { id: 271n, slug: "second-draft", title: "Second draft", status: "draft", publishedAt: null },
+    { id: 270n, slug: "first-draft", title: "First draft", status: "published", publishedAt: new Date("2026-11-10T17:31:00Z") },
   ]);
 });
 
@@ -66,7 +66,7 @@ describe("readDayFacts", () => {
       draftsMade: 2,
       draftReady: true,
       // The published draft wins over a later unpublished one.
-      issue: { id: "270", slug: "first-draft", title: "First draft", publishedAt: new Date("2026-11-10T17:31:00Z") },
+      issue: { id: "270", slug: "first-draft", title: "First draft", status: "published", publishedAt: new Date("2026-11-10T17:31:00Z") },
       warnings: [],
     });
   });
