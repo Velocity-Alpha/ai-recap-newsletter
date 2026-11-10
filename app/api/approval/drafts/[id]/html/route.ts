@@ -11,7 +11,7 @@ const NEW_TAB_BASE = '<base target="_blank">';
 
 /**
  * The email with `<base target="_blank">` first in its head, so its links open in a new tab: most sites refuse to
- * load inside the frame. For the preview only; the email saved for GHL stays as it is.
+ * load inside the frame. For the preview only; the email saved for the distribution service stays as it is.
  */
 function withLinksInNewTab(html: string): string {
   const opening = /<head\b[^>]*>/i.exec(html) ?? /<html\b[^>]*>/i.exec(html) ?? /<!doctype\b[^>]*>/i.exec(html);

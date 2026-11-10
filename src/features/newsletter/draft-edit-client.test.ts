@@ -11,7 +11,7 @@ const notJson = (status: number) => vi.fn<typeof fetch>(async () => new Response
 
 const STAGED = {
   version: 3,
-  serviceName: "GHL",
+  serviceName: "Pretend Mail",
   serviceUrl: "https://preview.example.test/v3",
   mode: "sent",
   stagedAt: "2026-05-21T14:20:00.000Z",
@@ -100,11 +100,11 @@ describe("requestStage", () => {
   });
 
   it("fills in what the answer leaves out: no link, no time, and sent", async () => {
-    const fetcher = answer(200, { staged: { version: 3, serviceName: "GHL" } });
+    const fetcher = answer(200, { staged: { version: 3, serviceName: "Pretend Mail" } });
 
     await expect(requestStage(41, false, fetcher)).resolves.toEqual({
       kind: "staged",
-      staged: { version: 3, serviceName: "GHL", serviceUrl: null, mode: "sent", stagedAt: null },
+      staged: { version: 3, serviceName: "Pretend Mail", serviceUrl: null, mode: "sent", stagedAt: null },
     });
   });
 
@@ -151,7 +151,7 @@ describe("requestStage", () => {
 
   it("does not take a 200 without a whole staged version as a staging", async () => {
     await expect(requestStage(41, false, answer(200, { success: true }))).rejects.toThrow("Could not stage the draft.");
-    await expect(requestStage(41, false, answer(200, { staged: { serviceName: "GHL" } }))).rejects.toThrow("Could not stage the draft.");
+    await expect(requestStage(41, false, answer(200, { staged: { serviceName: "Pretend Mail" } }))).rejects.toThrow("Could not stage the draft.");
     await expect(requestStage(41, false, answer(200, { staged: { version: 3 } }))).rejects.toThrow("Could not stage the draft.");
   });
 

@@ -90,7 +90,7 @@ describe("produceDraft", () => {
     expect(Object.keys(draft.stepMs)).toEqual(DRAFT_STEPS);
   });
 
-  it("makes no email in the distribution service: it has no GHL step and returns no template", async () => {
+  it("makes no email in the distribution service: it has no step for it and returns no template", async () => {
     const { deps, steps } = fakeDeps();
 
     const draft = await produceDraft(INPUT, deps);

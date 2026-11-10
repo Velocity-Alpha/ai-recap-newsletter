@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { currentDistributionServiceName } from "@/src/pipeline/distribution/service";
 import {
   dayIncidentDate,
   evaluateChecks,
@@ -182,6 +183,8 @@ describe("12:00 commit check", () => {
 });
 
 describe("18:00 draft and publish checks", () => {
+  const SERVICE = currentDistributionServiceName();
+
   it("raises a critical when committed but no draft is ready", () => {
     const found = failures(run("18:00", committedNoDraft()));
     expect(Object.keys(found)).toEqual(["draft-missing:2026-11-10"]);
@@ -189,10 +192,30 @@ describe("18:00 draft and publish checks", () => {
     expect(found["draft-missing:2026-11-10"].evidence).toContain("23 stories");
   });
 
-  it("warns as a reminder when the draft is ready but not published", () => {
-    const found = failures(run("18:00", draftNotPublished()));
+  it("warns as a reminder when the draft is ready but nothing is staged", () => {
+    const found = failures(run("18:00", draftNotPublished({ stagedVersion: null })));
     expect(Object.keys(found)).toEqual(["publish-pending:2026-11-10"]);
-    expect(found["publish-pending:2026-11-10"]).toMatchObject({ severity: "warning", link: `${SITE}/approval/issues` });
+    expect(found["publish-pending:2026-11-10"]).toMatchObject({
+      severity: "warning",
+      link: `${SITE}/approval/issues`,
+      what: "The draft for 2026-11-10 is ready but not staged.",
+    });
+    expect(found["publish-pending:2026-11-10"].evidence).toContain(`Stage it for sending, then send it from ${SERVICE}.`);
+  });
+
+  it("warns under the same incident key when a version is staged but not published", () => {
+    const found = failures(run("18:00", draftNotPublished({ stagedVersion: 2 })));
+    expect(Object.keys(found)).toEqual(["publish-pending:2026-11-10"]);
+    expect(found["publish-pending:2026-11-10"]).toMatchObject({ severity: "warning", what: "v2 for 2026-11-10 is staged but not published." });
+    expect(found["publish-pending:2026-11-10"].evidence).toContain(`Send it from ${SERVICE}, or mark it published.`);
+  });
+
+  it("adds that the draft changed after it was staged", () => {
+    const found = failures(run("18:00", draftNotPublished({ stagedVersion: 2, changedSinceStaged: true })));
+    expect(found["publish-pending:2026-11-10"]).toMatchObject({
+      what: "v2 for 2026-11-10 is staged but not published. The draft changed after v2 was staged.",
+    });
+    expect(found["publish-pending:2026-11-10"].evidence).toContain(`Send it from ${SERVICE}, or mark it published.`);
   });
 
   it("passes when the issue is published and on the site", () => {

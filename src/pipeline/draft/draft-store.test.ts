@@ -26,7 +26,6 @@ import {
   getDraftStatus,
   isStuckDraft,
   IssuePublishedError,
-  listDraftsForDate,
   readCurrentDraft,
   retryDraft,
   saveReadyDraft,
@@ -739,11 +738,6 @@ describe("the current draft: title and image changes (#149)", () => {
 
       await expect(getDraftStatus(v1.draftId)).resolves.toMatchObject({ hasNewerDraft: true });
       await expect(getDraftStatus(v2.draftId)).resolves.toMatchObject({ hasNewerDraft: false });
-      const listed = await listDraftsForDate(DATE);
-      expect(listed.map((draft) => [draft.version, draft.hasNewerDraft, draft.editedAt])).toEqual([
-        [2, false, null],
-        [1, true, NOW],
-      ]);
     }
 
     await fakeDb.client.issue.update({ where: { id: BigInt(v1.issueId) }, data: { publishedAt: NOW } });
@@ -804,63 +798,6 @@ describe("saveReadyDraft", () => {
 });
 
 describe("draft reads for the board", () => {
-  it("lists every draft for the date, newest first, with subject, status, and which one was sent", async () => {
-    const v1 = await createDraft(await outline());
-    const v2 = await createDraft(await outline());
-    await fakeDb.client.issueDraft.update({
-      where: { id: BigInt(v1.draftId) },
-      data: { status: "ready", content: SAMPLE_CONTENT, html: "<html>v1</html>", finishedAt: NOW },
-    });
-    await fakeDb.client.issueDraft.update({
-      where: { id: BigInt(v2.draftId) },
-      data: { status: "failed", failedStep: "save", error: "The database said no.", finishedAt: NOW },
-    });
-    await fakeDb.client.publishEvent.create({ data: { mode: "native", outcome: "published", draftId: BigInt(v1.draftId) } });
-    await createDraft(await outline("2027-01-05"));
-
-    const drafts = await listDraftsForDate(DATE);
-
-    // v1 is ready but not current: only the issue's newest draft can be, and v2 is newer.
-    expect(drafts.map((draft) => [draft.version, draft.status, draft.sent, draft.current])).toEqual([
-      [2, "failed", false, false],
-      [1, "ready", true, false],
-    ]);
-    expect(drafts[1]).toMatchObject({
-      id: v1.draftId,
-      issueId: v1.issueId,
-      issueDate: DATE,
-      subject: SAMPLE_CONTENT.title,
-      hasHtml: true,
-      finishedAt: NOW,
-      editedAt: null,
-    });
-    expect(drafts[0]).toMatchObject({ subject: null, failedStep: "save", error: "The database said no.", hasHtml: false });
-    await expect(listDraftsForDate("2027-02-01")).resolves.toEqual([]);
-  });
-
-  it("marks as current only the issue's newest draft, and only when it is ready", async () => {
-    const v1 = await createDraft(await outline());
-    await fakeDb.client.issueDraft.update({ where: { id: BigInt(v1.draftId) }, data: { status: "ready", content: SAMPLE_CONTENT } });
-    const current = async () => (await listDraftsForDate(DATE)).map((draft) => [draft.version, draft.current]);
-
-    await expect(current()).resolves.toEqual([[1, true]]);
-
-    const v2 = await createDraft(await outline());
-    for (const status of ["running", "failed"] as const) {
-      await fakeDb.client.issueDraft.update({ where: { id: BigInt(v2.draftId) }, data: { status } });
-      await expect(current()).resolves.toEqual([
-        [2, false],
-        [1, false],
-      ]);
-    }
-
-    await fakeDb.client.issueDraft.update({ where: { id: BigInt(v2.draftId) }, data: { status: "ready", content: SAMPLE_CONTENT } });
-    await expect(current()).resolves.toEqual([
-      [2, true],
-      [1, false],
-    ]);
-  });
-
   it("reads one draft's status for the live progress, and its HTML for the preview", async () => {
     const created = await createDraft(await outline());
     await fakeDb.client.issueDraft.update({
@@ -894,12 +831,9 @@ describe("draft reads for the board", () => {
     const created = await createDraft(await outline());
 
     const view = await getDraftStatus(created.draftId);
-    const [listed] = await listDraftsForDate(DATE);
 
-    for (const read of [view, listed]) {
-      for (const gone of ["ghlTemplateId", "ghlPreviewUrl", "sourceDraftId", "sourceVersion"]) {
-        expect(read).not.toHaveProperty(gone);
-      }
+    for (const gone of ["ghlTemplateId", "ghlPreviewUrl", "sourceDraftId", "sourceVersion"]) {
+      expect(view).not.toHaveProperty(gone);
     }
   });
 });

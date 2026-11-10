@@ -10,7 +10,7 @@ const noop = () => {};
 const STAGED: StagedSummary = {
   version: 3,
   stagedAt: "2026-05-21T14:20:00.000Z",
-  serviceName: "GHL",
+  serviceName: "Pretend Mail",
   serviceUrl: "https://preview.example.test/v3",
 };
 
@@ -169,7 +169,7 @@ describe("StagePanel", () => {
       expect(html).toContain("Staged, v3");
       expect(html).toContain('data-staged-version="3"');
       expect(html).toContain("May 21, 10:20 AM EDT");
-      expect(html).toMatch(/<a[^>]*href="https:\/\/preview\.example\.test\/v3"[^>]*>Open in GHL/);
+      expect(html).toMatch(/<a[^>]*href="https:\/\/preview\.example\.test\/v3"[^>]*>Open in Pretend Mail/);
       expect(html).toMatch(/<a[^>]*target="_blank"[^>]*rel="noreferrer"/);
       expect(html).not.toContain("Find it in");
       expect(html).not.toContain("Not sent outside production");
@@ -186,7 +186,7 @@ describe("StagePanel", () => {
       const html = render({ staged: { ...STAGED, serviceUrl: null } });
 
       expect(html).toContain("Staged, v3");
-      expect(html).toContain("Find it in GHL by its name.");
+      expect(html).toContain("Find it in Pretend Mail by its name.");
       expect(html).not.toContain("<a ");
       expect(html).not.toContain("Open in");
     });
@@ -195,7 +195,7 @@ describe("StagePanel", () => {
       const html = render({ staged: { ...STAGED, serviceUrl: null }, recorded: true });
 
       expect(html).toContain("Staged, v3");
-      expect(html).toContain("Not sent outside production: nothing reached GHL.");
+      expect(html).toContain("Not sent outside production: nothing reached Pretend Mail.");
       expect(html).not.toContain("Find it in");
       expect(html).not.toContain("<a ");
     });
@@ -267,7 +267,7 @@ describe("StageForSending", () => {
     const html = renderToStaticMarkup(<StageForSending draft={draft({ staged: STAGED })} />);
 
     expect(html).toContain("Staged, v3");
-    expect(html).toContain("Open in GHL");
+    expect(html).toContain("Open in Pretend Mail");
     expect(html).not.toContain("Not sent outside production");
   });
 

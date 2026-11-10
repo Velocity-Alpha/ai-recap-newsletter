@@ -6,6 +6,7 @@ import {
   draftViewHref,
   isRefusal,
   jsonPost,
+  currentDraftHref,
   nativeCommitTarget,
   secondCommitNotice,
 } from "@/src/features/newsletter/draft-links";
@@ -30,29 +31,41 @@ describe("draft links", () => {
   });
 });
 
+describe("currentDraftHref", () => {
+  it("links an older draft's page to the date's draft page, which shows the current draft", () => {
+    expect(currentDraftHref("2026-05-21", 42, 41)).toBe("/approval/drafts?date=2026-05-21");
+  });
+
+  it("is null when the page shows the current draft, or the date has none", () => {
+    expect(currentDraftHref("2026-05-21", 42, 42)).toBeNull();
+    expect(currentDraftHref("2026-05-21", null, 41)).toBeNull();
+    expect(currentDraftHref("2026-05-21", undefined, null)).toBeNull();
+  });
+});
+
 describe("secondCommitNotice", () => {
-  it("warns before a second native commit for a date that the new draft replaces the current one", () => {
-    expect(secondCommitNotice({ drafts: [{ id: 40, version: 1, status: "ready" }], nextVersion: 2 })).toBe(
+  it("warns before a second commit for a date that the new draft replaces the current one", () => {
+    expect(secondCommitNotice({ currentDraft: { id: 40, edited: false } })).toBe(
       "This makes a new draft. It replaces the current draft as the one to review and stage.",
     );
   });
 
-  it("names no draft number (the owner sees only staged version numbers) and no distribution service", () => {
-    const notice = secondCommitNotice({
-      drafts: [
-        { id: 41, version: 2, status: "failed" },
-        { id: 40, version: 1, status: "ready" },
-      ],
-      nextVersion: 3,
-    });
+  it("warns that the owner's title and image changes go too, when the current draft has them", () => {
+    expect(secondCommitNotice({ currentDraft: { id: 40, edited: true } })).toBe(
+      "This makes a new draft. This replaces the current draft, including your title and image changes.",
+    );
+  });
 
-    expect(notice).toBe("This makes a new draft. It replaces the current draft as the one to review and stage.");
-    expect(notice).not.toMatch(/v\d/);
-    expect(notice).not.toContain("GHL");
+  it("names no draft number and no distribution service", () => {
+    for (const edited of [true, false]) {
+      const notice = secondCommitNotice({ currentDraft: { id: 41, edited } });
+      expect(notice).not.toMatch(/v\d/);
+      expect(notice).not.toContain("GHL");
+    }
   });
 
   it("says nothing for the first commit", () => {
-    expect(secondCommitNotice({ drafts: [], nextVersion: 1 })).toBeNull();
+    expect(secondCommitNotice({ currentDraft: null })).toBeNull();
     expect(secondCommitNotice(null)).toBeNull();
   });
 });

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { GHL_SERVICE } from "@/src/pipeline/distribution/ghl";
-import { distributionServiceFromEnv, distributionServiceName } from "@/src/pipeline/distribution/service";
+import { currentDistributionServiceName, distributionServiceFromEnv, distributionServiceName } from "@/src/pipeline/distribution/service";
 import type { SideEffectRecord } from "@/src/pipeline/side-effects";
 
 const PRODUCTION_ENV = {
@@ -16,6 +16,12 @@ const EMAIL = { name: "2026-11-09 v3: Synthetic subject line", html: "<html><bod
 function json(body: unknown): Response {
   return new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } });
 }
+
+describe("currentDistributionServiceName", () => {
+  it("is the display name of the service that new staged versions go to", () => {
+    expect(currentDistributionServiceName()).toBe(distributionServiceFromEnv(PRODUCTION_ENV).displayName);
+  });
+});
 
 describe("distributionServiceName", () => {
   it("gives the owner's name for the service a staged version was made in", () => {

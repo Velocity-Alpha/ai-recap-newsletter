@@ -105,7 +105,7 @@ describe("DraftView", () => {
     expect(render(views[1])).toContain("Runs this draft again from the start.");
     expect(render(views[2])).toMatch(/<iframe[^>]*title="Email preview"/);
     // A staged version's number is the one the owner does see.
-    expect(render(ready({ version: 7, staged: { version: 2, stagedAt: null, serviceName: "GHL", serviceUrl: null } }))).toContain("Staged, v2");
+    expect(render(ready({ version: 7, staged: { version: 2, stagedAt: null, serviceName: "Pretend Mail", serviceUrl: null } }))).toContain("Staged, v2");
   });
 
   it("says when the job has not started yet", () => {
@@ -139,7 +139,7 @@ describe("DraftView", () => {
     expect(html).not.toContain("Retry");
   });
 
-  it("has no GHL link or template id of its own: the distribution service shows only with a staged version (#149)", () => {
+  it("has no service link or template id of its own: the distribution service shows only with a staged version (#149)", () => {
     const html = render(ready());
 
     expect(html).not.toContain("GHL");
@@ -284,12 +284,12 @@ describe("DraftView", () => {
 
     it("shows the issue's newest staged version, with a link into the distribution service", () => {
       const html = render(
-        ready({ staged: { version: 3, stagedAt: "2026-05-21T14:20:00.000Z", serviceName: "GHL", serviceUrl: "https://preview.example.test/v3" } }),
+        ready({ staged: { version: 3, stagedAt: "2026-05-21T14:20:00.000Z", serviceName: "Pretend Mail", serviceUrl: "https://preview.example.test/v3" } }),
       );
 
       expect(html).toContain("Staged, v3");
       expect(html).toContain("May 21, 10:20 AM EDT");
-      expect(html).toMatch(/<a[^>]*href="https:\/\/preview\.example\.test\/v3"[^>]*>Open in GHL/);
+      expect(html).toMatch(/<a[^>]*href="https:\/\/preview\.example\.test\/v3"[^>]*>Open in Pretend Mail/);
     });
 
     it("shows the staged version on a draft that can no longer be staged", () => {
@@ -297,12 +297,12 @@ describe("DraftView", () => {
         ready({
           editable: false,
           issuePublished: true,
-          staged: { version: 1, stagedAt: "2026-05-21T14:20:00.000Z", serviceName: "GHL", serviceUrl: null },
+          staged: { version: 1, stagedAt: "2026-05-21T14:20:00.000Z", serviceName: "Pretend Mail", serviceUrl: null },
         }),
       );
 
       expect(html).toContain("Staged, v1");
-      expect(html).toContain("Find it in GHL by its name.");
+      expect(html).toContain("Find it in Pretend Mail by its name.");
       expect(html).toMatch(STAGE_BUTTON_OFF);
     });
   });

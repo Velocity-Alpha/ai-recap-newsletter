@@ -1,15 +1,23 @@
 /** Board-side helpers for drafts (#79). Safe for client components. */
 
-export interface DraftingSummary {
-  /** Newest first. */
-  drafts: { id: number; version: number; status: string }[];
-  nextVersion: number;
-}
+import type { DateDraftsView } from "@/src/pipeline/draft/draft-board";
+
+/** What the commit dialog needs to know about the date's drafts. */
+type DraftingSummary = Pick<DateDraftsView, "currentDraft">;
 
 export function draftViewHref(date: string, draftId?: number): string {
   const params = new URLSearchParams({ date });
   if (draftId !== undefined) params.set("draft", String(draftId));
   return `/approval/drafts?${params}`;
+}
+
+/**
+ * The link from an older draft's page to the date's current draft. Null when the page already shows the
+ * current draft, or the date has none.
+ */
+export function currentDraftHref(date: string, currentDraftId: number | null | undefined, shownId: number | null): string | null {
+  if (typeof currentDraftId !== "number" || currentDraftId === shownId) return null;
+  return draftViewHref(date);
 }
 
 export function draftHtmlSrc(draftId: number): string {
@@ -54,10 +62,14 @@ export function isRefusal(error: unknown): boolean {
   return error instanceof DraftRequestError && error.status === 409;
 }
 
-/** Shown before a commit when the date already has drafts. It names no draft number: the owner never sees one. */
+const EDITS_REPLACED_NOTICE = "This replaces the current draft, including your title and image changes.";
+
+/** Shown before a commit when the date already has a draft. It never gives a draft row's number (#149). */
 export function secondCommitNotice(drafting: DraftingSummary | null): string | null {
-  if (!drafting || drafting.drafts.length === 0) return null;
-  return "This makes a new draft. It replaces the current draft as the one to review and stage.";
+  if (!drafting?.currentDraft) return null;
+  return drafting.currentDraft.edited
+    ? `This makes a new draft. ${EDITS_REPLACED_NOTICE}`
+    : "This makes a new draft. It replaces the current draft as the one to review and stage.";
 }
 
 /**
