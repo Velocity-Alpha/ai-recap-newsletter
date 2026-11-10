@@ -1,7 +1,6 @@
 import { newYorkTime, shiftDate, type Weekday } from "@/src/pipeline/checks/schedule";
 import { ISSUE_DRAFT, ISSUE_PUBLISHED, type IssueStatus } from "@/src/features/newsletter/issue-status";
 import { dateOnly, findSkippedDate } from "@/src/pipeline/checks/skipped-dates";
-import { readSetting } from "@/src/pipeline/settings";
 import { prisma } from "@/src/server/prisma";
 
 /**
@@ -14,8 +13,6 @@ export interface DayFacts {
   weekday: Weekday;
   /** Set when the owner pressed "No issue today" for this date. */
   skipped: { note: string | null; createdAt: Date } | null;
-  /** `ingest.owner`. While n8n ingests there is no ingest run to look for. */
-  ingestOwner: "n8n" | "native";
   /** The latest `ingest-stories` run that started on this date. */
   ingestRun: { id: string; status: string; startedAt: Date } | null;
   /** Stories ingested on this date (created in the New York day), by `stories.source`. */
@@ -40,7 +37,6 @@ export interface DayFacts {
 
 // Copied, not imported: run-ingest.ts would pull the OpenAI and Gmail clients into this function's bundle.
 const INGEST_JOB = "ingest-stories";
-const INGEST_OWNER_KEY = "ingest.owner";
 
 const HISTORY_WEEKS = 8;
 const WEEKDAYS: Weekday[] = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -92,9 +88,8 @@ export async function readDayFacts(date: string): Promise<DayFacts> {
   const today = newYorkDayRange(date);
   const history = Array.from({ length: HISTORY_WEEKS }, (_, index) => newYorkDayRange(shiftDate(date, -7 * (index + 1))));
 
-  const [skipped, ingestOwner, ingestRun, storiesBySource, historyBySource, queued, drafts, readyIssues] = await Promise.all([
+  const [skipped, ingestRun, storiesBySource, historyBySource, queued, drafts, readyIssues] = await Promise.all([
     readSkipped,
-    readSetting(INGEST_OWNER_KEY),
     prisma.pipelineRun.findFirst({
       where: { job: INGEST_JOB, startedAt: today },
       orderBy: { startedAt: "desc" },
@@ -123,7 +118,6 @@ export async function readDayFacts(date: string): Promise<DayFacts> {
     date,
     weekday: WEEKDAYS[day.getUTCDay()],
     skipped: skipped && { note: skipped.note, createdAt: skipped.createdAt },
-    ingestOwner: ingestOwner === "native" ? "native" : "n8n",
     ingestRun: ingestRun && { id: ingestRun.id.toString(), status: ingestRun.status, startedAt: ingestRun.startedAt },
     storiesBySource,
     storyTotal: sum(Object.values(storiesBySource)),

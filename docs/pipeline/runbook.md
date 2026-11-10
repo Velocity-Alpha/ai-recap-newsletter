@@ -29,7 +29,7 @@ Each entry says which job raises it and which PR added it.
 - **Admin pages** (#130, behind the approval login):
   - `/admin/incidents`: open and closed incidents.
   - `/admin/runs` and `/admin/runs/<id>`: each run and its events.
-  - `/admin/settings`: the settings. Leave the stage switches on `native`; `n8n` no longer works.
+  - `/admin/settings`: the rows of `pipeline_settings` (read only).
 - **Netlify function logs**: Netlify dashboard, the site, Logs, Functions. The functions are
   `ingest-stories`, `ingest-stories-background`, `run-checks`, `draft-issue-background`, `detect-publish`
   and `detect-publish-catch-up`. Use them when a run row was never written, for example when the database

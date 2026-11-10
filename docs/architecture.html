@@ -146,8 +146,8 @@ If the issue is missing after a send: /approval/issues -> "Mark as published"
   <tr><td><code>scraper_bookmarks</code></td><td>Last-read time per source (keys such as <code>the_signal</code>; <code>tldr_ai</code> and <code>aloa_ai</code> are unused)</td><td>ingest job</td></tr>
   <tr><td><code>issues</code></td><td>One row per date (<code>issue_date</code> is unique): <code>html</code>, <code>content_json</code>, <code>published_at</code>, <code>slug</code> (generated), and <code>status</code> (<code>draft</code> or <code>published</code>). The database computes <code>status</code> from <code>published_at</code>: read it to ask "is it published?", never write it</td><td>draft job (insert, update), publish job (update; the sent draft is copied over), owner ("Mark as published")</td></tr>
   <tr><td><code>subscribers</code>, <code>auth_codes</code></td><td>Site subscriber records and one-time codes</td><td>app</td></tr>
-  <tr><td><code>pipeline_settings</code></td><td>Settings and thresholds. The stage switches <code>ingest.owner</code>, <code>draft.owner</code> and <code>publish.owner</code> are left from the n8n migration: all are <code>native</code>, and <code>n8n</code> no longer works. Leave them; #147 removes them</td><td>owner, on <code>/admin/settings</code> or by SQL</td></tr>
-  <tr><td><code>pipeline_runs</code>, <code>pipeline_events</code></td><td>Job runs and their step logs; stage owner changes as job <code>admin-setting</code></td><td>jobs, <code>/admin/settings</code></td></tr>
+  <tr><td><code>pipeline_settings</code></td><td>Thresholds and the job runner (<code>pipeline.runner</code>). A job uses its default when a row is missing</td><td>owner, by SQL; shown on <code>/admin/settings</code></td></tr>
+  <tr><td><code>pipeline_runs</code>, <code>pipeline_events</code></td><td>Job runs and their step logs</td><td>jobs</td></tr>
   <tr><td><code>publish_events</code></td><td>Each seed email seen by publish detection and the decision, and which draft was sent (<code>draft_id</code>)</td><td>publish job</td></tr>
   <tr><td><code>approval_outlines</code></td><td>Each board commit: the normalised outline, its hash, and two columns left from the n8n migration (<code>draft_owner</code>, <code>forwarded_at</code>)</td><td>commit route</td></tr>
   <tr><td><code>issue_drafts</code></td><td>Each draft of an issue, version 1, 2, ... (one per commit, or per "New image"): status, current or failed step, content, html, image, GHL template; <code>source_draft_id</code> on a "New image" draft</td><td>commit, "Retry", "New image" and the <code>draft-issue</code> job</td></tr>
@@ -165,17 +165,16 @@ app/                         Next.js routes
   page.tsx, archive/, issue/[slug]/, newsletter/[id]/, for-brands/, unsubscribe/, privacy/, terms/
   approval/                  board (page.tsx), login/, issues/ ("Mark as published"), submitted/,
                              drafts/ (drafts for a date: live steps, Retry, email preview, "New image")
-  admin/                     overview, runs/ (+ [id]), incidents/, settings/ (stage switches); guard: src/server/admin-auth.ts
+  admin/                     overview, runs/ (+ [id]), incidents/, settings/ (read only); guard: src/server/admin-auth.ts
   api/newsletters/           list, [id], outline, commit (starts the draft job), publish-status
   api/approval/              login, outline (+ status, marker), issues/[id]/publish, skipped-dates,
                              drafts (+ [id], html, retry, image, image/ideas, image/generate)
-  api/admin/                 stage-switches (POST)
   api/subscriber/            subscribe, request-code, verify-code, sign-out, unsubscribe (+ webhook from GHL)
   api/issues/[slug], api/ticker, api/for-brands, api/revalidate (job token)
 src/features/newsletter/     site and board logic: repository, cache, curation.service, openai-dedup, lead-story,
                              openai-lead-pick, issue-status, render/, parsers/
 src/features/subscriber/     subscriber sessions, provider switch (ghl | beehiiv), Resend email, GHL webhook
-src/features/admin/          admin page data, stage switch config (allowed values) and change log
+src/features/admin/          admin page data
 src/pipeline/                runner-neutral job logic
   ingest/                    sources.ts, feeds, email-text, redirects, url, extract (gpt-6-luna), paywall,
                              ingest-store, telegram, schedule, start-ingest, run-ingest

@@ -1,7 +1,6 @@
-/** Board-side helpers for native drafts (#79). Safe for client components. */
+/** Board-side helpers for drafts (#79). Safe for client components. */
 
 export interface DraftingSummary {
-  owner: "n8n" | "native";
   /** Newest first. */
   drafts: { id: number; version: number; status: string }[];
   nextVersion: number;
@@ -27,7 +26,7 @@ export function jsonPost(body: unknown = {}): RequestInit {
 
 /** Shown before a commit when the date already has drafts. */
 export function secondCommitNotice(drafting: DraftingSummary | null): string | null {
-  if (drafting?.owner !== "native" || drafting.drafts.length === 0) return null;
+  if (!drafting || drafting.drafts.length === 0) return null;
   return `This makes draft v${drafting.nextVersion} and a new GHL template. Earlier drafts stay in GHL.`;
 }
 

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { DraftOwnerError, IssuePublishedError, NewImageError } from "@/src/pipeline/draft/draft-store";
+import { IssuePublishedError, NewImageError } from "@/src/pipeline/draft/draft-store";
 import { createApprovalSessionToken } from "@/src/server/approval-auth";
 
 const newImage = vi.hoisted(() => ({ chooseNewImage: vi.fn() }));
@@ -73,7 +73,6 @@ describe("POST /api/approval/drafts/[id]/image (Use this image)", () => {
     [404, new NewImageError("Draft 41 does not exist.", "missing")],
     [409, new NewImageError("Draft 41 is failed. Only a ready draft can get a new image.", "not_ready")],
     [409, new IssuePublishedError(3, "2026-05-21")],
-    [409, new DraftOwnerError()],
     [409, new NewImageError('Draft v1 is not the newest draft: v2 is running. Use "New image" on the newest ready draft.', "not_current")],
     [500, new NewImageConfigError("S3_BUCKET is not set on this deploy, so the chosen image cannot be checked.")],
   ])("answers %i with the plain reason", async (status, error) => {

@@ -5,7 +5,6 @@ import { EmptyNote, linkClass, PageHeader, RunStatusBadge, SectionTitle, Severit
 import { formatDuration, formatTime } from "@/src/features/admin/format";
 import { listIncidents } from "@/src/features/admin/incidents";
 import { listRecentRuns } from "@/src/features/admin/runs";
-import { readSettings } from "@/src/features/admin/settings";
 import { requireAdminPage } from "@/src/server/admin-auth";
 
 export const dynamic = "force-dynamic";
@@ -17,8 +16,7 @@ const OPEN_SHOWN = 3;
 
 export default async function AdminOverviewPage() {
   await requireAdminPage("/admin");
-  const [{ stageSwitches }, incidents, { runs }] = await Promise.all([
-    readSettings(),
+  const [incidents, { runs }] = await Promise.all([
     listIncidents(),
     listRecentRuns({ limit: LATEST_RUNS }),
   ]);
@@ -26,24 +24,10 @@ export default async function AdminOverviewPage() {
   return (
     <>
       <PageHeader eyebrow="Operations" title="The pipeline at a glance">
-        Who owns each stage, what is wrong right now, and the latest runs.
+        What is wrong right now, and the latest runs.
       </PageHeader>
 
       <section>
-        <SectionTitle aside={<Link href="/admin/settings" className={linkClass}>Change →</Link>}>Stage owners</SectionTitle>
-        <dl className="grid gap-4 sm:grid-cols-3">
-          {stageSwitches.map((view) => (
-            <div key={view.key} className="rounded-[16px] border border-[var(--border-light)] bg-[var(--bg-card)] px-5 py-4">
-              <dt className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--text-muted)]">{view.stage}</dt>
-              <dd className="mt-1 font-serif text-2xl italic text-[var(--text-primary)]">
-                {view.options.find((option) => option.isCurrent)?.label ?? view.current}
-              </dd>
-            </div>
-          ))}
-        </dl>
-      </section>
-
-      <section className="mt-12">
         <SectionTitle aside={<Link href="/admin/incidents" className={linkClass}>All incidents →</Link>}>
           {incidents.open.length === 1 ? "1 open incident" : `${incidents.open.length} open incidents`}
         </SectionTitle>

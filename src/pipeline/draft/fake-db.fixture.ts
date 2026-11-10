@@ -210,8 +210,6 @@ export function createFakeDb() {
       state.locks.length = 0;
       state.issueUpdateError = null;
       nextId = 1000n;
-      // Native drafting is on unless a test turns it off.
-      state.settings.rows.push({ id: 1n, key: "draft.owner", value: "native" });
     },
   };
 }

@@ -23,7 +23,6 @@ export function normalDay(overrides: Partial<DayFacts> = {}): DayFacts {
     date: "2026-11-10",
     weekday: "Tue",
     skipped: null,
-    ingestOwner: "native",
     ingestRun: { id: "41", status: "succeeded", startedAt: new Date("2026-11-10T14:55:00Z") },
     weekdayTotals: [78, 85, 80, 90, 76, 82, 88, 79], // median 81
     queuedStories: 23,

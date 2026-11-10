@@ -3,7 +3,6 @@ import { ISSUE_DRAFT, ISSUE_PUBLISHED } from "@/src/features/newsletter/issue-st
 import { toIssueContentJson, type WrittenIssueContent } from "@/src/pipeline/draft/content";
 import { emailImageUrl } from "@/src/pipeline/draft/email-html";
 import type { ApprovalOutline } from "@/src/pipeline/draft/outline";
-import { readDraftOwner } from "@/src/pipeline/draft/outline-store";
 import type { PartialDraft, ProducedDraft } from "@/src/pipeline/draft/produce-draft";
 import { finishRun, logEvent, startRun } from "@/src/pipeline/runs";
 import { prisma } from "@/src/server/prisma";
@@ -37,13 +36,6 @@ export class DraftNotRetryableError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "DraftNotRetryableError";
-  }
-}
-
-export class DraftOwnerError extends Error {
-  constructor() {
-    super("draft.owner is n8n, so native drafting is off.");
-    this.name = "DraftOwnerError";
   }
 }
 
@@ -100,19 +92,17 @@ async function lockIssueDate(tx: Client, date: string): Promise<void> {
   await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`issue-date:${date}`}))`;
 }
 
-/** Any published issue for the date. n8n could leave several issue rows for one date, so check them all. */
+/** The date's issue, if it is published. */
 async function publishedIssueFor(client: Client, date: string): Promise<{ id: bigint } | null> {
   return client.issue.findFirst({ where: { issueDate: day(date), status: ISSUE_PUBLISHED }, select: { id: true } });
 }
 
 /**
  * Finds the outline's issue, or creates it, and adds the next draft as `running`. Never creates a second issue
- * for a date. When n8n left several, it uses the latest unpublished one. Throws `DraftOwnerError` unless
- * `draft.owner` is native, and `IssuePublishedError` if any issue for the date is published.
+ * for a date. Throws `IssuePublishedError` if the date's issue is published.
  */
 export async function createDraft(outlineId: Id, options: { now?: () => Date } = {}): Promise<CreatedDraft> {
   const now = (options.now ?? (() => new Date()))();
-  if ((await readDraftOwner()) !== "native") throw new DraftOwnerError();
   const outline = await prisma.approvalOutline.findUnique({
     where: { id: BigInt(outlineId) },
     select: { id: true, issueDate: true },
@@ -222,7 +212,7 @@ async function readSourceDraft(draftId: Id): Promise<{ source: ImageSource; outl
 /**
  * "Use this image" (#116, ADR 0002): the issue's next draft, with the source draft's written content and the
  * owner's chosen image. The draft job copies the content, so it does not write again, and makes new HTML and a
- * new GHL template. The source draft is not changed. Same owner, published, and per-date lock rules as a commit.
+ * new GHL template. The source draft is not changed. Same published and per-date lock rules as a commit.
  */
 export async function createImageDraft(
   sourceDraftId: Id,
@@ -230,7 +220,6 @@ export async function createImageDraft(
   options: { now?: () => Date } = {},
 ): Promise<CreatedDraft> {
   const now = (options.now ?? (() => new Date()))();
-  if ((await readDraftOwner()) !== "native") throw new DraftOwnerError();
   const { source, outlineId } = await readSourceDraft(sourceDraftId);
 
   return prisma.$transaction(async (tx) => {

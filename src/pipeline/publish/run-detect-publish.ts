@@ -18,10 +18,6 @@ import { readSetting } from "@/src/pipeline/settings";
  * lookback window, so the polls keep Neon asleep on most runs.
  */
 
-/** Rule R1: one owner for publish detection. `n8n` (the default) means this job does nothing. */
-export const PUBLISH_OWNER_KEY = "publish.owner";
-export type PublishOwner = "n8n" | "shadow" | "native";
-
 /** Which job runner acts. The other one stops after its Gmail check. Missing means `netlify`. */
 export const PIPELINE_RUNNER_KEY = "pipeline.runner";
 export type PipelineRunner = "netlify" | "trigger";
@@ -29,11 +25,6 @@ export type PipelineRunner = "netlify" | "trigger";
 const JOB = "detect-publish";
 // A send is 2 seed copies. 20 covers several days of sends plus unrelated mail.
 const MESSAGE_LIMIT = 20;
-
-export async function readPublishOwner(): Promise<PublishOwner> {
-  const value = await readSetting(PUBLISH_OWNER_KEY);
-  return value === "shadow" || value === "native" ? value : "n8n";
-}
 
 export async function readPipelineRunner(): Promise<PipelineRunner> {
   return (await readSetting(PIPELINE_RUNNER_KEY)) === "trigger" ? "trigger" : "netlify";
@@ -46,11 +37,9 @@ export type RunDetectPublishResult =
   | { status: "outside_window" }
   | { status: "not_configured"; reason: string }
   | { status: "no_mail" }
-  | { status: "off" }
   | { status: "other_runner"; runner: PipelineRunner }
   | {
       status: "ran";
-      owner: Exclude<PublishOwner, "n8n">;
       summary: DetectPublishSummary;
       /** Set when the run was recorded in `pipeline_runs` (only when there was new mail or an error). */
       runId?: string;
@@ -90,15 +79,13 @@ export async function runDetectPublish(
   if (messageIds.length === 0) return { status: "no_mail" };
 
   // From here on the database is awake anyway.
-  const owner = await readPublishOwner();
-  if (owner === "n8n") return { status: "off" };
   const selected = await readPipelineRunner();
   if (selected !== runner) return { status: "other_runner", runner: selected };
 
   const store = options.store ?? createPrismaPublishStore();
-  const summary = await detectPublish({ gmail, store }, { mode: owner, messageIds });
+  const summary = await detectPublish({ gmail, store }, { messageIds });
   // Most polls see mail they already handled. Record a run only when something happened.
-  if (summary.results.length === 0 && summary.errors.length === 0) return { status: "ran", owner, summary };
+  if (summary.results.length === 0 && summary.errors.length === 0) return { status: "ran", summary };
 
   const runId = await startRun({ job: JOB, trigger: "schedule" }, now());
   for (const result of summary.results) {
@@ -121,7 +108,6 @@ export async function runDetectPublish(
   const siteRefresh = published ? await refreshSiteAfterPublish(runId, options.refreshSite) : undefined;
 
   const stats = {
-    owner,
     runner,
     lookbackMinutes,
     listed: summary.listed,
@@ -136,7 +122,7 @@ export async function runDetectPublish(
       : { status: "succeeded", stats },
     now(),
   );
-  return { status: "ran", owner, summary, runId: runId.toString(), ...(siteRefresh && { siteRefresh }) };
+  return { status: "ran", summary, runId: runId.toString(), ...(siteRefresh && { siteRefresh }) };
 }
 
 /** A failed refresh only delays the lists by up to an hour, so it is a warning, not a failed run. */
@@ -193,15 +179,13 @@ export function describePublishRun(result: RunDetectPublishResult): string {
       return `${result.reason} Nothing to do.`;
     case "no_mail":
       return "No new issue email. The database was not touched.";
-    case "off":
-      return "n8n owns publishing (publish.owner). Nothing to do.";
     case "other_runner":
       return `pipeline.runner is ${result.runner}. This runner does nothing.`;
     case "ran": {
       const { listed, skipped, results, errors } = result.summary;
       const refresh = result.siteRefresh ? ` Site refresh: ${result.siteRefresh}.` : "";
       const run = result.runId ? ` Pipeline run ${result.runId}.` : "";
-      return `${result.owner}: listed ${listed}, skipped ${skipped}, handled ${results.length}, failed ${errors.length}.${refresh}${run}`;
+      return `Listed ${listed}, skipped ${skipped}, handled ${results.length}, failed ${errors.length}.${refresh}${run}`;
     }
   }
 }

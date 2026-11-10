@@ -7,8 +7,7 @@ import { applyStoryChanges, type StoryChanges } from "@/src/pipeline/draft/story
 export { DRAFT_START_STEP } from "@/src/pipeline/draft/draft-store";
 
 /**
- * A commit and a retry while `draft.owner` is native (#79). The routes call these; the draft-issue background
- * function does the drafting. Neither calls n8n.
+ * A commit and a retry (#79). The routes call these; the draft-issue background function does the drafting.
  */
 
 export type DraftStart = { started: true } | { started: false; error: string };
@@ -54,7 +53,7 @@ export async function commitNativeDraft(
   target: DraftJobTarget,
   options: StartDraftOptions = {},
 ): Promise<NativeCommit> {
-  const saved = await saveOutline(outline, "native");
+  const saved = await saveOutline(outline);
   const storyChanges = await applyStoryChanges(outline);
   const draft = await createDraft(saved.id, { now: options.now });
   const start = await startDraftOrMarkFailed(draft.draftId, target, options);

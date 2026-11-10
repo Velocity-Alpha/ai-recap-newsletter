@@ -99,7 +99,7 @@ function ingestRunCheck(facts: DayFacts, runMissing: boolean, context: CheckCont
       ? {
           severity: "critical",
           what: `No ingest run today (${date}).`,
-          evidence: `No ingest-stories run in pipeline_runs since 00:00 New York, and ingest.owner is native. ${stories(facts.storyTotal)} ingested on ${date}.`,
+          evidence: `No ingest-stories run in pipeline_runs since 00:00 New York. ${stories(facts.storyTotal)} ingested on ${date}.`,
           link: context.runLink,
         }
       : null,
@@ -166,7 +166,7 @@ function sourceChecks(facts: DayFacts, context: CheckContext): Finding[] {
  * - no stories or no ingest run: the per-source warnings would only repeat the critical.
  */
 function storyChecks(time: CheckTime, facts: DayFacts, context: CheckContext): { findings: Finding[]; notes: string[] } {
-  const runMissing = facts.ingestOwner === "native" && !facts.ingestRun;
+  const runMissing = !facts.ingestRun;
   const findings = [ingestRunCheck(facts, runMissing, context)];
 
   if (time === "10:05" && facts.ingestRun?.status === "running") {

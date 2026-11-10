@@ -87,10 +87,6 @@ _Avoid_: holiday, day off
 **Stage**:
 One step of the daily pipeline: ingest, draft, or publish.
 
-**Stage owner**:
-A leftover setting from the move off n8n that says which system does a stage. Every stage is `native` now.
-_Avoid_: mode, flag
-
 **Seed inbox**:
 The mailbox that receives a copy of every sent issue. Its copy is how the system knows an issue was sent.
 

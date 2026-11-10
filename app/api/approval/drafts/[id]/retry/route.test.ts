@@ -6,9 +6,6 @@ import { createApprovalSessionToken } from "@/src/server/approval-auth";
 const nativeCommit = vi.hoisted(() => ({ retryNativeDraft: vi.fn() }));
 vi.mock("@/src/pipeline/draft/native-commit", () => nativeCommit);
 
-const outlineStore = vi.hoisted(() => ({ readDraftOwner: vi.fn() }));
-vi.mock("@/src/pipeline/draft/outline-store", () => outlineStore);
-
 import { POST } from "@/app/api/approval/drafts/[id]/retry/route";
 
 const DRAFT = { draftId: 41, issueId: 3, version: 2, issueDate: "2026-05-21" };
@@ -30,7 +27,6 @@ describe("POST /api/approval/drafts/[id]/retry", () => {
     vi.clearAllMocks();
     process.env.APPROVAL_PASSWORD = "approval-secret";
     process.env.SESSION_SECRET = "test-session-secret";
-    outlineStore.readDraftOwner.mockResolvedValue("native");
     nativeCommit.retryNativeDraft.mockResolvedValue({ draft: DRAFT, start: { started: true } });
   });
 
@@ -54,16 +50,6 @@ describe("POST /api/approval/drafts/[id]/retry", () => {
     expect(response.status).toBe(200);
     expect(nativeCommit.retryNativeDraft).toHaveBeenCalledWith(41, { siteUrl: "https://deploy-preview-9--ai-recap.netlify.app" });
     expect(json).toEqual({ success: true, draft: DRAFT });
-  });
-
-  it("refuses while n8n drafts", async () => {
-    outlineStore.readDraftOwner.mockResolvedValue("n8n");
-
-    const { response, json } = await retry("41");
-
-    expect(response.status).toBe(409);
-    expect(json.error).toContain("draft.owner is n8n");
-    expect(nativeCommit.retryNativeDraft).not.toHaveBeenCalled();
   });
 
   it.each([

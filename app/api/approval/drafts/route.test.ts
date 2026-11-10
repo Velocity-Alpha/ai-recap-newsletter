@@ -5,9 +5,6 @@ import { createApprovalSessionToken } from "@/src/server/approval-auth";
 const board = vi.hoisted(() => ({ listDraftsForBoard: vi.fn() }));
 vi.mock("@/src/pipeline/draft/draft-board", () => board);
 
-const outlineStore = vi.hoisted(() => ({ readDraftOwner: vi.fn() }));
-vi.mock("@/src/pipeline/draft/outline-store", () => outlineStore);
-
 import { GET } from "@/app/api/approval/drafts/route";
 
 const ENTRY = {
@@ -38,7 +35,6 @@ describe("GET /api/approval/drafts", () => {
     vi.clearAllMocks();
     process.env.APPROVAL_PASSWORD = "approval-secret";
     process.env.SESSION_SECRET = "test-session-secret";
-    outlineStore.readDraftOwner.mockResolvedValue("native");
     board.listDraftsForBoard.mockResolvedValue([ENTRY, { ...ENTRY, id: 40, version: 1 }]);
   });
 
@@ -61,15 +57,14 @@ describe("GET /api/approval/drafts", () => {
 
     expect(response.status).toBe(200);
     expect(board.listDraftsForBoard).toHaveBeenCalledWith("2026-05-21");
-    expect(json).toEqual({ owner: "native", drafts: [ENTRY, { ...ENTRY, id: 40, version: 1 }], nextVersion: 3 });
+    expect(json).toEqual({ drafts: [ENTRY, { ...ENTRY, id: 40, version: 1 }], nextVersion: 3 });
   });
 
-  it("reads no drafts while n8n drafts, so the board works as before", async () => {
-    outlineStore.readDraftOwner.mockResolvedValue("n8n");
+  it("says the next commit makes v1 when the date has no drafts", async () => {
+    board.listDraftsForBoard.mockResolvedValue([]);
 
     const { json } = await get("?date=2026-05-21");
 
-    expect(json).toEqual({ owner: "n8n", drafts: [], nextVersion: 1 });
-    expect(board.listDraftsForBoard).not.toHaveBeenCalled();
+    expect(json).toEqual({ drafts: [], nextVersion: 1 });
   });
 });

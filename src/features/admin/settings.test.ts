@@ -13,7 +13,7 @@ describe("readSettings", () => {
 
   it("lists every pipeline_settings row by key, with its JSON value and update time", async () => {
     prismaMock.pipelineSetting.findMany.mockResolvedValueOnce([
-      { key: "ingest.owner", value: "native", updatedAt: UPDATED },
+      { key: "check.deadline", value: "18:00", updatedAt: UPDATED },
       { key: "pipeline.runner", value: "netlify", updatedAt: UPDATED },
       { key: "threshold:stories:min-ratio", value: { ratio: 0.5 }, updatedAt: UPDATED },
     ]);
@@ -22,24 +22,9 @@ describe("readSettings", () => {
 
     expect(prismaMock.pipelineSetting.findMany).toHaveBeenCalledWith({ orderBy: { key: "asc" } });
     expect(settings.rows).toEqual([
-      { key: "ingest.owner", value: '"native"', updatedAt: UPDATED },
+      { key: "check.deadline", value: '"18:00"', updatedAt: UPDATED },
       { key: "pipeline.runner", value: '"netlify"', updatedAt: UPDATED },
       { key: "threshold:stories:min-ratio", value: '{"ratio":0.5}', updatedAt: UPDATED },
-    ]);
-  });
-
-  it("builds a stage switch for each stage from the same rows, with the default when a row is missing", async () => {
-    prismaMock.pipelineSetting.findMany.mockResolvedValueOnce([
-      { key: "ingest.owner", value: "native", updatedAt: UPDATED },
-      { key: "publish.owner", value: "shadow", updatedAt: UPDATED },
-    ]);
-
-    const { stageSwitches } = await readSettings();
-
-    expect(stageSwitches.map((view) => [view.key, view.current, view.isSet])).toEqual([
-      ["ingest.owner", "native", true],
-      ["draft.owner", "n8n", false],
-      ["publish.owner", "shadow", true],
     ]);
   });
 });

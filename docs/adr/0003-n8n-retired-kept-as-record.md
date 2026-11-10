@@ -21,4 +21,4 @@ step used to work.
 - Do not reactivate, edit, or call an AI Recap workflow. The same n8n instance runs other products; do not
   touch those either.
 - Native code keeps using the same GHL, S3, OpenAI, and Vertex keys. Nothing is revoked.
-- The stage-owner switches left in the code are removed in #147.
+- The code has no switch back to n8n: the stage-owner settings and the commit forward are removed (#147).

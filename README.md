@@ -116,8 +116,7 @@ Mutation routes:
 - `POST /api/approval/drafts/[id]/image` "Use this image": `{ imageUrl, scenePrompt }` from "generate" becomes the issue's next draft, with the same text, new HTML, and a new GHL template; it starts `draft-issue-background` (approval session)
 - `POST /api/approval/skipped-dates` with `{ date, note? }` marks a skipped date, and `DELETE /api/approval/skipped-dates?date=` undoes it, until that day is over (approval session). Used by "No issue today" on `/approval`.
 - `POST /api/approval/issues/[id]/publish` publishes an unpublished draft from its stored email HTML (approval session). Used by the "Mark as published" button on `/approval/issues`. It sends no email.
-- `POST /api/admin/stage-switches` sets a stage switch (approval session). The switches are left from the n8n migration: every stage is `native`, and `n8n` no longer works. Do not use it; #147 removes it.
-- `proxy.ts` refuses writes (any method but GET, HEAD, OPTIONS) to `/approval/*`, `/api/approval/*`, `/api/newsletters/commit`, and `/api/admin/*` unless they come from this site's own origin (`403`), and refuses API writes that are not `Content-Type: application/json` (`415`). See `src/server/same-origin.ts`.
+- `proxy.ts` refuses writes (any method but GET, HEAD, OPTIONS) to `/approval/*`, `/api/approval/*`, `/api/newsletters/commit`, and `/api/admin/*` (no routes today) unless they come from this site's own origin (`403`), and refuses API writes that are not `Content-Type: application/json` (`415`). See `src/server/same-origin.ts`.
 - `POST /api/revalidate` refreshes the cached issue lists, issue pages, and sitemap. It needs `Authorization: Bearer <token>`, a 5-minute token signed with a key derived from `SESSION_SECRET` (`src/server/cache-refresh-auth.ts`). The publish job calls it after it publishes an issue.
 
 Public unsubscribe page:
@@ -180,4 +179,3 @@ Optional:
 
 Google Analytics IDs (`NEXT_PUBLIC_GA_MEASUREMENT_ID`) and `APP_ENV` are set per deploy context in `netlify.toml`. `APP_ENV` is also a Netlify env var with the same values, because functions cannot read `netlify.toml` at runtime.
 
-Left from the n8n migration and unused while every stage is `native`: `N8N_WEBHOOK_JWT_SECRET`, `OUTLINE_COMMIT_WEBHOOK_URL`. #147 removes them.
