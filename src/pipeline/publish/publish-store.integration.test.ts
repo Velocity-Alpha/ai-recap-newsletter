@@ -89,10 +89,10 @@ describe.skipIf(!enabled)("publish store on a real database", () => {
   });
 
   it("records a message once per mode and reports which messages it has seen", async () => {
-    await store.recordEvent({ ...event("c"), mode: "shadow", outcome: "would_publish" });
-    await store.recordEvent({ ...event("c"), mode: "shadow", outcome: "would_publish" });
+    await store.recordEvent({ ...event("c"), mode: "manual", outcome: "published" });
+    await store.recordEvent({ ...event("c"), mode: "manual", outcome: "published" });
 
-    const seen = await store.knownMessageIds("shadow", [`${tag}-c`, `${tag}-missing`]);
+    const seen = await store.knownMessageIds("manual", [`${tag}-c`, `${tag}-missing`]);
 
     expect([...seen]).toEqual([`${tag}-c`]);
     expect(await prisma.publishEvent.count({ where: { gmailMessageId: `${tag}-c` } })).toBe(1);

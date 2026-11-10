@@ -33,10 +33,14 @@ model Issue {
   featureImageUrl     String?   @map("feature_image_url")
   excerpt             String?
   contentJson         Json?     @map("content_json")
-  issueDate           DateTime? @map("issue_date") @db.Date
+  /// At most one issue per date (#82).
+  issueDate           DateTime? @unique @map("issue_date") @db.Date
   promptFeaturedImage String?   @map("prompt_featured_image")
   slug                String?   @unique @default(dbgenerated("COALESCE(newsletter.slugify_issue_title(title), (id)::text)"))
   note                String?
+  /// 'draft' or 'published' (#82). The database computes it from published_at (a generated column), so never
+  /// write it. Read it to ask "is this issue published?"; read published_at for the time.
+  status              String    @default(dbgenerated())
 
   @@unique([title, publishedAt], map: "issues_title_published_unique")
   @@index([createdAt(sort: Desc)])
@@ -222,15 +226,14 @@ model RateLimit {
 }
 
 /// One row per board commit (#75): the normalised outline, its sha256, and who drafted it.
-/// draft_owner is 'n8n' or 'native' (CHECK constraint in the migration).
-/// forwarded_at is when n8n answered 2xx to the forwarded commit. It stays null under native drafting
-/// (issue_drafts tracks that) and when n8n never accepted the commit.
+/// draft_owner and forwarded_at are left from the move off n8n. Nothing reads or writes them; draft_owner has a
+/// default so inserts work without it. Issue #151 drops both.
 model ApprovalOutline {
   id          BigInt    @id @default(autoincrement())
   issueDate   DateTime  @map("issue_date") @db.Date
   payload     Json
   payloadHash String    @map("payload_hash")
-  draftOwner  String    @map("draft_owner")
+  draftOwner  String    @default("native") @map("draft_owner")
   committedAt DateTime  @default(now()) @map("committed_at") @db.Timestamptz(6)
   forwardedAt DateTime? @map("forwarded_at") @db.Timestamptz(6)
 

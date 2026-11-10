@@ -1,6 +1,5 @@
 import {
   createImageDraft,
-  DraftOwnerError,
   IssuePublishedError,
   NewImageError,
   readImageSource,
@@ -9,7 +8,6 @@ import {
 import { checkOwnImage, FeaturedImageError, makeImageFromScene, type FeaturedImage } from "@/src/pipeline/draft/image/featured-image";
 import { suggestSceneIdeas, type SceneIdea } from "@/src/pipeline/draft/image/scene-ideas";
 import { startDraftOrMarkFailed, type DraftStart } from "@/src/pipeline/draft/native-commit";
-import { readDraftOwner } from "@/src/pipeline/draft/outline-store";
 import { imageContextFor } from "@/src/pipeline/draft/produce-draft";
 import type { DraftJobTarget, StartDraftOptions } from "@/src/pipeline/draft/start-draft";
 
@@ -55,11 +53,6 @@ export class NewImageServiceError extends Error {
 
 type Env = Record<string, string | undefined>;
 
-async function readSource(draftId: number) {
-  if ((await readDraftOwner()) !== "native") throw new DraftOwnerError();
-  return readImageSource(draftId);
-}
-
 function sceneFrom(value: unknown): string {
   if (typeof value !== "string" || !value.trim()) throw new NewImageInputError("Write a scene prompt first.");
   const scene = value.trim();
@@ -72,7 +65,7 @@ function sceneFrom(value: unknown): string {
 /** Three scene ideas from the draft's subject line and top stories (one GPT-6 Luna call). */
 export async function suggestIdeasForDraft(draftId: number, options: { env?: Env } = {}): Promise<SceneIdea[]> {
   const env = options.env ?? process.env;
-  const source = await readSource(draftId);
+  const source = await readImageSource(draftId);
   try {
     return await suggestSceneIdeas(imageContextFor(source.content), { apiKey: env.OPENAI_API_KEY });
   } catch (error) {
@@ -87,7 +80,7 @@ export async function suggestIdeasForDraft(draftId: number, options: { env?: Env
 export async function generateImageForDraft(draftId: number, body: unknown, options: { env?: Env } = {}): Promise<FeaturedImage> {
   const env = options.env ?? process.env;
   const scenePrompt = sceneFrom((body as { scenePrompt?: unknown } | null)?.scenePrompt);
-  const source = await readSource(draftId);
+  const source = await readImageSource(draftId);
   return makeImageFromScene(
     { scenePrompt, issueDate: source.issueDate },
     {
@@ -117,7 +110,7 @@ export async function chooseNewImage(
     throw new NewImageInputError("Send the image and its scene prompt.");
   }
   const image = { imageUrl: imageUrl.trim(), scenePrompt: sceneFrom(scenePrompt) };
-  const source = await readSource(draftId);
+  const source = await readImageSource(draftId);
   try {
     checkOwnImage(image, source.issueDate, { appEnv: env.APP_ENV, bucket: env.S3_BUCKET });
   } catch (error) {
@@ -134,7 +127,7 @@ export function newImageErrorResponse(error: unknown): { status: number; error: 
   if (error instanceof NewImageInputError) return { status: 400, error: error.message };
   if (error instanceof NewImageConfigError) return { status: 500, error: error.message };
   if (error instanceof NewImageError) return { status: error.reason === "missing" ? 404 : 409, error: error.message };
-  if (error instanceof IssuePublishedError || error instanceof DraftOwnerError) return { status: 409, error: error.message };
+  if (error instanceof IssuePublishedError) return { status: 409, error: error.message };
   if (error instanceof FeaturedImageError || error instanceof NewImageServiceError) return { status: 502, error: error.message };
   return null;
 }

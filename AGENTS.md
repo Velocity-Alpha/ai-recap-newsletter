@@ -1,87 +1,60 @@
 # AI Recap Newsletter Agent Guide
 
+This file loads in every conversation. Keep it short: rules that always apply go here, everything else goes in
+a doc listed under "Read when needed".
+
 ## Product
 
-- AI Recap is an automated AI newsletter product.
-- The goal is operational reliability first: subscriber access, issue rendering, and API behavior should stay stable.
-- The product should feel like a high-end editorial daily briefing: authoritative and warm, not corporate or SaaS-y.
+- AI Recap is an automated weekday AI newsletter.
+- Reliability comes first: subscriber access, issue rendering, and API behavior must stay stable.
+- It should feel like a high-end editorial daily briefing: authoritative and warm, not corporate or SaaS-y.
 
-## System Context
+## System
 
-- Content + publishing website: Next.js App Router app in this repo.
-- Automation/ops pipeline: story ingestion, drafting, and publish detection run as Netlify functions in this repo
-  (`src/pipeline/`, `netlify/functions/`). n8n owns no stage since 2026-11-09; its workflows stay for rollback. See
-  [docs/architecture.html](./docs/architecture.html).
-- Newsletter subscription source of truth is split across this app and external automations like GHL.
-- GHL sends the actual emails.
+- One repo: a Next.js App Router site on Netlify, plus the pipeline jobs (ingest, draft, publish detection,
+  checks) as Netlify functions. Job logic is in `src/pipeline/`; `netlify/functions/` holds thin wrappers.
+- Data: Postgres on Neon through Prisma. Tests: Vitest. Styling: Tailwind CSS 4.
+- The owner sends each issue by hand in GoHighLevel (GHL). GHL emails the subscribers. Subscriber records
+  live in both this app and GHL.
+- n8n is retired. Never call or change it.
 
-## Stack
+## Rules
 
-- Next.js 16
-- React 18
-- TypeScript
-- Postgres on Neon via Prisma
-- Tailwind CSS 4
-- Vitest
-- ESLint
-- Netlify deployment
+- Use test-driven development. Update tests when behavior changes.
+- Read the code path before you change it. Keep changes small.
+- A change is done only when its automated checks pass. If you cannot run a check, say so in the handoff.
+- Run `APP_ENV=development npm run verify` (lint, tests, build) before every push.
+- Never run tests or jobs against the production database. Use the Neon `dev` branch.
+- Do not run `npm run prisma:migrate:prod:deploy` without the owner. Apply each migration to `dev` first.
+- The repo is public: no secrets, subscriber data, or open security details in code, docs, or issues.
+- Use the words in `GLOSSARY.md`.
 
-## Coding Rules
+## Commands
 
-- Use test-driven development by default.
-- Follow SOLID principles where they improve clarity and maintainability.
-- Do not mark a feature/fix as done until it is fully verified with the relevant automated checks.
-- Prefer targeted tests while iterating, then broader verification when the scope justifies it.
-- If you cannot run a needed check, say so explicitly in the handoff.
+- `npx vitest run <path>` runs some tests. `npm test` runs all.
+- `npm run db:reset-dev` resets the Neon `dev` branch. `npm run prisma:migrate:status` shows migration state.
 
-## Workflow Expectations
+## Docs
 
-- Read the relevant code paths before making assumptions.
-- Keep changes small and coherent.
-- Add brief comments only where the intent would otherwise be easy to misread.
-- Update tests when behavior changes.
-- Prioritize safe schema changes using Neon's branching and migration best practices.
-- Use modern Tailwind 4 and Next.js App Router patterns.
+- When jobs, services, data, or env vars change, update `docs/architecture.html` in the same PR.
+- Describe the system as it is now. Replace old text; do not append to it. Leave history to git and ADRs.
 
-## Key References
+## Read when needed
 
-- Read first: current and target architecture (stage owners, daily flow, jobs, services, data, env vars,
-  what n8n still does). Update it in the same PR when any of these change:
-  [docs/architecture.html](./docs/architecture.html)
-- README for setup, env vars, deploy, and API inventory:
-  [README.md](./README.md)
-- Prisma schema:
-  [prisma/schema.prisma](./prisma/schema.prisma)
+| Read | When |
+|---|---|
+| [docs/architecture.html](./docs/architecture.html) | Before work on the pipeline, jobs, data, or services |
+| [GLOSSARY.md](./GLOSSARY.md) | Before you name something |
+| [README.md](./README.md) | Setup, env vars, migrations, deploy, API routes |
+| [docs/pipeline/runbook.md](./docs/pipeline/runbook.md) | An incident or alert |
+| [docs/pipeline/adding-a-source.md](./docs/pipeline/adding-a-source.md) | Adding a news source |
+| [docs/adr/](./docs/adr/) | Before you change a past decision |
+| [docs/n8n-backend/](./docs/n8n-backend/), [docs/research/](./docs/research/) | History only: the old n8n system and past research. Not the current system |
 
 ## Agent skills
 
-### Issue tracker
-
-Issues live in GitHub Issues for `Velocity-Alpha/ai-recap-newsletter`, managed with the `gh` CLI. See `docs/agents/issue-tracker.md`.
-
-### Triage labels
-
-The five default labels, used as-is: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
-
-### Domain docs
-
-Single-context: one `GLOSSARY.md` and `docs/adr/` at the repo root, created when needed. See `docs/agents/domain.md`.
-
-## Pipeline
-
-The pipeline jobs (ingest, checks, drafting, publish detection) run as Netlify functions, not npm scripts.
-Run and test them with these commands:
-
-- `npx vitest run src/pipeline` runs the pipeline tests. `npm test` runs all tests.
-- `APP_ENV=development npm run verify` runs lint, tests and build. Run it before every push.
-- `npm run db:reset-dev` resets the Neon `dev` branch. `npm run prisma:migrate:status` shows migration state.
-- `npm run prisma:migrate:deploy` applies migrations to the database in `DATABASE_URL`;
-  `npm run prisma:migrate:prod:deploy` applies them to production. Do not run the production one without the owner.
-
-References:
-
-- [docs/architecture.html](./docs/architecture.html): stages, jobs, data, env vars.
-- [GLOSSARY.md](./GLOSSARY.md): the project's words.
-- [docs/adr/](./docs/adr/): decisions.
-- [docs/pipeline/runbook.md](./docs/pipeline/runbook.md): what each incident means and what to do.
-- [docs/pipeline/adding-a-source.md](./docs/pipeline/adding-a-source.md): how to add a news source.
+- **Issue tracker:** GitHub Issues for `Velocity-Alpha/ai-recap-newsletter`, with the `gh` CLI. See
+  `docs/agents/issue-tracker.md`.
+- **Triage labels:** `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See
+  `docs/agents/triage-labels.md`.
+- **Domain docs:** one `GLOSSARY.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.

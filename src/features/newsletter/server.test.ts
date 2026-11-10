@@ -127,6 +127,7 @@ describe("newsletter page data", () => {
       contentJson: { version: 2 },
       issueDate: new Date("2026-10-20T00:00:00.000Z"),
       publishedAt: new Date("2026-10-20T16:00:00.000Z"),
+      status: "published",
     });
     refreshPublishedIssues();
 
@@ -185,6 +186,7 @@ describe("newsletter page data", () => {
       contentJson: { version: 2 },
       issueDate: new Date("2026-10-19T00:00:00.000Z"),
       publishedAt: new Date("2026-10-19T16:00:00.000Z"),
+      status: "published",
     };
     prismaMock.issue.findUnique.mockResolvedValueOnce(issueRecord);
 

@@ -1,5 +1,7 @@
 # Migration plan: from n8n to a native AI Recap backend
 
+> **Historical. Finished 2026-11-10.** Every stage moved to native code, and n8n is retired ([ADR 0003](../adr/0003-n8n-retired-kept-as-record.md)). The plan to export and delete the workflows was dropped: they stay in n8n, disabled. The current system: [../architecture.html](../architecture.html).
+
 Status: **agreed with the owner on 2026-11-05** after a full review of the plan. Read [README.md](./README.md)
 first for how the system works today.
 

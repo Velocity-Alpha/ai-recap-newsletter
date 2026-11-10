@@ -23,7 +23,6 @@ import {
   createDraft,
   createImageDraft,
   DraftNotRetryableError,
-  DraftOwnerError,
   findDraftToRun,
   getDraftHtml,
   getDraftStatus,
@@ -43,13 +42,13 @@ const NOW = new Date("2027-01-04T15:00:00.000Z");
 
 async function outline(date = DATE): Promise<bigint> {
   const row = await fakeDb.client.approvalOutline.create({
-    data: { issueDate: new Date(`${date}T00:00:00.000Z`), payload: { ...SAMPLE_OUTLINE, date }, payloadHash: "h", draftOwner: "native" },
+    data: { issueDate: new Date(`${date}T00:00:00.000Z`), payload: { ...SAMPLE_OUTLINE, date }, payloadHash: "h" },
   });
   return (row as { id: bigint }).id;
 }
 
 async function issue(data: Record<string, unknown> = {}): Promise<bigint> {
-  const row = await fakeDb.client.issue.create({ data: { title: "An n8n draft", issueDate: DAY, ...data } });
+  const row = await fakeDb.client.issue.create({ data: { title: "A draft", issueDate: DAY, ...data } });
   return (row as { id: bigint }).id;
 }
 
@@ -82,19 +81,17 @@ describe("createDraft", () => {
     expect(second.draftId).not.toBe(first.draftId);
   });
 
-  it("drafts into the latest unpublished issue when n8n left several for the date", async () => {
-    await issue({ title: "Older n8n draft" });
-    const latest = await issue({ title: "Newer n8n draft" });
+  it("drafts into the date's issue when it already exists", async () => {
+    const existing = await issue({ title: "Today" });
     await issue({ title: "Another day", issueDate: new Date("2027-01-05T00:00:00.000Z") });
 
     const created = await createDraft(await outline());
 
-    expect(created).toMatchObject({ issueId: Number(latest), version: 1 });
-    expect(fakeDb.state.issues.rows).toHaveLength(3);
+    expect(created).toMatchObject({ issueId: Number(existing), version: 1 });
+    expect(fakeDb.state.issues.rows).toHaveLength(2);
   });
 
   it("stops when the date's issue is published, and creates nothing", async () => {
-    await issue({ title: "Unpublished duplicate" });
     const published = await issue({ title: "Sent", publishedAt: NOW });
 
     const attempt = createDraft(await outline());
@@ -112,17 +109,6 @@ describe("createDraft", () => {
     await createDraft(await outline(), { now: () => NOW });
 
     expect(fakeDb.state.drafts.rows[0]).toMatchObject({ queuedAt: NOW, startedAt: null });
-  });
-
-  it("refuses while n8n owns drafting, and creates nothing", async () => {
-    fakeDb.state.settings.rows[0].value = "n8n";
-
-    const attempt = createDraft(await outline());
-
-    await expect(attempt).rejects.toBeInstanceOf(DraftOwnerError);
-    await expect(attempt).rejects.toThrow("draft.owner is n8n, so native drafting is off.");
-    expect(fakeDb.state.issues.rows).toHaveLength(0);
-    expect(fakeDb.state.drafts.rows).toHaveLength(0);
   });
 });
 
@@ -355,14 +341,6 @@ describe("new image drafts (#116)", () => {
 
     await expect(getDraftStatus(source.draftId)).resolves.toMatchObject({ hasNewerDraft: false });
     await expect(createImageDraft(source.draftId, NEW_IMAGE, { now: () => NOW })).resolves.toMatchObject({ version: 3 });
-  });
-
-  it("refuses while n8n owns drafting", async () => {
-    const source = await readyDraft();
-    fakeDb.state.settings.rows[0].value = "n8n";
-
-    await expect(createImageDraft(source.draftId, NEW_IMAGE)).rejects.toBeInstanceOf(DraftOwnerError);
-    expect(fakeDb.state.drafts.rows).toHaveLength(1);
   });
 
   it("gives the job the source's content and the chosen image", async () => {

@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 
 import { DraftNotRetryableError, IssuePublishedError } from "@/src/pipeline/draft/draft-store";
 import { retryNativeDraft } from "@/src/pipeline/draft/native-commit";
-import { readDraftOwner } from "@/src/pipeline/draft/outline-store";
 import { hasValidApprovalSession } from "@/src/server/approval-auth";
 import { logServerError, logServerInfo } from "@/src/server/observability";
 import { positiveIdParam, type IdRouteContext } from "@/src/server/route-params";
@@ -18,13 +17,6 @@ export async function POST(request: Request, context: IdRouteContext) {
   if (!draftId) return NextResponse.json({ error: "Invalid draft id." }, { status: 400 });
 
   try {
-    if ((await readDraftOwner()) !== "native") {
-      return NextResponse.json(
-        { success: false, error: "draft.owner is n8n, so native drafting is off. Commit the outline again instead." },
-        { status: 409 },
-      );
-    }
-
     const { draft, start } = await retryNativeDraft(draftId, { siteUrl: new URL(request.url).origin });
     logServerInfo("approval.drafts.retry", { draftId, version: draft.version, started: start.started });
     if (!start.started) return NextResponse.json({ success: false, error: start.error, draft }, { status: 502 });

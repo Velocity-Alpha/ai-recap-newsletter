@@ -49,26 +49,17 @@ beforeEach(() => {
 });
 
 describe("runIngest", () => {
-  it("does nothing while n8n owns ingestion", async () => {
-    const ingest = vi.fn();
-    await expect(runIngest("netlify", { env: ENV, ingest })).resolves.toEqual({ status: "off" });
-    expect(ingest).not.toHaveBeenCalled();
-  });
-
   it("does nothing when the other runner is selected", async () => {
-    settings.set("ingest.owner", "native");
     settings.set("pipeline.runner", "trigger");
     await expect(runIngest("netlify", { env: ENV, ingest: vi.fn() })).resolves.toEqual({ status: "other_runner", runner: "trigger" });
   });
 
   it("names missing settings before it starts", async () => {
-    settings.set("ingest.owner", "native");
     const result = await runIngest("netlify", { env: { ...ENV, OPENAI_API_KEY: "" }, ingest: vi.fn() });
     expect(result).toEqual({ status: "not_configured", reason: "Missing setting: OPENAI_API_KEY." });
   });
 
   it("logs each source, sends the Telegram message in production, and records the run", async () => {
-    settings.set("ingest.owner", "native");
     const sendTelegram = vi.fn(async () => undefined);
     const result = await runIngest("netlify", { env: ENV, ingest: vi.fn(async () => ingestResult()), sendTelegram });
 
@@ -82,7 +73,6 @@ describe("runIngest", () => {
   });
 
   it("records the message instead of sending it outside production", async () => {
-    settings.set("ingest.owner", "native");
     const sendTelegram = vi.fn();
     const result = await runIngest("netlify", {
       env: { ...ENV, APP_ENV: "preview" },
@@ -97,7 +87,6 @@ describe("runIngest", () => {
   });
 
   it("marks the run failed when a source failed, and a Telegram failure is only a warning", async () => {
-    settings.set("ingest.owner", "native");
     const sendTelegram = vi.fn(async () => {
       throw new Error("Telegram sendMessage failed with HTTP 401 (Unauthorized).");
     });
@@ -112,7 +101,6 @@ describe("runIngest", () => {
 
 describe("describeIngestRun", () => {
   it("summarises a run for the function log", () => {
-    expect(describeIngestRun({ status: "off" })).toBe("n8n owns ingestion (ingest.owner). Nothing to do.");
     expect(
       describeIngestRun({ status: "ran", runId: "7", result: ingestResult(true), telegram: "sent" }),
     ).toBe("Run 7: 5 stories saved. Errors: TLDR. Telegram: sent.");

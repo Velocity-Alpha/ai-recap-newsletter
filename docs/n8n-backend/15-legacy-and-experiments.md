@@ -1,5 +1,7 @@
 # 15. Legacy, inactive and experimental workflows
 
+> **Historical.** This describes the n8n system that native code replaced in November 2026 ([ADR 0003](../adr/0003-n8n-retired-kept-as-record.md)). It is not the current system: see [../architecture.html](../architecture.html).
+
 Scope: the 18 AI Recap workflows that are not part of today's production pipeline. This covers the original
 end-to-end path (Fetch Newsletters → Agent - Extract and Store → 2. Sub: Create Issue (Upload to GHL)), its
 copies, the March 2026 Product Hunt feature branch, the scraping helpers, and the prototype and template

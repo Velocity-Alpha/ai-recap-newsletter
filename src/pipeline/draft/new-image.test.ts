@@ -14,7 +14,7 @@ vi.mock("@/src/pipeline/draft/image/featured-image", async (importOriginal) => (
   makeImageFromScene: images.makeImageFromScene,
 }));
 
-import { createDraft, DraftOwnerError, IssuePublishedError, NewImageError } from "@/src/pipeline/draft/draft-store";
+import { createDraft, IssuePublishedError, NewImageError } from "@/src/pipeline/draft/draft-store";
 import { SAMPLE_CONTENT, SAMPLE_OUTLINE } from "@/src/pipeline/draft/draft.fixture";
 import { fakeDb } from "@/src/pipeline/draft/fake-db.fixture";
 import { FeaturedImageError } from "@/src/pipeline/draft/image/featured-image";
@@ -41,7 +41,7 @@ const NEW_IMAGE = { imageUrl: `https://example-bucket.s3.amazonaws.com/newslette
 
 async function readyDraft() {
   const outline = (await fakeDb.client.approvalOutline.create({
-    data: { issueDate: new Date(`${DATE}T00:00:00.000Z`), payload: SAMPLE_OUTLINE, payloadHash: "h", draftOwner: "native" },
+    data: { issueDate: new Date(`${DATE}T00:00:00.000Z`), payload: SAMPLE_OUTLINE, payloadHash: "h" },
   })) as { id: bigint };
   const created = await createDraft(outline.id);
   await fakeDb.client.issueDraft.update({
@@ -76,14 +76,11 @@ describe("suggestIdeasForDraft", () => {
     );
   });
 
-  it("refuses a draft that is not ready, a published issue, and n8n drafting, without calling the model", async () => {
+  it("refuses a draft that is not ready and a published issue, without calling the model", async () => {
     const source = await readyDraft();
     const running = await createDraft(fakeDb.state.outlines.rows[0].id);
 
     await expect(suggestIdeasForDraft(running.draftId, { env: ENV })).rejects.toBeInstanceOf(NewImageError);
-    fakeDb.state.settings.rows[0].value = "n8n";
-    await expect(suggestIdeasForDraft(source.draftId, { env: ENV })).rejects.toBeInstanceOf(DraftOwnerError);
-    fakeDb.state.settings.rows[0].value = "native";
     await fakeDb.client.issue.update({ where: { id: BigInt(source.issueId) }, data: { publishedAt: NOW } });
     await expect(suggestIdeasForDraft(source.draftId, { env: ENV })).rejects.toBeInstanceOf(IssuePublishedError);
     expect(ideas.suggestSceneIdeas).not.toHaveBeenCalled();
@@ -222,7 +219,6 @@ describe("newImageErrorResponse", () => {
     expect(newImageErrorResponse(new NewImageError("Draft 9 does not exist.", "missing"))).toEqual({ status: 404, error: "Draft 9 does not exist." });
     expect(newImageErrorResponse(new NewImageError("Draft 9 is running.", "not_ready"))).toMatchObject({ status: 409 });
     expect(newImageErrorResponse(new IssuePublishedError(3, DATE))).toMatchObject({ status: 409, error: expect.stringContaining("already published") });
-    expect(newImageErrorResponse(new DraftOwnerError())).toMatchObject({ status: 409, error: expect.stringContaining("draft.owner is n8n") });
     expect(newImageErrorResponse(new FeaturedImageError("image", new Error("Vertex returned HTTP 429: Quota")))).toEqual({
       status: 502,
       error: "Featured image failed at image: Vertex returned HTTP 429: Quota",

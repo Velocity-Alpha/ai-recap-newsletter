@@ -36,15 +36,14 @@ function groupBySource(byStart: Record<string, unknown[]>) {
 beforeEach(() => {
   vi.clearAllMocks();
   settings.clear();
-  settings.set("ingest.owner", "native");
   db.skippedDate.findUnique.mockResolvedValue(null);
   db.pipelineRun.findFirst.mockResolvedValue({ id: 41n, status: "succeeded", startedAt: new Date("2026-11-10T14:55:00Z") });
   db.story.groupBy.mockImplementation(groupBySource({ [TODAY_START]: TODAY_BY_SOURCE, ...HISTORY }));
   db.story.aggregate.mockResolvedValue({ _count: { _all: 23 }, _min: { updatedAt: new Date("2026-11-10T16:52:00Z") } });
   db.issue.aggregate.mockResolvedValue({ _count: { _all: 2 }, _min: { createdAt: new Date("2026-11-10T16:48:00Z") } });
   db.issue.findMany.mockResolvedValue([
-    { id: 271n, slug: "second-draft", title: "Second draft", publishedAt: null },
-    { id: 270n, slug: "first-draft", title: "First draft", publishedAt: new Date("2026-11-10T17:31:00Z") },
+    { id: 271n, slug: "second-draft", title: "Second draft", status: "draft", publishedAt: null },
+    { id: 270n, slug: "first-draft", title: "First draft", status: "published", publishedAt: new Date("2026-11-10T17:31:00Z") },
   ]);
 });
 
@@ -54,7 +53,6 @@ describe("readDayFacts", () => {
       date: "2026-11-10",
       weekday: "Tue",
       skipped: null,
-      ingestOwner: "native",
       ingestRun: { id: "41", status: "succeeded", startedAt: new Date("2026-11-10T14:55:00Z") },
       storiesBySource: { tldr: 16, rundown_ai: 14, unknown: 1 },
       storyTotal: 31,
@@ -66,7 +64,7 @@ describe("readDayFacts", () => {
       draftsMade: 2,
       draftReady: true,
       // The published draft wins over a later unpublished one.
-      issue: { id: "270", slug: "first-draft", title: "First draft", publishedAt: new Date("2026-11-10T17:31:00Z") },
+      issue: { id: "270", slug: "first-draft", title: "First draft", status: "published", publishedAt: new Date("2026-11-10T17:31:00Z") },
       warnings: [],
     });
   });
@@ -109,8 +107,7 @@ describe("readDayFacts", () => {
     );
   });
 
-  it("reads an empty day, n8n ingestion, and a skipped date", async () => {
-    settings.set("ingest.owner", "n8n");
+  it("reads an empty day and a skipped date", async () => {
     db.skippedDate.findUnique.mockResolvedValue({
       date: day("2026-11-10"),
       note: null,
@@ -125,7 +122,6 @@ describe("readDayFacts", () => {
 
     await expect(readDayFacts("2026-11-10")).resolves.toMatchObject({
       skipped: { note: null, createdAt: new Date("2026-11-10T13:00:00Z") },
-      ingestOwner: "n8n",
       ingestRun: null,
       storiesBySource: {},
       storyTotal: 0,

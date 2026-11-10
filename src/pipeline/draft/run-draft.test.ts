@@ -67,7 +67,7 @@ function deps(overrides: Partial<ProduceDraftDeps> = {}): Partial<ProduceDraftDe
 
 async function commit(): Promise<{ draftId: number; issueId: number; version: number }> {
   const outline = await fakeDb.client.approvalOutline.create({
-    data: { issueDate: new Date(`${DATE}T00:00:00.000Z`), payload: SAMPLE_OUTLINE, payloadHash: "h", draftOwner: "native" },
+    data: { issueDate: new Date(`${DATE}T00:00:00.000Z`), payload: SAMPLE_OUTLINE, payloadHash: "h" },
   });
   return createDraft((outline as { id: bigint }).id);
 }
@@ -87,7 +87,6 @@ function stepHistory(): unknown[] {
 beforeEach(() => {
   fakeDb.reset();
   settings.clear();
-  settings.set("draft.owner", "native");
   runLog.events.length = 0;
   runLog.finished.length = 0;
   runLog.started.length = 0;
@@ -251,16 +250,6 @@ describe("runDraftJob", () => {
 
     expect(result).toMatchObject({ status: "failed", step: "load", error: "Story 507 is in the outline but not in the database." });
     expect(draftRow(draftId)).toMatchObject({ status: "failed", failedStep: "load" });
-  });
-
-  it("fails at load when n8n took drafting back after the commit", async () => {
-    const { draftId } = await commit();
-    settings.set("draft.owner", "n8n");
-
-    const result = await runDraftJob(draftId, { env: ENV, now: () => NOW, deps: deps() });
-
-    expect(result).toMatchObject({ status: "failed", step: "load" });
-    expect(draftRow(draftId).error).toContain("draft.owner");
   });
 
   it("stops at load when the issue was published after the commit", async () => {

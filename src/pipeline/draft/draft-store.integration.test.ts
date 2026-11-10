@@ -1,15 +1,12 @@
 // Opt-in: runs against a real database with the issue_drafts migrations applied, and cleans up after itself.
 //   PIPELINE_IT=1 DATABASE_URL=<Neon dev branch> npx vitest run src/pipeline/draft/draft-store.integration.test.ts
 // It refuses to run when DATABASE_URL points at the same Neon endpoint as PRODUCTION_DATABASE_URL.
-// The owner switch, run log, and incidents are mocked: the test writes only its own issue, draft, outline, and
+// The run log and incidents are mocked: the test writes only its own issue, draft, outline, and
 // story rows, and calls no outside service.
 import { randomInt, randomUUID } from "node:crypto";
 
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/src/pipeline/settings", () => ({
-  readSetting: vi.fn(async (key: string) => (key === "draft.owner" ? "native" : null)),
-}));
 vi.mock("@/src/pipeline/runs", () => ({
   startRun: vi.fn(async () => BigInt(1)),
   logEvent: vi.fn(async () => undefined),
@@ -75,7 +72,7 @@ describe.skipIf(!enabled)("draft store on a real database", () => {
 
   async function saveOutline(): Promise<bigint> {
     const row = await prisma.approvalOutline.create({
-      data: { issueDate: day, payload: outline as unknown as Prisma.InputJsonValue, payloadHash: tag, draftOwner: "native" },
+      data: { issueDate: day, payload: outline as unknown as Prisma.InputJsonValue, payloadHash: tag },
       select: { id: true },
     });
     return row.id;

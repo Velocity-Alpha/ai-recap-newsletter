@@ -11,7 +11,6 @@ import {
   setDraftStep,
   type IssueUpdate,
 } from "@/src/pipeline/draft/draft-store";
-import { readDraftOwner } from "@/src/pipeline/draft/outline-store";
 import {
   createDraftDeps,
   DraftStepError,
@@ -269,7 +268,6 @@ export async function runDraftJob(draftId: bigint | number | string, options: Ru
     const target = { draft: { id, version: draft.version } };
     const input: ProduceDraftInput | NewImageDraftInput = await untilAborted(
       (async () => {
-        if ((await readDraftOwner()) !== "native") throw new Error("draft.owner is n8n, so native drafting is off.");
         const inputs = await loadDraftInputs(draft);
         // A "New image" draft (#116) copies its source draft's content, so it needs no stories.
         if (draft.sourceDraftId !== null) return { ...target, issue: inputs.issue, ...(await loadNewImageInputs(draft)) };

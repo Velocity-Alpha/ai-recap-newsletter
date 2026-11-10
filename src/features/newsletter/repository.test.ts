@@ -155,11 +155,11 @@ describe("newsletter repository", () => {
 
     expect(prismaMock.issue.findUnique).toHaveBeenNthCalledWith(
       1,
-      expect.objectContaining({ where: { id: 7n, publishedAt: { not: null } } }),
+      expect.objectContaining({ where: { id: 7n, status: "published" } }),
     );
     expect(prismaMock.issue.findUnique).toHaveBeenNthCalledWith(
       2,
-      expect.objectContaining({ where: { slug: "issue-7", publishedAt: { not: null } } }),
+      expect.objectContaining({ where: { slug: "issue-7", status: "published" } }),
     );
   });
 
@@ -173,6 +173,7 @@ describe("newsletter repository", () => {
       contentJson: null,
       issueDate: null,
       publishedAt: null,
+      status: "draft",
     });
 
     await expect(fetchNewsletterIssueApiResponseById(8)).resolves.toBeNull();
@@ -190,6 +191,7 @@ describe("newsletter repository", () => {
         contentJson: { blocks: [] },
         issueDate: new Date("2026-04-03T00:00:00.000Z"),
         publishedAt: new Date("2026-04-03T12:00:00.000Z"),
+        status: "published",
       })
       .mockResolvedValueOnce({
         id: 6n,
@@ -200,6 +202,7 @@ describe("newsletter repository", () => {
         contentJson: { blocks: ["story"] },
         issueDate: null,
         publishedAt: new Date("2026-04-04T12:00:00.000Z"),
+        status: "published",
       });
 
     await expect(fetchNewsletterIssueApiResponseById(5)).resolves.toEqual({

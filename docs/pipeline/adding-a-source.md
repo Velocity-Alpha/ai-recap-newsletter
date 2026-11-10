@@ -100,7 +100,7 @@ cannot be read, or the page cap is exceeded. A post whose body is missing or who
 the bookmark at the last post before it. The good posts are still saved, and the next run reads them again
 harmlessly.
 
-Why this design: [ADR 0003](../adr/0003-beehiiv-site-source.md).
+Why this design: [ADR 0004](../adr/0004-beehiiv-site-source.md).
 
 ## Test it
 

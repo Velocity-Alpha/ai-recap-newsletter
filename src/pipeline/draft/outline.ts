@@ -104,3 +104,14 @@ function sortKeys(value: unknown): unknown {
 export function hashOutline(outline: ApprovalOutline): string {
   return createHash("sha256").update(JSON.stringify(sortKeys(outline))).digest("hex");
 }
+
+/** `YYYY-MM-DD`, optionally followed by a time. Returns the calendar date as written, or null. */
+export function parseCommitDate(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const match = /^(\d{4})-(\d{2})-(\d{2})(?:T.*)?$/.exec(value.trim());
+  if (!match) return null;
+  const [, year, month, day] = match;
+  const date = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
+  if (date.getUTCMonth() !== Number(month) - 1 || date.getUTCDate() !== Number(day)) return null;
+  return `${year}-${month}-${day}`;
+}

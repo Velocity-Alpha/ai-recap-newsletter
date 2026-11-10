@@ -13,7 +13,7 @@ import type { DraftBoardView, DraftListEntry } from "@/src/pipeline/draft/draft-
 // The draft view (#79): one draft's live progress, preview, or failure, and every draft for the date.
 // proxy.ts keeps it behind the approval login, like the rest of /approval.
 
-type DraftListState = { owner: "n8n" | "native"; drafts: DraftListEntry[] };
+type DraftListState = { drafts: DraftListEntry[] };
 
 function parseDate(value: string | null): string {
   return value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : new Date().toISOString().slice(0, 10);
@@ -64,7 +64,7 @@ function DraftsForDate({ date, requestedId }: { date: string; requestedId: numbe
         const body = await readJson(response);
         if (!active) return;
         if (!response.ok) throw new Error(String(body.error ?? `Drafts returned ${response.status}.`));
-        setList({ owner: body.owner === "native" ? "native" : "n8n", drafts: (body.drafts as DraftListEntry[]) ?? [] });
+        setList({ drafts: (body.drafts as DraftListEntry[]) ?? [] });
         setListError(null);
       })
       .catch((error: unknown) => {
@@ -141,11 +141,6 @@ function DraftsForDate({ date, requestedId }: { date: string; requestedId: numbe
         </Link>
         <p className="mt-6 text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--accent-primary)]">Drafts</p>
         <h1 className="mt-2 font-serif text-[clamp(28px,4vw,40px)] leading-tight text-[var(--text-primary)]">{formatDate(date)}</h1>
-        {list?.owner === "n8n" ? (
-          <p className="mt-3 text-sm text-[var(--text-secondary)]">
-            n8n drafts issues now (draft.owner is n8n), so this page lists no drafts. Its drafts are in GHL.
-          </p>
-        ) : null}
 
         <div className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
           <div>

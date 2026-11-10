@@ -1,5 +1,7 @@
 # 50: Website and Neon database (the shared data model)
 
+> **Historical, written 2026-11-03.** The n8n parts describe a retired system ([ADR 0003](../adr/0003-n8n-retired-kept-as-record.md)). The website and subscriber parts may have changed since: trust the code and [../architecture.html](../architecture.html).
+
 Scope: the Neon Postgres database that n8n and the Next.js app share (schemas `newsletter` and `public`), the live schema compared with `prisma/`, which workflow or route touches each table, and how airecap.news renders published issues and stories. It also maps the app code (`app/`, `src/`) and says where a native pipeline would plug in.
 
 Evidence used: read-only queries against the prod and dev branches on 2026-11-03 (`db_ro.sh`), the repo at the current `main` commit, the workflow JSON exports, `executions.json`, `credentials.json` (names and types only), and one error execution payload. No writes, no webhook calls, no git commands.

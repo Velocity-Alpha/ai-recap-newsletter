@@ -1,5 +1,7 @@
 # 20. Issue drafting and featured-image generation (n8n)
 
+> **Historical.** This describes the n8n system that native code replaced in November 2026 ([ADR 0003](../adr/0003-n8n-retired-kept-as-record.md)). It is not the current system: see [../architecture.html](../architecture.html).
+
 Scope: `2. Create Issue Draft` [QLPaj244TM7azSAH], `2.1 Sub: Compile Draft Stories` [rsHDKdELUG59wZzX], `2.2 Sub: Generate Issue Featured Image` [OPjiGtzSNgCkQdG8], `2.2.1 Sub: Create Image Prompt` [j2B4f4kFJs6sBdog], `2.2.2 Sub: Generate Stylized Image From Prompt` [0Gd3lzvwITBnd8om], `Agent: Change Featured Image` [Ixc1D30eBAT0Mauf], plus the inactive predecessor `2. Sub: Create Issue (Upload to GHL)` [EOmzdknnvWLmyV48].
 
 Sources: workflow JSON exports, retained executions 20838–21440 (pulled with `includeData=true`), read-only queries against Neon prod, and the app repo. Verbatim prompt and code blocks below come straight from the workflow JSON. The only change is that the leading `=` (n8n's expression marker) is removed. `{{ ... }}` is n8n expression syntax, evaluated at runtime.

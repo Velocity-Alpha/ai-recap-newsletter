@@ -9,13 +9,9 @@ import { readSetting } from "@/src/pipeline/settings";
 import { createSideEffects } from "@/src/pipeline/side-effects";
 
 /**
- * Story ingestion with its switch, run log and Telegram message, independent of the job runner. The
+ * Story ingestion with its run log and Telegram message, independent of the job runner. The
  * Netlify background function calls it (netlify/functions/ingest-stories-background.mts).
  */
-
-/** Rule R1: one owner for ingestion. Anything but `native` (n8n, the default) means this job does nothing. */
-export const INGEST_OWNER_KEY = "ingest.owner";
-export type IngestOwner = "n8n" | "native";
 
 /** Which job runner acts. Missing means `netlify`. */
 type PipelineRunner = "netlify" | "trigger";
@@ -25,7 +21,6 @@ const JOB = "ingest-stories";
 export type TelegramStatus = "sent" | "recorded" | "failed" | "not_configured";
 
 export type RunIngestResult =
-  | { status: "off" }
   | { status: "other_runner"; runner: PipelineRunner }
   | { status: "not_configured"; reason: string }
   | { status: "ran"; runId: string; result: IngestResult; telegram: TelegramStatus };
@@ -99,7 +94,6 @@ export async function runIngest(runner: PipelineRunner, options: RunIngestOption
   const env = options.env ?? process.env;
   const now = options.now ?? (() => new Date());
 
-  if ((await readSetting(INGEST_OWNER_KEY)) !== "native") return { status: "off" };
   const selected: PipelineRunner = (await readSetting("pipeline.runner")) === "trigger" ? "trigger" : "netlify";
   if (selected !== runner) return { status: "other_runner", runner: selected };
 
@@ -131,7 +125,6 @@ export async function runIngest(runner: PipelineRunner, options: RunIngestOption
 
   const withErrors = result.sources.filter((source) => source.status === "failed" || source.status === "partial");
   const stats = {
-    owner: "native",
     runner,
     targetDate: result.targetDate,
     storiesSaved: result.storiesSaved,
@@ -150,8 +143,6 @@ export async function runIngest(runner: PipelineRunner, options: RunIngestOption
 
 export function describeIngestRun(run: RunIngestResult): string {
   switch (run.status) {
-    case "off":
-      return "n8n owns ingestion (ingest.owner). Nothing to do.";
     case "other_runner":
       return `pipeline.runner is ${run.runner}. This runner does nothing.`;
     case "not_configured":

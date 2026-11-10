@@ -9,6 +9,7 @@ type IssueRow = {
   contentJson: unknown;
   issueDate: Date | null;
   publishedAt: Date | null;
+  status: "draft" | "published";
 };
 
 const PUBLISHED: IssueRow = {
@@ -20,6 +21,7 @@ const PUBLISHED: IssueRow = {
   contentJson: {},
   issueDate: new Date("2026-11-04T00:00:00.000Z"),
   publishedAt: new Date("2026-11-04T14:00:00.000Z"),
+  status: "published",
 };
 
 const UNPUBLISHED: IssueRow = {
@@ -31,6 +33,7 @@ const UNPUBLISHED: IssueRow = {
   contentJson: {},
   issueDate: new Date("2026-11-05T00:00:00.000Z"),
   publishedAt: null,
+  status: "draft",
 };
 
 // A tiny stand-in for the issues table. It applies the `where` filter like the database would,

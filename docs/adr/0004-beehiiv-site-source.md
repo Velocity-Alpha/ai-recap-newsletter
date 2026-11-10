@@ -1,4 +1,4 @@
-# 0003 — Read beehiiv publications from their website
+# 0004 — Read beehiiv publications from their website
 
 - **Status:** Accepted, 2026-11-10.
 - **Background:** `docs/n8n-backend/15-legacy-and-experiments.md`, `docs/pipeline/adding-a-source.md`.
