@@ -1,4 +1,4 @@
-import { createTelegramSender, REVIEW_CHAT_ID } from "@/src/pipeline/ingest/telegram";
+import { createTelegramSender, REVIEW_CHAT_ID } from "@/src/pipeline/review-group";
 
 /**
  * Where ops alerts go. Telegram today; Slack (#119) can replace it by changing only `opsChannelFromEnv`.

@@ -1,70 +1,76 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
-
-vi.mock("next/link", () => ({
-  default: ({ href, children, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement> & { href: string }) => (
-    <a href={href} {...props}>
-      {children}
-    </a>
-  ),
-}));
+import { describe, expect, it } from "vitest";
 
 import DraftList from "@/src/components/approval/DraftList";
-import type { DraftListEntry } from "@/src/pipeline/draft/draft-board";
+import type { StagedVersionEntry } from "@/src/pipeline/draft/draft-board";
 
-function entry(data: Partial<DraftListEntry>): DraftListEntry {
+function entry(data: Partial<StagedVersionEntry>): StagedVersionEntry {
   return {
-    id: 40,
+    id: 9,
     version: 1,
-    status: "ready",
-    subject: null,
-    failedStepLabel: null,
-    ghlTemplateId: null,
-    ghlPreviewUrl: null,
+    title: "First Take",
+    stagedAt: "2026-05-21T14:00:00.000Z",
+    serviceName: "Pretend Mail",
+    serviceUrl: "https://mail.example.test/emails/1",
+    latest: false,
     sent: false,
-    current: false,
-    sourceVersion: null,
-    createdAt: "2026-05-21T14:00:00.000Z",
     ...data,
   };
 }
 
-describe("DraftList", () => {
-  it("lists each draft with version, time, subject, status, GHL link, and which was sent", () => {
-    const html = renderToStaticMarkup(
-      <DraftList
-        date="2026-05-21"
-        selectedId={41}
-        drafts={[
-          entry({ id: 42, version: 3, status: "failed", failedStepLabel: "making the image" }),
-          entry({ id: 41, version: 2, status: "running" }),
-          entry({ id: 40, version: 1, subject: "First Take", ghlPreviewUrl: "https://preview.example.test/1", sent: true, current: true }),
-        ]}
-      />,
-    );
+function renderThree() {
+  return renderToStaticMarkup(
+    <DraftList
+      stagedVersions={[
+        entry({ id: 11, version: 3, title: "Third Take", latest: true, serviceUrl: "https://mail.example.test/emails/3" }),
+        entry({ id: 10, version: 2, title: "Second Take", sent: true, serviceUrl: null }),
+        entry({}),
+      ]}
+    />,
+  );
+}
 
-    expect(html).toContain("v3");
-    expect(html).toContain("Failed at making the image");
-    expect(html).toContain("Running");
+describe("DraftList", () => {
+  it("lists each staged version with its number, time and title, newest first", () => {
+    const html = renderThree();
+
+    expect(html.indexOf("v3")).toBeLessThan(html.indexOf("v2"));
+    expect(html.indexOf("v2")).toBeLessThan(html.indexOf("v1"));
+    expect(html).toContain("Third Take");
+    expect(html).toContain("Second Take");
     expect(html).toContain("First Take");
     expect(html).toContain("10:00 AM");
-    expect(html).toContain("Sent");
-    expect(html).toContain("Current");
-    expect(html).toContain('href="https://preview.example.test/1"');
-    expect(html).toContain('href="/approval/drafts?date=2026-05-21&amp;draft=42"');
-    expect(html).toMatch(/aria-current="true"[^>]*href="\/approval\/drafts\?date=2026-05-21&amp;draft=41"|href="\/approval\/drafts\?date=2026-05-21&amp;draft=41"[^>]*aria-current="true"/);
   });
 
-  it("marks a draft made by New image with the draft it came from (#116)", () => {
-    const html = renderToStaticMarkup(
-      <DraftList date="2026-05-21" selectedId={null} drafts={[entry({ id: 42, version: 3, sourceVersion: 2 }), entry({ id: 41, version: 2 })]} />,
-    );
+  it("marks the newest one latest and the one that was sent", () => {
+    const items = renderThree().split("<li").slice(1);
 
-    expect(html).toContain("New image of v2");
-    expect(html.match(/New image of/g)).toHaveLength(1);
+    expect(items[0]).toContain("Latest");
+    expect(items[0]).not.toContain("Sent");
+    expect(items[1]).toContain("Sent");
+    expect(items[1]).not.toContain("Latest");
+    expect(items[2]).not.toContain("Latest");
+    expect(items[2]).not.toContain("Sent");
   });
 
-  it("says when there are no drafts yet", () => {
-    expect(renderToStaticMarkup(<DraftList date="2026-05-21" selectedId={null} drafts={[]} />)).toContain("No drafts for this date yet.");
+  it("links to the email in the distribution service, by the service's name, only when there is a link", () => {
+    const items = renderThree().split("<li").slice(1);
+
+    expect(items[0]).toContain('href="https://mail.example.test/emails/3"');
+    expect(items[0]).toContain("Open in Pretend Mail");
+    expect(items[0]).toContain('rel="noopener noreferrer"');
+    expect(items[1]).not.toContain("Open in");
+    expect(items[1]).not.toContain("href=");
+  });
+
+  it("shows a version without a time", () => {
+    const html = renderToStaticMarkup(<DraftList stagedVersions={[entry({ stagedAt: null, latest: true })]} />);
+
+    expect(html).toContain("v1");
+    expect(html).not.toContain("·");
+  });
+
+  it("says when nothing is staged yet", () => {
+    expect(renderToStaticMarkup(<DraftList stagedVersions={[]} />)).toContain("Nothing is staged for this date yet.");
   });
 });

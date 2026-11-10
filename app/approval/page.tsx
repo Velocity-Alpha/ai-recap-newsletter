@@ -21,7 +21,7 @@ import {
   parseReuseDraftDates,
   toggleReuseDraftDate,
 } from "@/features/newsletter/reuse-drafts-param";
-import type { DraftingSummary } from "@/features/newsletter/draft-links";
+import type { DateDraftsView } from "@/src/pipeline/draft/draft-board";
 import { awaitLeadPick } from "@/features/newsletter/lead-pick-client";
 import { applyLeadPick } from "@/features/newsletter/lead-story";
 
@@ -121,15 +121,15 @@ function ApprovalPageForDate({ dateKey, reuseKey }: { dateKey: string; reuseKey:
     } | null;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
-  // The date's drafts. Null if the read fails: the board then shows no draft links.
-  const [drafting, setDrafting] = useState<DraftingSummary | null>(null);
+  // The date's state and drafts. Null if the read fails: the board then shows no state and no draft link.
+  const [drafting, setDrafting] = useState<DateDraftsView | null>(null);
 
   useEffect(() => {
     let active = true;
     fetch(`/api/approval/drafts?${new URLSearchParams({ date: dateKey })}`, { cache: "no-store" })
-      .then((res) => (res.ok ? (res.json() as Promise<DraftingSummary>) : null))
+      .then((res) => (res.ok ? (res.json() as Promise<DateDraftsView>) : null))
       .then((data) => {
-        if (active) setDrafting(Array.isArray(data?.drafts) ? data : null);
+        if (active) setDrafting(data?.state && Array.isArray(data.stagedVersions) ? data : null);
       })
       .catch(() => {
         if (active) setDrafting(null);

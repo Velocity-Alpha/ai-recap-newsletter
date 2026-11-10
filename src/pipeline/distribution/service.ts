@@ -1,4 +1,4 @@
-import { createGhlDistributionService } from "@/src/pipeline/distribution/ghl";
+import { createGhlDistributionService, GHL_SERVICE } from "@/src/pipeline/distribution/ghl";
 import type { SideEffectRecord } from "@/src/pipeline/side-effects";
 
 /**
@@ -8,7 +8,7 @@ import type { SideEffectRecord } from "@/src/pipeline/side-effects";
 export interface DistributionService {
   /** Stored in staged_versions.service. */
   key: string;
-  /** Shown to the owner, e.g. in "Open in GHL". */
+  /** Shown to the owner, e.g. in "Open in <displayName>". */
   displayName: string;
   /**
    * Creates a new email in the service. It never changes or deletes an existing one. `recorded` outside
@@ -25,9 +25,24 @@ export interface DistributionServiceOptions {
 }
 
 /** The one place that picks the service. A different service is one new implementation and a change here. */
+const CURRENT = { ...GHL_SERVICE, create: createGhlDistributionService };
+
+const DISPLAY_NAMES: Record<string, string> = { [GHL_SERVICE.key]: GHL_SERVICE.displayName };
+
+/** The owner's name for the service a staged version was made in (staged_versions.service). */
+export function distributionServiceName(key: string): string {
+  return DISPLAY_NAMES[key] ?? key;
+}
+
+/** The owner's name for the service that new staged versions go to. */
+export function currentDistributionServiceName(): string {
+  return CURRENT.displayName;
+}
+
+/** The service that new staged versions go to (`CURRENT`). */
 export function distributionServiceFromEnv(
   env: Record<string, string | undefined> = process.env,
   options: DistributionServiceOptions = {},
 ): DistributionService {
-  return createGhlDistributionService(env, options);
+  return CURRENT.create(env, options);
 }

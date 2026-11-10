@@ -40,7 +40,7 @@
 <ul>
   <li>One repo holds the website and the pipeline jobs. It is a Next.js App Router app on Netlify. Jobs are Netlify functions in <code>netlify/functions/</code>, and their logic is in <code>src/pipeline/</code>.</li>
   <li>The data is in Postgres on Neon (Free plan), schema <code>newsletter</code>. Prisma is the client.</li>
-  <li>Each weekday: the ingest job collects stories, the owner picks them on the board and commits, the draft job writes the issue and makes a GHL email template, the owner sends it in GoHighLevel (GHL), and the publish job puts the issue on the site when the sent email reaches the seed inbox.</li>
+  <li>Each weekday: the ingest job collects stories, the owner picks them on the board and commits, the draft job writes the issue, the owner reviews the draft in the app and stages it for sending with one click, the owner sends the staged email in GoHighLevel (GHL), and the publish job puts the issue on the site when the sent email reaches the seed inbox.</li>
   <li>The <code>run-checks</code> job tests outcomes three times a day and posts incidents to the ops chat.</li>
   <li>n8n is retired. Its workflows are disabled and kept as a record (<a href="./adr/0003-n8n-retired-kept-as-record.md">ADR 0003</a>). Never call or change them.</li>
 </ul>
@@ -71,15 +71,25 @@
 draft-issue-background (15 min limit)
          -> read feature-section articles (story_articles) -> gpt-6-luna writes the issue JSON
          -> gpt-6-luna scene prompt -> Vertex gemini-3.1-flash-image -> S3 velocity-alpha-public-assets/newsletter/
-         -> TypeScript email template -> new GHL template "&lt;date&gt; v&lt;n&gt;: &lt;subject&gt;"
+         -> TypeScript email template (no call to GHL)
          -> issue_drafts row ready -> issues row takes the draft's title, HTML, image, content_json
-         /approval/drafts: live steps, Retry, "New image", "Open in GHL" (each version has its own template)
+         -> Telegram "draft is ready for review" with the link, to the review group (only for the
+            issue's newest draft)
+
+owner    Reviews the draft on /approval/drafts: live steps, Retry, the email preview
+         title field and "New image" change the same draft and the issue row (no new draft, no call to GHL)
+         "Stage for sending" -> POST /api/approval/drafts/[id]/stage -> staged_versions row v&lt;n&gt;
+         -> new GHL template "&lt;date&gt; v&lt;n&gt;: &lt;title&gt;" with data-version-id -> "Staged, v&lt;n&gt;" + "Open in GHL"
+         a draft that has not changed since the newest staged version needs a second yes
+         the board and the draft page show the state of the date: No outline, Drafting, Draft failed,
+         Draft ready, "Staged, v&lt;n&gt;" (plus "The draft changed after v&lt;n&gt; was staged."), or Published;
+         the draft page lists the staged versions (latest, sent); the owner never sees a draft row number
 
 10:05  run-checks: an ingest run happened, story count vs 8-week median, per source
          -> incidents in alerts -> the review bot posts them to the "AI Recap Ops" chat
 12:00  run-checks: no commit yet -> warning
 
-owner    Opens the newest draft's template in GHL and sends the campaign by hand
+owner    Opens the newest staged version's template in GHL and sends the campaign by hand
 GHL      Emails all subscribers, plus the seed inbox
 
 every 5 min, 09:00-21:00 weekdays
@@ -101,7 +111,7 @@ If the issue is missing after a send: /approval/issues -> "Mark as published"
   <tr><td><code>ingest-stories-background</code></td><td>none (called by the above)</td><td>valid token</td><td><code>runIngest()</code> in <code>src/pipeline/ingest/run-ingest.ts</code></td></tr>
   <tr><td><code>detect-publish</code></td><td><code>*/5 0,1,13-23 * * *</code></td><td>weekdays 09:00–21:00 New York</td><td>Reads the seed inbox (only <code>PUBLISH_SEED_RECIPIENTS</code>, the monitor seed address, so each send is read once), 20-minute lookback, publishes. It checks Gmail first and opens the database only when an issue email arrived</td></tr>
   <tr><td><code>detect-publish-catch-up</code></td><td><code>0 3 * * *</code></td><td>daily</td><td>Same, 3-day lookback</td></tr>
-  <tr><td><code>draft-issue-background</code></td><td>none (on commit)</td><td>valid token signed for the draft; the draft is waiting to run</td><td><code>runDraftJob()</code> in <code>src/pipeline/draft/run-draft.ts</code>; gives up at 13 min. The commit route, "Retry" and "New image" start it with <code>startDraftJob()</code></td></tr>
+  <tr><td><code>draft-issue-background</code></td><td>none (on commit)</td><td>valid token signed for the draft; the draft is waiting to run</td><td><code>runDraftJob()</code> in <code>src/pipeline/draft/run-draft.ts</code>; gives up at 13 min. The commit route and "Retry" start it with <code>startDraftJob()</code></td></tr>
   <tr><td><code>run-checks</code></td><td><code>0,5 14,15,16,17,22,23 * * 1-5</code></td><td>10:05, 12:00, 18:00 New York on weekdays (1 min early to 4 min late); outside production, a run at any other time ("Run now") is a full 18:00 pass</td><td>Outcome checks raise or resolve incidents; at 18:00 the daily summary to the ops chat, then the Healthchecks.io ping. Each outside call gets 5 s; Telegram and site calls stop 20 s into the run. <code>runChecks()</code> in <code>src/pipeline/checks/run-checks.ts</code></td></tr>
 </table>
 <p>Each run writes <code>pipeline_runs</code> (job, trigger, status, stats) and <code>pipeline_events</code> (step log). Job tokens: <code>src/server/job-token.ts</code>, format <code>&lt;expiresAtMs&gt;.&lt;sig&gt;</code>, HMAC key derived from <code>SESSION_SECRET</code> per purpose.</p>
@@ -128,8 +138,8 @@ If the issue is missing after a send: /approval/issues -> "Mark as published"
   <tr><td>Neon</td><td>Postgres: production branch and <code>dev</code> branch</td><td>app, jobs</td></tr>
   <tr><td>OpenAI</td><td>Extraction, dedup, lead pick, drafting and image prompt</td><td>app, jobs</td></tr>
   <tr><td>Gmail API (read-only)</td><td>Newsletter emails for ingestion; sent-campaign copies for publish detection</td><td>ingest and publish jobs</td></tr>
-  <tr><td>Telegram</td><td>Review bot: "board ready" ping to the review group; ops alerts and the daily summary to the "AI Recap Ops" chat (<code>TELEGRAM_OPS_CHAT_ID</code>)</td><td>ingest, <code>run-checks</code>, draft job (production only)</td></tr>
-  <tr><td>GoHighLevel (GHL)</td><td>Subscriber list, campaign emails, email templates; subscribe and unsubscribe webhooks</td><td>app (subscribe, unsubscribe webhook), draft job (templates, <code>src/pipeline/draft/ghl-template.ts</code>), owner (send). GHL cannot schedule a campaign through its API, so sending stays manual</td></tr>
+  <tr><td>Telegram</td><td>Review bot: "board ready" and "draft is ready for review" messages to the review group; ops alerts and the daily summary to the "AI Recap Ops" chat (<code>TELEGRAM_OPS_CHAT_ID</code>)</td><td>ingest, <code>run-checks</code>, draft job (production only)</td></tr>
+  <tr><td>GoHighLevel (GHL)</td><td>Subscriber list, campaign emails, email templates; subscribe and unsubscribe webhooks</td><td>app (subscribe, unsubscribe webhook), "Stage for sending" (templates, <code>src/pipeline/distribution/</code>), owner (send). GHL cannot schedule a campaign through its API, so sending stays manual</td></tr>
   <tr><td>Resend</td><td>One-time sign-in codes for subscribers</td><td>app (<code>fetch</code>, no SDK)</td></tr>
   <tr><td>Beehiiv</td><td>Old subscriber provider, still supported in code</td><td><code>SUBSCRIBER_PROVIDER=beehiiv</code> only (production uses <code>ghl</code>)</td></tr>
   <tr><td>AWS S3</td><td>Featured images, bucket <code>velocity-alpha-public-assets</code>, prefix <code>newsletter/</code></td><td>draft job (<code>src/pipeline/draft/image/</code>); dev uses prefix <code>newsletter-dev/</code></td></tr>
@@ -146,14 +156,14 @@ If the issue is missing after a send: /approval/issues -> "Mark as published"
   <tr><td><code>stories</code></td><td>Extracted stories per day and source (snake_case columns, but <code>"createdAt"</code> is camelCase)</td><td>ingest job</td></tr>
   <tr><td><code>story_sources</code></td><td>Which newsletters covered each story, one row per story and source key. <code>stories.source</code> keeps only the last writer, so the board reads coverage here. If the table is missing, ingestion and the board log and fall back to <code>stories.source</code>.</td><td>ingest job</td></tr>
   <tr><td><code>scraper_bookmarks</code></td><td>Last-read time per source (keys such as <code>the_signal</code>; <code>tldr_ai</code> and <code>aloa_ai</code> are unused)</td><td>ingest job</td></tr>
-  <tr><td><code>issues</code></td><td>One row per date (<code>issue_date</code> is unique): <code>html</code>, <code>content_json</code>, <code>published_at</code>, <code>slug</code> (generated), and <code>status</code> (<code>draft</code> or <code>published</code>). The database computes <code>status</code> from <code>published_at</code>: read it to ask "is it published?", never write it</td><td>draft job (insert, update), publish job (update; the sent draft is copied over), owner ("Mark as published")</td></tr>
+  <tr><td><code>issues</code></td><td>One row per date (<code>issue_date</code> is unique): <code>html</code>, <code>content_json</code>, <code>published_at</code>, <code>slug</code> (generated), and <code>status</code> (<code>draft</code> or <code>published</code>). The database computes <code>status</code> from <code>published_at</code>: read it to ask "is it published?", never write it</td><td>draft job (insert, update), title and image changes (update), publish job (update; the sent staged version is copied over), owner ("Mark as published", from the newest staged version)</td></tr>
   <tr><td><code>subscribers</code>, <code>auth_codes</code></td><td>Site subscriber records and one-time codes</td><td>app</td></tr>
   <tr><td><code>pipeline_settings</code></td><td>Thresholds and the job runner (<code>pipeline.runner</code>). A job uses its default when a row is missing</td><td>owner, by SQL; shown on <code>/admin/settings</code></td></tr>
   <tr><td><code>pipeline_runs</code>, <code>pipeline_events</code></td><td>Job runs and their step logs</td><td>jobs</td></tr>
   <tr><td><code>publish_events</code></td><td>Each seed email seen by publish detection and the decision, and which staged version and draft was sent (<code>staged_version_id</code>, <code>draft_id</code>)</td><td>publish job</td></tr>
   <tr><td><code>approval_outlines</code></td><td>Each board commit: the normalised outline and its hash</td><td>commit route</td></tr>
-  <tr><td><code>issue_drafts</code></td><td>Each draft of an issue, version 1, 2, ... (one per commit, or per "New image"): status, current or failed step, content, html, image, GHL template; <code>source_draft_id</code> on a "New image" draft</td><td>commit, "Retry", "New image" and the <code>draft-issue</code> job</td></tr>
-  <tr><td><code>staged_versions</code></td><td>Each staged version of an issue, v1, v2, ...: the exact title, image, content, and HTML that was staged for sending, the distribution service (<code>ghl</code>), and the id and link that service returned. A row never changes once its status is <code>staged</code>. Its <code>id</code> is the <code>data-version-id</code> in the staged email. The migration made one row for each earlier ready draft that had a GHL template</td><td><code>POST /api/approval/drafts/[id]/stage</code> (<code>src/pipeline/distribution/stage-draft.ts</code>)</td></tr>
+  <tr><td><code>issue_drafts</code></td><td>Each draft of an issue, version 1, 2, ... (one per commit): status, current or failed step, content, html, image, and <code>edited_at</code> (when the owner last changed the title or the image). The newest draft, when ready, is the current draft: only it can be changed or staged. <code>ghl_template_id</code>, <code>ghl_preview_url</code>, and <code>source_draft_id</code> are no longer read or written</td><td>commit, "Retry", the <code>draft-issue</code> job, and the title and image changes (<code>PATCH /api/approval/drafts/[id]</code>, <code>POST .../image</code>)</td></tr>
+  <tr><td><code>staged_versions</code></td><td>Each staged version of an issue, v1, v2, ...: the exact title, image, content, and HTML that was staged for sending, the distribution service (<code>ghl</code>), and the id and link that service returned. A row never changes once its status is <code>staged</code>. Its <code>id</code> is the <code>data-version-id</code> in the staged email. The migrations made one row for each earlier ready draft that had a GHL template</td><td><code>POST /api/approval/drafts/[id]/stage</code> (<code>src/pipeline/distribution/stage-draft.ts</code>)</td></tr>
   <tr><td><code>story_articles</code></td><td>The saved copy of each story's article, per story and link: status (read, paywalled, blocked, failed), method, text (at most 50,000 characters), read time, and the issue whose draft read it. A read copy is reused by later drafts; an edited link is read again. Each draft job first clears the text (not the row) of up to 200 copies whose issue was published over 14 days ago or that were read over 30 days ago.</td><td>draft job</td></tr>
   <tr><td><code>alerts</code></td><td>Open and resolved incidents, one open row per <code>incident_key</code></td><td><code>run-checks</code>, the draft job, and "Stage for sending", through <code>src/pipeline/notify/</code></td></tr>
   <tr><td><code>skipped_dates</code></td><td>Dates the owner marked "No issue today"; that date's checks are off</td><td>app (<code>/approval</code>)</td></tr>
@@ -167,7 +177,8 @@ If the issue is missing after a send: /approval/issues -> "Mark as published"
 app/                         Next.js routes
   page.tsx, archive/, issue/[slug]/, newsletter/[id]/, for-brands/, unsubscribe/, privacy/, terms/
   approval/                  board (page.tsx), login/, issues/ ("Mark as published"), submitted/,
-                             drafts/ (drafts for a date: live steps, Retry, email preview, "New image")
+                             drafts/ (drafts for a date: live steps, Retry, email preview, the title field, "New image",
+                             "Stage for sending")
   admin/                     overview, runs/ (+ [id]), incidents/, settings/ (read only); guard: src/server/admin-auth.ts
   api/newsletters/           list, [id], outline, commit (starts the draft job), publish-status
   api/approval/              login, outline (+ status, marker), issues/[id]/publish, skipped-dates,
@@ -180,18 +191,23 @@ src/features/subscriber/     subscriber sessions, provider switch (ghl | beehiiv
 src/features/admin/          admin page data
 src/pipeline/                runner-neutral job logic
   ingest/                    sources.ts, feeds, beehiiv-site, email-text, redirects, url, extract (gpt-6-luna), paywall,
-                             ingest-store, telegram, schedule, start-ingest, run-ingest
+                             ingest-store, schedule, start-ingest, run-ingest
   publish/                   gmail-client, sent-email-parser, publish-decision, publish-store, content-diff,
                              site-refresh, manual-publish, publish-schedule, detect-publish, run-detect-publish
-  checks/                    schedule, day-facts (the only DB reads), checks (pure), site, summary, heartbeat,
+  checks/                    schedule, day-facts (its DB reads; staged facts through distribution/issue-state-store),
+                             checks (pure), site, summary, heartbeat,
                              skipped-dates, run-checks
   draft/                     outline, outline-store, native-commit, start-draft, run-draft, produce-draft, writer,
-                             validate, email-html, ghl-template, new-image, draft-store, draft-board;
+                             validate, email-html, ghl-template, new-image, draft-edit (title), draft-store,
+                             draft-board;
                              articles/ (article reader), image/ (scene prompt, Vertex, S3)
   notify/                    ops alerts: raiseIncident / resolveIncident, Telegram ops channel, message text
   distribution/              service (the distribution service: GHL today), ghl, stage-draft ("Stage for sending"),
-                             staged-version (pure rules), staged-version-store
+                             staged-version (pure rules), staged-version-store,
+                             issue-state (pure: the state of a date, for the board and the 18:00 check),
+                             issue-state-store (reads its facts)
   side-effects/              the guard for the distribution service, S3 and the review group
+  review-group.ts            Telegram messages to the review group, from the ingest job and the draft job
   settings.ts, runs.ts, alerts.ts
 src/server/                  prisma client, job-token, approval, admin and cache-refresh auth, rate-limit (+ store),
                              client-ip, same-origin, safe-compare, observability
@@ -210,7 +226,7 @@ scripts/                     reset-dev-branch.mjs, run-prisma-prod.mjs, import-s
   <tr><td>Database</td><td>Neon <code>dev</code> branch, fake subscribers (<code>npm run db:reset-dev</code>)</td><td>Neon production branch</td></tr>
   <tr><td>Jobs</td><td>No schedules act. Use "Run now" on the deploy preview.</td><td>Scheduled on the <code>main</code> deploy</td></tr>
   <tr><td>Gmail</td><td colspan="2">Same mailbox, read-only scope in both</td></tr>
-  <tr><td>Telegram</td><td>Not sent; the text is recorded in the run</td><td>Review group ("board ready") and the ops chat (alerts, daily summary)</td></tr>
+  <tr><td>Telegram</td><td>Not sent; the text is recorded in the run</td><td>Review group ("board ready", "draft is ready for review") and the ops chat (alerts, daily summary)</td></tr>
 </table>
 <p><code>APP_ENV</code> is set in <code>netlify.toml</code> and also as a Netlify env var with the same value per context, because functions cannot read <code>netlify.toml</code> values at runtime. Next routes get the build's value inlined (<code>next.config.mjs</code> <code>env</code>), so they must read <code>process.env.APP_ENV</code> by name, never <code>process.env</code> whole.</p>
 <p>Guards: <code>src/pipeline/side-effects/</code> gates the distribution service (GHL), S3, and the review group (record-only outside production; S3 only under <code>newsletter-dev/</code>). <code>src/pipeline/notify/</code> sends ops alerts only in production.</p>
@@ -232,7 +248,7 @@ scripts/                     reset-dev-branch.mjs, run-prisma-prod.mjs, import-s
   <li><a href="../GLOSSARY.md">Glossary</a>: the words to use for issues, drafts, commits, checks, and incidents.</li>
   <li><a href="../README.md">README</a>: setup, env vars, migrations, deploy, API routes. <a href="../prisma/schema.prisma">Prisma schema</a>.</li>
   <li><a href="./pipeline/runbook.md">Pipeline runbook</a>: what each incident key means and what to do. <a href="./pipeline/adding-a-source.md">Adding a source</a>.</li>
-  <li>Decisions: <a href="./adr/0001-job-runner.md">ADR 0001: job runner</a>, <a href="./adr/0002-new-draft-per-commit.md">ADR 0002: a new draft per commit</a>, <a href="./adr/0003-n8n-retired-kept-as-record.md">ADR 0003: n8n retired</a>, <a href="./adr/0004-beehiiv-site-source.md">ADR 0004: beehiiv site source</a>.</li>
+  <li>Decisions: <a href="./adr/0001-job-runner.md">ADR 0001: job runner</a>, <a href="./adr/0003-n8n-retired-kept-as-record.md">ADR 0003: n8n retired</a>, <a href="./adr/0004-beehiiv-site-source.md">ADR 0004: beehiiv site source</a>, <a href="./adr/0005-draft-staged-for-sending-by-the-owner.md">ADR 0005: a draft is staged for sending by the owner</a> (replaces <a href="./adr/0002-new-draft-per-commit.md">ADR 0002</a>).</li>
   <li>History, not the current system: <a href="./n8n-backend/README.md">the old n8n backend and the migration plan</a>, and <a href="./research/">research</a> on job runners, news search, and article reading.</li>
 </ul>
 

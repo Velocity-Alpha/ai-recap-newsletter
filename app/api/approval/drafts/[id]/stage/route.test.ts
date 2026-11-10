@@ -18,7 +18,7 @@ const STAGED = {
   issueDate: "2026-05-21",
   title: "Pretend Lab Plans A Week",
   service: "ghl",
-  serviceName: "GHL",
+  serviceName: "Pretend Mail",
   serviceRef: "tpl_new",
   serviceUrl: "https://preview.example/tpl_new/index.html",
   mode: "sent",

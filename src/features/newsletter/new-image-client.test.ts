@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { requestImage, requestImageDraft, requestSceneIdeas } from "@/src/features/newsletter/new-image-client";
+import { requestImage, requestSceneIdeas, requestUseImage } from "@/src/features/newsletter/new-image-client";
 
 const IMAGE = { imageUrl: "https://example-bucket.s3.amazonaws.com/newsletter-dev/2026-05-21-abc123.jpg", scenePrompt: "A pretend lamp." };
 
@@ -59,11 +59,12 @@ describe("requestImage", () => {
   });
 });
 
-describe("requestImageDraft", () => {
-  it("sends the chosen image and returns the new draft's id", async () => {
-    const fetcher = answer(200, { success: true, draft: { draftId: 42, version: 3 } });
+describe("requestUseImage", () => {
+  it("sends the chosen image to the same draft, and resolves with nothing when the draft was changed", async () => {
+    const fetcher = answer(200, { success: true });
 
-    await expect(requestImageDraft(41, IMAGE, fetcher)).resolves.toEqual({ draftId: 42, error: null });
+    await expect(requestUseImage(41, IMAGE, fetcher)).resolves.toBeUndefined();
+    expect(fetcher).toHaveBeenCalledTimes(1);
     expect(fetcher).toHaveBeenCalledWith("/api/approval/drafts/41/image", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -71,16 +72,48 @@ describe("requestImageDraft", () => {
     });
   });
 
-  it("still returns the new draft when its job did not start, so the page can show it with Retry", async () => {
-    const fetcher = answer(502, { success: false, error: "Starting the draft job failed with HTTP 500.", draft: { draftId: 42 } });
-
-    await expect(requestImageDraft(41, IMAGE, fetcher)).resolves.toEqual({ draftId: 42, error: "Starting the draft job failed with HTTP 500." });
+  it("throws the server's plain reason when the image was not changed", async () => {
+    await expect(requestUseImage(41, IMAGE, answer(409, { success: false, error: "The issue for 2026-05-21 is already published." }))).rejects.toThrow(
+      "The issue for 2026-05-21 is already published.",
+    );
+    await expect(
+      requestUseImage(41, IMAGE, answer(409, { success: false, error: "This is not the newest draft for 2026-05-21. Reload the page." })),
+    ).rejects.toThrow("Reload the page.");
   });
 
-  it("throws the plain reason when no draft was made", async () => {
-    await expect(requestImageDraft(41, IMAGE, answer(409, { success: false, error: "The issue for 2026-05-21 is already published." }))).rejects.toThrow(
-      "already published",
+  it("carries the HTTP status on the error, so the page can read the draft again after a refusal", async () => {
+    await expect(requestUseImage(41, IMAGE, answer(409, { success: false, error: "The issue is already published." }))).rejects.toMatchObject({
+      name: "DraftRequestError",
+      status: 409,
+    });
+    await expect(requestUseImage(41, IMAGE, answer(500, {}))).rejects.toMatchObject({ status: 500 });
+    await expect(requestImage(41, "x", answer(429, { error: "Too many images this hour." }))).rejects.toMatchObject({ status: 429 });
+    await expect(requestUseImage(41, IMAGE, vi.fn<typeof fetch>(async () => Promise.reject(new TypeError("offline"))))).rejects.toMatchObject({
+      status: null,
+    });
+  });
+
+  it("throws a plain fallback when the server gives no reason", async () => {
+    await expect(requestUseImage(41, IMAGE, answer(500, {}))).rejects.toThrow("Could not change the image.");
+    await expect(requestUseImage(41, IMAGE, answer(500, { error: "" }))).rejects.toThrow("Could not change the image.");
+    const notJson = vi.fn<typeof fetch>(async () => new Response("<html>Bad gateway</html>", { status: 502 }));
+    await expect(requestUseImage(41, IMAGE, notJson)).rejects.toThrow("Could not change the image.");
+  });
+
+  it("does not take a 200 without success as a change", async () => {
+    await expect(requestUseImage(41, IMAGE, answer(200, {}))).rejects.toThrow("Could not change the image.");
+    await expect(requestUseImage(41, IMAGE, answer(200, { success: false, error: "The image was not saved." }))).rejects.toThrow(
+      "The image was not saved.",
     );
-    await expect(requestImageDraft(41, IMAGE, answer(500, {}))).rejects.toThrow("Could not make the new draft.");
+  });
+
+  it("does not take a failed answer that says success as a change", async () => {
+    await expect(requestUseImage(41, IMAGE, answer(502, { success: true }))).rejects.toThrow("Could not change the image.");
+  });
+
+  it("says when the server could not be reached", async () => {
+    await expect(requestUseImage(41, IMAGE, vi.fn<typeof fetch>(async () => Promise.reject(new TypeError("offline"))))).rejects.toThrow(
+      "Could not reach the server. Try again.",
+    );
   });
 });

@@ -1,6 +1,6 @@
 /**
  * Test helper: renders an issue email the way n8n's "Build Clean HTML Email" node does, optionally with
- * the changes GHL and Mailgun make before it reaches the seed inbox. Fixtures use placeholder text only.
+ * the changes the distribution service and Mailgun make before it reaches the seed inbox. Fixtures use placeholder text only.
  */
 
 export interface FixtureBullet {
@@ -38,7 +38,7 @@ export interface FixtureIssue {
 }
 
 export interface RenderOptions {
-  /** Apply what GHL and Mailgun do to the received copy. */
+  /** Apply what the distribution service and Mailgun do to the received copy. */
   received?: boolean;
 }
 
@@ -251,25 +251,25 @@ export function renderIssueEmail(issue: FixtureIssue, options: RenderOptions = {
   return options.received ? asReceivedCopy(html) : html;
 }
 
-/** Applies what GHL and Mailgun do to an issue email before it reaches the seed inbox. */
+/** Applies what the distribution service and Mailgun do to an issue email before it reaches the seed inbox. */
 export function asReceivedCopy(html: string): string {
   let link = 0;
   return html
     .replace("{{contact.first_name}}", "Reader")
-    // GHL adds a hidden preview line right after <body>.
+    // The distribution service adds a hidden preview line right after <body>.
     .replace(
       /<body([^>]*)>/,
       '<body$1><div style="display:none;font-size:1px;max-height:0px;overflow:hidden;">Preview text</div>'
     )
     // Mailgun rewrites every link to a tracking redirect.
     .replace(/href="[^"]*"/g, () => `href="https://email.mg.example.test/c/track-${(link += 1)}"`)
-    // GHL wraps link text in Outlook-only comments.
+    // The distribution service wraps link text in Outlook-only comments.
     .replace(/(<a\b[^>]*>)/g, '$1<!--[if mso]><font color="#B7410E"><![endif]-->')
     .replace(/<\/a>/g, "<!--[if mso]></font><![endif]--></a>")
     // The HTML serializer adds tbody around table rows.
     .replace(/<table([^>]*)>/g, "<table$1><tbody>")
     .replace(/<\/table>/g, "</tbody></table>")
-    // Appended GHL footer with an unsubscribe link outside the issue wrapper.
+    // Appended distribution service footer with an unsubscribe link outside the issue wrapper.
     .replace(
       "</body>",
       '<div><a href="https://services.example.test/unsubscribe/abc">Unsubscribe</a></div></body>'

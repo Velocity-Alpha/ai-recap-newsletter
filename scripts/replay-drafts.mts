@@ -15,7 +15,7 @@
 // Needs: DATABASE_URL (the Neon dev branch; stories are only read) and OPENAI_API_KEY. Refuses APP_ENV=production.
 // Optional: JINA_API_KEY and GITHUB_TOKEN, for the article reader (#120).
 // Effect: no issue, draft, or saved-article row is written, articles are read from the web each time, the image
-// step reuses n8n's image and scene prompt, and GHL is a dry run. Writes <out>/<date>.native.html,
+// step reuses n8n's image and scene prompt. Writes <out>/<date>.native.html,
 // <out>/<date>.n8n.html, <out>/<date>.json (with each article's read outcome, not its text), and <out>/index.html.
 
 import { mkdir, readFile, writeFile } from "node:fs/promises";

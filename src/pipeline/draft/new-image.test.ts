@@ -14,7 +14,8 @@ vi.mock("@/src/pipeline/draft/image/featured-image", async (importOriginal) => (
   makeImageFromScene: images.makeImageFromScene,
 }));
 
-import { createDraft, IssuePublishedError, NewImageError } from "@/src/pipeline/draft/draft-store";
+import { DraftTitleError } from "@/src/pipeline/draft/draft-edit";
+import { createDraft, DraftEditError, IssuePublishedError } from "@/src/pipeline/draft/draft-store";
 import { SAMPLE_CONTENT, SAMPLE_OUTLINE } from "@/src/pipeline/draft/draft.fixture";
 import { fakeDb } from "@/src/pipeline/draft/fake-db.fixture";
 import { FeaturedImageError } from "@/src/pipeline/draft/image/featured-image";
@@ -27,16 +28,15 @@ import {
   NewImageConfigError,
   newImageErrorResponse,
   NewImageInputError,
+  NewImageServiceError,
   suggestIdeasForDraft,
 } from "@/src/pipeline/draft/new-image";
-import { readDraftJobRequest } from "@/src/pipeline/draft/start-draft";
 
 const DATE = "2027-01-04";
 const NOW = new Date("2027-01-04T15:00:00.000Z");
-const SECRET = "s".repeat(32);
-const SITE = { siteUrl: "https://deploy-preview-9--ai-recap.netlify.app" };
-const ENV = { APP_ENV: "preview", S3_BUCKET: "example-bucket", SESSION_SECRET: SECRET, OPENAI_API_KEY: "test-openai", VERTEX_API_KEY: "test-vertex" };
+const ENV = { APP_ENV: "preview", S3_BUCKET: "example-bucket", OPENAI_API_KEY: "test-openai", VERTEX_API_KEY: "test-vertex" };
 const OLD_IMAGE = `https://example-bucket.s3.amazonaws.com/newsletter-dev/${DATE}-old111.jpg`;
+const OLD_HTML = "<html>v1</html>";
 const NEW_IMAGE = { imageUrl: `https://example-bucket.s3.amazonaws.com/newsletter-dev/${DATE}-new222.jpg`, scenePrompt: "A pretend lighthouse." };
 
 async function readyDraft() {
@@ -46,13 +46,17 @@ async function readyDraft() {
   const created = await createDraft(outline.id);
   await fakeDb.client.issueDraft.update({
     where: { id: BigInt(created.draftId) },
-    data: { status: "ready", content: SAMPLE_CONTENT, html: "<html>v1</html>", featuredImageUrl: OLD_IMAGE, scenePrompt: "A pretend robot." },
+    data: { status: "ready", content: SAMPLE_CONTENT, html: OLD_HTML, featuredImageUrl: OLD_IMAGE, scenePrompt: "A pretend robot." },
   });
   return created;
 }
 
 function draftRow(id: number) {
-  return fakeDb.state.drafts.rows.find((row) => Number(row.id) === id);
+  return fakeDb.state.drafts.rows.find((row) => Number(row.id) === id)!;
+}
+
+function issueRow(id: number) {
+  return fakeDb.state.issues.rows.find((row) => Number(row.id) === id)!;
 }
 
 beforeEach(() => {
@@ -62,7 +66,7 @@ beforeEach(() => {
 });
 
 describe("suggestIdeasForDraft", () => {
-  it("asks for ideas from the ready draft's subject line and top stories", async () => {
+  it("asks for ideas from the current draft's subject line and top stories", async () => {
     const source = await readyDraft();
 
     await expect(suggestIdeasForDraft(source.draftId, { env: ENV })).resolves.toEqual([{ label: "Lighthouse", scene: "A pretend lighthouse." }]);
@@ -76,11 +80,12 @@ describe("suggestIdeasForDraft", () => {
     );
   });
 
-  it("refuses a draft that is not ready and a published issue, without calling the model", async () => {
+  it("refuses a draft that is not ready, an older draft, and a published issue, without calling the model", async () => {
     const source = await readyDraft();
     const running = await createDraft(fakeDb.state.outlines.rows[0].id);
 
-    await expect(suggestIdeasForDraft(running.draftId, { env: ENV })).rejects.toBeInstanceOf(NewImageError);
+    await expect(suggestIdeasForDraft(running.draftId, { env: ENV })).rejects.toMatchObject({ name: "DraftEditError", reason: "not_ready" });
+    await expect(suggestIdeasForDraft(source.draftId, { env: ENV })).rejects.toMatchObject({ name: "DraftEditError", reason: "not_current" });
     await fakeDb.client.issue.update({ where: { id: BigInt(source.issueId) }, data: { publishedAt: NOW } });
     await expect(suggestIdeasForDraft(source.draftId, { env: ENV })).rejects.toBeInstanceOf(IssuePublishedError);
     expect(ideas.suggestSceneIdeas).not.toHaveBeenCalled();
@@ -99,6 +104,7 @@ describe("suggestIdeasForDraft", () => {
 describe("generateImageForDraft", () => {
   it("makes one image from the owner's scene for the draft's date, with no retries, inside a route's time", async () => {
     const source = await readyDraft();
+    const before = structuredClone(draftRow(source.draftId));
 
     await expect(generateImageForDraft(source.draftId, { scenePrompt: "  A pretend lighthouse.  " }, { env: ENV })).resolves.toEqual(NEW_IMAGE);
 
@@ -112,8 +118,9 @@ describe("generateImageForDraft", () => {
     );
     // The image and the upload together, with room for the database reads, inside Netlify's 60 s.
     expect(BOARD_IMAGE_TIMEOUT_MS + BOARD_UPLOAD_TIMEOUT_MS).toBeLessThanOrEqual(50_000);
-    // Nothing is drafted until the owner picks the image.
+    // The draft does not change until the owner picks the image.
     expect(fakeDb.state.drafts.rows).toHaveLength(1);
+    expect(draftRow(source.draftId)).toEqual(before);
   });
 
   it.each([
@@ -136,93 +143,207 @@ describe("generateImageForDraft", () => {
     await expect(generateImageForDraft(source.draftId, { scenePrompt: "A lamp." }, { env: ENV })).rejects.toBeInstanceOf(IssuePublishedError);
     expect(images.makeImageFromScene).not.toHaveBeenCalled();
   });
+
+  it("refuses an older draft once a newer one exists, and makes no image", async () => {
+    const source = await readyDraft();
+    await createDraft(fakeDb.state.outlines.rows[0].id);
+
+    await expect(generateImageForDraft(source.draftId, { scenePrompt: "A lamp." }, { env: ENV })).rejects.toMatchObject({
+      name: "DraftEditError",
+      reason: "not_current",
+    });
+    expect(images.makeImageFromScene).not.toHaveBeenCalled();
+  });
 });
 
 describe("chooseNewImage", () => {
-  const accepted = () => vi.fn<typeof fetch>(async () => new Response(null, { status: 202 }));
+  /** S3's answer to the HEAD request for an uploaded JPEG. */
+  const inS3 = () => vi.fn<typeof fetch>(async () => new Response(null, { status: 200, headers: { "content-type": "image/jpeg" } }));
 
-  it("makes the next draft with the chosen image and starts its job", async () => {
+  it("checks the image is in S3, then puts it into the same draft and the issue", async () => {
     const source = await readyDraft();
-    const fetch = accepted();
+    const fetch = inS3();
 
-    const result = await chooseNewImage(source.draftId, NEW_IMAGE, SITE, { env: ENV, now: () => NOW, fetch });
+    const result = await chooseNewImage(source.draftId, NEW_IMAGE, { env: ENV, now: () => NOW, fetch });
 
     expect(result).toEqual({
-      draft: { draftId: expect.any(Number), issueId: source.issueId, version: 2, issueDate: DATE },
-      start: { started: true },
-    });
-    expect(draftRow(result.draft.draftId)).toMatchObject({
-      status: "running",
-      sourceDraftId: BigInt(source.draftId),
+      draftId: source.draftId,
+      issueId: source.issueId,
+      version: 1,
+      issueDate: DATE,
+      content: SAMPLE_CONTENT,
       featuredImageUrl: NEW_IMAGE.imageUrl,
       scenePrompt: NEW_IMAGE.scenePrompt,
     });
-    const [url, init] = fetch.mock.calls[0];
-    await expect(readDraftJobRequest(new Request(url, init), { SESSION_SECRET: SECRET }, NOW)).resolves.toBe(result.draft.draftId);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(fetch).toHaveBeenCalledWith(NEW_IMAGE.imageUrl, expect.objectContaining({ method: "HEAD" }));
+    const row = draftRow(source.draftId);
+    expect(row).toMatchObject({
+      version: 1,
+      status: "ready",
+      content: SAMPLE_CONTENT,
+      featuredImageUrl: NEW_IMAGE.imageUrl,
+      scenePrompt: NEW_IMAGE.scenePrompt,
+      editedAt: NOW,
+    });
+    expect(row.html).not.toBe(OLD_HTML);
+    expect(row.html).toContain(`url=${NEW_IMAGE.imageUrl}"`);
+    expect(row.html).toContain(SAMPLE_CONTENT.title);
+    expect(issueRow(source.issueId)).toMatchObject({
+      title: SAMPLE_CONTENT.title,
+      html: row.html,
+      featureImageUrl: NEW_IMAGE.imageUrl,
+      promptFeaturedImage: NEW_IMAGE.scenePrompt,
+    });
+  });
+
+  it("makes no new draft and no staged version, and starts no job", async () => {
+    const source = await readyDraft();
+    const fetch = inS3();
+
+    await chooseNewImage(source.draftId, NEW_IMAGE, { env: ENV, now: () => NOW, fetch });
+
+    expect(fakeDb.state.drafts.rows).toHaveLength(1);
+    expect(fakeDb.state.stagedVersions.rows).toHaveLength(0);
+    // The only request is the HEAD to S3: nothing goes to the draft job or the distribution service.
+    expect(fetch.mock.calls.map(([url, init]) => [url, init?.method])).toEqual([[NEW_IMAGE.imageUrl, "HEAD"]]);
+  });
+
+  it("trims the image address and the scene prompt", async () => {
+    const source = await readyDraft();
+
+    const result = await chooseNewImage(
+      source.draftId,
+      { imageUrl: `  ${NEW_IMAGE.imageUrl}  `, scenePrompt: `  ${NEW_IMAGE.scenePrompt}\n` },
+      { env: ENV, now: () => NOW, fetch: inS3() },
+    );
+
+    expect(result).toMatchObject({ featuredImageUrl: NEW_IMAGE.imageUrl, scenePrompt: NEW_IMAGE.scenePrompt });
   });
 
   it.each([
     ["an image from elsewhere", { ...NEW_IMAGE, imageUrl: "https://elsewhere.example.test/a.jpg" }, "is not an image this site uploaded"],
     ["an image for another date", { ...NEW_IMAGE, imageUrl: NEW_IMAGE.imageUrl.replace(DATE, "2027-01-05") }, "is not an image this site uploaded"],
     ["no scene prompt", { imageUrl: NEW_IMAGE.imageUrl }, "Send the image and its scene prompt"],
-  ])("refuses %s, and makes no draft", async (_name, body, message) => {
+    ["no image", { scenePrompt: NEW_IMAGE.scenePrompt }, "Send the image and its scene prompt"],
+    ["no body", null, "Send the image and its scene prompt"],
+    ["an empty scene prompt", { ...NEW_IMAGE, scenePrompt: "   " }, "Write a scene prompt first."],
+    ["a scene prompt that is too long", { ...NEW_IMAGE, scenePrompt: "x".repeat(MAX_SCENE_PROMPT_CHARS + 1) }, "Keep it under"],
+  ])("refuses %s as a bad request, without asking S3, and leaves the draft as it was", async (_name, body, message) => {
     const source = await readyDraft();
-    const fetch = accepted();
+    const before = structuredClone(draftRow(source.draftId));
+    const fetch = inS3();
 
-    const attempt = chooseNewImage(source.draftId, body, SITE, { env: ENV, now: () => NOW, fetch });
+    const error = await chooseNewImage(source.draftId, body, { env: ENV, now: () => NOW, fetch }).catch((reason: unknown) => reason);
 
-    await expect(attempt).rejects.toBeInstanceOf(NewImageInputError);
-    await expect(attempt).rejects.toThrow(message);
-    expect(fakeDb.state.drafts.rows).toHaveLength(1);
+    expect(error).toBeInstanceOf(NewImageInputError);
+    expect((error as Error).message).toContain(message);
+    expect(newImageErrorResponse(error)).toMatchObject({ status: 400 });
+    expect(draftRow(source.draftId)).toEqual(before);
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it("answers 500 with a plain message when S3_BUCKET is not set, before reading the request, and makes no draft", async () => {
+  it.each([
+    ["is missing from S3", () => new Response(null, { status: 404 }), "The chosen image is not in S3 as a JPEG (HTTP 404)."],
+    [
+      "is not a JPEG",
+      () => new Response(null, { status: 200, headers: { "content-type": "text/html" } }),
+      "The chosen image is not in S3 as a JPEG (HTTP 200, text/html).",
+    ],
+  ])("answers 502 when the image %s, and leaves the draft and the issue as they were", async (_name, answer, message) => {
     const source = await readyDraft();
-    const fetch = accepted();
+    const before = structuredClone({ draft: draftRow(source.draftId), issue: issueRow(source.issueId) });
+    const s3 = vi.fn<typeof fetch>(async () => answer());
+
+    const error = await chooseNewImage(source.draftId, NEW_IMAGE, { env: ENV, now: () => NOW, fetch: s3 }).catch((reason: unknown) => reason);
+
+    expect(error).toBeInstanceOf(NewImageServiceError);
+    expect(newImageErrorResponse(error)).toEqual({ status: 502, error: message });
+    expect(draftRow(source.draftId)).toEqual(before.draft);
+    expect(issueRow(source.issueId)).toEqual(before.issue);
+  });
+
+  it("answers 502 when S3 cannot be reached, and leaves the draft as it was", async () => {
+    const source = await readyDraft();
+    const before = structuredClone(draftRow(source.draftId));
+    const s3 = vi.fn<typeof fetch>(async () => {
+      throw new Error("network down");
+    });
+
+    const error = await chooseNewImage(source.draftId, NEW_IMAGE, { env: ENV, now: () => NOW, fetch: s3 }).catch((reason: unknown) => reason);
+
+    expect(error).toBeInstanceOf(NewImageServiceError);
+    expect(newImageErrorResponse(error)).toEqual({ status: 502, error: "Could not check the chosen image in S3: network down" });
+    expect(draftRow(source.draftId)).toEqual(before);
+  });
+
+  it("answers 500 with a plain message when S3_BUCKET is not set, before reading the request, and changes nothing", async () => {
+    const source = await readyDraft();
+    const before = structuredClone(draftRow(source.draftId));
+    const fetch = inS3();
     const noBucket = { ...ENV, S3_BUCKET: undefined };
 
-    const error = await chooseNewImage(source.draftId, NEW_IMAGE, SITE, { env: noBucket, now: () => NOW, fetch }).catch((reason: unknown) => reason);
+    const error = await chooseNewImage(source.draftId, null, { env: noBucket, now: () => NOW, fetch }).catch((reason: unknown) => reason);
 
     expect(error).toBeInstanceOf(NewImageConfigError);
     expect(newImageErrorResponse(error)).toEqual({ status: 500, error: "S3_BUCKET is not set on this deploy, so the chosen image cannot be checked." });
-    expect(fakeDb.state.drafts.rows).toHaveLength(1);
+    expect(draftRow(source.draftId)).toEqual(before);
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it("marks the new draft failed at start when its job cannot start, so the board offers Retry", async () => {
-    const source = await readyDraft();
-    const down = vi.fn<typeof fetch>(async () => new Response(null, { status: 500 }));
-
-    const result = await chooseNewImage(source.draftId, NEW_IMAGE, SITE, { env: ENV, now: () => NOW, fetch: down });
-
-    expect(result.start).toEqual({ started: false, error: "Starting the draft job failed with HTTP 500." });
-    expect(draftRow(result.draft.draftId)).toMatchObject({ status: "failed", failedStep: "start", featuredImageUrl: NEW_IMAGE.imageUrl });
-  });
-
-  it("refuses once the issue is published, and never changes it", async () => {
+  it("refuses once the issue is published, without asking S3, and never changes it", async () => {
     const source = await readyDraft();
     await fakeDb.client.issue.update({ where: { id: BigInt(source.issueId) }, data: { publishedAt: NOW, title: "Sent issue" } });
-    const issueBefore = structuredClone(fakeDb.state.issues.rows[0]);
+    const before = structuredClone({ draft: draftRow(source.draftId), issue: issueRow(source.issueId) });
+    const fetch = inS3();
 
-    await expect(chooseNewImage(source.draftId, NEW_IMAGE, SITE, { env: ENV, now: () => NOW, fetch: accepted() })).rejects.toBeInstanceOf(
-      IssuePublishedError,
-    );
+    await expect(chooseNewImage(source.draftId, NEW_IMAGE, { env: ENV, now: () => NOW, fetch })).rejects.toBeInstanceOf(IssuePublishedError);
+
     expect(fakeDb.state.drafts.rows).toHaveLength(1);
-    expect(fakeDb.state.issues.rows[0]).toEqual(issueBefore);
+    expect(draftRow(source.draftId)).toEqual(before.draft);
+    expect(issueRow(source.issueId)).toEqual(before.issue);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("refuses an older draft once a newer one exists, a draft that is not ready, and a missing draft, without asking S3", async () => {
+    const source = await readyDraft();
+    const running = await createDraft(fakeDb.state.outlines.rows[0].id);
+    const before = structuredClone(fakeDb.state.drafts.rows);
+    const fetch = inS3();
+    const options = { env: ENV, now: () => NOW, fetch };
+
+    await expect(chooseNewImage(source.draftId, NEW_IMAGE, options)).rejects.toMatchObject({ name: "DraftEditError", reason: "not_current" });
+    await expect(chooseNewImage(running.draftId, NEW_IMAGE, options)).rejects.toMatchObject({ name: "DraftEditError", reason: "not_ready" });
+    await expect(chooseNewImage(999, NEW_IMAGE, options)).rejects.toMatchObject({ name: "DraftEditError", reason: "missing" });
+
+    expect(fakeDb.state.drafts.rows).toEqual(before);
+    expect(fetch).not.toHaveBeenCalled();
   });
 });
 
 describe("newImageErrorResponse", () => {
   it("maps each refusal to a status and a plain message, and leaves anything else to the route", () => {
     expect(newImageErrorResponse(new NewImageInputError("Write a scene first."))).toEqual({ status: 400, error: "Write a scene first." });
-    expect(newImageErrorResponse(new NewImageError("Draft 9 does not exist.", "missing"))).toEqual({ status: 404, error: "Draft 9 does not exist." });
-    expect(newImageErrorResponse(new NewImageError("Draft 9 is running.", "not_ready"))).toMatchObject({ status: 409 });
+    expect(newImageErrorResponse(new NewImageConfigError("S3_BUCKET is not set."))).toEqual({ status: 500, error: "S3_BUCKET is not set." });
+    expect(newImageErrorResponse(new DraftEditError("Draft 9 does not exist.", "missing"))).toEqual({ status: 404, error: "Draft 9 does not exist." });
+    expect(newImageErrorResponse(new DraftEditError("The draft is running.", "not_ready"))).toEqual({ status: 409, error: "The draft is running." });
+    expect(newImageErrorResponse(new DraftEditError("This is not the newest draft.", "not_current"))).toMatchObject({ status: 409 });
     expect(newImageErrorResponse(new IssuePublishedError(3, DATE))).toMatchObject({ status: 409, error: expect.stringContaining("already published") });
     expect(newImageErrorResponse(new FeaturedImageError("image", new Error("Vertex returned HTTP 429: Quota")))).toEqual({
       status: 502,
       error: "Featured image failed at image: Vertex returned HTTP 429: Quota",
     });
+    expect(newImageErrorResponse(new NewImageServiceError("The chosen image is not in S3 as a JPEG (HTTP 404)."))).toEqual({
+      status: 502,
+      error: "The chosen image is not in S3 as a JPEG (HTTP 404).",
+    });
     expect(newImageErrorResponse(new Error("database down"))).toBeNull();
+  });
+
+  it("answers as the draft edit does for anything that module knows", () => {
+    expect(newImageErrorResponse(new DraftTitleError("The title is empty. Write a title first."))).toEqual({
+      status: 400,
+      error: "The title is empty. Write a title first.",
+    });
   });
 });

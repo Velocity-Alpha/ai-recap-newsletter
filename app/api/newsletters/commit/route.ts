@@ -150,7 +150,7 @@ async function commitDraft(
 
   return jsonWithRequestId(context, {
     success: true,
-    message: `Draft v${draft.version} for ${draft.issueDate} started.`,
+    message: `The draft for ${draft.issueDate} started.`,
     receivedAt: new Date().toISOString(),
     draft,
   });

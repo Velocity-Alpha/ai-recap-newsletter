@@ -150,7 +150,7 @@ describe("runChecks at 10:05", () => {
 
   it("closes check incidents and failed stagings of earlier dates with one combined message, and leaves other incidents alone", async () => {
     notify.listOpenIncidents.mockResolvedValue([
-      told("publish-pending:2026-11-09", "warning", "The draft for 2026-11-09 is ready but not published."),
+      told("publish-pending:2026-11-09", "warning", "v1 for 2026-11-09 is staged but not published."),
       told("draft-missing:2026-11-06", "critical", "Committed, but no draft is ready for 2026-11-06."),
       untold("source-empty:tldr:2026-11-09"),
       untold("stage.failed:2026-11-09"),
@@ -175,7 +175,7 @@ describe("runChecks at 10:05", () => {
     expect(notify.postToOpsChat.mock.calls[0][0]).toBe(
       [
         "RESOLVED: closed 2 incidents from earlier days. Their day is over.",
-        "- WARNING publish-pending:2026-11-09: The draft for 2026-11-09 is ready but not published.",
+        "- WARNING publish-pending:2026-11-09: v1 for 2026-11-09 is staged but not published.",
         "- CRITICAL draft-missing:2026-11-06: Committed, but no draft is ready for 2026-11-06.",
       ].join("\n"),
     );

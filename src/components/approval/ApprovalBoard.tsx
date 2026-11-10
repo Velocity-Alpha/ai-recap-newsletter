@@ -28,14 +28,11 @@ import {
   Zap,
 } from "lucide-react";
 
+import DateState from "@/components/approval/DateState";
 import NoIssueTodayButton from "@/components/approval/NoIssueTodayButton";
 import { Button } from "@/components/ui/button";
-import {
-  draftViewHref,
-  nativeCommitTarget,
-  secondCommitNotice,
-  type DraftingSummary,
-} from "@/features/newsletter/draft-links";
+import { nativeCommitTarget, secondCommitNotice } from "@/features/newsletter/draft-links";
+import type { DateDraftsView } from "@/src/pipeline/draft/draft-board";
 
 type StoryOption = {
   id: number;
@@ -114,8 +111,8 @@ type ApprovalBoardProps = {
       published_at: string | null;
     } | null;
   } | null;
-  /** The date's drafts (#79). Null if they could not be read. */
-  drafting?: DraftingSummary | null;
+  /** The date's state, current draft, and staged versions. Null if the read failed. */
+  drafting?: DateDraftsView | null;
 };
 
 type PreviewStory = CandidateMapEntry & {
@@ -237,8 +234,6 @@ export default function ApprovalBoard({
 }: ApprovalBoardProps) {
   const router = useRouter();
   const nextDraftNotice = secondCommitNotice(drafting);
-  const draftCount = drafting?.drafts.length ?? 0;
-  const latestDraft = draftCount > 0 ? drafting?.drafts[0] : undefined;
   const [commitModalOpen, setCommitModalOpen] = useState(false);
   const [isCommitting, setIsCommitting] = useState(false);
   const [commitResponseMessage, setCommitResponseMessage] = useState<string | null>(null);
@@ -752,20 +747,7 @@ export default function ApprovalBoard({
             </button>
           </div>
         ))}
-        {latestDraft ? (
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[rgba(107,155,184,0.3)] bg-[rgba(232,242,248,0.7)] px-4 py-3 sm:px-6">
-            <p className="text-sm font-semibold text-[var(--watercolor-ink)]">
-              {draftCount === 1 ? "This date has 1 draft." : `This date has ${draftCount} drafts.`}{" "}
-              {`The latest is v${latestDraft.version}, ${latestDraft.status}.`}
-            </p>
-            <a
-              href={draftViewHref(dateKey, latestDraft.id)}
-              className="shrink-0 rounded-md border border-[rgba(107,155,184,0.5)] bg-white/80 px-3 py-1.5 text-xs font-medium text-[var(--watercolor-ink)] transition hover:bg-white"
-            >
-              View drafts
-            </a>
-          </div>
-        ) : null}
+        {drafting ? <DateState date={dateKey} view={drafting} /> : null}
         {dedupFailureReason ? (
           <div className="border-t border-red-300 bg-red-50 px-4 py-3 sm:px-6">
             <p className="text-sm font-semibold text-red-700">

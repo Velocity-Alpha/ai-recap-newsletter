@@ -101,10 +101,16 @@ Nine keys. The date in each key is the issue date in New York time.
 - **Raised by:** `run-checks`, from 18:00 (PR #129).
 - **Severity:** warning.
 - **Meaning:** The draft is ready, but the issue's `status` is still `draft`. The issue has not gone out, or
-  publish detection has not noticed it.
-- **Do (fix):** Send the email from GHL. Publish detection marks the issue published when the sent email
-  reaches Gmail. If you did send it and this stays open, read the latest `detect-publish` run. If you will
-  not send today, press "No issue today".
+  publish detection has not noticed it. The alert has one of three texts:
+  - `The draft for <date> is ready but not staged.` Nothing is staged.
+  - `v<n> for <date> is staged but not published.` A staged version waits in GHL.
+  - The same, plus `The draft changed after v<n> was staged.` The title, the image, or the draft is newer
+    than the staged version.
+- **Do (fix):** A ready draft has no email in GHL until it is staged. If nothing is staged, or the draft
+  changed and you want the change, open `/approval/drafts` and press "Stage for sending". Then send the
+  newest staged version from GHL. Publish detection
+  marks the issue published when the sent email reaches Gmail. If you did send it and this stays open, read
+  the latest `detect-publish` run. If you will not send today, press "No issue today".
 
 ### `site-check-failed:<date>`
 
@@ -121,22 +127,24 @@ Nine keys. The date in each key is the issue date in New York time.
 
 - **Raised by:** the `draft-issue` job, in `src/pipeline/draft/run-draft.ts` (PR #132, carried by #133
   and #134).
-- **Severity:** critical. A failed "New image" draft is a warning: its ready source draft is still there.
+- **Severity:** critical.
 - **Meaning:** A draft failed at one step: loading the outline, reading articles, writing, checking the
-  writing, making the image, building the email, creating the GHL template, or saving. The alert names the
+  writing, making the image, building the email, or saving. The alert names the
   step. If the draft has no issue date, the key ends in `issue-<id>` instead of a date. A duplicate issue
   title is one known cause; the message then says so.
 - **Do (check, fix, retry):** The incident message links to the drafts page for the date
   (`/approval/drafts?date=<date>`). Steps (from PR #133):
-  1. Open `/approval/drafts?date=<YYYY-MM-DD>`. It lists every draft for the date.
+  1. Open `/approval/drafts?date=<YYYY-MM-DD>`. It shows the date's current draft and its staged versions.
   2. Read the failed step and the error on the failed draft. Fix the cause if it is outside the code, for
      example an API key or a quota.
   3. Press "Retry". The page offers it for a draft that failed, and for a draft stuck in running: one that
      started over 20 minutes ago, or was queued and never started after 5 minutes. A retry runs the same
-     draft version again from the start, with a new GHL template; the old template stays in GHL. It is
-     refused when the issue is already published.
-  4. Or commit again from the board. That makes a new draft version with its own GHL template
-     ([ADR 0002](../adr/0002-new-draft-per-commit.md)).
+     draft again from the start. It is refused when the issue is already published.
+  4. Or commit again from the board. That makes a new draft, which replaces the failed one as the current
+     draft ([ADR 0005](../adr/0005-draft-staged-for-sending-by-the-owner.md)).
+
+  A draft never creates an email in the distribution service, so a failed draft leaves nothing to clean up
+  there.
 
   The incident closes when a draft is ready. `run-checks` does not close this key at the end of the day,
   so it stays open until a draft succeeds.

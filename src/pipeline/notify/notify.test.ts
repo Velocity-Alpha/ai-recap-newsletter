@@ -72,7 +72,7 @@ vi.mock("@/src/pipeline/runs", () => ({
   }),
 }));
 
-import { REVIEW_CHAT_ID } from "@/src/pipeline/ingest/telegram";
+import { REVIEW_CHAT_ID } from "@/src/pipeline/review-group";
 import {
   listInfoIncidents,
   listOpenIncidents,

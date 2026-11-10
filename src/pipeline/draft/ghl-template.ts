@@ -1,8 +1,7 @@
-import { stagedEmailName } from "@/src/pipeline/distribution/staged-version";
 import { createSideEffects, type SideEffectRecord } from "@/src/pipeline/side-effects";
 
 /**
- * Each draft gets its own new GHL email template (ADR 0002). Same two calls as n8n's `2. Create Issue Draft`
+ * A new GHL email template for each staged version (ADR 0005). Same two calls as n8n's `2. Create Issue Draft`
  * (docs/n8n-backend/20-drafting-and-images.md §1.8): create the template, then set its HTML.
  *
  * It never edits or deletes an existing template: the input has no template id, and the second call only
@@ -22,16 +21,7 @@ const SETTING = {
   userId: "GHL_USER_ID",
 } as const;
 
-export interface DraftTemplateInput {
-  /** The issue date, `YYYY-MM-DD`. */
-  issueDate: string;
-  /** The draft's version for that date: 1, 2, ... */
-  version: number;
-  subject: string;
-  html: string;
-}
-
-export interface DraftTemplateResult {
+export interface EmailTemplateResult {
   templateId: string;
   /** GHL's preview link, when it returns one. */
   previewUrl?: string;
@@ -39,7 +29,7 @@ export interface DraftTemplateResult {
   mode: "sent" | "recorded";
 }
 
-export interface DraftTemplateDeps {
+export interface EmailTemplateDeps {
   /** `APP_ENV` and the `GHL_*` settings. */
   env: Record<string, string | undefined>;
   fetch?: typeof fetch;
@@ -140,17 +130,11 @@ function dryRunTemplateId(name: string): string {
   return `dry-run-${name.split(":")[0].trim().replace(/\s+/g, "-")}`;
 }
 
-/** A draft's own template, named `<YYYY-MM-DD> v<version>: <subject>` (`stagedEmailName`). */
-export async function createDraftTemplate(input: DraftTemplateInput, deps: DraftTemplateDeps): Promise<DraftTemplateResult> {
-  const name = stagedEmailName({ issueDate: input.issueDate, version: input.version, title: input.subject });
-  return createEmailTemplate({ name, html: input.html }, deps);
-}
-
 /**
  * Creates a new GHL template with this name and sets its HTML. Outside production both calls are recorded,
  * nothing is sent, and the template id is a stand-in.
  */
-export async function createEmailTemplate(input: { name: string; html: string }, deps: DraftTemplateDeps): Promise<DraftTemplateResult> {
+export async function createEmailTemplate(input: { name: string; html: string }, deps: EmailTemplateDeps): Promise<EmailTemplateResult> {
   const { name } = input;
   const effects = createSideEffects({ appEnv: deps.env.APP_ENV, record: deps.record });
   const settings = readSettings(deps.env, effects.live);

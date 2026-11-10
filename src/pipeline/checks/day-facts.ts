@@ -1,6 +1,8 @@
 import { newYorkTime, shiftDate, type Weekday } from "@/src/pipeline/checks/schedule";
 import { ISSUE_DRAFT, ISSUE_PUBLISHED, type IssueStatus } from "@/src/features/newsletter/issue-status";
 import { dateOnly, findSkippedDate } from "@/src/pipeline/checks/skipped-dates";
+import { stagedFacts } from "@/src/pipeline/distribution/issue-state";
+import { readDateIssueFacts } from "@/src/pipeline/distribution/issue-state-store";
 import { prisma } from "@/src/server/prisma";
 
 /**
@@ -31,6 +33,10 @@ export interface DayFacts {
   draftReady: boolean;
   /** The published issue for this date, else the latest ready draft. */
   issue: { id: string; slug: string | null; title: string; status: IssueStatus; publishedAt: Date | null } | null;
+  /** The number of the issue's newest staged version (GLOSSARY.md). Null when nothing is staged. */
+  stagedVersion: number | null;
+  /** The draft changed after that version was staged: another draft row, title, or image. */
+  changedSinceStaged: boolean;
   /** Facts that could not be read and fell back to a default. The run logs them as warnings. */
   warnings: string[];
 }
@@ -56,40 +62,50 @@ function sum(values: number[]): number {
   return values.reduce((total, value) => total + value, 0);
 }
 
+function shortReason(error: unknown): string {
+  return (error instanceof Error ? error.message : String(error)).replace(/\s+/g, " ").trim().slice(0, 300);
+}
+
 function earliest(...dates: Array<Date | null>): Date | null {
   const known = dates.filter((date): date is Date => date !== null);
   return known.length === 0 ? null : new Date(Math.min(...known.map((date) => date.getTime())));
 }
 
 /**
- * Reads the facts from the tables n8n and the native jobs write today:
+ * Reads the facts from these tables:
  * - stories: counted by ingest time (`createdAt` in the New York day), not by `stories.day`. `day` is the
  *   newsletter's own date, often the day before for late senders, so by `day` several sources look empty
  *   most mornings (on the production copy, AI Breakfast on 7 of 8 Tuesdays; by ingest time, 1 of 8).
  *   The same weekday in the 8 weeks before gives the thin-day median. Which sources are expected on a
  *   weekday is fixed per source (`expectedOn` in sources.ts), not read from this history.
- * - commit: stories whose `queued_for_publication_date` is the date (n8n sets it on commit). n8n stores no
- *   commit time, so it is about the earlier of the first draft row and the queued stories' last update.
- * - drafts: `issues` rows for the date (n8n inserts one per commit). Ready = the row has its email HTML.
+ * - commit: stories whose `queued_for_publication_date` is the date (the commit sets it). The commit time is
+ *   about the earlier of the issue row's creation and the queued stories' last update.
+ * - drafts: the `issues` row for the date. Ready = the row has its email HTML.
  * - published: that issue's `status`.
- * When native drafting lands, read the commit from `approval_outlines.committed_at` (#75) and the drafts from
- * `issue_drafts` with status `ready` (#76) here. The checks do not change.
+ * - staged: the issue's newest staged version and whether the draft changed after it (`stagedFacts`, #149).
  */
 export async function readDayFacts(date: string): Promise<DayFacts> {
   const warnings: string[] = [];
   // A missing skipped_dates table (migration not applied) must not stop the checks: the date counts as not
   // skipped, and the run log says why.
   const readSkipped = findSkippedDate(date).catch((error: unknown) => {
-    const reason = (error instanceof Error ? error.message : String(error)).replace(/\s+/g, " ").trim().slice(0, 300);
-    warnings.push(`Could not read skipped_dates, so ${date} counts as not skipped: ${reason}`);
+    warnings.push(`Could not read skipped_dates, so ${date} counts as not skipped: ${shortReason(error)}`);
     return null;
   });
+  // The same for staged_versions: the date then counts as not staged.
+  const readStaged = readDateIssueFacts(date)
+    .then(stagedFacts)
+    .catch((error: unknown) => {
+      warnings.push(`Could not read the staged versions, so ${date} counts as not staged: ${shortReason(error)}`);
+      return { stagedVersion: null, changedSinceStaged: false };
+    });
   const day = dateOnly(date);
   const today = newYorkDayRange(date);
   const history = Array.from({ length: HISTORY_WEEKS }, (_, index) => newYorkDayRange(shiftDate(date, -7 * (index + 1))));
 
-  const [skipped, ingestRun, storiesBySource, historyBySource, queued, drafts, readyIssues] = await Promise.all([
+  const [skipped, staged, ingestRun, storiesBySource, historyBySource, queued, drafts, readyIssues] = await Promise.all([
     readSkipped,
+    readStaged,
     prisma.pipelineRun.findFirst({
       where: { job: INGEST_JOB, startedAt: today },
       orderBy: { startedAt: "desc" },
@@ -134,6 +150,8 @@ export async function readDayFacts(date: string): Promise<DayFacts> {
       status: issue.status === ISSUE_PUBLISHED ? ISSUE_PUBLISHED : ISSUE_DRAFT,
       publishedAt: issue.publishedAt,
     },
+    stagedVersion: staged.stagedVersion,
+    changedSinceStaged: staged.changedSinceStaged,
     warnings,
   };
 }
