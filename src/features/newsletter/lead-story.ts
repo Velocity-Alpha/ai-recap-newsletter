@@ -35,7 +35,7 @@ const RESEARCH_SECTION = "research";
 const FEED_SOURCES = new Set(["huggingface", "product_hunt_ai"]);
 
 const MAJOR_LAB =
-  /\b(openai|chatgpt|gpt|anthropic|claude|google|deepmind|gemini|meta|llama|xai|grok|microsoft|copilot|nvidia|apple|amazon|aws|deepseek|mistral|kimi|moonshot|qwen|alibaba)\b/i;
+  /\b(openai|chatgpt|gpt|anthropic|claude|google|deepmind|gemini|meta|llama|xai|grok|microsoft|copilot|nvidia|apple|amazon|aws|deepseek|mistral|kimi|moonshot|qwen|alibaba|z\.ai|zhipu|glm|minimax|tencent|hunyuan)\b/i;
 const LAUNCH = /\b(launch(es|ed)?|release[sd]?|ships?|introduc(es|ed)|unveil(s|ed)?|debuts?|open-sources?|rolls? out)\b/i;
 const MODEL = /\b(models?|gpt-\S+|gemini \d|claude \S+|llama \d|weights|open-weight|genie|lfm\d|large \d)\b/i;
 const BIG_MONEY = /\bipo\b|go(es|ing)? public|\$\d+(\.\d+)?\s?(b|billion)\b|\$[1-9]\d{2,}\s?(m|million)\b/i;

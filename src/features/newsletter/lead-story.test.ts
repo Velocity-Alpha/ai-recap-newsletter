@@ -44,6 +44,7 @@ describe("leadScore", () => {
     expect(leadScore(story(1, 4, { headline: "Anthropic Opens Paid AI Safety Residency" }))).toBe(5);
     expect(leadScore(story(1, 4, { headline: "Kimi Releases 104B Open-Weight Model With 1M-Token Context" }))).toBe(6);
     expect(leadScore(story(1, 4, { headline: "Google Introduces Gemini 4 Carbon" }))).toBe(6);
+    expect(leadScore(story(1, 4, { headline: "MiniMax Opens A Paris Office" }))).toBe(5);
   });
 
   it("adds a point for an IPO or a giant round", () => {
