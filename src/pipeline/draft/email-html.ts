@@ -9,7 +9,8 @@ import type {
 /**
  * The issue email, ported from n8n's "Build Clean HTML Email" (docs/n8n-backend/20-drafting-and-images.md
  * §1.7.2). Same markup and whitespace, so GHL and publish detection see what they always have. Changes:
- * - the issue wrapper also carries `data-draft-id`, so publish detection knows which draft was sent;
+ * - the issue wrapper also carries `data-draft-id`, and a staged email carries `data-version-id` too, so publish
+ *   detection knows which staged version was sent (the draft's own HTML, the preview in the app, has no version id);
  * - the footer year comes from the issue date (n8n hardcoded 2026);
  * - the title comes from the written content, and an invalid issue date throws instead of printing today;
  * - the image block is left out when there is no image (n8n always printed one).
@@ -26,6 +27,8 @@ export interface EmailDraft {
   id: number;
   /** The featured image's own URL (S3). The email loads it through the site's image CDN. */
   featuredImageUrl: string;
+  /** Set only on a staged email (#149): the staged version's id, written as `data-version-id`. */
+  versionId?: number;
 }
 
 const IMAGE_CDN = "https://airecap.news/.netlify/images?w=600&q=70&url=";
@@ -258,6 +261,7 @@ export function renderIssueEmailHtml(content: WrittenIssueContent, issue: EmailI
   const featureImageUrl = emailImageUrl(draft.featuredImageUrl);
   const executiveSummary = normalizeText(content.overview.summary || "Your daily AI intelligence briefing.");
   const headerTitle = stripEmoji(content.title) || "AI Recap";
+  const versionAttr = draft.versionId === undefined ? "" : `\n      data-version-id="${escapeAttr(draft.versionId)}"`;
 
   return `
 <!DOCTYPE html>
@@ -269,7 +273,7 @@ export function renderIssueEmailHtml(content: WrittenIssueContent, issue: EmailI
   <body style="margin: 0; padding: 0; background-color: #ffffff; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
     <div
       data-issue-id="${escapeAttr(issue.id)}"
-      data-draft-id="${escapeAttr(draft.id)}"
+      data-draft-id="${escapeAttr(draft.id)}"${versionAttr}
       style="max-width: 680px; margin: 0 auto; padding: 40px 20px;"
     >
       <div style="text-align: center; margin-bottom: 32px;">

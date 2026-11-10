@@ -145,12 +145,22 @@ async function post(
   return (await response.json().catch(() => ({}))) as Record<string, unknown>;
 }
 
+/** The stand-in template id outside production: the name's `<date> v<version>` part, e.g. `dry-run-2026-11-09-v2`. */
+function dryRunTemplateId(name: string): string {
+  return `dry-run-${name.split(":")[0].trim().replace(/\s+/g, "-")}`;
+}
+
+/** A draft's own template, named `<YYYY-MM-DD> v<version>: <subject>` (`draftTemplateName`). */
+export async function createDraftTemplate(input: DraftTemplateInput, deps: DraftTemplateDeps): Promise<DraftTemplateResult> {
+  return createEmailTemplate({ name: draftTemplateName(input), html: input.html }, deps);
+}
+
 /**
- * Creates a new GHL template for one draft and sets its HTML. Outside production both calls are recorded,
+ * Creates a new GHL template with this name and sets its HTML. Outside production both calls are recorded,
  * nothing is sent, and the template id is a stand-in.
  */
-export async function createDraftTemplate(input: DraftTemplateInput, deps: DraftTemplateDeps): Promise<DraftTemplateResult> {
-  const name = draftTemplateName(input);
+export async function createEmailTemplate(input: { name: string; html: string }, deps: DraftTemplateDeps): Promise<DraftTemplateResult> {
+  const { name } = input;
   const effects = createSideEffects({ appEnv: deps.env.APP_ENV, record: deps.record });
   const settings = readSettings(deps.env, effects.live);
   const fetcher = deps.fetch ?? fetch;
@@ -159,7 +169,7 @@ export async function createDraftTemplate(input: DraftTemplateInput, deps: Draft
 
   const createBody = { locationId: settings.locationId, title: name, type: "html", builderVersion: "2", html: input.html };
   const created = await effects.run({
-    target: "ghl",
+    target: "distribution",
     action: "createTemplate",
     payload: { method: "POST", url: `${GHL_API_BASE}${CREATE_PATH}`, body: createBody },
     send: async () => {
@@ -169,13 +179,13 @@ export async function createDraftTemplate(input: DraftTemplateInput, deps: Draft
       }
       return response.id;
     },
-    dryRun: () => `dry-run-${input.issueDate}-v${input.version}`,
+    dryRun: () => dryRunTemplateId(name),
   });
   const templateId = created.value;
 
   const setHtmlBody = { locationId: settings.locationId, templateId, updatedBy: settings.userId, editorType: "html", html: input.html };
   const filled = await effects.run({
-    target: "ghl",
+    target: "distribution",
     action: "setTemplateHtml",
     payload: { method: "POST", url: `${GHL_API_BASE}${SET_HTML_PATH}`, body: setHtmlBody },
     send: async () => {

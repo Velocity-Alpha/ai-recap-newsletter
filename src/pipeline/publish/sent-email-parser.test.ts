@@ -89,6 +89,29 @@ describe("parseSentEmail", () => {
     }
   });
 
+  it("has no version id for an email staged before staged versions, with or without a draft id", () => {
+    const html = renderIssueEmail(PLACEHOLDER_ISSUE);
+
+    expect(parseSentEmail(html)?.versionId).toBeNull();
+    expect(parseSentEmail(html.replace('data-issue-id="268"', 'data-issue-id="268" data-draft-id="17"'))).toMatchObject({ draftId: 17, versionId: null });
+  });
+
+  it("reads the staged version id when the issue wrapper carries one", () => {
+    const html = renderIssueEmail(PLACEHOLDER_ISSUE).replace('data-issue-id="268"', 'data-issue-id="268" data-draft-id="17" data-version-id="93"');
+
+    const result = parseSentEmail(html);
+
+    expect(result).toMatchObject({ versionId: 93, draftId: 17, problems: [] });
+    expect(result?.content).toEqual(EXPECTED_CONTENT);
+  });
+
+  it("ignores a version id that is not a positive whole number", () => {
+    for (const value of ["", "abc", "0", "-3", "4.5"]) {
+      const html = renderIssueEmail(PLACEHOLDER_ISSUE).replace('data-issue-id="268"', `data-issue-id="268" data-version-id="${value}"`);
+      expect(parseSentEmail(html)?.versionId).toBeNull();
+    }
+  });
+
   it("returns null for an email that is not an issue", () => {
     expect(parseSentEmail("<html><body><p>Unrelated newsletter</p></body></html>")).toBeNull();
     expect(parseSentEmail("")).toBeNull();

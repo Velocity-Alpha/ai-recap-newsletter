@@ -209,7 +209,7 @@ describe("createDraftTemplate outside production", () => {
     expect(result).toEqual({ templateId: "dry-run-2026-11-09-v2", mode: "recorded" });
     expect(records).toEqual([
       {
-        target: "ghl",
+        target: "distribution",
         action: "createTemplate",
         payload: {
           method: "POST",
@@ -224,7 +224,7 @@ describe("createDraftTemplate outside production", () => {
         },
       },
       {
-        target: "ghl",
+        target: "distribution",
         action: "setTemplateHtml",
         payload: {
           method: "POST",

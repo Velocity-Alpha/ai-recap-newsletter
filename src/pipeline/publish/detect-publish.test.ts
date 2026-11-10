@@ -111,7 +111,17 @@ describe("detectPublish", () => {
     const gmail = fakeGmail([message("m1", html)]);
     await detectPublish({ gmail, store }, { messageIds: await newestFirst(gmail) });
 
-    expect(events).toMatchObject([{ gmailMessageId: "m1", outcome: "published", draftId: 41 }]);
+    expect(events).toMatchObject([{ gmailMessageId: "m1", outcome: "published", draftId: 41, versionId: null }]);
+  });
+
+  it("records which staged version was sent when the email carries a version id", async () => {
+    const html = ISSUE_HTML.replace('data-issue-id="268"', 'data-issue-id="268" data-draft-id="41" data-version-id="93"');
+    const { store, events } = fakeStore([{ id: 268, publishedAt: null, contentJson: null }]);
+
+    const gmail = fakeGmail([message("m1", html)]);
+    await detectPublish({ gmail, store }, { messageIds: await newestFirst(gmail) });
+
+    expect(events).toMatchObject([{ gmailMessageId: "m1", outcome: "published", draftId: 41, versionId: 93 }]);
   });
 
   it("keeps going after one message fails, and reports the failure", async () => {

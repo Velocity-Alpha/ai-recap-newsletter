@@ -81,5 +81,6 @@ function manualEvent(issueId: number, parsed: SentEmailParseResult) {
     contentJson: parsed.content,
     problems: parsed.problems,
     draftId: parsed.draftId,
+    versionId: parsed.versionId,
   };
 }

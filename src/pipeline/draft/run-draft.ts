@@ -25,7 +25,7 @@ import {
 } from "@/src/pipeline/draft/produce-draft";
 import { raiseIncident, resolveIncident } from "@/src/pipeline/notify";
 import { finishRun, logEvent, startRun, type RunTrigger } from "@/src/pipeline/runs";
-import type { SideEffectRecord } from "@/src/pipeline/side-effects";
+import { withoutHtml, type SideEffectRecord } from "@/src/pipeline/side-effects";
 
 /**
  * The `draft-issue` job (#76): runs one draft that `createDraft` (or `retryDraft`) left in `running`. It writes
@@ -104,20 +104,6 @@ function plainError(error: unknown, step: DraftJobStep, produced: ProducedDraft 
   }
   const message = error instanceof Error ? error.message : String(error);
   return message.length > MAX_ERROR_CHARS ? `${message.slice(0, MAX_ERROR_CHARS)}...` : message;
-}
-
-/** GHL calls recorded outside production go into the run log, without the email HTML. */
-function withoutHtml(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(withoutHtml);
-  if (value && typeof value === "object") {
-    return Object.fromEntries(
-      Object.entries(value).map(([key, item]) => [
-        key,
-        key === "html" && typeof item === "string" ? `[${item.length} characters of HTML]` : withoutHtml(item),
-      ]),
-    );
-  }
-  return value;
 }
 
 function partialFrom(error: unknown, produced: ProducedDraft | null): PartialDraft {
