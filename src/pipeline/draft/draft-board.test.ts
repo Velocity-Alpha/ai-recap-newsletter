@@ -8,7 +8,7 @@ vi.mock("@/src/server/prisma", async () => {
 import {
   draftStepLabel,
   draftSteps,
-  listDraftsForBoard,
+  readDateForBoard,
   readDraftForBoard,
   toDraftBoardView,
 } from "@/src/pipeline/draft/draft-board";
@@ -330,30 +330,97 @@ describe("readDraftForBoard", () => {
   });
 });
 
-describe("listDraftsForBoard", () => {
-  it("lists the date's drafts, newest first, with subject, status, sent and current", async () => {
-    const issueId = await seedIssue();
-    const v1 = await seedDraft(issueId);
-    await fakeDb.client.issueDraft.create({
-      data: { issueId, version: 2, outlineId: 2n, status: "failed", failedStep: "image", error: "No image." },
-    });
-    await fakeDb.client.publishEvent.create({ data: { draftId: BigInt(v1) } });
+describe("readDateForBoard", () => {
+  const staged = (issueId: bigint, draftId: number, data: Record<string, unknown> = {}) =>
+    fakeDb.client.stagedVersion.create({
+      data: {
+        issueId,
+        draftId: BigInt(draftId),
+        version: 1,
+        status: "staged",
+        title: "First Take",
+        featuredImageUrl: null,
+        service: "ghl",
+        serviceUrl: "https://preview.example.test/v1",
+        stagedAt: new Date("2027-01-04T14:30:00.000Z"),
+        ...data,
+      },
+    }) as Promise<{ id: bigint }>;
 
-    const drafts = await listDraftsForBoard("2027-01-04");
-
-    expect(drafts.map((draft) => [draft.version, draft.status, draft.sent, draft.current])).toEqual([
-      [2, "failed", false, false],
-      [1, "ready", true, true],
-    ]);
-    expect(drafts[0]).toMatchObject({ failedStepLabel: "making the image", subject: null });
-    expect(drafts[1]).toMatchObject({ subject: "First Take", failedStepLabel: null, createdAt: expect.any(String) });
+  it("says no outline, with no draft and no staged versions, for an empty date", async () => {
+    await expect(readDateForBoard("2027-01-04")).resolves.toEqual({ state: { kind: "no_outline" }, currentDraft: null, stagedVersions: [] });
   });
 
-  it("gives each entry only what the list shows: no distribution service fields, no source draft", async () => {
-    await seedDraft(await seedIssue());
+  it("gives the newest draft as the current draft, also while it runs or after it failed", async () => {
+    const issueId = await seedIssue();
+    await seedDraft(issueId);
+    const failed = (await fakeDb.client.issueDraft.create({
+      data: { issueId, version: 2, outlineId: 2n, status: "failed", failedStep: "image", error: "No image." },
+    })) as { id: bigint };
 
-    const [entry] = await listDraftsForBoard("2027-01-04");
+    await expect(readDateForBoard("2027-01-04")).resolves.toEqual({
+      state: { kind: "draft_failed" },
+      currentDraft: { id: Number(failed.id), edited: false },
+      stagedVersions: [],
+    });
+  });
 
-    expect(Object.keys(entry).sort()).toEqual(["createdAt", "current", "failedStepLabel", "id", "sent", "status", "subject", "version"]);
+  it("says when the owner changed the current draft's title or image", async () => {
+    await seedDraft(await seedIssue(), { editedAt: NOW });
+
+    const view = await readDateForBoard("2027-01-04");
+
+    expect(view.state).toEqual({ kind: "draft_ready" });
+    expect(view.currentDraft?.edited).toBe(true);
+  });
+
+  it("lists the staged versions newest first, with the latest and the sent one marked", async () => {
+    const issueId = await seedIssue();
+    const draftId = await seedDraft(issueId);
+    const v1 = await staged(issueId, draftId);
+    const v2 = await staged(issueId, draftId, { version: 2, title: "Second Take", serviceUrl: null, stagedAt: new Date("2027-01-04T14:45:00.000Z") });
+    await fakeDb.client.publishEvent.create({ data: { issueId, stagedVersionId: v1.id, draftId: BigInt(draftId) } });
+
+    const view = await readDateForBoard("2027-01-04");
+
+    expect(view.state).toEqual({ kind: "staged", version: 2, changedSinceStaged: true });
+    expect(view.stagedVersions).toEqual([
+      { id: Number(v2.id), version: 2, title: "Second Take", stagedAt: "2027-01-04T14:45:00.000Z", serviceName: "GHL", serviceUrl: null, latest: true, sent: false },
+      {
+        id: Number(v1.id),
+        version: 1,
+        title: "First Take",
+        stagedAt: "2027-01-04T14:30:00.000Z",
+        serviceName: "GHL",
+        serviceUrl: "https://preview.example.test/v1",
+        latest: false,
+        sent: true,
+      },
+    ]);
+  });
+
+  it("marks the newest version of the draft as sent for an email that names only its draft", async () => {
+    const issueId = await seedIssue();
+    const draftId = await seedDraft(issueId);
+    await staged(issueId, draftId);
+    await staged(issueId, draftId, { version: 2 });
+    await fakeDb.client.publishEvent.create({ data: { issueId, draftId: BigInt(draftId) } });
+
+    const view = await readDateForBoard("2027-01-04");
+
+    expect(view.stagedVersions.map((version) => [version.version, version.sent])).toEqual([
+      [2, true],
+      [1, false],
+    ]);
+  });
+
+  it("never gives a draft row number", async () => {
+    const issueId = await seedIssue();
+    await staged(issueId, await seedDraft(issueId));
+
+    const view = await readDateForBoard("2027-01-04");
+
+    expect(Object.keys(view.currentDraft ?? {}).sort()).toEqual(["edited", "id"]);
+    expect(Object.keys(view.stagedVersions[0]).sort()).toEqual(["id", "latest", "sent", "serviceName", "serviceUrl", "stagedAt", "title", "version"]);
   });
 });

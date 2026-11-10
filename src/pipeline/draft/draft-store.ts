@@ -475,13 +475,6 @@ export interface DraftView {
   hasNewerDraft: boolean;
 }
 
-export interface DraftListItem extends DraftView {
-  /** A sent email carried this draft's id (publish_events.draft_id). */
-  sent: boolean;
-  /** The newest ready draft: the one the issue row holds. */
-  current: boolean;
-}
-
 const VIEW_SELECT = {
   id: true,
   issueId: true,
@@ -536,34 +529,6 @@ function toView(
     issuePublished: extra.issuePublished,
     hasNewerDraft: extra.hasNewerDraft,
   };
-}
-
-/** Every draft for a date (YYYY-MM-DD), newest first. */
-export async function listDraftsForDate(date: string): Promise<DraftListItem[]> {
-  const issues = await prisma.issue.findMany({ where: { issueDate: day(date) }, select: { id: true, status: true } });
-  if (issues.length === 0) return [];
-  const issuePublished = issues.some((issue) => issue.status === ISSUE_PUBLISHED);
-  const rows = await prisma.issueDraft.findMany({
-    where: { issueId: { in: issues.map((issue) => issue.id) } },
-    orderBy: [{ version: "desc" }, { id: "desc" }],
-    select: VIEW_SELECT,
-  });
-  if (rows.length === 0) return [];
-
-  const sentRows = await prisma.publishEvent.findMany({
-    where: { draftId: { in: rows.map((row) => row.id) } },
-    select: { draftId: true },
-  });
-  const sent = new Set(sentRows.map((row) => String(row.draftId)));
-  const current = rows.find((row) => row.status === "ready")?.id;
-  return rows.map((row) => ({
-    ...toView(row, date, {
-      issuePublished,
-      hasNewerDraft: rows.some((other) => other.issueId === row.issueId && other.version > row.version),
-    }),
-    sent: sent.has(String(row.id)),
-    current: row.id === current,
-  }));
 }
 
 /** One draft's status, for the board's live progress. Null when there is no such draft. */

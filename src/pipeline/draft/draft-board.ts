@@ -1,10 +1,10 @@
+import { issueState, type IssueState } from "@/src/pipeline/distribution/issue-state";
+import { readDateIssueFacts, type StagedVersionRow } from "@/src/pipeline/distribution/issue-state-store";
 import { distributionServiceName } from "@/src/pipeline/distribution/service";
 import {
   DRAFT_START_STEP,
   getDraftStatus,
   isStuckDraft,
-  listDraftsForDate,
-  type DraftListItem,
   type DraftStatus,
   type DraftView,
 } from "@/src/pipeline/draft/draft-store";
@@ -38,7 +38,7 @@ export interface UnreadStory {
 export interface StagedSummary {
   version: number;
   stagedAt: string | null;
-  /** The distribution service's name for the owner, e.g. "GHL". */
+  /** The distribution service's name for the owner. */
   serviceName: string;
   /** The staged email in the service, when the service gave a link. */
   serviceUrl: string | null;
@@ -82,17 +82,23 @@ export interface DraftBoardView {
   finishedAt: string | null;
 }
 
-export interface DraftListEntry {
+/** One staged version in the draft page's list. */
+export interface StagedVersionEntry extends StagedSummary {
   id: number;
-  version: number;
-  status: DraftStatus;
-  subject: string | null;
-  failedStepLabel: string | null;
-  /** A sent email carried this draft. */
+  title: string;
+  /** The newest staged version: the one to send. */
+  latest: boolean;
+  /** A sent email carried this version. */
   sent: boolean;
-  /** The newest ready draft, which the issue holds. */
-  current: boolean;
-  createdAt: string;
+}
+
+/** What the board and the draft page show for a date. */
+export interface DateDraftsView {
+  state: IssueState;
+  /** The issue's newest draft row. `edited`: the owner changed its title or image. */
+  currentDraft: { id: number; edited: boolean } | null;
+  /** Newest first. */
+  stagedVersions: StagedVersionEntry[];
 }
 
 const START_LABEL = "starting the draft job";
@@ -155,19 +161,6 @@ export function toDraftBoardView(
   };
 }
 
-export function toDraftListEntry(item: DraftListItem): DraftListEntry {
-  return {
-    id: item.id,
-    version: item.version,
-    status: item.status,
-    subject: item.subject,
-    failedStepLabel: item.status === "failed" ? draftStepLabel(item.failedStep) : null,
-    sent: item.sent,
-    current: item.current,
-    createdAt: item.createdAt.toISOString(),
-  };
-}
-
 async function loadUnreadStories(ids: number[]): Promise<UnreadStory[]> {
   if (ids.length === 0) return [];
   const rows = await prisma.story.findMany({ where: { id: { in: ids } }, select: { id: true, headline: true, url: true } });
@@ -178,14 +171,39 @@ async function loadUnreadStories(ids: number[]): Promise<UnreadStory[]> {
   });
 }
 
+function toStagedSummary(row: Pick<StagedVersionRow, "version" | "stagedAt" | "service" | "serviceUrl">): StagedSummary {
+  return { version: row.version, stagedAt: iso(row.stagedAt), serviceName: distributionServiceName(row.service), serviceUrl: row.serviceUrl };
+}
+
 async function loadStagedSummary(issueId: number): Promise<StagedSummary | null> {
   const row = await prisma.stagedVersion.findFirst({
     where: { issueId: BigInt(issueId), status: "staged" },
     orderBy: { version: "desc" },
     select: { version: true, stagedAt: true, service: true, serviceUrl: true },
   });
-  if (!row) return null;
-  return { version: row.version, stagedAt: iso(row.stagedAt), serviceName: distributionServiceName(row.service), serviceUrl: row.serviceUrl };
+  return row && toStagedSummary(row);
+}
+
+/**
+ * The ids of the staged versions a sent email carried. An email staged before #149 names only its draft: it
+ * counts for that draft's newest staged version, as in publish detection.
+ */
+async function loadSentVersionIds(issueIds: number[], versions: StagedVersionRow[]): Promise<Set<number>> {
+  if (versions.length === 0) return new Set();
+  const events = await prisma.publishEvent.findMany({
+    where: { issueId: { in: issueIds.map((id) => BigInt(id)) } },
+    select: { stagedVersionId: true, draftId: true },
+  });
+  const sent = new Set<number>();
+  for (const event of events) {
+    if (event.stagedVersionId !== null) sent.add(Number(event.stagedVersionId));
+    else if (event.draftId !== null) {
+      // `versions` is newest first.
+      const ofDraft = versions.find((version) => version.draftId === Number(event.draftId));
+      if (ofDraft) sent.add(ofDraft.id);
+    }
+  }
+  return sent;
 }
 
 /** One draft for the board's live view. Null when there is no such draft. */
@@ -199,7 +217,19 @@ export async function readDraftForBoard(draftId: number, now: Date): Promise<Dra
   });
 }
 
-/** Every draft for a date (YYYY-MM-DD), newest first. */
-export async function listDraftsForBoard(date: string): Promise<DraftListEntry[]> {
-  return (await listDraftsForDate(date)).map(toDraftListEntry);
+/** The date's state, current draft, and staged versions. `date` is YYYY-MM-DD. */
+export async function readDateForBoard(date: string): Promise<DateDraftsView> {
+  const facts = await readDateIssueFacts(date);
+  const sent = await loadSentVersionIds(facts.issueIds, facts.stagedVersions);
+  return {
+    state: issueState(facts),
+    currentDraft: facts.newestDraft && { id: facts.newestDraft.id, edited: facts.newestDraft.editedAt !== null },
+    stagedVersions: facts.stagedVersions.map((row, index) => ({
+      ...toStagedSummary(row),
+      id: row.id,
+      title: row.title,
+      latest: index === 0,
+      sent: sent.has(row.id),
+    })),
+  };
 }

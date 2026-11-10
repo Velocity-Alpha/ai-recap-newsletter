@@ -29,27 +29,28 @@ describe("draft links", () => {
 });
 
 describe("secondCommitNotice", () => {
-  it("warns before a second native commit for a date that the new draft replaces the current one", () => {
-    expect(secondCommitNotice({ drafts: [{ id: 40, version: 1, status: "ready" }], nextVersion: 2 })).toBe(
-      "This makes draft v2. It replaces the current draft as the one to review and stage.",
+  it("warns before a second commit for a date that the new draft replaces the current one", () => {
+    expect(secondCommitNotice({ currentDraft: { id: 40, edited: false } })).toBe(
+      "This makes a new draft. It replaces the current draft as the one to review and stage.",
     );
   });
 
-  it("names the version the commit makes, and no distribution service", () => {
-    const notice = secondCommitNotice({
-      drafts: [
-        { id: 41, version: 2, status: "failed" },
-        { id: 40, version: 1, status: "ready" },
-      ],
-      nextVersion: 3,
-    });
+  it("warns that the owner's title and image changes go too, when the current draft has them", () => {
+    expect(secondCommitNotice({ currentDraft: { id: 40, edited: true } })).toBe(
+      "This makes a new draft. This replaces the current draft, including your title and image changes.",
+    );
+  });
 
-    expect(notice).toBe("This makes draft v3. It replaces the current draft as the one to review and stage.");
-    expect(notice).not.toContain("GHL");
+  it("names no draft number and no distribution service", () => {
+    for (const edited of [true, false]) {
+      const notice = secondCommitNotice({ currentDraft: { id: 41, edited } });
+      expect(notice).not.toMatch(/v\d/);
+      expect(notice).not.toContain("GHL");
+    }
   });
 
   it("says nothing for the first commit", () => {
-    expect(secondCommitNotice({ drafts: [], nextVersion: 1 })).toBeNull();
+    expect(secondCommitNotice({ currentDraft: null })).toBeNull();
     expect(secondCommitNotice(null)).toBeNull();
   });
 });

@@ -1,10 +1,9 @@
 /** Board-side helpers for drafts (#79). Safe for client components. */
 
-export interface DraftingSummary {
-  /** Newest first. */
-  drafts: { id: number; version: number; status: string }[];
-  nextVersion: number;
-}
+import type { DateDraftsView } from "@/src/pipeline/draft/draft-board";
+
+/** What the commit dialog needs to know about the date's drafts. */
+export type DraftingSummary = Pick<DateDraftsView, "currentDraft">;
 
 export function draftViewHref(date: string, draftId?: number): string {
   const params = new URLSearchParams({ date });
@@ -24,10 +23,14 @@ export function jsonPost(body: unknown = {}): RequestInit {
   return { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) };
 }
 
-/** Shown before a commit when the date already has drafts. */
+export const EDITS_REPLACED_NOTICE = "This replaces the current draft, including your title and image changes.";
+
+/** Shown before a commit when the date already has a draft. It never gives a draft row's number (#149). */
 export function secondCommitNotice(drafting: DraftingSummary | null): string | null {
-  if (!drafting || drafting.drafts.length === 0) return null;
-  return `This makes draft v${drafting.nextVersion}. It replaces the current draft as the one to review and stage.`;
+  if (!drafting?.currentDraft) return null;
+  return drafting.currentDraft.edited
+    ? `This makes a new draft. ${EDITS_REPLACED_NOTICE}`
+    : "This makes a new draft. It replaces the current draft as the one to review and stage.";
 }
 
 /**
