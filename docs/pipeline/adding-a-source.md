@@ -18,7 +18,7 @@ on its own. One source can fail without stopping the others. For each source it 
    (`storyGuid`), drops stories with no usable link, and checks each URL for a paywall (`checkPaywall`).
 5. Saves the rows (`IngestStore.upsertStories`) and moves the bookmark (`writeBookmark`).
 
-The result is a `SourceResult` with an `items` count (emails, feed snapshots or posts) and a `SourceStatus`: `ok`, `no_new`, `partial` or `failed`.
+The result is a `SourceResult` with a `documents` count (emails, feed snapshots or posts read) and a `SourceStatus`: `ok`, `no_new`, `partial` or `failed`.
 `run-ingest.ts` writes one run-log line per source.
 
 ## Add an email source
@@ -80,20 +80,23 @@ subscriber lists, not sources.
 What it reads (`beehiiv-site.ts`):
 - `{siteUrl}/sitemap.xml`. Posts are the URLs under `/p/` on the site's host (`www.` or not). A post is
   read when its `lastmod` day (UTC) is on or after the cutoff day. A sitemap with no posts fails the source.
-- Each post page, newest first, at most 30 per run. If more posts changed, the run reads the 30 newest and
-  records an error.
+- Each post page, newest `lastmod` first, then in sitemap order. The page cap is 30 pages per run
+  (`BEEHIIV_PAGE_LIMIT`). If more posts changed, the run reads that many and records an error. New posts may be
+  among the unread ones; see the [runbook](./runbook.md#a-source-error-in-an-ingest-run).
 - The `Article` ld+json block gives `datePublished` and `isAccessibleForFree`. Only an explicit false
   means paid. Paid posts and posts at or before the cutoff are skipped before the body is read.
 - The body is the element with id `content-blocks`. A free, new post without it is an error.
+- A post dated after the run's time is an error. It would move the bookmark past every post until then.
 
 Stories that link to the publication's own site are dropped. They count as stories without a link.
 
 How dates work: the issue date is the New York date of `datePublished`. Each story gets its date from
 the extractor, with the issue date as the fallback.
 
-The bookmark moves to the newest `datePublished` read. If any page fails, or the 30-page cap was hit, the
-bookmark does not move in that run. The good posts are still saved, and the next run reads them again
-harmlessly.
+The bookmark moves to the last post of the unbroken run of successes from the oldest, as for emails. It
+stays strictly before the first failed post's time, so a failed post that shares a time with a good one is
+read again. If any page fails to load or parse, or the page cap is exceeded, the bookmark does not move in
+that run. The good posts are still saved, and the next run reads them again harmlessly.
 
 Why this design: [ADR 0003](../adr/0003-beehiiv-site-source.md).
 

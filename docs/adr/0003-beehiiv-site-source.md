@@ -22,9 +22,15 @@ It uses only stable, standard parts of the site:
 - The element with id `content-blocks` holds the post body.
 
 A post's metadata is read first. Paid posts and posts at or before the bookmark are skipped before the
-body is needed. The run reads at most 30 post pages, newest first, and records an error when there are
-more. If any page fails, or the cap is hit, the bookmark stays where it is. A failed page has no known
-date, so it cannot be placed in the bookmark order.
+body is needed. A post dated in the future is a failed page. The run reads post pages up to the page cap,
+newest `lastmod` first, then in sitemap order. When more posts changed, it records one error and says new
+posts may be unread (see the runbook). If any page fails, or the cap is exceeded, the bookmark stays where
+it is. A failed page has no known date, so it cannot be placed in the bookmark order.
+
+For every source kind, the bookmark stays strictly before the first failed document's time. A document
+that shares a time with an earlier success is then read again.
+
+Run counts are `documents`: emails, feed snapshots or posts read.
 
 Stories that link to the publication's own site are dropped. They point at the newsletter, not the news.
 
@@ -44,4 +50,6 @@ missing. It needs no new service.
   run; the upsert makes that harmless.
 - `curation.service.ts` still hides stories whose URL contains "tldr", "rundown" or "beehiiv". It covers
   old rows. The own-site drop at ingest could replace it later.
+- `lastmod` is a day, so when many posts are edited at once the page cap can hide a new post. We cannot tell
+  which are new without reading them. The error says so, and the runbook says what to do.
 - Publications already read by email stay on email. Reading one both ways would save its stories twice.

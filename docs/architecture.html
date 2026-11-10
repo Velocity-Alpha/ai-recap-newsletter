@@ -67,7 +67,7 @@
 09:55  ingest-stories (scheduled, 30 s limit) --POST + 5-min job token--> ingest-stories-background (15 min limit)
          Gmail API, read-only: every new email from each newsletter sender since its bookmark
          (The Rundown, AI Breakfast, The Signal, TLDR, AlphaSignal) + Product Hunt + Hugging Face feeds
-         + beehiiv websites: sitemap.xml + up to 30 post pages per run (In the World of AI; ADR 0003),
+         + beehiiv websites: sitemap.xml + post pages up to the page cap (In the World of AI; ADR 0003),
            stories linking to the newsletter's own site dropped, bookmark held if any page fails
          -> follow tracking links, strip tracking params -> gpt-6-luna extraction (strict schema)
          -> paywall check -> INSERT newsletter.stories (+ story_sources: which newsletter sent it) -> update scraper_bookmarks

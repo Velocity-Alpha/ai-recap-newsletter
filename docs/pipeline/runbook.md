@@ -144,6 +144,22 @@ Eight keys. The date in each key is the issue date in New York time.
   The incident closes when a draft is ready. `run-checks` does not close this key at the end of the day,
   so it stays open until a draft succeeds.
 
+## A source error in an ingest run
+
+Some ingest errors are not incidents. They show on the source's line in the `ingest-stories` run
+(`/admin/runs/<id>`), with status `partial` or `failed`.
+
+### `<name>: N posts changed since <day>; read <cap>. New posts may be among the unread ones.`
+
+- **Raised by:** `ingest-stories`, for a beehiiv site source (ADR 0003).
+- **Severity:** none. The source line is `partial` or `failed`. The bookmark does not move.
+- **Meaning:** More posts changed on the site than the page cap allows in one run. Usually the publisher
+  edited many old posts at once. The run read the newest by `lastmod`. A new post may be among the unread
+  ones.
+- **Do (check, then add by hand):** Nothing to fix. The error clears itself when the edits leave the
+  72-hour window. Meanwhile, open the site and look for posts published in that window. Add any missed
+  story to the board by hand.
+
 ## A run that fails to report
 
 `run-checks` has one more alert that is not an incident. If the check job itself throws, it posts
