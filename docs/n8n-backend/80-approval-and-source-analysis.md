@@ -1,5 +1,7 @@
 # Approval edits, newsletter arrival, and source yield
 
+> **Historical analysis (2026-11-04).** Its findings on what the owner edits on the board still inform board work. Its pipeline details describe the retired n8n system, not the current one: see [../architecture.html](../architecture.html).
+
 Status: analysis, 2026-11-04. Read-only: no n8n changes, no webhook calls, no database writes. Read
 [README.md](./README.md), [10-ingestion.md](./10-ingestion.md) and
 [30-approval-and-telegram.md](./30-approval-and-telegram.md) first for how the pipeline works.

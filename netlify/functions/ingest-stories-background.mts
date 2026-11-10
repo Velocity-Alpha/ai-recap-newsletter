@@ -2,7 +2,7 @@ import { describeIngestRun, runIngest } from "@/src/pipeline/ingest/run-ingest";
 import { isAuthorizedIngestRequest } from "@/src/pipeline/ingest/start-ingest";
 
 // The ingestion work (ADR 0001). The "-background" name gives it 15 minutes. Only ingest-stories starts it,
-// with a short-lived job token. runIngest does nothing while ingest.owner is not `native`.
+// with a short-lived job token.
 export default async function ingestStoriesBackground(request: Request): Promise<void> {
   if (!isAuthorizedIngestRequest(request, process.env, new Date())) {
     console.warn("[ingest-stories-background] Rejected a request without a valid job token.");

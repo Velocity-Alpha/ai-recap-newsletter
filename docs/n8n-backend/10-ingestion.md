@@ -1,6 +1,6 @@
 # 10 — Story ingestion pipeline (n8n, active)
 
-> **Retired:** Story ingestion is native since 2026-11-09 (PR #112). The 9 n8n ingestion workflows described here are off. See `src/pipeline/ingest/` and [../pipeline/adding-a-source.md](../pipeline/adding-a-source.md).
+> **Historical.** This describes the n8n system that native code replaced in November 2026 ([ADR 0003](../adr/0003-n8n-retired-kept-as-record.md)). It is not the current system: see [../architecture.html](../architecture.html).
 
 Scope: `1. Fetch Stories` [hdEUV8VFZbI13VpV], `Resolve Redirect URLS from Emails` [ELtnV1av7bg8hxCz],
 `HTML Strip` [QizlCbiLwCn4fGRf], `Agent - Extract and Store v2` [vVPv9aMjTwYBFKqb], `Check for Paywalls`

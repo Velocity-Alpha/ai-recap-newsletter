@@ -1,4 +1,5 @@
 import type { NewsletterIssueApiResponse } from "@/src/features/newsletter/types";
+import { ISSUE_PUBLISHED } from "@/src/features/newsletter/issue-status";
 import type { Newsletter } from "@/src/types/newsletter.types";
 import { prisma } from "@/src/server/prisma";
 
@@ -172,7 +173,7 @@ export async function fetchNewsletterListPage(page: number, limit: number): Prom
         created_at
       FROM newsletter.issues
       WHERE content_json IS NOT NULL
-        AND published_at IS NOT NULL
+        AND status = 'published'
     ),
     total AS (
       SELECT COUNT(*)::int AS total_count
@@ -221,7 +222,7 @@ export async function fetchPublishedNewsletterEntries(): Promise<PublishedNewsle
       issue_date
     FROM newsletter.issues
     WHERE content_json IS NOT NULL
-      AND published_at IS NOT NULL
+      AND status = 'published'
     ORDER BY COALESCE(issue_date, published_at::date) DESC, published_at DESC
   `;
 
@@ -248,9 +249,7 @@ export async function fetchLastPublishedIssueDateOnOrBefore(
 
   const issueRecord = await prisma.issue.findFirst({
     where: {
-      publishedAt: {
-        not: null,
-      },
+      status: ISSUE_PUBLISHED,
       issueDate: {
         not: null,
         lte: targetDateValue,
@@ -290,17 +289,17 @@ export async function fetchLastPublishedIssueDateOnOrBefore(
   };
 }
 
-// Public issue lookups return published issues only. The query filters on published_at, and this
+// Public issue lookups return published issues only. The query filters on status, and this
 // check backs it up so a future query change cannot expose an unpublished issue.
 function toPublishedIssueApiResponse(
-  record: Parameters<typeof mapIssueRecord>[0] | null,
+  record: (Parameters<typeof mapIssueRecord>[0] & { status: string }) | null,
 ): NewsletterIssueApiResponse | null {
-  return record?.publishedAt ? mapIssueRecord(record) : null;
+  return record?.status === ISSUE_PUBLISHED ? mapIssueRecord(record) : null;
 }
 
 export async function fetchNewsletterIssueApiResponseById(id: number): Promise<NewsletterIssueApiResponse | null> {
   const record = await prisma.issue.findUnique({
-    where: { id: BigInt(id), publishedAt: { not: null } },
+    where: { id: BigInt(id), status: ISSUE_PUBLISHED },
     select: {
       id: true,
       slug: true,
@@ -310,6 +309,7 @@ export async function fetchNewsletterIssueApiResponseById(id: number): Promise<N
       contentJson: true,
       issueDate: true,
       publishedAt: true,
+      status: true,
     },
   });
 
@@ -318,7 +318,7 @@ export async function fetchNewsletterIssueApiResponseById(id: number): Promise<N
 
 export async function fetchNewsletterIssueApiResponseBySlug(slug: string): Promise<NewsletterIssueApiResponse | null> {
   const record = await prisma.issue.findUnique({
-    where: { slug, publishedAt: { not: null } },
+    where: { slug, status: ISSUE_PUBLISHED },
     select: {
       id: true,
       slug: true,
@@ -328,6 +328,7 @@ export async function fetchNewsletterIssueApiResponseBySlug(slug: string): Promi
       contentJson: true,
       issueDate: true,
       publishedAt: true,
+      status: true,
     },
   });
 

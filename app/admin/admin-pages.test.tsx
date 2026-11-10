@@ -55,7 +55,7 @@ const RUNS = [
     status: "succeeded",
     startedAt: T,
     finishedAt: T,
-    stats: { key: "ingest.owner", from: null, to: "native", by: "approval login" },
+    stats: { key: "pipeline.runner", from: null, to: "netlify", by: "approval login" },
     error: null,
   },
 ];
@@ -85,9 +85,8 @@ describe("admin pages render", () => {
       args.where.job === "admin-setting" ? [RUNS[1]] : RUNS,
     );
     prismaMock.pipelineSetting.findMany.mockResolvedValue([
-      { key: "ingest.owner", value: "native", updatedAt: T },
       { key: "pipeline.runner", value: "netlify", updatedAt: T },
-      { key: "publish.owner", value: "native", updatedAt: T },
+      { key: "threshold:stories:min-ratio", value: { ratio: 0.5 }, updatedAt: T },
     ]);
     prismaMock.alert.findMany.mockImplementation(async (args: { where: { status: string } }) =>
       args.where.status === "open" ? [OPEN_ALERT] : [],
@@ -170,26 +169,22 @@ describe("admin pages render", () => {
     expect(html).toContain("Nothing resolved yet.");
   });
 
-  it("/admin/settings shows every row, the switches, and the change log", async () => {
+  it("/admin/settings shows every row, and no stage switches", async () => {
     const html = await render(AdminSettingsPage());
 
-    for (const key of ["ingest.owner", "pipeline.runner", "publish.owner", "draft.owner"]) expect(html).toContain(key);
+    for (const key of ["pipeline.runner", "threshold:stories:min-ratio"]) expect(html).toContain(key);
     expect(html).toContain("&quot;netlify&quot;");
-    expect(html).toContain("Switch to n8n");
-    expect(html).not.toContain("not built yet");
-    expect(html).not.toMatch(/<button[^>]*disabled=""/);
-    expect(html).toContain("Not set. The jobs use n8n.");
-    expect(html).toContain("not set → <strong>native</strong>");
-    // The confirmation appears only after a click.
-    expect(html).not.toContain("Yes, switch to");
+    expect(html).not.toContain("n8n");
+    expect(html).not.toContain("Stage owners");
+    expect(html).not.toContain("<button");
   });
 
-  it("/admin shows stage owners, open incidents, and the latest runs", async () => {
+  it("/admin shows open incidents and the latest runs, and no stage owners", async () => {
     const html = await render(AdminOverviewPage());
 
     expect(html).toContain("1 open incident");
     expect(html).toContain("No stories for today");
     expect(html).toContain('href="/admin/runs/8"');
-    expect(html).toContain("Native");
+    expect(html).not.toContain("Stage owners");
   });
 });

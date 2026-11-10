@@ -86,7 +86,7 @@ describe.skipIf(!enabled)("readDayFacts on a real database", () => {
       commitTime: newYorkTime(date, "11:48"),
       draftsMade: 1,
       draftReady: true,
-      issue: { id: ids.issue.toString(), title: `Synthetic issue ${tag}`, publishedAt: newYorkTime(date, "12:31") },
+      issue: { id: ids.issue.toString(), title: `Synthetic issue ${tag}`, status: "published", publishedAt: newYorkTime(date, "12:31") },
       warnings: [],
     });
     expect(facts.issue?.slug).toBeTruthy();

@@ -1,11 +1,10 @@
-import { diffIssueContent } from "@/src/pipeline/publish/content-diff";
 import type { GmailReader } from "@/src/pipeline/publish/gmail-client";
 import { decidePublish, type PublishMode, type PublishOutcome } from "@/src/pipeline/publish/publish-decision";
 import { parseSentEmail, type PublishedIssueContent } from "@/src/pipeline/publish/sent-email-parser";
 
 /**
  * Runner-agnostic publish detection: reads issue emails from the seed mailbox, decides what each one means,
- * and records one `publish_events` row per Gmail message and mode. In native mode it also publishes.
+ * records one `publish_events` row per Gmail message, and publishes the issue.
  */
 
 export const NEWSLETTER_SENDER = "newsletter@airecap.news";
@@ -53,8 +52,6 @@ export interface DetectPublishResult {
   gmailMessageId: string;
   issueId: number | null;
   outcome: PublishOutcome;
-  /** Shadow mode only: how this email's content differs from the stored `content_json`. */
-  differences?: string[];
 }
 
 export interface DetectPublishSummary {
@@ -74,10 +71,10 @@ export function buildPublishQuery(options: { recipients?: string[]; since: Date 
 export async function detectPublish(
   deps: { gmail: GmailReader; store: PublishStore },
   /** `messageIds` as Gmail lists them, newest first. The caller lists them, so it can stop before the database. */
-  options: { mode: Exclude<PublishMode, "manual">; messageIds: string[] },
+  options: { messageIds: string[] },
 ): Promise<DetectPublishSummary> {
   const { gmail, store } = deps;
-  const { mode } = options;
+  const mode = "native" as const;
 
   // Handle the oldest first, so the first copy of a send is the one that publishes.
   const listed = [...options.messageIds].reverse();
@@ -93,7 +90,7 @@ export async function detectPublish(
       const message = await gmail.getMessage(gmailMessageId);
       const parsed = parseSentEmail(message.html);
       const issue = parsed ? await store.findIssue(parsed.content.issue_id) : null;
-      const outcome = decidePublish({ mode, parsed, issue, sentAt: message.sentAt });
+      const outcome = decidePublish({ mode, parsed, issue });
       const event: PublishEventInput = {
         mode,
         outcome,
@@ -119,9 +116,6 @@ export async function detectPublish(
         });
       } else {
         await store.recordEvent(event);
-      }
-      if (mode === "shadow" && parsed && issue?.contentJson) {
-        result.differences = diffIssueContent(parsed.content, issue.contentJson);
       }
       summary.results.push(result);
     } catch (error) {

@@ -19,7 +19,7 @@ import {
 import { APPROVAL_SESSION_COOKIE_NAME, createApprovalSessionToken } from "@/src/server/approval-auth";
 
 function request(token?: string) {
-  return new Request("http://localhost/api/admin/stage-switches", {
+  return new Request("http://localhost/api/admin/example", {
     method: "POST",
     headers: token ? { cookie: `${APPROVAL_SESSION_COOKIE_NAME}=${token}` } : {},
   });

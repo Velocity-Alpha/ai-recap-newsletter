@@ -7,11 +7,10 @@ import {
 import type { ApprovedSections, WrittenIssueContent } from "@/src/pipeline/draft/content";
 import { renderIssueEmailHtml } from "@/src/pipeline/draft/email-html";
 import { createDraftTemplate } from "@/src/pipeline/draft/ghl-template";
-import { normalizeOutline, type ApprovalOutline } from "@/src/pipeline/draft/outline";
+import { normalizeOutline, parseCommitDate, type ApprovalOutline } from "@/src/pipeline/draft/outline";
 import { DRAFT_STEPS, DraftStepError, produceDraft, readNoArticles, type DraftStep, type ReadArticles } from "@/src/pipeline/draft/produce-draft";
 import { findContentProblems } from "@/src/pipeline/draft/validate";
 import { createOpenAIIssueWriter, type IssueWriter } from "@/src/pipeline/draft/writer";
-import { parseCommitDate } from "@/src/pipeline/side-effects/commit-webhook";
 
 /**
  * The pieces of scripts/replay-drafts.mts that need no database or network: replay one past commit through

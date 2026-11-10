@@ -125,12 +125,6 @@ describe("10:05 stories check", () => {
     expect(found["stories-thin:2026-11-10"].evidence).toContain("no Tuesday history yet");
   });
 
-  it("does not look for an ingest run while n8n owns ingestion", () => {
-    const found = failures(run("10:05", missingRun({ ingestOwner: "n8n" })));
-    expect(found["ingest-run-missing:2026-11-10"]).toBeUndefined();
-    expect(found["stories-thin:2026-11-10"]).toBeDefined();
-  });
-
   it("skips the thin check without any history for that weekday", () => {
     expect(failures(run("10:05", thinDay({ weekdayTotals: [] })))["stories-thin:2026-11-10"]).toBeUndefined();
   });

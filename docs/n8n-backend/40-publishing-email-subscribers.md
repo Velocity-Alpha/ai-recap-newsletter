@@ -1,6 +1,6 @@
 # 40: Publishing, email sending, and subscribers
 
-> **Partly retired:** Publish detection (`3. Gmail Listen - Publish`) is native since 2026-11-08, and that n8n workflow is off. The rest of this part (GHL template creation, the human GHL step, subscribers) still runs as described.
+> **Historical, written 2026-11-03.** The n8n parts describe a retired system ([ADR 0003](../adr/0003-n8n-retired-kept-as-record.md)). The website and subscriber parts may have changed since: trust the code and [../architecture.html](../architecture.html).
 
 Scope: how an approved draft becomes a sent email and a published web issue (GHL template creation in
 `2. Create Issue Draft`, the human GHL campaign step, `3. Gmail Listen - Publish`), the dead Beehiiv

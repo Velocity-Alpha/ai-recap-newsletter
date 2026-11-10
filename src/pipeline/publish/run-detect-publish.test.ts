@@ -21,7 +21,6 @@ import { PLACEHOLDER_ISSUE, renderIssueEmail } from "@/src/pipeline/publish/sent
 import {
   describePublishRun,
   readPipelineRunner,
-  readPublishOwner,
   runDetectPublish,
   runPublishCatchUp,
   runPublishPoll,
@@ -51,22 +50,13 @@ function store(): PublishStore {
   };
 }
 
-/** Settings in the order the job reads them: owner, then runner. */
-function settings(owner: unknown, runner: unknown = null) {
-  mocks.readSetting.mockImplementation(async (key: string) => (key === "publish.owner" ? owner : runner));
+/** The `pipeline.runner` setting. Null means the row is missing. */
+function settings(runner: unknown = null) {
+  mocks.readSetting.mockResolvedValue(runner);
 }
 
 describe("settings", () => {
   beforeEach(() => vi.clearAllMocks());
-
-  it("reads publish.owner and defaults to n8n for a missing or unknown value", async () => {
-    mocks.readSetting.mockResolvedValueOnce("shadow").mockResolvedValueOnce(null).mockResolvedValueOnce("robots");
-
-    expect(await readPublishOwner()).toBe("shadow");
-    expect(await readPublishOwner()).toBe("n8n");
-    expect(await readPublishOwner()).toBe("n8n");
-    expect(mocks.readSetting).toHaveBeenCalledWith("publish.owner");
-  });
 
   it("reads pipeline.runner and defaults to netlify for a missing or unknown value", async () => {
     mocks.readSetting.mockResolvedValueOnce("trigger").mockResolvedValueOnce(null).mockResolvedValueOnce("cron");
@@ -106,19 +96,8 @@ describe("runDetectPublish", () => {
     expect(db.knownMessageIds).not.toHaveBeenCalled();
   });
 
-  it("does nothing more while n8n owns publishing", async () => {
-    settings("n8n");
-    const db = store();
-
-    const result = await runDetectPublish("netlify", 20, { gmail: gmail(["m1"]), store: db, now: () => NOW });
-
-    expect(result).toEqual({ status: "off" });
-    expect(db.knownMessageIds).not.toHaveBeenCalled();
-    expect(mocks.startRun).not.toHaveBeenCalled();
-  });
-
   it("does nothing more when the other runner is selected", async () => {
-    settings("shadow", "trigger");
+    settings("trigger");
     const db = store();
 
     const result = await runDetectPublish("netlify", 20, { gmail: gmail(["m1"]), store: db, now: () => NOW });
@@ -128,7 +107,7 @@ describe("runDetectPublish", () => {
   });
 
   it("searches with the seed recipients and logs a run with one event per message", async () => {
-    settings("shadow");
+    settings();
     const reader = gmail(["m1"]);
 
     const result = await runDetectPublish("netlify", 20, {
@@ -142,7 +121,7 @@ describe("runDetectPublish", () => {
       `from:newsletter@airecap.news (to:a@example.test OR to:b@example.test) after:${TWENTY_MINUTES_AGO}`,
       20,
     );
-    expect(result).toMatchObject({ status: "ran", owner: "shadow", runId: "42" });
+    expect(result).toMatchObject({ status: "ran", runId: "42" });
     expect(mocks.startRun).toHaveBeenCalledWith({ job: "detect-publish", trigger: "schedule" }, NOW);
     expect(mocks.logEvent).toHaveBeenCalledWith(42n, {
       level: "info",
@@ -154,14 +133,14 @@ describe("runDetectPublish", () => {
       42n,
       {
         status: "succeeded",
-        stats: { owner: "shadow", runner: "netlify", lookbackMinutes: 20, listed: 1, skipped: 0, handled: 1, errors: 0 },
+        stats: { runner: "netlify", lookbackMinutes: 20, listed: 1, skipped: 0, handled: 1, errors: 0 },
       },
       NOW,
     );
   });
 
   it("records no run when every listed message was already handled", async () => {
-    settings("shadow");
+    settings();
     const db = store();
     vi.mocked(db.knownMessageIds).mockResolvedValue(new Set(["m1"]));
 
@@ -172,7 +151,7 @@ describe("runDetectPublish", () => {
   });
 
   it("marks the run failed when a message could not be read", async () => {
-    settings("native", "trigger");
+    settings("trigger");
 
     await runDetectPublish("trigger", 20, { gmail: gmail(["m1"], true), store: store(), now: () => NOW });
 
@@ -186,7 +165,7 @@ describe("runDetectPublish", () => {
       42n,
       {
         status: "failed",
-        stats: { owner: "native", runner: "trigger", lookbackMinutes: 20, listed: 1, skipped: 0, handled: 0, errors: 1 },
+        stats: { runner: "trigger", lookbackMinutes: 20, listed: 1, skipped: 0, handled: 0, errors: 1 },
         error: "1 message(s) failed.",
       },
       NOW,
@@ -232,7 +211,7 @@ describe("site refresh after a native publish", () => {
   });
 
   it("refreshes the site once when an issue was published", async () => {
-    settings("native");
+    settings();
     const refreshSite = vi.fn(async () => {});
 
     const result = await runDetectPublish("netlify", 20, {
@@ -243,7 +222,7 @@ describe("site refresh after a native publish", () => {
     });
 
     expect(refreshSite).toHaveBeenCalledTimes(1);
-    expect(result).toMatchObject({ status: "ran", owner: "native", siteRefresh: "refreshed" });
+    expect(result).toMatchObject({ status: "ran", siteRefresh: "refreshed" });
     expect(mocks.logEvent).toHaveBeenCalledWith(42n, {
       level: "info",
       step: "site_refresh",
@@ -252,7 +231,7 @@ describe("site refresh after a native publish", () => {
   });
 
   it("logs a warning but does not fail the run when the refresh fails", async () => {
-    settings("native");
+    settings();
     const refreshSite = vi.fn(async () => {
       throw new Error("Site refresh failed with HTTP 503.");
     });
@@ -275,7 +254,7 @@ describe("site refresh after a native publish", () => {
   });
 
   it("logs a warning when no refresh is configured", async () => {
-    settings("native");
+    settings();
 
     const result = await runDetectPublish("netlify", 20, { gmail: issueMail(), store: draftStore(), now: () => NOW });
 
@@ -287,8 +266,8 @@ describe("site refresh after a native publish", () => {
     });
   });
 
-  it("does not refresh the site in shadow mode", async () => {
-    settings("shadow");
+  it("does not refresh the site when the issue was already published", async () => {
+    settings();
     const refreshSite = vi.fn(async () => {});
     const db = draftStore();
     vi.mocked(db.findIssue).mockResolvedValue({ id: 268, publishedAt: NOW, contentJson: null });
@@ -332,21 +311,20 @@ describe("describePublishRun and throwIfPublishRunFailed", () => {
 
   it("describes each result in one log line", () => {
     expect(describePublishRun({ status: "no_mail" })).toBe("No new issue email. The database was not touched.");
-    expect(describePublishRun({ status: "off" })).toBe("n8n owns publishing (publish.owner). Nothing to do.");
     expect(describePublishRun({ status: "other_runner", runner: "trigger" })).toBe(
       "pipeline.runner is trigger. This runner does nothing.",
     );
-    expect(describePublishRun({ status: "ran", owner: "shadow", summary, runId: "7" })).toBe(
-      "shadow: listed 2, skipped 1, handled 0, failed 1. Pipeline run 7.",
+    expect(describePublishRun({ status: "ran", summary, runId: "7" })).toBe(
+      "Listed 2, skipped 1, handled 0, failed 1. Pipeline run 7.",
     );
-    expect(describePublishRun({ status: "ran", owner: "native", summary, runId: "7", siteRefresh: "failed" })).toBe(
-      "native: listed 2, skipped 1, handled 0, failed 1. Site refresh: failed. Pipeline run 7.",
+    expect(describePublishRun({ status: "ran", summary, runId: "7", siteRefresh: "failed" })).toBe(
+      "Listed 2, skipped 1, handled 0, failed 1. Site refresh: failed. Pipeline run 7.",
     );
   });
 
   it("throws only when a message failed, so the runner shows the run as failed", () => {
     expect(() => throwIfPublishRunFailed({ status: "no_mail" })).not.toThrow();
-    expect(() => throwIfPublishRunFailed({ status: "ran", owner: "native", summary, runId: "7" })).toThrow(
+    expect(() => throwIfPublishRunFailed({ status: "ran", summary, runId: "7" })).toThrow(
       "1 message(s) failed. See pipeline run 7.",
     );
   });

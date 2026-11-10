@@ -114,7 +114,7 @@ type ApprovalBoardProps = {
       published_at: string | null;
     } | null;
   } | null;
-  /** The date's native drafts (#79). Null while n8n drafts: the board then works as before. */
+  /** The date's drafts (#79). Null if they could not be read. */
   drafting?: DraftingSummary | null;
 };
 
@@ -237,7 +237,7 @@ export default function ApprovalBoard({
 }: ApprovalBoardProps) {
   const router = useRouter();
   const nextDraftNotice = secondCommitNotice(drafting);
-  const draftCount = drafting?.owner === "native" ? drafting.drafts.length : 0;
+  const draftCount = drafting?.drafts.length ?? 0;
   const latestDraft = draftCount > 0 ? drafting?.drafts[0] : undefined;
   const [commitModalOpen, setCommitModalOpen] = useState(false);
   const [isCommitting, setIsCommitting] = useState(false);

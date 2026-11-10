@@ -9,7 +9,6 @@ import {
 } from "@/src/pipeline/publish/detect-publish";
 import type { GmailMessage, GmailReader } from "@/src/pipeline/publish/gmail-client";
 import { PLACEHOLDER_ISSUE, renderIssueEmail } from "@/src/pipeline/publish/sent-email.fixture";
-import { parseSentEmail } from "@/src/pipeline/publish/sent-email-parser";
 
 const SENT_AT = new Date("2026-11-03T17:48:22.000Z");
 const ISSUE_HTML = renderIssueEmail(PLACEHOLDER_ISSUE, { received: true });
@@ -79,47 +78,12 @@ describe("buildPublishQuery", () => {
 });
 
 describe("detectPublish", () => {
-  it("in shadow mode records what it would publish and compares it with the stored content, without publishing", async () => {
-    const stored = parseSentEmail(ISSUE_HTML)!.content;
-    const { store, events, published } = fakeStore([
-      { id: 268, publishedAt: SENT_AT, contentJson: { ...stored, title: "Different Title" } },
-    ]);
-
-    const gmail = fakeGmail([message("m1")]);
-    const summary = await detectPublish({ gmail, store }, { mode: "shadow", messageIds: await newestFirst(gmail) });
-
-    expect(published).toEqual([]);
-    expect(events).toEqual([
-      {
-        mode: "shadow",
-        outcome: "would_publish",
-        gmailMessageId: "m1",
-        receivedAt: SENT_AT,
-        issueId: 268,
-        subject: "♊️ Placeholder Title For Tests",
-        title: "Placeholder Title For Tests",
-        storyIds: [11023, 11007, 10996, 11009, 11010, 10998],
-        contentJson: stored,
-        problems: [],
-        draftId: null,
-      },
-    ]);
-    expect(summary.results).toEqual([
-      {
-        gmailMessageId: "m1",
-        issueId: 268,
-        outcome: "would_publish",
-        differences: ['title: native="Placeholder Title For Tests" published="Different Title"'],
-      },
-    ]);
-  });
-
-  it("in native mode publishes from the oldest copy and marks the second copy already published", async () => {
+  it("publishes from the oldest copy and marks the second copy already published", async () => {
     const { store, events, published } = fakeStore([{ id: 268, publishedAt: null, contentJson: null }]);
     const later = new Date(SENT_AT.getTime() + 1000);
 
     const gmail = fakeGmail([message("first"), message("second", ISSUE_HTML, later)]);
-    const summary = await detectPublish({ gmail, store }, { mode: "native", messageIds: await newestFirst(gmail) });
+    const summary = await detectPublish({ gmail, store }, { messageIds: await newestFirst(gmail) });
 
     expect(published).toEqual([268]);
     expect(events.map((e) => [e.gmailMessageId, e.outcome])).toEqual([
@@ -129,11 +93,11 @@ describe("detectPublish", () => {
     expect(summary.results.map((r) => r.outcome)).toEqual(["published", "already_published"]);
   });
 
-  it("skips messages it has already handled in this mode, and records other mail as not an issue", async () => {
+  it("skips messages it has already handled, and records other mail as not an issue", async () => {
     const gmail = fakeGmail([message("seen"), message("promo", "<p>Upgrade your plan</p>")]);
     const { store, events } = fakeStore([], ["seen"]);
 
-    const summary = await detectPublish({ gmail, store }, { mode: "shadow", messageIds: await newestFirst(gmail) });
+    const summary = await detectPublish({ gmail, store }, { messageIds: await newestFirst(gmail) });
 
     expect(gmail.reads).toEqual(["promo"]);
     expect(summary.skipped).toBe(1);
@@ -145,7 +109,7 @@ describe("detectPublish", () => {
     const { store, events } = fakeStore([{ id: 268, publishedAt: null, contentJson: null }]);
 
     const gmail = fakeGmail([message("m1", html)]);
-    await detectPublish({ gmail, store }, { mode: "native", messageIds: await newestFirst(gmail) });
+    await detectPublish({ gmail, store }, { messageIds: await newestFirst(gmail) });
 
     expect(events).toMatchObject([{ gmailMessageId: "m1", outcome: "published", draftId: 41 }]);
   });
@@ -154,7 +118,7 @@ describe("detectPublish", () => {
     const gmail = fakeGmail([message("ok")]);
     const { store } = fakeStore([{ id: 268, publishedAt: null, contentJson: null }]);
 
-    const summary = await detectPublish({ gmail, store }, { mode: "native", messageIds: ["broken", "ok"] });
+    const summary = await detectPublish({ gmail, store }, { messageIds: ["broken", "ok"] });
 
     expect(summary.results.map((r) => r.gmailMessageId)).toEqual(["ok"]);
     expect(summary.errors).toEqual([{ gmailMessageId: "broken", message: "no message broken" }]);

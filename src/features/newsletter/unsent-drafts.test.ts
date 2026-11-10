@@ -59,7 +59,7 @@ describe("findUnsentDrafts", () => {
     expect(issueFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
-          publishedAt: { not: null },
+          status: "published",
           issueDate: {
             in: [new Date("2026-10-22T00:00:00.000Z"), new Date("2026-10-21T00:00:00.000Z")],
           },

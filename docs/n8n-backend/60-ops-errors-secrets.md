@@ -1,5 +1,7 @@
 # 60 — Operations: error handling, reliability, schedules, secrets, instance
 
+> **Historical.** This describes the n8n system that native code replaced in November 2026 ([ADR 0003](../adr/0003-n8n-retired-kept-as-record.md)). It is not the current system: see [../architecture.html](../architecture.html).
+
 Scope: how the AI Recap n8n system behaves operationally as a whole. Per-flow business logic lives in the other
 `docs/n8n-backend/*` files; this file covers the cross-cutting concerns. Sources: workflow JSON exports
 (draft `nodes` and published `activeVersion`), `executions.json` (655 runs), live execution payloads pulled with

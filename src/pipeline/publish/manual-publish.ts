@@ -20,7 +20,7 @@ export interface ManualPublishPreview {
   problems: string[];
 }
 
-async function load(issueId: number, store: ManualPublishStore, now: Date) {
+async function load(issueId: number, store: ManualPublishStore) {
   const draft = await store.findDraft(issueId);
   const parsed = draft ? parseSentEmail(draft.html ?? "") : null;
   const preview: ManualPublishPreview = {
@@ -37,7 +37,7 @@ async function load(issueId: number, store: ManualPublishStore, now: Date) {
   if (!parsed) return { preview: { ...preview, status: "no_email" as const }, parsed: null };
   if (parsed.content.issue_id !== issueId) return { preview: { ...preview, status: "wrong_issue" as const }, parsed: null };
 
-  const outcome = decidePublish({ mode: "manual", parsed, issue: draft, sentAt: now });
+  const outcome = decidePublish({ mode: "manual", parsed, issue: draft });
   return outcome === "published"
     ? { preview, parsed }
     : { preview: { ...preview, status: "already_published" as const }, parsed: null };
@@ -46,9 +46,8 @@ async function load(issueId: number, store: ManualPublishStore, now: Date) {
 export async function previewManualPublish(
   issueId: number,
   store: ManualPublishStore = createPrismaPublishStore(),
-  now: Date = new Date(),
 ): Promise<ManualPublishPreview> {
-  return (await load(issueId, store, now)).preview;
+  return (await load(issueId, store)).preview;
 }
 
 export async function manualPublish(
@@ -56,7 +55,7 @@ export async function manualPublish(
   now: Date,
   store: ManualPublishStore = createPrismaPublishStore(),
 ): Promise<{ outcome: ManualPublishStatus | "published"; preview: ManualPublishPreview }> {
-  const { preview, parsed } = await load(issueId, store, now);
+  const { preview, parsed } = await load(issueId, store);
   if (preview.status !== "ready" || !parsed) return { outcome: preview.status, preview };
 
   const outcome = await store.publish({

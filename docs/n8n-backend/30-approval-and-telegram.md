@@ -1,5 +1,7 @@
 # 30: Human-in-the-loop approval flow and Telegram touchpoints
 
+> **Historical.** This describes the n8n system that native code replaced in November 2026 ([ADR 0003](../adr/0003-n8n-retired-kept-as-record.md)). It is not the current system: see [../architecture.html](../architecture.html).
+
 Scope: everything between "stories are in `newsletter.stories`" and "an approved outline is handed to `2. Create Issue Draft`", plus every Telegram node in the n8n instance. It covers both the n8n side and the website side (Next.js routes, UI, auth).
 
 Sources: n8n workflow exports (draft `nodes` and published `activeVersion`), execution payloads pulled with `includeData=true`, read-only queries against prod Neon, and the website code at the worktree's commit. Secret values, chat ids, tokens, IPs and email addresses are left out on purpose.

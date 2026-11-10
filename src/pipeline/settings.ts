@@ -1,7 +1,7 @@
 import type { Prisma } from "@/src/generated/prisma";
 import { prisma } from "@/src/server/prisma";
 
-// Stage owners, deadlines and thresholds (rule R1). Callers validate the JSON shape they expect.
+// Deadlines, thresholds and the job runner (rule R1). Callers validate the JSON shape they expect.
 // Never store secrets (tokens, keys, passwords, URLs with credentials) here: /admin/settings prints every row.
 // Secrets belong in env vars.
 export async function readSetting(key: string): Promise<Prisma.JsonValue | null> {

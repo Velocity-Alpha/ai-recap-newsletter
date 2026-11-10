@@ -121,7 +121,7 @@ function ApprovalPageForDate({ dateKey, reuseKey }: { dateKey: string; reuseKey:
     } | null;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
-  // The date's native drafts. Null while n8n drafts or if the read fails: the board then works as before.
+  // The date's drafts. Null if the read fails: the board then shows no draft links.
   const [drafting, setDrafting] = useState<DraftingSummary | null>(null);
 
   useEffect(() => {
@@ -129,7 +129,7 @@ function ApprovalPageForDate({ dateKey, reuseKey }: { dateKey: string; reuseKey:
     fetch(`/api/approval/drafts?${new URLSearchParams({ date: dateKey })}`, { cache: "no-store" })
       .then((res) => (res.ok ? (res.json() as Promise<DraftingSummary>) : null))
       .then((data) => {
-        if (active) setDrafting(data?.owner === "native" ? data : null);
+        if (active) setDrafting(Array.isArray(data?.drafts) ? data : null);
       })
       .catch(() => {
         if (active) setDrafting(null);
