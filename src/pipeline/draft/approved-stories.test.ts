@@ -25,6 +25,21 @@ describe("toApprovedSections", () => {
     expect(toApprovedSections(SAMPLE_OUTLINE, storyRows())).toEqual(SAMPLE_APPROVED);
   });
 
+  it("puts the lead story first in Top Stories", () => {
+    const sections = toApprovedSections({ ...SAMPLE_OUTLINE, leadStoryId: 502 }, storyRows());
+    expect(sections.headlines.map((story) => story.id)).toEqual([502, 501]);
+  });
+
+  it("moves a lead story from another section to the top of Top Stories", () => {
+    const sections = toApprovedSections({ ...SAMPLE_OUTLINE, leadStoryId: 504 }, storyRows());
+    expect(sections.headlines.map((story) => story.id)).toEqual([504, 501, 502]);
+    expect(sections.research.map((story) => story.id)).toEqual([503]);
+  });
+
+  it("keeps board order when there is no lead story", () => {
+    expect(toApprovedSections({ ...SAMPLE_OUTLINE, leadStoryId: null }, storyRows())).toEqual(SAMPLE_APPROVED);
+  });
+
   it("keeps the database note and link for a story the outline does not list", () => {
     const rows = storyRows().map((row) => (row.id === 505 ? { ...row, note: "From the database." } : row));
     expect(toApprovedSections(SAMPLE_OUTLINE, rows).tools[0]).toMatchObject({ id: 505, note: "From the database." });

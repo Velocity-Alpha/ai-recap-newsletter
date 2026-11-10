@@ -65,6 +65,19 @@ export function toApprovedSections(outline: ApprovalOutline, rows: StoryRow[]): 
       sections[section.key].push(story);
     }
   }
+  return withLeadFirst(sections, outline.leadStoryId);
+}
+
+/** The owner's lead story opens the email: first in Top Stories, moved there from any other section. */
+function withLeadFirst(sections: ApprovedSections, leadStoryId: number | null): ApprovedSections {
+  if (leadStoryId === null) return sections;
+  for (const key of SECTION_KEYS as readonly SectionKey[]) {
+    const index = sections[key].findIndex((story) => story.id === leadStoryId);
+    if (index === -1) continue;
+    const [lead] = sections[key].splice(index, 1);
+    sections.headlines.unshift(lead);
+    break;
+  }
   return sections;
 }
 
