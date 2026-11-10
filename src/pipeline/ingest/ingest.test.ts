@@ -234,6 +234,14 @@ describe("ingestStories: feeds", () => {
     expect(result.sources[0]).toMatchObject({ status: "ok", documents: 1, stories: 1 });
   });
 
+  it("sends the browser User-Agent and a timeout", async () => {
+    const fetch = fakeFetch({ "https://www.producthunt.com/feed?category=artificial-intelligence": () => new Response("<feed></feed>") });
+    await ingestStories({ gmail: fakeGmail([]).gmail, fetch, extract: vi.fn(), store: memoryStore().store, now: NOW, sources: [PRODUCT_HUNT] });
+    const [, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
+    expect(init.headers).toEqual({ "user-agent": BROWSER_USER_AGENT });
+    expect(init.signal).toBeInstanceOf(AbortSignal);
+  });
+
   it("reports a broken Hugging Face page as a failed source", async () => {
     const fetch = fakeFetch({ "https://huggingface.co/papers": () => new Response("<html></html>") });
     const result = await ingestStories({ gmail: fakeGmail([]).gmail, fetch, extract: vi.fn(), store: memoryStore().store, now: NOW, sources: [HUGGING_FACE] });
@@ -271,7 +279,7 @@ describe("ingestStories: beehiiv sites", () => {
     return `<script type="application/ld+json">{"@type":"Article","datePublished":"${publishedAt}","isAccessibleForFree":"${options.free ?? "True"}"}</script>${body}`;
   }
 
-  /** A site whose sitemap lists `entries` (lastmod from the page's date) and serves `pages` by slug. */
+  /** A site whose sitemap lists `entries` (each with lastmod 2026-11-09 unless `entries` says otherwise) and serves `pages` by slug. */
   function site(pages: Record<string, string | number>, entries?: Entry[]) {
     const listed = entries ?? Object.keys(pages).map((slug) => ({ slug, lastmod: "2026-11-09" }));
     return fakeFetch({
@@ -294,7 +302,7 @@ describe("ingestStories: beehiiv sites", () => {
   describe("a new post", () => {
     const fetch = () => site({ monday: page("monday", "2026-11-09T03:01:00.000Z") });
 
-    it("passes the New York date of datePublished as the issue date", async () => {
+    it("passes the New York date of datePublished as the source date", async () => {
       const extract = extractFromBody();
       await run(fetch(), memoryStore().store, extract);
       expect(extract.mock.calls[0][0]).toEqual({ sourceDate: "2026-11-08", text: "body of monday" });
@@ -314,15 +322,27 @@ describe("ingestStories: beehiiv sites", () => {
     });
   });
 
-  it("extracts several new posts oldest first and moves the bookmark to the newest", async () => {
-    const { store, marks } = memoryStore({ example_ai: TWO_DAYS_AGO });
-    const extract = extractFromBody();
-    const fetch = site({ later: page("later", "2026-11-09T05:00:00.000Z"), earlier: page("earlier", "2026-11-08T03:00:00.000Z") });
+  describe("several new posts", () => {
+    const fetch = () => site({ later: page("later", "2026-11-09T05:00:00.000Z"), earlier: page("earlier", "2026-11-08T03:00:00.000Z") });
 
-    await run(fetch, store, extract);
+    it("are extracted oldest first", async () => {
+      const extract = extractFromBody();
+      await run(fetch(), memoryStore().store, extract);
+      expect(extract.mock.calls.map(([input]) => input.text)).toEqual(["body of earlier", "body of later"]);
+    });
 
-    expect(extract.mock.calls.map(([input]) => input.text)).toEqual(["body of earlier", "body of later"]);
-    expect(marks.get("example_ai")).toEqual(new Date("2026-11-09T05:00:00.000Z"));
+    it("move the bookmark to the newest", async () => {
+      const { store, marks } = memoryStore({ example_ai: TWO_DAYS_AGO });
+      await run(fetch(), store);
+      expect(marks.get("example_ai")).toEqual(new Date("2026-11-09T05:00:00.000Z"));
+    });
+  });
+
+  it("skips an old post without a body, with no error", async () => {
+    const { store } = memoryStore({ example_ai: new Date("2026-11-09T03:01:00.000Z") });
+    const old = page("old", "2026-11-09T03:00:00.000Z", { body: "<div>moved</div>" });
+    const result = await run(site({ old }), store, vi.fn());
+    expect(result.sources[0]).toMatchObject({ status: "no_new", documents: 0, errors: [] });
   });
 
   it("skips a post at or before the bookmark without calling the model", async () => {
@@ -407,12 +427,43 @@ describe("ingestStories: beehiiv sites", () => {
     expect(marks.get("example_ai")).toEqual(new Date("2026-11-08T03:00:00.000Z"));
   });
 
-  it("drops stories that link to the source's own site, with or without www., and counts them as without a link", async () => {
-    const { store, rows } = memoryStore();
-    const extract = vi.fn(async () => [story({ url: "https://www.news.example.org/p/older" }), story({ url: "https://example.org/news" })]);
-    const result = await run(site({ monday: page("monday", "2026-11-09T03:00:00.000Z") }), store, extract);
-    expect([...rows.values()].map((row) => row.url)).toEqual(["https://example.org/news"]);
-    expect(result.sources[0]).toMatchObject({ stories: 1, skippedNoLink: 1 });
+  describe("a story linking to the source's own site", () => {
+    const ownSiteStories = (ownUrl: string) => vi.fn(async () => [story({ url: ownUrl }), story({ url: "https://example.org/news" })]);
+    const monday = () => site({ monday: page("monday", "2026-11-09T03:00:00.000Z") });
+
+    it("is dropped", async () => {
+      const { store, rows } = memoryStore();
+      await run(monday(), store, ownSiteStories("https://news.example.org/p/older"));
+      expect([...rows.values()].map((row) => row.url)).toEqual(["https://example.org/news"]);
+    });
+
+    it("counts as a story without a link", async () => {
+      const result = await run(monday(), memoryStore().store, ownSiteStories("https://news.example.org/p/older"));
+      expect(result.sources[0]).toMatchObject({ stories: 1, skippedNoLink: 1 });
+    });
+
+    it("is dropped when the link adds www.", async () => {
+      const result = await run(monday(), memoryStore().store, ownSiteStories("https://www.news.example.org/p/older"));
+      expect(result.sources[0]).toMatchObject({ stories: 1, skippedNoLink: 1 });
+    });
+
+    it("is dropped when the siteUrl has www. and the link does not", async () => {
+      const wwwSite: StorySource = { ...SITE, siteUrl: "https://www.news.example.org" };
+      const url = "https://www.news.example.org/p/monday";
+      const fetch = fakeFetch({
+        "https://www.news.example.org/sitemap.xml": () => new Response(`<urlset><url><loc>${url}</loc><lastmod>2026-11-09</lastmod></url></urlset>`),
+        [url]: () => new Response(page("monday", "2026-11-09T03:00:00.000Z")),
+      });
+      const result = await ingestStories({
+        gmail: fakeGmail([]).gmail,
+        fetch,
+        extract: ownSiteStories("https://news.example.org/p/older"),
+        store: memoryStore().store,
+        now: NOW,
+        sources: [wwwSite],
+      });
+      expect(result.sources[0]).toMatchObject({ stories: 1, skippedNoLink: 1 });
+    });
   });
 
   it("reads posts listed under the site's www. host", async () => {

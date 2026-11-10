@@ -90,13 +90,15 @@ What it reads (`beehiiv-site.ts`):
 
 Stories that link to the publication's own site are dropped. They count as stories without a link.
 
-How dates work: the issue date is the New York date of `datePublished`. Each story gets its date from
-the extractor, with the issue date as the fallback.
+How dates work: the source date (`sourceDate`) is the New York date of the post's `datePublished`. Each
+story gets its date from the extractor, with the source date as the fallback.
 
 The bookmark moves to the last post of the unbroken run of successes from the oldest, as for emails. It
 stays strictly before the first failed post's time, so a failed post that shares a time with a good one is
-read again. If any page fails to load or parse, or the page cap is exceeded, the bookmark does not move in
-that run. The good posts are still saved, and the next run reads them again harmlessly.
+read again. The bookmark does not move at all in a run where a page fails to load, a page's Article data
+cannot be read, or the page cap is exceeded. A post whose body is missing or whose extraction fails stops
+the bookmark at the last post before it. The good posts are still saved, and the next run reads them again
+harmlessly.
 
 Why this design: [ADR 0003](../adr/0003-beehiiv-site-source.md).
 

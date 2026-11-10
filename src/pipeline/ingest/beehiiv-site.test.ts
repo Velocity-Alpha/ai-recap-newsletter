@@ -3,19 +3,32 @@ import { describe, expect, it } from "vitest";
 import { listSitemapPosts, readPostMeta, readPostText } from "@/src/pipeline/ingest/beehiiv-site";
 
 describe("listSitemapPosts", () => {
-  it("lists only /p/ posts, with lastmod or null, and decodes entities and CDATA", () => {
-    const xml = `<?xml version="1.0"?><urlset>
-      <url><loc>https://news.example.org/</loc><lastmod>2026-11-10</lastmod></url>
-      <url><loc>https://news.example.org/p/first-post</loc><lastmod>2026-11-10</lastmod></url>
-      <url><loc>https://news.example.org/p/a&amp;b</loc></url>
-      <url><loc><![CDATA[https://news.example.org/p/wrapped]]></loc><lastmod><![CDATA[2026-11-09]]></lastmod></url>
-      <url><loc>https://news.example.org/archive</loc></url>
-    </urlset>`;
-    expect(listSitemapPosts(xml)).toEqual([
-      { url: "https://news.example.org/p/first-post", lastmod: "2026-11-10" },
-      { url: "https://news.example.org/p/a&b", lastmod: null },
-      { url: "https://news.example.org/p/wrapped", lastmod: "2026-11-09" },
+  const urlset = (...urls: string[]) => `<?xml version="1.0"?><urlset>${urls.join("")}</urlset>`;
+
+  it("lists only URLs under /p/", () => {
+    const xml = urlset(
+      "<url><loc>https://news.example.org/</loc><lastmod>2026-11-10</lastmod></url>",
+      "<url><loc>https://news.example.org/p/first-post</loc><lastmod>2026-11-10</lastmod></url>",
+      "<url><loc>https://news.example.org/archive</loc></url>",
+    );
+    expect(listSitemapPosts(xml).map((post) => post.url)).toEqual(["https://news.example.org/p/first-post"]);
+  });
+
+  it("gives a post without lastmod a null lastmod", () => {
+    expect(listSitemapPosts(urlset("<url><loc>https://news.example.org/p/x</loc></url>"))).toEqual([
+      { url: "https://news.example.org/p/x", lastmod: null },
     ]);
+  });
+
+  it("decodes XML entities in loc", () => {
+    expect(listSitemapPosts(urlset("<url><loc>https://news.example.org/p/a&amp;b</loc></url>"))[0].url).toBe(
+      "https://news.example.org/p/a&b",
+    );
+  });
+
+  it("unwraps CDATA in loc and lastmod", () => {
+    const xml = urlset("<url><loc><![CDATA[https://news.example.org/p/wrapped]]></loc><lastmod><![CDATA[2026-11-09]]></lastmod></url>");
+    expect(listSitemapPosts(xml)).toEqual([{ url: "https://news.example.org/p/wrapped", lastmod: "2026-11-09" }]);
   });
 });
 
@@ -28,9 +41,13 @@ const article = (free?: string) =>
   `{"@type":"Article","headline":"A post","datePublished":"2026-11-10T03:01:00.000Z"${free === undefined ? "" : `,"isAccessibleForFree":${free}`}}`;
 
 describe("readPostMeta", () => {
-  it("reads the Article date and free flag, skipping other and broken blocks", () => {
-    const meta = readPostMeta(page(['{"@type":"BreadcrumbList"}', "{not json", article('"True"'), '{"@type":"FAQPage"}']));
-    expect(meta).toEqual({ publishedAt: new Date("2026-11-10T03:01:00.000Z"), free: true });
+  it("reads the Article date and free flag", () => {
+    expect(readPostMeta(page([article('"True"')]))).toEqual({ publishedAt: new Date("2026-11-10T03:01:00.000Z"), free: true });
+  });
+
+  it("skips ld+json blocks that are not an Article or not valid JSON", () => {
+    const meta = readPostMeta(page(['{"@type":"BreadcrumbList"}', "{not json", article(), '{"@type":"FAQPage"}']));
+    expect(meta.publishedAt).toEqual(new Date("2026-11-10T03:01:00.000Z"));
   });
 
   it("reads the script's raw text, so entities in a headline do not break the JSON", () => {
@@ -41,6 +58,7 @@ describe("readPostMeta", () => {
   it("treats only an explicit false as paid", () => {
     expect(readPostMeta(page([article('"False"')])).free).toBe(false);
     expect(readPostMeta(page([article('"false"')])).free).toBe(false);
+    expect(readPostMeta(page([article('"FALSE"')])).free).toBe(false);
     expect(readPostMeta(page([article("false")])).free).toBe(false);
     for (const free of [undefined, "null", "true", '"True"']) expect(readPostMeta(page([article(free)])).free).toBe(true);
   });

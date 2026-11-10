@@ -62,7 +62,7 @@ export interface SourceResult {
   source: string;
   name: string;
   status: SourceStatus;
-  /** Emails, feed snapshots or posts read. */
+  /** Emails, feed snapshots or posts read. The unread remainder past the page cap counts as one. */
   documents: number;
   stories: number;
   /** Stories with no usable link (none, or a link to the source's own site). */
@@ -107,8 +107,14 @@ async function mapInBatches<T, R>(items: T[], size: number, run: (item: T) => Pr
   return results;
 }
 
-function fetchPage(url: string, fetchImpl: typeof fetch): Promise<Response> {
-  return fetchImpl(url, { headers: { "user-agent": BROWSER_USER_AGENT }, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+/**
+ * GET with the browser User-Agent and a timeout. A non-OK response throws `<what> returned HTTP <status>.`,
+ * or `HTTP <status>.` when `what` is null (the caller already labels the error).
+ */
+async function fetchPage(url: string, what: string | null, fetchImpl: typeof fetch): Promise<string> {
+  const response = await fetchImpl(url, { headers: { "user-agent": BROWSER_USER_AGENT }, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+  if (!response.ok) throw new Error(`${what ? `${what} returned ` : ""}HTTP ${response.status}.`);
+  return response.text();
 }
 
 /** The later of the source's bookmark and the lookback limit. */
@@ -159,8 +165,8 @@ async function toRows(
 }
 
 /** Extracts stories from one document's text and saves them. */
-async function extractAndSave(options: { input: ExtractionInput; rows: RowContext; deps: IngestDeps; result: SourceResult }): Promise<void> {
-  const { input, rows: context, deps, result } = options;
+async function extractAndSave(options: { input: ExtractionInput; context: RowContext; deps: IngestDeps; result: SourceResult }): Promise<void> {
+  const { input, context, deps, result } = options;
   const stories = await deps.extract(input);
   const { rows, skippedNoLink } = await toRows(stories, { ...context, fetch: deps.fetch });
   result.stories += await deps.store.upsertStories(rows);
@@ -183,19 +189,18 @@ async function processInOrder<T>(
   options: { result: SourceResult; label: (document: T) => string; at: (document: T) => Date; run: (document: T) => Promise<void> },
 ): Promise<Date | null> {
   const succeeded: Date[] = [];
-  let firstFailure: Date | null = null;
+  let firstFailure = Infinity;
   for (const document of [...documents].sort((a, b) => options.at(a).getTime() - options.at(b).getTime())) {
     try {
       await options.run(document);
       options.result.documents += 1;
-      if (!firstFailure) succeeded.push(options.at(document));
+      if (firstFailure === Infinity) succeeded.push(options.at(document));
     } catch (error) {
       recordFailure(options.result, options.label(document), error);
-      firstFailure ??= options.at(document);
+      firstFailure = Math.min(firstFailure, options.at(document).getTime());
     }
   }
-  const limit = firstFailure;
-  return (limit ? succeeded.filter((at) => at < limit) : succeeded).at(-1) ?? null;
+  return succeeded.filter((at) => at.getTime() < firstFailure).at(-1) ?? null;
 }
 
 async function ingestEmailSource(source: GmailSource, deps: IngestDeps, result: SourceResult): Promise<void> {
@@ -214,7 +219,7 @@ async function ingestEmailSource(source: GmailSource, deps: IngestDeps, result: 
         ? await resolveTrackingLinks(raw, source.trackingLinks, { fetch: deps.fetch })
         : raw;
       const text = source.body === "html" && mail.html ? htmlToText(resolved) : resolved;
-      await extractAndSave({ input: { sourceDate: newYorkDate(mail.sentAt), text }, rows: { source: source.key }, deps, result });
+      await extractAndSave({ input: { sourceDate: newYorkDate(mail.sentAt), text }, context: { source: source.key }, deps, result });
     },
   });
   if (advanceTo) await deps.store.writeBookmark(source.key, advanceTo);
@@ -223,9 +228,7 @@ async function ingestEmailSource(source: GmailSource, deps: IngestDeps, result: 
 async function ingestFeedSource(source: FeedSource, deps: IngestDeps, result: SourceResult, targetDate: string): Promise<void> {
   const cutoff = await readCutoff(source.key, deps);
   const url = source.kind === "product_hunt" ? PRODUCT_HUNT_FEED_URL : HUGGING_FACE_PAPERS_URL;
-  const response = await fetchPage(url, deps.fetch);
-  if (!response.ok) throw new Error(`${source.name} returned HTTP ${response.status}.`);
-  const body = await response.text();
+  const body = await fetchPage(url, source.name, deps.fetch);
   const feed =
     source.kind === "product_hunt"
       ? buildProductHuntText(body, { cutoff, now: deps.now, targetDate })
@@ -237,7 +240,7 @@ async function ingestFeedSource(source: FeedSource, deps: IngestDeps, result: So
   // board), so they take the run's date.
   await extractAndSave({
     input: { sourceDate: targetDate, text: feed.text },
-    rows: { source: source.key, fixedDay: targetDate },
+    context: { source: source.key, fixedDay: targetDate },
     deps,
     result,
   });
@@ -254,9 +257,8 @@ async function listChangedPosts(
   cutoffDay: string,
   deps: IngestDeps,
 ): Promise<{ urls: string[]; changed: number }> {
-  const response = await fetchPage(new URL("/sitemap.xml", source.siteUrl).href, deps.fetch);
-  if (!response.ok) throw new Error(`${source.name} sitemap returned HTTP ${response.status}.`);
-  const posts = listSitemapPosts(await response.text()).filter((post) => siteHost(post.url) === host);
+  const xml = await fetchPage(new URL("/sitemap.xml", source.siteUrl).href, `${source.name} sitemap`, deps.fetch);
+  const posts = listSitemapPosts(xml).filter((post) => siteHost(post.url) === host);
   if (posts.length === 0) throw new Error(`${source.name} sitemap lists no posts.`);
 
   // beehiiv's lastmod is the UTC day (checked 2026-11-10 against posts published at 03:01Z and 14:11Z).
@@ -270,9 +272,7 @@ type PostPage = { ok: true; url: string; html: string; meta: PostMeta } | { ok: 
 
 async function readPostPage(url: string, deps: IngestDeps): Promise<PostPage> {
   try {
-    const response = await fetchPage(url, deps.fetch);
-    if (!response.ok) throw new Error(`HTTP ${response.status}.`);
-    const html = await response.text();
+    const html = await fetchPage(url, null, deps.fetch);
     const meta = readPostMeta(html);
     // A future date would move the bookmark past every post until then.
     if (meta.publishedAt > deps.now) throw new Error(`datePublished is in the future (${meta.publishedAt.toISOString()}).`);
@@ -291,11 +291,12 @@ async function ingestBeehiivSiteSource(source: BeehiivSiteSource, deps: IngestDe
 
   for (const page of pages) if (!page.ok) recordFailure(result, page.url, page.error);
   if (changed > urls.length) {
-    // The unread posts count as one failed document, so the status still compares documents with errors.
+    // The unread remainder counts as one failed document (see `SourceResult.documents`).
     recordFailure(result, source.name, `${changed} posts changed since ${cutoffDay}; read ${urls.length}. New posts may be among the unread ones.`);
   }
   // A failed page has no known date, and unread posts may be new, so either keeps the bookmark.
-  const nothingFailed = result.errors.length === 0;
+  // Read before processInOrder, which adds body and extraction errors of its own.
+  const allPagesRead = result.errors.length === 0;
 
   // lastmod is only a day, so a post read earlier today is fetched again and skipped here, with no model call.
   const posts = pages.filter(
@@ -308,12 +309,12 @@ async function ingestBeehiivSiteSource(source: BeehiivSiteSource, deps: IngestDe
     run: (post) =>
       extractAndSave({
         input: { sourceDate: newYorkDate(post.meta.publishedAt), text: readPostText(post.html) },
-        rows: { source: source.key, ownHost: host },
+        context: { source: source.key, ownHost: host },
         deps,
         result,
       }),
   });
-  if (advanceTo && nothingFailed) await deps.store.writeBookmark(source.key, advanceTo);
+  if (advanceTo && allPagesRead) await deps.store.writeBookmark(source.key, advanceTo);
 }
 
 function finalStatus(result: SourceResult): SourceStatus {

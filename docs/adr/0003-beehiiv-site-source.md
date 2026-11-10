@@ -21,11 +21,13 @@ It uses only stable, standard parts of the site:
 - The schema.org `Article` data (`ld+json`) on each post gives `datePublished` and `isAccessibleForFree`.
 - The element with id `content-blocks` holds the post body.
 
-A post's metadata is read first. Paid posts and posts at or before the bookmark are skipped before the
+A post's metadata is read first. Paid posts and posts at or before the cutoff (the later of the bookmark and 72 hours ago) are skipped before the
 body is needed. A post dated in the future is a failed page. The run reads post pages up to the page cap,
 newest `lastmod` first, then in sitemap order. When more posts changed, it records one error and says new
-posts may be unread (see the runbook). If any page fails, or the cap is exceeded, the bookmark stays where
-it is. A failed page has no known date, so it cannot be placed in the bookmark order.
+posts may be unread (see the runbook). If a page fails to load, its Article data cannot be read, or the cap
+is exceeded, the bookmark stays where it is. Such a page has no known date, so it cannot be placed in the
+bookmark order. A post whose body is missing or whose extraction fails stops the bookmark at the last post
+before it.
 
 For every source kind, the bookmark stays strictly before the first failed document's time. A document
 that shares a time with an earlier success is then read again.

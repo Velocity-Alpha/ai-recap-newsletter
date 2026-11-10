@@ -156,9 +156,11 @@ Some ingest errors are not incidents. They show on the source's line in the `ing
 - **Meaning:** More posts changed on the site than the page cap allows in one run. Usually the publisher
   edited many old posts at once. The run read the newest by `lastmod`. A new post may be among the unread
   ones.
-- **Do (check, then add by hand):** Nothing to fix. The error clears itself when the edits leave the
-  72-hour window. Meanwhile, open the site and look for posts published in that window. Add any missed
-  story to the board by hand.
+- **Do (wait, then tell the developer if it stays):** Nothing to fix. The error clears itself when the
+  edited posts' `lastmod` days fall out of the lookback window. `lastmod` is compared by UTC day, so this
+  can take up to about a day longer than 72 hours. A post published during that time may not be read. If
+  its stories matter, they usually arrive through another source. If the error does not clear, tell the
+  developer.
 
 ## A run that fails to report
 
