@@ -32,6 +32,7 @@ describe("buildDailySummary", () => {
         "- AlphaSignal: 9",
         "- Product Hunt: 10",
         "- Hugging Face: 10",
+        "- In the World of AI: 0",
         "Commit: about 11:42 (23 stories queued).",
         "Drafts: 1 made, ready.",
         'Published: 12:31, "Synthetic Model Ships & Agents Learn".',

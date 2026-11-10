@@ -53,7 +53,7 @@ function notes(outcome: CheckOutcome): string[] {
 
 const RUNNING = { id: "41", status: "running", startedAt: new Date("2026-11-10T14:55:00Z") };
 
-const SOURCE_KEYS = ["rundown_ai", "ai_breakfast", "the_signal", "tldr", "alphasignal", "product_hunt_ai", "huggingface"];
+const SOURCE_KEYS = ["rundown_ai", "ai_breakfast", "the_signal", "tldr", "alphasignal", "product_hunt_ai", "huggingface", "world_of_ai"];
 
 describe("10:05 stories check", () => {
   it("passes on a normal day, and checks only the stories", () => {

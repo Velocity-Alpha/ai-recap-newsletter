@@ -50,6 +50,8 @@
 09:55  ingest-stories (scheduled, 30 s limit) --POST + 5-min job token--> ingest-stories-background (15 min limit)
          Gmail API, read-only: every new email from each newsletter sender since its bookmark
          (The Rundown, AI Breakfast, The Signal, TLDR, AlphaSignal) + Product Hunt + Hugging Face feeds
+         + beehiiv websites: sitemap.xml + post pages up to the page cap (In the World of AI; ADR 0004),
+           stories linking to the newsletter's own site dropped, bookmark held if any page fails
          -> follow tracking links, strip tracking params -> gpt-6-luna extraction (strict schema)
          -> paywall check -> INSERT newsletter.stories (+ story_sources: which newsletter sent it) -> update scraper_bookmarks
          -> pipeline_runs / pipeline_events rows -> Telegram "board ready" to the review group
@@ -176,7 +178,7 @@ src/features/newsletter/     site and board logic: repository, cache, curation.s
 src/features/subscriber/     subscriber sessions, provider switch (ghl | beehiiv), Resend email, GHL webhook
 src/features/admin/          admin page data
 src/pipeline/                runner-neutral job logic
-  ingest/                    sources.ts, feeds, email-text, redirects, url, extract (gpt-6-luna), paywall,
+  ingest/                    sources.ts, feeds, beehiiv-site, email-text, redirects, url, extract (gpt-6-luna), paywall,
                              ingest-store, telegram, schedule, start-ingest, run-ingest
   publish/                   gmail-client, sent-email-parser, publish-decision, publish-store, content-diff,
                              site-refresh, manual-publish, publish-schedule, detect-publish, run-detect-publish
@@ -227,7 +229,7 @@ scripts/                     reset-dev-branch.mjs, run-prisma-prod.mjs, import-s
   <li><a href="../GLOSSARY.md">Glossary</a>: the words to use for issues, drafts, commits, checks, and incidents.</li>
   <li><a href="../README.md">README</a>: setup, env vars, migrations, deploy, API routes. <a href="../prisma/schema.prisma">Prisma schema</a>.</li>
   <li><a href="./pipeline/runbook.md">Pipeline runbook</a>: what each incident key means and what to do. <a href="./pipeline/adding-a-source.md">Adding a source</a>.</li>
-  <li>Decisions: <a href="./adr/0001-job-runner.md">ADR 0001: job runner</a>, <a href="./adr/0002-new-draft-per-commit.md">ADR 0002: a new draft per commit</a>, <a href="./adr/0003-n8n-retired-kept-as-record.md">ADR 0003: n8n retired</a>.</li>
+  <li>Decisions: <a href="./adr/0001-job-runner.md">ADR 0001: job runner</a>, <a href="./adr/0002-new-draft-per-commit.md">ADR 0002: a new draft per commit</a>, <a href="./adr/0003-n8n-retired-kept-as-record.md">ADR 0003: n8n retired</a>, <a href="./adr/0004-beehiiv-site-source.md">ADR 0004: beehiiv site source</a>.</li>
   <li>History, not the current system: <a href="./n8n-backend/README.md">the old n8n backend and the migration plan</a>, and <a href="./research/">research</a> on job runners, news search, and article reading.</li>
 </ul>
 

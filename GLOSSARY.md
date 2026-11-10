@@ -9,6 +9,11 @@ publishing an issue, and the operations that watch it.
 A newsletter or feed that stories are collected from.
 _Avoid_: provider, sender
 
+**Beehiiv site source**:
+A kind of source read from a beehiiv publication's public website instead of email. In the World of AI is
+one. Each publication has its own source key.
+_Avoid_: beehiiv (as a source name), subscriber provider (that is the subscriber list)
+
 **Story**:
 One news item taken from a source for one day, with a headline, summary, and link.
 _Avoid_: item, post
