@@ -75,6 +75,10 @@
          board proposal: src/features/newsletter/curation.service.ts + openai-dedup.ts (gpt-6-luna)
            + proposed lead story (lead-story.ts, #58): importance + sources that covered it + editorial rubric,
              pre-set on the board and moved to the top of Top Stories; the owner can change it
+           + AI lead pick after dedup (openai-lead-pick.ts, gpt-6-luna): the lead score shortlists 8 stories,
+             the model picks one with the owner's rubric and a one-line reason (never a recently published
+             story). GET /api/approval/outline/lead polls it; the board swaps it in only if not yet edited.
+             Best-effort: off with APPROVAL_LEAD_PICK=off, and on any failure the scored lead stays
          owner edits, then commits -> POST /api/newsletters/commit  ("No issue today" marks a skipped date)
          -> approval_outlines row -> story changes (queued, excluded, edits) in one transaction
          -> new issue_drafts row (version n+1) -> starts draft-issue-background (job token)
@@ -266,7 +270,7 @@ scripts/                     reset-dev-branch.mjs, run-prisma-prod.mjs, import-s
 <h2 id="vars">11. Env var names (values live in Netlify and <code>.env.local</code>, never in git)</h2>
 <table>
   <tr><th>Group</th><th>Names</th></tr>
-  <tr><td>Core</td><td><code>APP_ENV</code> <code>DATABASE_URL</code> <code>NEXT_PUBLIC_SITE_URL</code> <code>SESSION_SECRET</code> <code>APPROVAL_PASSWORD</code> <code>NEWSLETTER_RUNTIME_DB_ROLE</code></td></tr>
+  <tr><td>Core</td><td><code>APP_ENV</code> <code>DATABASE_URL</code> <code>NEXT_PUBLIC_SITE_URL</code> <code>SESSION_SECRET</code> <code>APPROVAL_PASSWORD</code> <code>NEWSLETTER_RUNTIME_DB_ROLE</code> <code>APPROVAL_LEAD_PICK</code> (optional; <code>off</code> keeps the scored lead)</td></tr>
   <tr><td>Production DB scripts (local only)</td><td><code>PRODUCTION_DATABASE_URL</code> <code>NEON_PROJECT_ID</code></td></tr>
   <tr><td>Pipeline</td><td><code>OPENAI_API_KEY</code> <code>GMAIL_OAUTH_CLIENT_ID</code> <code>GMAIL_OAUTH_CLIENT_SECRET</code> <code>GMAIL_OAUTH_REFRESH_TOKEN</code> <code>PUBLISH_SEED_RECIPIENTS</code> <code>TELEGRAM_REVIEW_BOT_TOKEN</code> (production only) <code>TELEGRAM_REVIEW_CHAT_ID</code> (optional) <code>TELEGRAM_OPS_CHAT_ID</code> <code>HEALTHCHECKS_PING_URL</code> (both production only)</td></tr>
   <tr><td>Native drafting</td><td><code>VERTEX_API_KEY</code> <code>S3_ACCESS_KEY_ID</code> <code>S3_SECRET_ACCESS_KEY</code> <code>S3_REGION</code> <code>S3_BUCKET</code> (featured image; the S3 prefix comes from <code>APP_ENV</code>) <code>GHL_PRIVATE_INTEGRATION_TOKEN</code> <code>GHL_LOCATION_ID</code> <code>GHL_USER_ID</code> (production only, GHL templates) <code>JINA_API_KEY</code> <code>GITHUB_TOKEN</code> (both optional, article reader)</td></tr>

@@ -100,6 +100,8 @@ type ApprovalBoardProps = {
   candidateMap: Record<string, CandidateMapEntry>;
   /** The lead the board pre-sets (#58); the owner can change it. Null or absent: no lead is pre-set. */
   proposedLeadId?: number | null;
+  /** The AI lead pick's one-line reason for the proposed lead. Null while the board shows the scored lead. */
+  proposedLeadReason?: string | null;
   dedupFailureReason: string | null;
   publishStatus: {
     target_date: string;
@@ -228,6 +230,7 @@ export default function ApprovalBoard({
   candidateSections,
   candidateMap,
   proposedLeadId = null,
+  proposedLeadReason = null,
   dedupFailureReason,
   publishStatus,
   drafting = null,
@@ -989,8 +992,9 @@ export default function ApprovalBoard({
                                     Headline story must stay selected and included.
                                   </p>
                                 ) : isHeadline && story.id === proposedLeadId ? (
-                                  <p className="mt-0.5 truncate text-[11px] font-medium text-[var(--accent-primary)]">
-                                    Proposed lead. Use &ldquo;Set as headline&rdquo; on another story to change it.
+                                  <p className="mt-0.5 text-[11px] font-medium text-[var(--accent-primary)]">
+                                    {proposedLeadReason ? `Proposed lead: ${proposedLeadReason} ` : "Proposed lead. "}
+                                    Use &ldquo;Set as headline&rdquo; on another story to change it.
                                   </p>
                                 ) : null}
                                 {!isExpanded && story.summary ? (

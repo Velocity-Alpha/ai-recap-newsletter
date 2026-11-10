@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { leadScore, proposeLeadStory, storySources } from "@/src/features/newsletter/lead-story";
+import {
+  applyLeadPick,
+  leadScore,
+  leadShortlist,
+  moveLeadToTopStories,
+  proposeLeadStory,
+  storySources,
+} from "@/src/features/newsletter/lead-story";
 
 type Story = {
   id: number;
@@ -109,5 +116,89 @@ describe("proposeLeadStory", () => {
 
   it("proposes nothing when no story is eligible", () => {
     expect(proposeLeadStory(sections({ headlines: [], research: [story(2, 5)] }))).toBeNull();
+  });
+});
+
+// A built board: Top Stories 1-3 (+ fill-in 4), Research 10-11 (+ fill-in 12), Tools 20 (no fill-in).
+function builtBoard() {
+  const option = (id: number) => ({ id, headline: `Story ${id}`, summary: `Summary ${id}` });
+  const entries: Story[] = [
+    story(1, 4),
+    story(2, 5),
+    story(3, 3),
+    story(4, 5),
+    story(10, 5),
+    story(11, 4, { sources: ["tldr", "rundown_ai", "alphasignal"] }),
+    story(12, 3),
+    story(20, 4, { headline: "Mistral Releases Mistral Large 4 Weights" }),
+  ];
+  return {
+    candidate_sections: [
+      { key: "headlines", label: "Top Stories", max: 3, selected: [1, 2, 3].map(option), fill_ins: [option(4)] },
+      { key: "research", label: "Research", max: 4, selected: [10, 11].map(option), fill_ins: [option(12)] },
+      { key: "tools", label: "Tools", max: 3, selected: [option(20)], fill_ins: [] },
+    ],
+    candidate_map: Object.fromEntries(
+      entries.map((entry) => [String(entry.id), { ...entry, summary: `Summary ${entry.id}` }])
+    ),
+    selected_story_ids: [1, 2, 3, 10, 11, 20],
+    proposed_lead_id: 11 as number | null,
+    proposed_lead_reason: null as string | null,
+  };
+}
+
+describe("moveLeadToTopStories", () => {
+  it("puts the lead first in Top Stories, promotes a fill-in where it left, and demotes the last Top Story", () => {
+    const board = builtBoard();
+    const moved = moveLeadToTopStories(board.candidate_sections, { id: 11, sectionKey: "research" });
+
+    expect(moved[0].selected.map((s) => s.id)).toEqual([11, 1, 2]);
+    expect(moved[0].fill_ins.map((s) => s.id)).toEqual([3, 4]);
+    expect(moved[1].selected.map((s) => s.id)).toEqual([10, 12]);
+    expect(moved[1].fill_ins).toEqual([]);
+    // The input is left as it was (the board keeps it in React state).
+    expect(board.candidate_sections[0].selected.map((s) => s.id)).toEqual([1, 2, 3]);
+  });
+
+  it("leaves a Top Story lead where it is", () => {
+    const board = builtBoard();
+    expect(moveLeadToTopStories(board.candidate_sections, { id: 2, sectionKey: "headlines" })).toEqual(
+      board.candidate_sections
+    );
+  });
+});
+
+describe("leadShortlist", () => {
+  it("lists the selected stories that can lead, best score first", () => {
+    const shortlist = leadShortlist(builtBoard(), 3);
+
+    // 10 is single-source research and 4 is a fill-in, so neither can lead.
+    expect(shortlist.map((entry) => entry.id)).toEqual([11, 20, 2]);
+    expect(shortlist[0]).toEqual({
+      id: 11,
+      headline: "Story 11",
+      summary: "Summary 11",
+      section: "research",
+      sources: 3,
+      score: 6,
+    });
+  });
+});
+
+describe("applyLeadPick", () => {
+  it("makes the picked story the proposed lead, with its reason, at the top of Top Stories", () => {
+    const board = builtBoard();
+    const picked = applyLeadPick(board, { leadId: 20, reason: "Open weights from a frontier lab." });
+
+    expect(picked.proposed_lead_id).toBe(20);
+    expect(picked.proposed_lead_reason).toBe("Open weights from a frontier lab.");
+    expect(picked.candidate_sections[0].selected.map((s) => s.id)).toEqual([20, 1, 2]);
+    expect([...picked.selected_story_ids].sort((a, b) => a - b)).toEqual([1, 2, 10, 11, 20]);
+  });
+
+  it("ignores a pick that is not on the shortlist", () => {
+    const board = builtBoard();
+    expect(applyLeadPick(board, { leadId: 4, reason: "A fill-in" })).toBe(board);
+    expect(applyLeadPick(board, { leadId: 999, reason: "Made up" })).toBe(board);
   });
 });

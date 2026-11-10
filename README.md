@@ -145,6 +145,7 @@ Read routes:
 - `GET /api/ticker`
 - `GET /api/approval/outline?date=` for the password-protected approval board outline
 - `GET /api/approval/outline/marker?date=` the highest story id in the board's candidate window; the board reads it to spot stories newer than its cached copy (approval session)
+- `GET /api/approval/outline/lead?response_id=` polls the AI lead pick that the dedup status check started; returns the picked lead and its reason (approval session)
 - `GET /api/newsletters/outline?date=` for the authenticated newsletter outline API
 - `GET /api/approval/issues/[id]/publish` previews what "Mark as published" would publish (approval session)
 - `GET /api/approval/skipped-dates?date=` says whether a date is a skipped date (approval session)
@@ -221,6 +222,7 @@ Required environment variables:
 - `GHL_SUBSCRIBE_WEBHOOK_URL` when the provider is `ghl`
 - `GHL_UNSUBSCRIBE_WEBHOOK_SECRET`
 - `APPROVAL_PASSWORD` — the approval board password. With it or `SESSION_SECRET` unset, `/approval` stays locked in every environment
+- `APPROVAL_LEAD_PICK` (optional) — `off` skips the AI lead pick, so the board keeps the scored lead
 - `N8N_WEBHOOK_JWT_SECRET`
 - `OPENROUTER_API_KEY`
 - `FOR_BRANDS_WEBHOOK_URL` if you want to override the default for-brands destination

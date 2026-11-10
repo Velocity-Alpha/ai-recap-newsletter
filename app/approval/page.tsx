@@ -22,6 +22,8 @@ import {
   toggleReuseDraftDate,
 } from "@/features/newsletter/reuse-drafts-param";
 import type { DraftingSummary } from "@/features/newsletter/draft-links";
+import { awaitLeadPick } from "@/features/newsletter/lead-pick-client";
+import { applyLeadPick } from "@/features/newsletter/lead-story";
 
 function parseDateKey(value: string | null): string {
   return approvalDateKey(value);
@@ -290,6 +292,7 @@ function ApprovalPageForDate({ dateKey, reuseKey }: { dateKey: string; reuseKey:
             .catch(() => null)) as {
             status: "processing" | "completed" | "error";
             outline?: ApprovalOutlineData;
+            lead_response_id?: string | null;
             error?: string;
           } | null;
 
@@ -331,12 +334,16 @@ function ApprovalPageForDate({ dateKey, reuseKey }: { dateKey: string; reuseKey:
             });
             setIsDedupPending(false);
             // The deduplicated board only holds stories from the first build, so keep that build's marker.
-            writeApprovalOutlineCache(cacheId, {
+            const dedupedOutline = {
               ...statusPayload.outline,
               candidate_marker: fallbackOutline.candidate_marker,
-            });
+            };
+            writeApprovalOutlineCache(cacheId, dedupedOutline);
             setOutlineData(normalizeApprovalOutlineData(statusPayload.outline));
             setDedupFailureReason(null);
+            if (statusPayload.lead_response_id) {
+              applyLeadPickWhenReady(statusPayload.lead_response_id, dedupedOutline);
+            }
             return;
           }
 
@@ -381,6 +388,18 @@ function ApprovalPageForDate({ dateKey, reuseKey }: { dateKey: string; reuseKey:
       poll();
     }
 
+    // The board opens with the scored lead. The AI's pick replaces it only if the owner has not edited the board.
+    function applyLeadPickWhenReady(leadResponseId: string, outline: ApprovalOutlineData) {
+      void awaitLeadPick(leadResponseId, { isActive: () => active }).then((pick) => {
+        if (!pick || !active || isApprovalOutlineCacheEdited(cacheId)) return;
+        const picked = applyLeadPick(outline, pick);
+        if (picked === outline) return;
+        console.log("[approval:lead] AI lead pick applied", { dateKey, leadId: pick.leadId });
+        writeApprovalOutlineCache(cacheId, picked);
+        setOutlineData(normalizeApprovalOutlineData(picked));
+      });
+    }
+
     return () => {
       active = false;
       clearTimeout(timeoutId);
@@ -409,6 +428,7 @@ function ApprovalPageForDate({ dateKey, reuseKey }: { dateKey: string; reuseKey:
       candidateSections={outlineData.candidate_sections}
       candidateMap={outlineData.candidate_map}
       proposedLeadId={outlineData.proposed_lead_id ?? null}
+      proposedLeadReason={outlineData.proposed_lead_reason ?? null}
       publishStatus={publishStatus}
       dedupFailureReason={dedupFailureReason}
       drafting={drafting}

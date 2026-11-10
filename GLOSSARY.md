@@ -33,8 +33,9 @@ The story the issue's subject line is based on.
 _Avoid_: headline (that is a section and a story field), top story
 
 **Proposed lead**:
-The lead story the board pre-sets for a date, from its importance, how many sources covered it, and the
-owner's editorial rubric. The owner can change it before committing.
+The lead story the board pre-sets for a date. The lead score (importance, how many sources covered it, and the
+owner's editorial rubric) shortlists candidates and pre-sets the best one; the AI lead pick then chooses from
+the shortlist and replaces it unless the owner has edited the board. The owner can change it before committing.
 _Avoid_: default headline
 
 **Coverage**:

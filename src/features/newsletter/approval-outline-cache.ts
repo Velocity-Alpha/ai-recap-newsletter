@@ -45,6 +45,8 @@ export type ApprovalOutlineData = {
   selected_story_ids: number[];
   // The lead the board pre-sets (#58). Missing on boards cached before it.
   proposed_lead_id?: number | null;
+  // Why the AI lead pick chose that lead. Null while the board shows the scored lead.
+  proposed_lead_reason?: string | null;
   // Optional: boards cached before this field existed do not have it.
   unsent_drafts?: UnsentDraftNotice[];
   // Highest candidate story id the server saw when it built the board. Missing on older cached boards.
