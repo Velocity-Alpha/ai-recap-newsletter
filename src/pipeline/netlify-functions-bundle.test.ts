@@ -1,5 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
+
+import { build } from "esbuild";
 import { describe, expect, it } from "vitest";
 
 import { CHECK_SCHEDULE } from "@/src/pipeline/checks/schedule";
@@ -50,4 +52,26 @@ describe("Netlify function bundle", () => {
       expect(patterns.some((pattern) => pattern.test(name)), name).toBe(true);
     }
   });
+  // Netlify functions do not ship the `next` package, so any import of next/* in their code makes the function fail
+  // to load (ingest-stories-background, 2026-11-10).
+  it("never imports next/* from any function", async () => {
+    const dir = path.join(root, "netlify/functions");
+    for (const file of readdirSync(dir).filter((name) => /\.m?[jt]s$/.test(name))) {
+      const result = await build({
+        entryPoints: [path.join(dir, file)],
+        bundle: true,
+        write: false,
+        metafile: true,
+        platform: "node",
+        format: "esm",
+        packages: "external",
+        logLevel: "silent",
+        tsconfig: path.join(root, "tsconfig.json"),
+      });
+      const offenders = Object.entries(result.metafile.inputs).flatMap(([input, { imports }]) =>
+        imports.filter((entry) => entry.external && /^next(\/|$)/.test(entry.path)).map((entry) => `${input} -> ${entry.path}`),
+      );
+      expect(offenders, file).toEqual([]);
+    }
+  }, 60_000);
 });
