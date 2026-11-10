@@ -13,7 +13,7 @@ on its own. One source can fail without stopping the others. For each source it 
 
 1. Reads the bookmark (`IngestStore.readBookmark`). The cutoff is the later of the bookmark and 72 hours ago.
 2. Collects text newer than the cutoff.
-3. Calls the extractor (`Extractor` in `extract.ts`), once per email or feed snapshot.
+3. Calls the extractor (`Extractor` in `extract.ts`), once per email, feed snapshot or beehiiv post.
 4. Turns the stories into rows (`toRows`): cleans the URL (`cleanStoryUrl`), builds the `guid`
    (`storyGuid`), drops stories with no usable link, and checks each URL for a paywall (`checkPaywall`).
 5. Saves the rows (`IngestStore.upsertStories`) and moves the bookmark (`writeBookmark`).
@@ -59,6 +59,31 @@ Use this when the source is a web page or feed, like Product Hunt or Hugging Fac
 3. In `ingestFeedSource` in `ingest.ts`, add the new kind to the URL choice and to the builder choice.
    Feed stories take the run's date (`fixedDay`), because feed items rarely carry a reliable date.
 
+## Add a beehiiv site source
+
+Use this when the source is a beehiiv publication with a public website, like In the World of AI. Pick it
+over email when the mailbox is not subscribed, or when the email is only a digest. Do not add a publication
+both ways. Its stories would be saved twice.
+
+1. Add a `BeehiivSiteSource` to `STORY_SOURCES`:
+
+   ```ts
+   { key: "my_source", name: "My Source", kind: "beehiiv_site", siteUrl: "https://news.example.org", expectedOn: [] }
+   ```
+
+2. Nothing else is needed. `ingestBeehiivSiteSource` in `ingest.ts` does the rest.
+
+What it reads (`beehiiv-site.ts`):
+- `{siteUrl}/sitemap.xml`. Posts are the URLs under `/p/`. A post is read when its `lastmod` day is on or
+  after the cutoff day. At most 10 posts are read per run.
+- Each post page. The `Article` ld+json block gives `datePublished` and `isAccessibleForFree`. Paid posts
+  are skipped. The body is the element with id `content-blocks`.
+
+How dates work: the issue date is the New York date of `datePublished`. The bookmark moves to
+`datePublished`. Each story gets its date from the extractor, with the issue date as the fallback.
+
+Why this design: [ADR 0003](../adr/0003-beehiiv-site-source.md).
+
 ## Test it
 
 Write the test first. The tests use Vitest and fakes, not the network.
@@ -68,7 +93,8 @@ Write the test first. The tests use Vitest and fakes, not the network.
    source through `deps.sources` and a fake `extract` function. Check the saved rows, the `SourceResult`
    status, and that the bookmark moves only after success.
 2. For a feed, add parser tests in `src/pipeline/ingest/feeds.test.ts` with a small synthetic sample.
-   For tracking links, add a case in `redirects.test.ts`.
+   For tracking links, add a case in `redirects.test.ts`. For beehiiv page parsing, see
+   `beehiiv-site.test.ts`.
 3. Use synthetic text. Do not paste real newsletter content into the repo.
 4. Run `npx vitest run src/pipeline/ingest`, then `APP_ENV=development npm run verify`.
 
