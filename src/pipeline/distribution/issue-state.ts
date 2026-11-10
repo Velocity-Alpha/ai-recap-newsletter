@@ -38,6 +38,20 @@ export function issueState(facts: IssueStateFacts): IssueState {
   };
 }
 
+/**
+ * What the 18:00 check says about staging: the newest staged version's number, and whether the draft changed
+ * after it. A newer draft that still runs or that failed is also a different draft.
+ */
+export function stagedFacts(facts: IssueStateFacts): { stagedVersion: number | null; changedSinceStaged: boolean } {
+  const staged = facts.newestStaged;
+  if (!staged) return { stagedVersion: null, changedSinceStaged: false };
+  const state = issueState(facts);
+  return {
+    stagedVersion: staged.version,
+    changedSinceStaged: state.kind === "staged" ? state.changedSinceStaged : state.kind !== "published",
+  };
+}
+
 const TEXT: Record<Exclude<IssueState["kind"], "staged">, string> = {
   no_outline: "No outline",
   drafting: "Drafting",

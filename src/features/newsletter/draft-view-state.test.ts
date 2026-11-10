@@ -32,9 +32,9 @@ const REFUSED = new DraftRequestError("The issue for 2026-05-21 (id 3) is alread
 
 const STAGED_REPLY: StageReply = {
   kind: "staged",
-  staged: { version: 3, serviceName: "GHL", serviceUrl: "https://preview.example.test/v3", mode: "sent", stagedAt: "2026-05-21T14:20:00.000Z" },
+  staged: { version: 3, serviceName: "Pretend Mail", serviceUrl: "https://preview.example.test/v3", mode: "sent", stagedAt: "2026-05-21T14:20:00.000Z" },
 };
-const V3: StagedSummary = { version: 3, stagedAt: "2026-05-21T14:20:00.000Z", serviceName: "GHL", serviceUrl: "https://preview.example.test/v3" };
+const V3: StagedSummary = { version: 3, stagedAt: "2026-05-21T14:20:00.000Z", serviceName: "Pretend Mail", serviceUrl: "https://preview.example.test/v3" };
 
 /** Runs a control's events through its reducer, as `useReducer` does, and counts the reloads. */
 function harness<State, Event>(reducer: (state: State, event: Event) => State, initial: State) {

@@ -8,7 +8,7 @@ import type {
 
 /**
  * The issue email, ported from n8n's "Build Clean HTML Email" (docs/n8n-backend/20-drafting-and-images.md
- * §1.7.2). Same markup and whitespace, so GHL and publish detection see what they always have. Changes:
+ * §1.7.2). Same markup and whitespace, so the distribution service and publish detection see what they always have. Changes:
  * - the issue wrapper also carries `data-draft-id`, and a staged email carries `data-version-id` too, so publish
  *   detection knows which staged version was sent (the draft's own HTML, the preview in the app, has no version id);
  * - the footer year comes from the issue date (n8n hardcoded 2026);

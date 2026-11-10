@@ -79,6 +79,9 @@ owner    Reviews the draft on /approval/drafts: live steps, Retry, the email pre
          "Stage for sending" -> POST /api/approval/drafts/[id]/stage -> staged_versions row v&lt;n&gt;
          -> new GHL template "&lt;date&gt; v&lt;n&gt;: &lt;title&gt;" with data-version-id -> "Staged, v&lt;n&gt;" + "Open in GHL"
          a draft that has not changed since the newest staged version needs a second yes
+         the board and the draft page show the state of the date: No outline, Drafting, Draft failed,
+         Draft ready, "Staged, v&lt;n&gt;" (plus "The draft changed after v&lt;n&gt; was staged."), or Published;
+         the draft page lists the staged versions (latest, sent); the owner never sees a draft row number
 
 10:05  run-checks: an ingest run happened, story count vs 8-week median, per source
          -> incidents in alerts -> the review bot posts them to the "AI Recap Ops" chat
@@ -189,7 +192,8 @@ src/pipeline/                runner-neutral job logic
                              ingest-store, schedule, start-ingest, run-ingest
   publish/                   gmail-client, sent-email-parser, publish-decision, publish-store, content-diff,
                              site-refresh, manual-publish, publish-schedule, detect-publish, run-detect-publish
-  checks/                    schedule, day-facts (the only DB reads), checks (pure), site, summary, heartbeat,
+  checks/                    schedule, day-facts (its DB reads; staged facts through distribution/issue-state-store),
+                             checks (pure), site, summary, heartbeat,
                              skipped-dates, run-checks
   draft/                     outline, outline-store, native-commit, start-draft, run-draft, produce-draft, writer,
                              validate, email-html, ghl-template, new-image, draft-edit (title), draft-store,
@@ -197,7 +201,9 @@ src/pipeline/                runner-neutral job logic
                              articles/ (article reader), image/ (scene prompt, Vertex, S3)
   notify/                    ops alerts: raiseIncident / resolveIncident, Telegram ops channel, message text
   distribution/              service (the distribution service: GHL today), ghl, stage-draft ("Stage for sending"),
-                             staged-version (pure rules), staged-version-store
+                             staged-version (pure rules), staged-version-store,
+                             issue-state (pure: the state of a date, for the board and the 18:00 check),
+                             issue-state-store (reads its facts)
   side-effects/              the guard for the distribution service, S3 and the review group
   review-group.ts            Telegram messages to the review group, from the ingest job and the draft job
   settings.ts, runs.ts, alerts.ts

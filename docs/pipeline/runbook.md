@@ -101,9 +101,14 @@ Nine keys. The date in each key is the issue date in New York time.
 - **Raised by:** `run-checks`, from 18:00 (PR #129).
 - **Severity:** warning.
 - **Meaning:** The draft is ready, but the issue's `status` is still `draft`. The issue has not gone out, or
-  publish detection has not noticed it.
-- **Do (fix):** A ready draft has no email in GHL until it is staged. If nothing is staged, open
-  `/approval/drafts` and press "Stage for sending" first. Then send the email from GHL. Publish detection
+  publish detection has not noticed it. The alert has one of three texts:
+  - `The draft for <date> is ready but not staged.` Nothing is staged.
+  - `v<n> for <date> is staged but not published.` A staged version waits in GHL.
+  - The same, plus `The draft changed after v<n> was staged.` The title, the image, or the draft is newer
+    than the staged version.
+- **Do (fix):** A ready draft has no email in GHL until it is staged. If nothing is staged, or the draft
+  changed and you want the change, open `/approval/drafts` and press "Stage for sending". Then send the
+  newest staged version from GHL. Publish detection
   marks the issue published when the sent email reaches Gmail. If you did send it and this stays open, read
   the latest `detect-publish` run. If you will not send today, press "No issue today".
 

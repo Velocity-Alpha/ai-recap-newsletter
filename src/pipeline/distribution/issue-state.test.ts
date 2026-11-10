@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { issueState, issueStateText, stagedChangeNote, type IssueStateFacts } from "@/src/pipeline/distribution/issue-state";
+import { issueState, issueStateText, stagedChangeNote, stagedFacts, type IssueStateFacts } from "@/src/pipeline/distribution/issue-state";
 
 const DRAFT = { id: 41, status: "ready", title: "Pretend Lab Plans A Week", featuredImageUrl: "https://assets.example.test/a.jpg" } as const;
 const STAGED = { version: 2, draftId: 41, title: DRAFT.title, featuredImageUrl: DRAFT.featuredImageUrl } as const;
@@ -70,5 +70,36 @@ describe("issueState", () => {
 
   it("gives no change note for a state that is not staged", () => {
     expect(stagedChangeNote(issueState(facts()))).toBeNull();
+  });
+});
+
+describe("stagedFacts", () => {
+  it("gives no version when nothing is staged", () => {
+    expect(stagedFacts(facts())).toEqual({ stagedVersion: null, changedSinceStaged: false });
+  });
+
+  it("gives the newest staged version, not changed, for the draft that was staged", () => {
+    expect(stagedFacts(facts({ newestStaged: { ...STAGED } }))).toEqual({ stagedVersion: 2, changedSinceStaged: false });
+  });
+
+  it("says changed when the title or image is different", () => {
+    expect(stagedFacts(facts({ newestDraft: { ...DRAFT, title: "Pretend Lab Plans A Month" }, newestStaged: { ...STAGED } }))).toEqual({
+      stagedVersion: 2,
+      changedSinceStaged: true,
+    });
+  });
+
+  it.each(["running", "failed"])("says changed when a newer draft is %s", (status) => {
+    expect(stagedFacts(facts({ newestDraft: { ...DRAFT, id: 42, status }, newestStaged: { ...STAGED } }))).toEqual({
+      stagedVersion: 2,
+      changedSinceStaged: true,
+    });
+  });
+
+  it("says not changed once the issue is published", () => {
+    expect(stagedFacts(facts({ published: true, newestDraft: { ...DRAFT, id: 42 }, newestStaged: { ...STAGED } }))).toEqual({
+      stagedVersion: 2,
+      changedSinceStaged: false,
+    });
   });
 });

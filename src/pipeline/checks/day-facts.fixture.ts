@@ -37,6 +37,8 @@ export function normalDay(overrides: Partial<DayFacts> = {}): DayFacts {
       status: "published",
       publishedAt: new Date("2026-11-10T17:31:00Z"),
     },
+    stagedVersion: 1,
+    changedSinceStaged: false,
     warnings: [],
     ...overrides,
     storiesBySource,
@@ -107,7 +109,7 @@ export function committedNoDraft(overrides: Partial<DayFacts> = {}): DayFacts {
   return normalDay({ draftsMade: 1, draftReady: false, issue: null, ...overrides });
 }
 
-/** A ready draft that is not published yet. */
+/** A ready draft that is not published yet. Its v1 is staged, unless the overrides say otherwise. */
 export function draftNotPublished(overrides: Partial<DayFacts> = {}): DayFacts {
   return normalDay({
     issue: { id: "270", slug: "synthetic-model-ships", title: "Synthetic Model Ships & Agents Learn", status: "draft", publishedAt: null },

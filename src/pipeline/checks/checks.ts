@@ -2,6 +2,8 @@ import type { AlertSeverity } from "@/src/pipeline/alerts";
 import { ISSUE_PUBLISHED } from "@/src/features/newsletter/issue-status";
 import type { DayFacts } from "@/src/pipeline/checks/day-facts";
 import { CHECK_TIMES, newYorkClock, WEEKDAY_NAMES, type CheckTime } from "@/src/pipeline/checks/schedule";
+import { stagedChangeText } from "@/src/pipeline/distribution/issue-state";
+import { currentDistributionServiceName } from "@/src/pipeline/distribution/service";
 import { STAGE_INCIDENT_PREFIX } from "@/src/pipeline/distribution/staged-version";
 import { STORY_SOURCES } from "@/src/pipeline/ingest/sources";
 
@@ -221,8 +223,20 @@ function draftCheck(facts: DayFacts, context: CheckContext): Finding {
   };
 }
 
+/** The 18:00 reminder's two texts: nothing staged, staged, or staged and then changed (#149). */
+function publishPendingTexts(facts: DayFacts): { what: string; fix: string } {
+  const service = currentDistributionServiceName();
+  const version = facts.stagedVersion;
+  if (version === null) {
+    return { what: `The draft for ${facts.date} is ready but not staged.`, fix: `Stage it for sending, then send it from ${service}.` };
+  }
+  const changed = facts.changedSinceStaged ? ` ${stagedChangeText(version)}` : "";
+  return { what: `v${version} for ${facts.date} is staged but not published.${changed}`, fix: `Send it from ${service}, or mark it published.` };
+}
+
 function publishCheck(facts: DayFacts, context: CheckContext): Finding {
   const issue = facts.issue;
+  const texts = publishPendingTexts(facts);
   return {
     check: "publish",
     incidentKey: keyFor("publish", facts.date),
@@ -230,8 +244,8 @@ function publishCheck(facts: DayFacts, context: CheckContext): Finding {
       facts.draftReady && issue && issue.status !== ISSUE_PUBLISHED
         ? {
             severity: "warning",
-            what: `The draft for ${facts.date} is ready but not published.`,
-            evidence: `Issue ${issue.id} ("${issue.title}") is still a draft at 18:00. Send it from GHL, or mark it published.`,
+            what: texts.what,
+            evidence: `Issue ${issue.id} ("${issue.title}") is not published at 18:00. ${texts.fix}`,
             link: `${context.siteUrl}/approval/issues`,
           }
         : null,

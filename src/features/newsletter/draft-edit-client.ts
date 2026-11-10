@@ -34,7 +34,7 @@ export async function requestTitleChange(draftId: number, title: string, fetcher
 /** A staged version, as the stage route returns it. */
 export interface StagedReply {
   version: number;
-  /** The distribution service's name for the owner, e.g. "GHL". */
+  /** The distribution service's name for the owner. */
   serviceName: string;
   serviceUrl: string | null;
   /** `recorded` outside production: nothing reached the service. */

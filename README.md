@@ -95,7 +95,7 @@ Read routes:
 - `GET /api/newsletters/outline?date=` for the authenticated newsletter outline API
 - `GET /api/approval/issues/[id]/publish` previews what "Mark as published" would publish (approval session)
 - `GET /api/approval/skipped-dates?date=` says whether a date is a skipped date (approval session)
-- `GET /api/approval/drafts?date=` lists a date's drafts for the board (approval session)
+- `GET /api/approval/drafts?date=` a date's state (`no_outline`, `drafting`, `draft_failed`, `draft_ready`, `staged`, `published`), its current draft, and its staged versions, for the board and the draft page (approval session)
 - `GET /api/approval/drafts/[id]` one draft's status, polled by `/approval/drafts` while it runs (approval session)
 - `GET /api/approval/drafts/[id]/html` the draft's email HTML for the sandboxed preview frame (approval session)
 

@@ -58,7 +58,7 @@ describe("parseSentEmail", () => {
     expect(result?.problems).toEqual([]);
   });
 
-  it("reads the same content from the received copy, ignoring tracking links and GHL additions", () => {
+  it("reads the same content from the received copy, ignoring tracking links and distribution service additions", () => {
     const result = parseSentEmail(renderIssueEmail(PLACEHOLDER_ISSUE, { received: true }));
 
     expect(result?.content).toEqual(EXPECTED_CONTENT);
