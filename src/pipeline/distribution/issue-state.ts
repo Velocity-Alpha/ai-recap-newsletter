@@ -1,7 +1,7 @@
 import { draftChangedSinceStaged } from "@/src/pipeline/distribution/staged-version";
 
 /**
- * The state of a date's issue (#149, ADR 0004): one pure function of plain facts. No database and no clock.
+ * The state of a date's issue (#149, ADR 0005): one pure function of plain facts. No database and no clock.
  * The board and the 18:00 check both use it. Safe for client components.
  */
 
