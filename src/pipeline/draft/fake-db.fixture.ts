@@ -116,6 +116,11 @@ function table(
       for (const row of rows) update(row, data);
       return { count: rows.length };
     },
+    deleteMany: async ({ where }: { where?: Where } = {}) => {
+      const rows = state.rows.filter((row) => matches(row, where));
+      state.rows = state.rows.filter((row) => !rows.includes(row));
+      return { count: rows.length };
+    },
   };
 }
 
@@ -126,6 +131,7 @@ export function createFakeDb() {
     outlines: { rows: [], updates: [] } as FakeTable,
     stories: { rows: [], updates: [] } as FakeTable,
     publishEvents: { rows: [], updates: [] } as FakeTable,
+    stagedVersions: { rows: [], updates: [] } as FakeTable,
     settings: { rows: [], updates: [] } as FakeTable,
     locks: [] as unknown[][],
     /** Makes the next issue update fail with this error (then clears). */
@@ -167,11 +173,17 @@ export function createFakeDb() {
         startedAt: null,
         finishedAt: null,
         sourceDraftId: null,
+        editedAt: null,
       }),
+    }),
+    stagedVersion: table(state.stagedVersions, {
+      nextId: id,
+      unique: ["issueId", "version"],
+      defaults: () => ({ featuredImageUrl: null, scenePrompt: null, serviceRef: null, serviceUrl: null, createdAt: now(), stagedAt: null }),
     }),
     approvalOutline: table(state.outlines, { nextId: id, defaults: () => ({ committedAt: now() }) }),
     story: table(state.stories, { nextId: id, defaults: () => ({}) }),
-    publishEvent: table(state.publishEvents, { nextId: id, defaults: () => ({ draftId: null }) }),
+    publishEvent: table(state.publishEvents, { nextId: id, defaults: () => ({ draftId: null, stagedVersionId: null }) }),
     pipelineSetting: table(state.settings, { nextId: id, defaults: () => ({}) }),
     $executeRaw: async (strings: TemplateStringsArray, ...values: unknown[]) => {
       state.locks.push([strings.join("?"), ...values]);
@@ -184,10 +196,12 @@ export function createFakeDb() {
         outlines: state.outlines.rows,
         stories: state.stories.rows,
         publishEvents: state.publishEvents.rows,
+        stagedVersions: state.stagedVersions.rows,
       });
       try {
         return await run(client);
       } catch (error) {
+        state.stagedVersions.rows = snapshot.stagedVersions;
         state.issues.rows = snapshot.issues;
         state.drafts.rows = snapshot.drafts;
         state.outlines.rows = snapshot.outlines;
@@ -202,7 +216,7 @@ export function createFakeDb() {
     state,
     client,
     reset() {
-      for (const key of ["issues", "drafts", "outlines", "stories", "publishEvents", "settings"] as const) {
+      for (const key of ["issues", "drafts", "outlines", "stories", "publishEvents", "stagedVersions", "settings"] as const) {
         state[key].rows = [];
         state[key].updates = [];
       }

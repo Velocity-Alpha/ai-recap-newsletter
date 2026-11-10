@@ -148,12 +148,14 @@ describe("runChecks at 10:05", () => {
     );
   });
 
-  it("closes check incidents of earlier dates with one combined message, and leaves other incidents alone", async () => {
+  it("closes check incidents and failed stagings of earlier dates with one combined message, and leaves other incidents alone", async () => {
     notify.listOpenIncidents.mockResolvedValue([
       told("publish-pending:2026-11-09", "warning", "The draft for 2026-11-09 is ready but not published."),
       told("draft-missing:2026-11-06", "critical", "Committed, but no draft is ready for 2026-11-06."),
       untold("source-empty:tldr:2026-11-09"),
+      untold("stage.failed:2026-11-09"),
       told("ingest-failed:2026-11-09"),
+      told("draft.failed:2026-11-09"),
       told("stories-thin:2026-11-10"),
     ]);
     const { options: opts } = options(AT_1005, normalDay());
@@ -164,6 +166,7 @@ describe("runChecks at 10:05", () => {
       "publish-pending:2026-11-09",
       "draft-missing:2026-11-06",
       "source-empty:tldr:2026-11-09",
+      "stage.failed:2026-11-09",
     ]);
     expect(alerts.resolveAlert).toHaveBeenCalledWith("publish-pending:2026-11-09", AT_1005);
     // No "resolved" message per incident: one message, listing only the incidents the owner was told about.
@@ -171,13 +174,13 @@ describe("runChecks at 10:05", () => {
     expect(notify.postToOpsChat).toHaveBeenCalledTimes(1);
     expect(notify.postToOpsChat.mock.calls[0][0]).toBe(
       [
-        "RESOLVED: closed 2 incidents from earlier days. Their day is over, so their checks no longer run.",
+        "RESOLVED: closed 2 incidents from earlier days. Their day is over.",
         "- WARNING publish-pending:2026-11-09: The draft for 2026-11-09 is ready but not published.",
         "- CRITICAL draft-missing:2026-11-06: Committed, but no draft is ready for 2026-11-06.",
       ].join("\n"),
     );
     expect(runs.finished[0].stats).toMatchObject({
-      closed: ["publish-pending:2026-11-09", "draft-missing:2026-11-06", "source-empty:tldr:2026-11-09"],
+      closed: ["publish-pending:2026-11-09", "draft-missing:2026-11-06", "source-empty:tldr:2026-11-09", "stage.failed:2026-11-09"],
     });
   });
 

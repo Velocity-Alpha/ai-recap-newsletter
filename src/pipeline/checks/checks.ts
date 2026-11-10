@@ -2,6 +2,7 @@ import type { AlertSeverity } from "@/src/pipeline/alerts";
 import { ISSUE_PUBLISHED } from "@/src/features/newsletter/issue-status";
 import type { DayFacts } from "@/src/pipeline/checks/day-facts";
 import { CHECK_TIMES, newYorkClock, WEEKDAY_NAMES, type CheckTime } from "@/src/pipeline/checks/schedule";
+import { STAGE_INCIDENT_PREFIX } from "@/src/pipeline/distribution/staged-version";
 import { STORY_SOURCES } from "@/src/pipeline/ingest/sources";
 
 /**
@@ -63,12 +64,18 @@ function keyFor(check: CheckName, date: string, source?: string): string {
   return [CHECK_INCIDENT_PREFIXES[check], ...(source ? [source] : []), date].join(":");
 }
 
-/** The date of a check incident key, or null for any other key. */
-export function checkIncidentDate(incidentKey: string): string | null {
+/**
+ * Incidents that end with their day: every check incident, and `stage.failed`, which nothing can resolve once
+ * the issue is published (staging is then refused). `draft.failed` is not one: it stays open until a draft works.
+ */
+const DAY_INCIDENT_PREFIXES: readonly string[] = [...Object.values(CHECK_INCIDENT_PREFIXES), STAGE_INCIDENT_PREFIX];
+
+/** The date of an incident key that ends with its day, or null for any other key. */
+export function dayIncidentDate(incidentKey: string): string | null {
   const parts = incidentKey.split(":");
   const date = parts.at(-1) ?? "";
   if (parts.length < 2 || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
-  return (Object.values(CHECK_INCIDENT_PREFIXES) as string[]).includes(parts[0]) ? date : null;
+  return DAY_INCIDENT_PREFIXES.includes(parts[0]) ? date : null;
 }
 
 export function median(values: number[]): number | null {

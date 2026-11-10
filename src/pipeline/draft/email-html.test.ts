@@ -46,6 +46,17 @@ describe("renderIssueEmailHtml", () => {
     );
   });
 
+  it("has no version id in the draft's own HTML", () => {
+    expect(renderIssueEmailHtml(SAMPLE_CONTENT, SAMPLE_ISSUE, SAMPLE_DRAFT)).not.toContain("data-version-id");
+  });
+
+  it("adds only the staged version's id to a staged email", () => {
+    const html = renderIssueEmailHtml(SAMPLE_CONTENT, SAMPLE_ISSUE, { ...SAMPLE_DRAFT, versionId: 93 });
+
+    expect(html.replace('      data-version-id="93"\n', "")).toBe(renderIssueEmailHtml(SAMPLE_CONTENT, SAMPLE_ISSUE, SAMPLE_DRAFT));
+    expect(parseSentEmail(asReceivedCopy(html))).toMatchObject({ versionId: 93, draftId: 41, problems: [] });
+  });
+
   it("escapes text and leaves out the image when there is none", () => {
     const content = structuredClone(SAMPLE_CONTENT);
     content.headlines[0].headline = "Tags <b>stay</b> text";

@@ -22,6 +22,7 @@ function parsed(problems: string[] = []): SentEmailParseResult {
     storyIds: [1],
     problems,
     draftId: null,
+    versionId: null,
   };
 }
 

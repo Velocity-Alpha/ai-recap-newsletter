@@ -1,5 +1,6 @@
 import type { Prisma, PrismaClient } from "@/src/generated/prisma";
 import { ISSUE_DRAFT } from "@/src/features/newsletter/issue-status";
+import { sentVersionIssueFields } from "@/src/pipeline/distribution/staged-version-store";
 import { sentDraftIssueFields } from "@/src/pipeline/draft/draft-store";
 import type { PublishEventInput, PublishStore } from "@/src/pipeline/publish/detect-publish";
 import type { PublishMode } from "@/src/pipeline/publish/publish-decision";
@@ -30,9 +31,11 @@ function eventData(event: PublishEventInput): Prisma.PublishEventCreateManyInput
     storyIds: event.storyIds,
     contentJson: (event.contentJson ?? undefined) as Prisma.InputJsonValue | undefined,
     problems: event.problems,
-    // Only a native email carries a draft id. An n8n email leaves the column out of the insert, so publishing
-    // keeps working on a database that does not have the issue_drafts migration yet.
+    // Only a native email carries a draft id, and only an email staged since #149 names a staged version. The
+    // insert names each column only when it has a value. This is not a way to run without the migrations:
+    // `publish` reads `staged_versions` for every email that names a draft.
     ...(event.draftId === null ? {} : { draftId: BigInt(event.draftId) }),
+    ...(event.versionId === null ? {} : { stagedVersionId: BigInt(event.versionId) }),
   };
 }
 
@@ -71,14 +74,20 @@ export function createPrismaPublishStore(client: PrismaClient = prisma): PrismaP
 
     async publish({ issueId, content, storyIds, publishedAt, event }) {
       return client.$transaction(async (tx) => {
-        // A native email names its draft. The issue takes that draft, which may be older than the newest one.
-        const sentDraft = event.draftId === null ? null : await sentDraftIssueFields(tx, issueId, event.draftId);
+        // The email names the staged version it was made from. The issue takes that version's copies, which may
+        // be older than the newest draft.
+        const sentVersion =
+          event.versionId === null && event.draftId === null ? null : await sentVersionIssueFields(tx, issueId, event);
+        // Until the draft job stops making its own email (#149, step 2), a draft can have an email and no staged
+        // version. Such an email names no version, and the issue then takes that draft.
+        const sentDraft =
+          sentVersion || event.versionId !== null || event.draftId === null ? null : await sentDraftIssueFields(tx, issueId, event.draftId);
         // Only an unpublished issue changes, so a second copy or a later resend never moves published_at.
         const updated = await tx.issue.updateMany({
           where: { id: BigInt(issueId), status: ISSUE_DRAFT },
           data: {
             publishedAt,
-            ...(sentDraft ?? {
+            ...(sentVersion?.fields ?? sentDraft ?? {
               contentJson: content as unknown as Prisma.InputJsonValue,
               ...(content.title ? { title: content.title } : {}),
             }),
@@ -91,7 +100,9 @@ export function createPrismaPublishStore(client: PrismaClient = prisma): PrismaP
             data: { usedInPublicationDate: utcDay(publishedAt) },
           });
         }
-        await tx.publishEvent.createMany({ data: [eventData({ ...event, outcome })], skipDuplicates: true });
+        // The event keeps the staged version that was found, not an id the email only claims.
+        const versionId = sentVersion?.stagedVersionId ?? null;
+        await tx.publishEvent.createMany({ data: [eventData({ ...event, versionId, outcome })], skipDuplicates: true });
         return outcome;
       });
     },

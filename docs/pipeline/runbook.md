@@ -38,7 +38,7 @@ Each entry says which job raises it and which PR added it.
 
 ## Incidents
 
-Eight keys. The date in each key is the issue date in New York time.
+Nine keys. The date in each key is the issue date in New York time.
 
 ### `ingest-run-missing:<date>`
 
@@ -140,6 +140,24 @@ Eight keys. The date in each key is the issue date in New York time.
 
   The incident closes when a draft is ready. `run-checks` does not close this key at the end of the day,
   so it stays open until a draft succeeds.
+
+### `stage.failed:<date>`
+
+- **Raised by:** "Stage for sending" (`POST /api/approval/drafts/[id]/stage`), in
+  `src/pipeline/distribution/stage-draft.ts` (#149).
+- **Severity:** warning.
+- **Meaning:** One of two things. The call that creates the email in the distribution service (GHL) failed or
+  took over 30 seconds. Or GHL created the email, but the app could not save the staged version; the error
+  then names the GHL template. In both cases no staged version was saved, the draft is not changed, and the
+  page showed the same error.
+- **Do (check, fix, retry):** Read the error in the alert, or in the `stage-draft` run in `/admin/runs`. Fix
+  the cause if it is outside the code, for example a GHL token. Before you stage again, look in GHL for an
+  email named `<date> v<n>: <title>` with the failed version number. A failed attempt can leave one there,
+  also when the error does not say so (a timeout). Delete it by hand, so the next staging does not make a
+  second email with the same name.
+
+  The incident closes at the next staging for the date that works. If none does, `run-checks` closes it at
+  its first run on a later day.
 
 ## A source error in an ingest run
 

@@ -64,6 +64,19 @@ One generated version of an issue's email, with its own GHL template. Each commi
 change, makes a new draft. The latest draft is the current one.
 _Avoid_: template (GHL's copy of a draft), version, preview
 
+**Stage for sending**:
+The owner's click that copies the current draft into the distribution service.
+_Avoid_: push, export, publish. "Stage" alone is a pipeline step (see Operations).
+
+**Staged version**:
+One exact combination of body, title, and image that was staged for sending. Numbered v1, v2, ... for each
+issue. It never changes after it is made.
+_Avoid_: template, draft version
+
+**Distribution service**:
+The outside service that sends the issue email. GHL today.
+_Avoid_: email provider, ESP
+
 **Featured image**:
 The illustration at the top of an issue.
 _Avoid_: hero image, cover

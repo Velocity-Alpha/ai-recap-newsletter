@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  checkIncidentDate,
+  dayIncidentDate,
   evaluateChecks,
   needsSiteCheck,
   type CheckOutcome,
@@ -238,11 +238,19 @@ describe("18:00 draft and publish checks", () => {
   });
 });
 
-describe("checkIncidentDate", () => {
+describe("dayIncidentDate", () => {
+  it("reads the date of a failed staging, which nothing can resolve after its day", () => {
+    expect(dayIncidentDate("stage.failed:2026-11-09")).toBe("2026-11-09");
+  });
+
+  it("ignores a failed draft, which stays open until a draft works", () => {
+    expect(dayIncidentDate("draft.failed:2026-11-09")).toBeNull();
+  });
+
   it("reads the date of a check incident key, and ignores other keys", () => {
-    expect(checkIncidentDate("source-empty:tldr:2026-11-10")).toBe("2026-11-10");
-    expect(checkIncidentDate("stories-thin:2026-11-09")).toBe("2026-11-09");
-    expect(checkIncidentDate("ingest-failed:2026-11-09")).toBeNull();
-    expect(checkIncidentDate("stories-thin")).toBeNull();
+    expect(dayIncidentDate("source-empty:tldr:2026-11-10")).toBe("2026-11-10");
+    expect(dayIncidentDate("stories-thin:2026-11-09")).toBe("2026-11-09");
+    expect(dayIncidentDate("ingest-failed:2026-11-09")).toBeNull();
+    expect(dayIncidentDate("stories-thin")).toBeNull();
   });
 });

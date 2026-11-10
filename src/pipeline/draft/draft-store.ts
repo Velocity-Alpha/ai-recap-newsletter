@@ -65,7 +65,7 @@ function day(date: string): Date {
   return new Date(`${date}T00:00:00.000Z`);
 }
 
-function dateKey(value: Date | null): string | null {
+export function dateKey(value: Date | null): string | null {
   return value ? value.toISOString().slice(0, 10) : null;
 }
 
@@ -88,12 +88,12 @@ export function isStuckDraft(draft: { status: string; startedAt: Date | null; qu
  * Serialises everything that picks or writes the issue for a date: creating a draft, and copying a ready draft to
  * the issue. The unique index on `issues.issue_date` (#82) backs it up.
  */
-async function lockIssueDate(tx: Client, date: string): Promise<void> {
+export async function lockIssueDate(tx: Client, date: string): Promise<void> {
   await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`issue-date:${date}`}))`;
 }
 
 /** The date's issue, if it is published. */
-async function publishedIssueFor(client: Client, date: string): Promise<{ id: bigint } | null> {
+export async function publishedIssueFor(client: Client, date: string): Promise<{ id: bigint } | null> {
   return client.issue.findFirst({ where: { issueDate: day(date), status: ISSUE_PUBLISHED }, select: { id: true } });
 }
 

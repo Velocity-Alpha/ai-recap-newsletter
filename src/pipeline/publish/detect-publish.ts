@@ -23,6 +23,8 @@ export interface PublishEventInput {
   problems: string[];
   /** The native draft the email was made from (`data-draft-id`); null for n8n's emails. */
   draftId: number | null;
+  /** The staged version the email was made from (`data-version-id`); null for emails staged before #149. */
+  versionId: number | null;
 }
 
 export interface StoredIssue {
@@ -103,6 +105,7 @@ export async function detectPublish(
         contentJson: parsed?.content ?? null,
         problems: parsed?.problems ?? [],
         draftId: parsed?.draftId ?? null,
+        versionId: parsed?.versionId ?? null,
       };
 
       const result: DetectPublishResult = { gmailMessageId, issueId: event.issueId, outcome };
