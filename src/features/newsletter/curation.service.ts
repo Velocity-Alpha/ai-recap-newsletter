@@ -1,8 +1,9 @@
 import { prisma } from "@/src/server/prisma";
-import { logServerInfo } from "@/src/server/observability";
+import { logServerError, logServerInfo } from "@/src/server/observability";
 import { CANDIDATE_SECTION_CONFIGS, type SectionKey } from "@/src/features/newsletter/section-config";
 import { storyUrlKey } from "@/src/features/newsletter/story-url";
 import { findUnsentDrafts } from "@/src/features/newsletter/unsent-drafts";
+import { proposeLeadStory, storySources } from "@/src/features/newsletter/lead-story";
 
 export interface StoryRecord {
   id: number;
@@ -13,6 +14,11 @@ export interface StoryRecord {
   story_details: string | null;
   category: string | null;
   source: string | null;
+  /**
+   * Every newsletter that covered the story (#58): its stored mentions, plus the sources of same-URL copies
+   * the board dropped. Unset when none were loaded; `storySources` then falls back to `source`.
+   */
+  sources?: string[];
   url: string | null;
   importance_score: number | null;
   paywall_detected?: "yes" | "no" | "unknown" | "error";
@@ -54,6 +60,11 @@ export interface ApprovalOutlineData {
     StoryRecord & { keyword_score: number; combined_score: number }
   >;
   selected_story_ids: number[];
+  /**
+   * The selected story the board pre-sets as the lead (#58, lead-story.ts), or null when none is eligible.
+   * Absent on boards cached before #58.
+   */
+  proposed_lead_id?: number | null;
   /** Earlier drafts that were never sent, and whether their stories are back in this board's pool. */
   unsent_drafts: UnsentDraftNotice[];
   /**
@@ -455,7 +466,30 @@ async function getCandidateStories(date: Date): Promise<StoryRecord[]> {
     rowCount: candidateStoryRecords.length,
   });
 
-  return candidateStoryRecords;
+  const mentions = await getStoryMentions(candidateStoryRecords.map((story) => story.id));
+  return candidateStoryRecords.map((story) => ({
+    ...story,
+    sources: storySources({ source: story.source, sources: mentions.get(story.id) }),
+  }));
+}
+
+/**
+ * The newsletters ingestion recorded for each story (`story_sources`, #58). Coverage only shapes the proposed
+ * lead, so a failed read (for example before the table's migration) logs and leaves each row's own source.
+ */
+async function getStoryMentions(storyIds: number[]): Promise<Map<number, string[]>> {
+  const mentions = new Map<number, string[]>();
+  if (storyIds.length === 0) return mentions;
+  try {
+    const rows = await prisma.storySource.findMany({
+      where: { storyId: { in: storyIds } },
+      select: { storyId: true, source: true },
+    });
+    for (const row of rows) mentions.set(row.storyId, [...(mentions.get(row.storyId) ?? []), row.source]);
+  } catch (error) {
+    logServerError("approval.outline.fetch.sources.failed", error, { storyCount: storyIds.length });
+  }
+  return mentions;
 }
 
 /**
@@ -627,6 +661,31 @@ function createSectionBlueprints(
 }
 
 /**
+ * Puts a lead proposed from another section at the top of Top Stories, as the owner does by hand (#58). The
+ * section it leaves promotes its first fill-in, and the last Top Story becomes the first Top Story fill-in.
+ */
+function moveLeadToTopStories(
+  sections: CandidateSection[],
+  lead: { id: number; sectionKey: string } | null
+): CandidateSection[] {
+  const topStories = sections.find((section) => section.key === "headlines");
+  const from = sections.find((section) => section.key === lead?.sectionKey);
+  if (!lead || !topStories || !from || from === topStories) return sections;
+  const story = from.selected.find((option) => option.id === lead.id);
+  if (!story) return sections;
+
+  from.selected = from.selected.filter((option) => option.id !== lead.id);
+  const promoted = from.fill_ins.shift();
+  if (promoted) from.selected.push(promoted);
+
+  topStories.selected = [story, ...topStories.selected];
+  if (topStories.selected.length > topStories.max) {
+    topStories.fill_ins = [...topStories.selected.splice(topStories.max), ...topStories.fill_ins];
+  }
+  return sections;
+}
+
+/**
  * Builds the approval board from stories that are already ranked.
  *
  * Slots are filled in rank order from whatever is passed in. Pass only the
@@ -648,18 +707,24 @@ export function buildApprovalOutline(
   });
 
   // Create section blueprints
-  const candidate_sections = createSectionBlueprints(
-    grouped.research,
-    grouped.tools,
-    grouped.general
+  const storyById = new Map<number, ProcessedStory>(
+    rankedStories.map((story) => [story.id, story])
   );
+  const proposedLead = proposeLeadStory(
+    createSectionBlueprints(grouped.research, grouped.tools, grouped.general).map((section) => ({
+      key: section.key,
+      selected: section.selected.flatMap((option) => storyById.get(option.id) ?? []),
+    }))
+  );
+  const candidate_sections = moveLeadToTopStories(
+    createSectionBlueprints(grouped.research, grouped.tools, grouped.general),
+    proposedLead
+  );
+  const proposed_lead_id = proposedLead?.id ?? null;
 
   // Build candidate map and selected IDs
   const candidate_map: Record<string, ProcessedStory> = {};
   const selected_story_ids = new Set<number>();
-  const storyById = new Map<number, ProcessedStory>(
-    rankedStories.map((story) => [story.id, story])
-  );
 
   for (const section of candidate_sections) {
     for (const story of section.selected) {
@@ -681,6 +746,7 @@ export function buildApprovalOutline(
   logServerInfo("approval.outline.final", {
     sectionCount: candidate_sections.length,
     selectedStoryCount: selected_story_ids.size,
+    proposedLeadId: proposed_lead_id,
   });
 
   return {
@@ -688,6 +754,7 @@ export function buildApprovalOutline(
     candidate_sections,
     candidate_map,
     selected_story_ids: Array.from(selected_story_ids),
+    proposed_lead_id,
     unsent_drafts: unsentDrafts,
     candidate_marker: candidateMarker,
   };
@@ -740,7 +807,7 @@ function removeUrlDuplicates(
   rankedCandidates: ProcessedStory[],
   publishedUrlKeys: ReadonlySet<string>
 ): { kept: ProcessedStory[]; sameUrlCount: number; publishedUrlCount: number } {
-  const seen = new Set<string>();
+  const keptByKey = new Map<string, ProcessedStory>();
   const kept: ProcessedStory[] = [];
   let sameUrlCount = 0;
   let publishedUrlCount = 0;
@@ -751,12 +818,19 @@ function removeUrlDuplicates(
       publishedUrlCount += 1;
       continue;
     }
-    if (key && seen.has(key)) {
+    const original = key ? keptByKey.get(key) : undefined;
+    if (original) {
+      // The copy's newsletter still covered the story: credit it to the one the board keeps.
+      original.sources = storySources({
+        source: original.source,
+        sources: [...(original.sources ?? []), ...storySources(story)],
+      });
       sameUrlCount += 1;
       continue;
     }
-    if (key) seen.add(key);
-    kept.push(story);
+    const copy = { ...story };
+    if (key) keptByKey.set(key, copy);
+    kept.push(copy);
   }
 
   return { kept, sameUrlCount, publishedUrlCount };

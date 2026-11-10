@@ -30,13 +30,15 @@ function toRankedStories(pool: ArchivedBoard["ranked_pool"]): ProcessedStory[] {
     id: entry.id,
     guid: null,
     day: null,
-    headline: `Story ${entry.id}`,
+    headline: entry.headline,
     summary: "",
     story_details: "",
     category: entry.category,
-    source: null,
+    source: entry.sources[0] ?? null,
+    sources: entry.sources,
     url: null,
-    importance_score: 0,
+    paywall_detected: entry.paywall as ProcessedStory["paywall_detected"],
+    importance_score: entry.importance,
     keyword_score: 0,
     combined_score: pool.length - index,
   }));
@@ -105,5 +107,36 @@ describe("approval board replay of the archived commits (doc 80)", () => {
     expect(median(rows.map((row) => row.after))).toBeGreaterThanOrEqual(
       median(rows.map((row) => row.approved))
     );
+  });
+
+  it("proposes the reviewer's lead more often than the old default #1 Top Story did", () => {
+    const rows = archive.boards.map((board) => {
+      const outline = boardWithRefill(board);
+      // The old default lead: the first Top Story, i.e. the top-ranked kept story of the general pool.
+      const removed = new Set(board.removed_ids);
+      const firstGeneral = board.ranked_pool.find(
+        (entry) => !removed.has(entry.id) && normalizeCategory(entry.category) === "general"
+      );
+      return {
+        date: board.date,
+        chosen: board.lead_id,
+        oldDefault: firstGeneral?.id ?? null,
+        proposed: outline.proposed_lead_id,
+        selected: outline.selected_story_ids,
+      };
+    });
+    const oldHits = rows.filter((row) => row.oldDefault === row.chosen).length;
+    const proposedHits = rows.filter((row) => row.proposed === row.chosen).length;
+    console.info(
+      `Lead replay: proposed = chosen in ${proposedHits} of ${rows.length} commits` +
+        ` (old default #1 Top Story: ${oldHits} of ${rows.length}).\n` +
+        rows.map((row) => `  ${row.date} chosen ${row.chosen}, proposed ${row.proposed}`).join("\n")
+    );
+
+    // Doc 80: the default #1 Top Story became the lead in 2 of 10 commits.
+    expect(oldHits).toBe(2);
+    expect(proposedHits).toBeGreaterThan(oldHits);
+    // The proposal is always pre-selected, so the board's commit check accepts it as is.
+    for (const row of rows) expect(row.selected, row.date).toContain(row.proposed);
   });
 });

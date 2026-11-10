@@ -23,6 +23,7 @@ describe.skipIf(!enabled)("ingest store on a real database", () => {
   const store = createPrismaIngestStore();
 
   afterAll(async () => {
+    await prisma.storySource.deleteMany({ where: { source: { startsWith: tag } } });
     await prisma.story.deleteMany({ where: { guid: { startsWith: tag } } });
     await prisma.scraperBookmark.deleteMany({ where: { source: tag } });
   });
@@ -54,6 +55,16 @@ describe.skipIf(!enabled)("ingest store on a real database", () => {
       excludeFromCandidates: true,
       note: "kept",
     });
+  });
+
+  it("records each newsletter that sent the same story once (#58)", async () => {
+    await store.upsertStories([row]);
+    await store.upsertStories([{ ...row, source: `${tag}-second` }]);
+    await store.upsertStories([{ ...row, source: `${tag}-second` }]);
+    const saved = await prisma.story.findUniqueOrThrow({ where: { guid: row.guid } });
+
+    const sources = await prisma.storySource.findMany({ where: { storyId: saved.id }, orderBy: { source: "asc" } });
+    expect(sources.map((mention) => mention.source)).toEqual([tag, `${tag}-second`]);
   });
 
   it("reads and writes bookmarks", async () => {

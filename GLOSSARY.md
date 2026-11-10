@@ -32,6 +32,15 @@ Top Stories or Research & Analysis. Each story in a feature section gets a longe
 The story the issue's subject line is based on.
 _Avoid_: headline (that is a section and a story field), top story
 
+**Proposed lead**:
+The lead story the board pre-sets for a date, from its importance, how many sources covered it, and the
+owner's editorial rubric. The owner can change it before committing.
+_Avoid_: default headline
+
+**Coverage**:
+The number of different sources that sent the same story.
+_Avoid_: mentions, overlap
+
 **Outline**:
 The owner's chosen stories for one date: sections, lead story, and any note or link edits.
 _Avoid_: selection, payload

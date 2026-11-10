@@ -3,6 +3,7 @@
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { hasBoardEdits } from "@/components/approval/board-edits";
+import { storySources } from "@/src/features/newsletter/lead-story";
 import {
   ChevronDown,
   ChevronLeft,
@@ -59,6 +60,8 @@ type CandidateMapEntry = {
   story_details: string | null;
   category: string | null;
   source: string | null;
+  /** Every newsletter that covered the story (#58). */
+  sources?: string[];
   url: string | null;
   importance_score: number | null;
   paywall_detected?: "yes" | "no" | "unknown" | "error";
@@ -95,6 +98,8 @@ type ApprovalBoardProps = {
   referenceStories: ReferenceStory[];
   candidateSections: CandidateSection[];
   candidateMap: Record<string, CandidateMapEntry>;
+  /** The lead the board pre-sets (#58); the owner can change it. Null or absent: no lead is pre-set. */
+  proposedLeadId?: number | null;
   dedupFailureReason: string | null;
   publishStatus: {
     target_date: string;
@@ -222,6 +227,7 @@ export default function ApprovalBoard({
   referenceStories,
   candidateSections,
   candidateMap,
+  proposedLeadId = null,
   dedupFailureReason,
   publishStatus,
   drafting = null,
@@ -237,7 +243,7 @@ export default function ApprovalBoard({
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [previewStoryId, setPreviewStoryId] = useState<number | null>(null);
   const [sections, setSections] = useState<SectionState[]>(() => initSections(candidateSections));
-  const [headlineStoryId, setHeadlineStoryId] = useState<number | null>(null);
+  const [headlineStoryId, setHeadlineStoryId] = useState<number | null>(proposedLeadId);
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
   const [excludeState, setExcludeState] = useState<Record<number, ExcludeState>>({});
   const [urlOverrides, setUrlOverrides] = useState<Record<number, string>>({});
@@ -248,12 +254,14 @@ export default function ApprovalBoard({
 
   useEffect(() => {
     setSections(initSections(candidateSections));
-  }, [candidateSections]);
+    setHeadlineStoryId(proposedLeadId);
+  }, [candidateSections, proposedLeadId]);
 
   const edited = hasBoardEdits({
     candidateSections,
     sections,
     headlineStoryId,
+    proposedLeadId,
     excludeState,
     urlOverrides,
     notesOverrides,
@@ -910,6 +918,7 @@ export default function ApprovalBoard({
                         const isExcluded = excl?.excluded ?? false;
                         const isHeadline = headlineStoryId === story.id;
                         const hasHeadlineValidationError = isHeadline && (isExcluded || status === "fill-in");
+                        const sourceCount = full ? storySources(full).length : 0;
 
                         return (
                           <div
@@ -947,7 +956,10 @@ export default function ApprovalBoard({
 
                               {/* Headline star */}
                               {isHeadline && (
-                                <Star className="h-3.5 w-3.5 shrink-0 fill-[var(--accent-primary)] text-[var(--accent-primary)]" />
+                                <Star
+                                  className="h-3.5 w-3.5 shrink-0 fill-[var(--accent-primary)] text-[var(--accent-primary)]"
+                                  aria-label={story.id === proposedLeadId ? "Proposed lead story" : "Lead story"}
+                                />
                               )}
 
                               {/* Text */}
@@ -962,11 +974,23 @@ export default function ApprovalBoard({
                                     : "text-[var(--text-primary)]"
                                 }`}>
                                   {renderPaywallIcon(candidateMap[String(story.id)]?.paywall_detected, candidateMap[String(story.id)]?.error)}
-                                  {story.headline}
+                                  <span className="truncate">{story.headline}</span>
+                                  {sourceCount > 1 ? (
+                                    <span
+                                      title={`Covered by ${storySources(full!).join(", ")}`}
+                                      className="shrink-0 rounded-full border border-[rgba(107,155,184,0.24)] bg-[rgba(232,242,248,0.8)] px-1.5 text-[10px] font-medium text-[var(--watercolor-ink)]"
+                                    >
+                                      {sourceCount} sources
+                                    </span>
+                                  ) : null}
                                 </p>
                                 {hasHeadlineValidationError ? (
                                   <p className="mt-1 truncate text-[11px] font-medium text-[var(--accent-warm)]">
                                     Headline story must stay selected and included.
+                                  </p>
+                                ) : isHeadline && story.id === proposedLeadId ? (
+                                  <p className="mt-0.5 truncate text-[11px] font-medium text-[var(--accent-primary)]">
+                                    Proposed lead. Use &ldquo;Set as headline&rdquo; on another story to change it.
                                   </p>
                                 ) : null}
                                 {!isExpanded && story.summary ? (
@@ -1068,8 +1092,7 @@ export default function ApprovalBoard({
                                     {status === "selected" ? "Mark as fill-in" : "Select for issue"}
                                   </button>
 
-                                  {/* Headline picker — only for Top Stories */}
-                                  {section.key === "headlines" && (
+                                  {/* Lead picker: any section, since a story several sources covered can lead from there (#58). */}
                                   <button
                                     onClick={() => setHeadlineStoryId(isHeadline ? null : story.id)}
                                     className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition ${
@@ -1081,7 +1104,6 @@ export default function ApprovalBoard({
                                     <Star className={`h-3 w-3 ${ isHeadline ? "fill-current" : ""}`} />
                                     {isHeadline ? "Headline story" : "Set as headline"}
                                   </button>
-                                  )}
 
                                   {/* Exclude checkbox */}
                                   <label className="flex cursor-pointer items-center gap-2 text-xs text-[var(--text-secondary)] sm:hidden">

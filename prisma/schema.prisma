@@ -301,3 +301,16 @@ model StoryArticle {
   @@map("story_articles")
   @@schema("newsletter")
 }
+
+/// Which newsletters covered a story (#58): one row per story and source key, written by ingestion. stories.source
+/// keeps only the last source to write a row (two sources with the same link on the same day share one row), so
+/// the board reads coverage across sources from here. No foreign key, like the other pipeline tables.
+model StorySource {
+  storyId     Int      @map("story_id")
+  source      String
+  firstSeenAt DateTime @default(now()) @map("first_seen_at") @db.Timestamptz(6)
+
+  @@id([storyId, source])
+  @@map("story_sources")
+  @@schema("newsletter")
+}

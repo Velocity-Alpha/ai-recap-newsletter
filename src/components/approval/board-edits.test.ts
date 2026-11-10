@@ -57,4 +57,10 @@ describe("hasBoardEdits", () => {
     expect(hasBoardEdits({ ...untouched(), urlOverrides: { 1: "https://example.com/a" } })).toBe(true);
     expect(hasBoardEdits({ ...untouched(), notesOverrides: { 1: "Lead with this" } })).toBe(true);
   });
+
+  it("treats the proposed lead as part of the board as built (#58)", () => {
+    expect(hasBoardEdits({ ...untouched(), proposedLeadId: 1, headlineStoryId: 1 })).toBe(false);
+    expect(hasBoardEdits({ ...untouched(), proposedLeadId: 1, headlineStoryId: 2 })).toBe(true);
+    expect(hasBoardEdits({ ...untouched(), proposedLeadId: 1, headlineStoryId: null })).toBe(true);
+  });
 });

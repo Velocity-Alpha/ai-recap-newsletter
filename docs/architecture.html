@@ -68,11 +68,13 @@
          Gmail API, read-only: every new email from each newsletter sender since its bookmark
          (The Rundown, AI Breakfast, The Signal, TLDR, AlphaSignal) + Product Hunt + Hugging Face feeds
          -> follow tracking links, strip tracking params -> gpt-6-luna extraction (strict schema)
-         -> paywall check -> INSERT newsletter.stories -> update scraper_bookmarks
+         -> paywall check -> INSERT newsletter.stories (+ story_sources: which newsletter sent it) -> update scraper_bookmarks
          -> pipeline_runs / pipeline_events rows -> Telegram "board ready" to the review group
 
 ~10:00 Owner opens /approval (defaults to today's New York date; shared password login, rate limited)
          board proposal: src/features/newsletter/curation.service.ts + openai-dedup.ts (gpt-6-luna)
+           + proposed lead story (lead-story.ts, #58): importance + sources that covered it + editorial rubric,
+             pre-set on the board and moved to the top of Top Stories; the owner can change it
          owner edits, then commits -> POST /api/newsletters/commit  ("No issue today" marks a skipped date)
          -> approval_outlines row -> story changes (queued, excluded, edits) in one transaction
          -> new issue_drafts row (version n+1) -> starts draft-issue-background (job token)
@@ -190,6 +192,7 @@ Later: pre-send review in the app before the GHL template (#117)
 <table>
   <tr><th>Table</th><th>Holds</th><th>Written by</th></tr>
   <tr><td><code>stories</code></td><td>Extracted stories per day and source (snake_case columns, but <code>"createdAt"</code> is camelCase)</td><td>native ingest</td></tr>
+  <tr><td><code>story_sources</code></td><td>Which newsletters covered each story, one row per story and source key (#58). <code>stories.source</code> keeps only the last writer, so the board reads coverage here. If the table is missing, ingestion and the board log and fall back to <code>stories.source</code>.</td><td>native ingest</td></tr>
   <tr><td><code>scraper_bookmarks</code></td><td>Last-read time per source (keys such as <code>the_signal</code>; <code>tldr_ai</code> and <code>aloa_ai</code> are unused)</td><td>native ingest</td></tr>
   <tr><td><code>issues</code></td><td>Drafts and published issues: <code>html</code>, <code>content_json</code>, <code>published_at</code> (NULL = draft), <code>slug</code> (generated)</td><td>n8n (insert, until 2026-11-09), native draft (insert, update), native publish (update; a native email's draft is copied over), owner ("Mark as published")</td></tr>
   <tr><td><code>subscribers</code>, <code>auth_codes</code></td><td>Site subscriber records and one-time codes</td><td>app</td></tr>
@@ -204,7 +207,7 @@ Later: pre-send review in the app before the GHL template (#117)
   <tr><td><code>rate_limits</code></td><td>Fixed-window counters for login, sign-up, and New image (Generate, ideas) per-session limits; keys hold a hash, never an address. Rows are deleted a day after their window starts</td><td>app (approval login and New image, subscriber sign-up and sign-in codes)</td></tr>
   <tr><td><code>public.schema_migrations</code></td><td>Legacy migration record</td><td>none</td></tr>
 </table>
-<p>The 2026-11-09 migrations are applied to production: <code>rate_limits</code>, <code>approval_outlines</code>, <code>issue_drafts</code> (with <code>publish_events.draft_id</code>), <code>skipped_dates</code>, <code>story_articles</code>, <code>issue_drafts.source_draft_id</code>, and <code>stories_day_idx</code> on <code>stories(day)</code> (#137). <span class="plan">Planned:</span> After n8n is off (#82): an issue <code>status</code> (draft or published) and a unique issue date. Later: the issue-to-story link and a stable story key (#118), and raw items for ingestion (#111). The runtime DB role is <code>newsletter_web</code> (<code>prisma/bootstrap/001_grant_newsletter_web.sql</code>).</p>
+<p>The 2026-11-09 migrations are applied to production: <code>rate_limits</code>, <code>approval_outlines</code>, <code>issue_drafts</code> (with <code>publish_events.draft_id</code>), <code>skipped_dates</code>, <code>story_articles</code>, <code>issue_drafts.source_draft_id</code>, and <code>stories_day_idx</code> on <code>stories(day)</code> (#137). <span class="plan">Pending:</span> <code>story_sources</code> (#58, migration <code>20261110150000_add_story_sources</code>) is applied to <code>dev</code> only; the owner applies it to production. <span class="plan">Planned:</span> After n8n is off (#82): an issue <code>status</code> (draft or published) and a unique issue date. Later: the issue-to-story link and a stable story key (#118), and raw items for ingestion (#111). The runtime DB role is <code>newsletter_web</code> (<code>prisma/bootstrap/001_grant_newsletter_web.sql</code>).</p>
 
 <h2 id="code">9. Code map</h2>
 <pre>
