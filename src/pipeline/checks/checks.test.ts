@@ -120,7 +120,7 @@ describe("10:05 stories check", () => {
   });
 
   it("raises a critical for a day without stories even without history", () => {
-    const found = failures(run("10:05", missingRun({ ingestRun: normalDay().ingestRun, weekdayTotals: [], sourceWeekdays: {} })));
+    const found = failures(run("10:05", missingRun({ ingestRun: normalDay().ingestRun, weekdayTotals: [] })));
     expect(found["stories-thin:2026-11-10"]).toMatchObject({ severity: "critical", what: "No stories today." });
     expect(found["stories-thin:2026-11-10"].evidence).toContain("no Tuesday history yet");
   });
@@ -135,21 +135,26 @@ describe("10:05 stories check", () => {
     expect(failures(run("10:05", thinDay({ weekdayTotals: [] })))["stories-thin:2026-11-10"]).toBeUndefined();
   });
 
-  it("does not warn about a source that seldom sends on this weekday", () => {
-    // AlphaSignal had stories on only 3 of the last 8 Tuesdays.
-    const found = failures(run("10:05", thinDay({ sourceWeekdays: { ...thinDay().sourceWeekdays, alphasignal: 3 } })));
-    expect(found["source-empty:alphasignal:2026-11-10"]).toBeUndefined();
-    // On half of them or more, it is expected.
-    const usual = failures(run("10:05", thinDay({ sourceWeekdays: { ...thinDay().sourceWeekdays, alphasignal: 4 } })));
-    expect(usual["source-empty:alphasignal:2026-11-10"]).toBeDefined();
+  it("warns only about empty sources that are expected on this weekday", () => {
+    // Tuesday: AI Breakfast (no reliable day) and The Signal (Mondays) are not expected.
+    const found = failures(run("10:05", normalDay({ storiesBySource: { tldr: 5 } })));
+    const warned = Object.keys(found).filter((key) => key.startsWith("source-empty:"));
+    expect(warned.sort()).toEqual(
+      ["alphasignal", "huggingface", "product_hunt_ai", "rundown_ai"].map((key) => `source-empty:${key}:2026-11-10`),
+    );
   });
 
-  it("warns about every empty source without any history", () => {
-    const found = failures(run("10:05", normalDay({ storiesBySource: { tldr: 5 }, weekdayTotals: [], sourceWeekdays: {} })));
-    for (const key of SOURCE_KEYS.filter((key) => key !== "tldr")) {
-      expect(found[`source-empty:${key}:2026-11-10`]).toBeDefined();
-    }
-    expect(found["source-empty:tldr:2026-11-10"]).toBeUndefined();
+  it("does not expect TLDR on a Monday, but does expect The Signal", () => {
+    const found = failures(run("10:05", monday({ storiesBySource: { ...monday().storiesBySource, tldr: 0, the_signal: 0 } })));
+    expect(found["source-empty:tldr:2026-11-09"]).toBeUndefined();
+    expect(found["source-empty:the_signal:2026-11-09"]).toMatchObject({ what: "No stories from The Signal today." });
+  });
+
+  it("names the weekdays a source is expected on in the evidence", () => {
+    const found = failures(run("10:05", thinDay()));
+    expect(found["source-empty:alphasignal:2026-11-10"].evidence).toContain(
+      "AlphaSignal stories usually arrive on Monday, Tuesday, Wednesday, Thursday and Friday.",
+    );
   });
 });
 

@@ -26,8 +26,6 @@ export function normalDay(overrides: Partial<DayFacts> = {}): DayFacts {
     ingestOwner: "native",
     ingestRun: { id: "41", status: "succeeded", startedAt: new Date("2026-11-10T14:55:00Z") },
     weekdayTotals: [78, 85, 80, 90, 76, 82, 88, 79], // median 81
-    // Every source sent on each of the last 8 Tuesdays.
-    sourceWeekdays: Object.fromEntries(Object.keys(NORMAL_SOURCES).map((key) => [key, 8])),
     queuedStories: 23,
     committed: true,
     commitTime: new Date("2026-11-10T16:42:00Z"),

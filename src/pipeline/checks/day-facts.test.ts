@@ -59,7 +59,6 @@ describe("readDayFacts", () => {
       storiesBySource: { tldr: 16, rundown_ai: 14, unknown: 1 },
       storyTotal: 31,
       weekdayTotals: [80, 76],
-      sourceWeekdays: { tldr: 2, rundown_ai: 1 },
       queuedStories: 23,
       committed: true,
       // The first draft row is older than the queued stories' last touch, so it is the better estimate.
@@ -131,7 +130,6 @@ describe("readDayFacts", () => {
       storiesBySource: {},
       storyTotal: 0,
       weekdayTotals: [],
-      sourceWeekdays: {},
       queuedStories: 0,
       committed: false,
       commitTime: null,
