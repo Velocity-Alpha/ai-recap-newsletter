@@ -84,6 +84,15 @@ describe("NewImagePanel", () => {
     expect(render({ error: "Featured image failed at image: Vertex returned HTTP 429: Quota" })).toContain("Vertex returned HTTP 429: Quota");
   });
 
+  it("shows the per-session limit in plain words, for Generate and for ideas", () => {
+    expect(render({ error: "Too many images this hour. Try again in about 12 minutes." })).toContain(
+      "Too many images this hour. Try again in about 12 minutes.",
+    );
+    const ideas = render({ ideas: { status: "error", error: "Too many scene idea requests this hour. Try again in about a minute." } });
+    expect(ideas).toContain("Too many scene idea requests this hour. Try again in about a minute.");
+    expect(ideas).toMatch(/<button[^>]*>Try again<\/button>/);
+  });
+
   it("says when the draft has no image yet", () => {
     expect(render({ currentImageUrl: null })).toContain("This draft has no image.");
   });

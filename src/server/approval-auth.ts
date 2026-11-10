@@ -108,11 +108,15 @@ function parseCookieHeader(cookieHeader: string | null): Map<string, string> {
   return cookies;
 }
 
+/** The approval session cookie's value, unchecked. Each sign-in gets a new one. */
+export function approvalSessionToken(request: Request): string | undefined {
+  return parseCookieHeader(request.headers.get("cookie")).get(APPROVAL_SESSION_COOKIE_NAME);
+}
+
 /** True when the request carries a valid approval session. False when approval login is not configured. */
 export async function hasValidApprovalSession(request: Request, now: Date = new Date()): Promise<boolean> {
   const config = getApprovalAuthConfig();
   if (!config) return false;
 
-  const token = parseCookieHeader(request.headers.get("cookie")).get(APPROVAL_SESSION_COOKIE_NAME);
-  return isValidApprovalSessionToken(token, config, now);
+  return isValidApprovalSessionToken(approvalSessionToken(request), config, now);
 }
