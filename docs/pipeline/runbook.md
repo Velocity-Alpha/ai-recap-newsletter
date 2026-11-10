@@ -4,10 +4,7 @@ What each incident means and what the owner does about it. Read [GLOSSARY.md](..
 words (incident, alert, check, skipped date) and [docs/architecture.html](../architecture.html) for the
 stages.
 
-Each entry says which job raises it and which PR added it. All of those PRs are merged and in production
-since 2026-11-09: #123 (ops alerts), #129 (run checks), #132 (draft job), #133 (native commit), #134
-(article reader). `draft.owner` is `native` in production since 2026-11-09 20:34 UTC, so `draft.failed` can
-appear there now.
+Each entry says which job raises it and which PR added it.
 
 ## How incidents work
 
@@ -32,7 +29,7 @@ appear there now.
 - **Admin pages** (#130, behind the approval login):
   - `/admin/incidents`: open and closed incidents.
   - `/admin/runs` and `/admin/runs/<id>`: each run and its events.
-  - `/admin/settings`: stage owners (such as `ingest.owner` and `draft.owner`) and other settings.
+  - `/admin/settings`: the settings. Leave the stage switches on `native`; `n8n` no longer works.
 - **Netlify function logs**: Netlify dashboard, the site, Logs, Functions. The functions are
   `ingest-stories`, `ingest-stories-background`, `run-checks`, `draft-issue-background`, `detect-publish`
   and `detect-publish-catch-up`. Use them when a run row was never written, for example when the database
@@ -47,7 +44,7 @@ Eight keys. The date in each key is the issue date in New York time.
 
 - **Raised by:** `run-checks`, from 10:05 (PR #129).
 - **Severity:** critical.
-- **Meaning:** `ingest.owner` is `native`, but there is no `ingest-stories` run since 00:00 New York.
+- **Meaning:** There is no `ingest-stories` run since 00:00 New York.
   The 09:55 job did not start.
 - **Do (check, then retry):** Open `/admin/runs` and look for an `ingest-stories` run today. If there is
   none, check the `ingest-stories` function in Netlify: was it deployed, did it run, did it fail to start.
@@ -103,7 +100,7 @@ Eight keys. The date in each key is the issue date in New York time.
 
 - **Raised by:** `run-checks`, from 18:00 (PR #129).
 - **Severity:** warning.
-- **Meaning:** The draft is ready, but the issue has no `published_at`. The issue has not gone out, or
+- **Meaning:** The draft is ready, but the issue's `status` is still `draft`. The issue has not gone out, or
   publish detection has not noticed it.
 - **Do (fix):** Send the email from GHL. Publish detection marks the issue published when the sent email
   reaches Gmail. If you did send it and this stays open, read the latest `detect-publish` run. If you will
@@ -137,7 +134,7 @@ Eight keys. The date in each key is the issue date in New York time.
   3. Press "Retry". The page offers it for a draft that failed, and for a draft stuck in running: one that
      started over 20 minutes ago, or was queued and never started after 5 minutes. A retry runs the same
      draft version again from the start, with a new GHL template; the old template stays in GHL. It is
-     refused when the issue is already published, and when `draft.owner` is `n8n`.
+     refused when the issue is already published.
   4. Or commit again from the board. That makes a new draft version with its own GHL template
      ([ADR 0002](../adr/0002-new-draft-per-commit.md)).
 

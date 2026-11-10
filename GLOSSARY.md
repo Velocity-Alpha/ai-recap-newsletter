@@ -75,7 +75,7 @@ _Avoid_: publish
 
 **Published**:
 The state of an issue once its sent email has reached the seed inbox, or the owner has marked it published.
-The issue then shows on the website.
+The issue then shows on the website. Until then the issue is a draft (`issues.status`).
 _Avoid_: sent, live
 
 **Skipped date**:
@@ -88,11 +88,8 @@ _Avoid_: holiday, day off
 One step of the daily pipeline: ingest, draft, or publish.
 
 **Stage owner**:
-The system that does a stage in production: n8n or native code.
+A leftover setting from the move off n8n that says which system does a stage. Every stage is `native` now.
 _Avoid_: mode, flag
-
-**Shadow**:
-A stage owner value where native code runs and records what it would do, but does not act.
 
 **Seed inbox**:
 The mailbox that receives a copy of every sent issue. Its copy is how the system knows an issue was sent.

@@ -1,12 +1,15 @@
-# AI Recap backend: how the n8n system works today
+# The old n8n backend (historical)
 
-This folder documents the AI Recap backend as it runs in n8n (`https://n8n.velocityalpha.com`) on
-2026-11-03. The goal is to move the backend into a native application, so these docs describe every flow
-in enough detail to rebuild it without opening n8n.
+> **Historical.** Native code in this repo replaced the n8n system in November 2026
+> ([ADR 0003](../adr/0003-n8n-retired-kept-as-record.md)). The n8n workflows are disabled and kept as a record.
+> Nothing here describes the current system: see [../architecture.html](../architecture.html).
 
-All facts come from read-only exports of the 71 workflows on the instance, the last 14 days of execution
-history, the live Neon database (read-only queries), and this repo. No workflow, credential, or row was
-changed. No secret values appear in these docs; credentials are named, never shown.
+This folder records how the AI Recap backend ran in n8n (`https://n8n.velocityalpha.com`) on 2026-11-03, in
+enough detail to look up how any step used to work without opening n8n. The native code was ported from these
+docs, so code comments cite them by section.
+
+All facts came from read-only exports of the 71 workflows on the instance, 14 days of execution history, the
+Neon database (read-only queries), and this repo. No secret values appear; credentials are named, never shown.
 
 ## How to use these docs
 
@@ -19,14 +22,14 @@ changed. No secret values appear in these docs; credentials are named, never sho
 | [40-publishing-email-subscribers.md](./40-publishing-email-subscribers.md) | How an issue reaches subscribers through GHL, how "published" is detected from a seed inbox, subscriber sync, login, article gate |
 | [50-app-and-database.md](./50-app-and-database.md) | Live Neon schema and data, who reads and writes each table, the Next.js site, caching, code structure, schema gaps |
 | [60-ops-errors-secrets.md](./60-ops-errors-secrets.md) | Error handling, failures, schedules, credentials map, hardcoded secrets, retention, instance facts, ops checklist |
-| [70-migration-plan.md](./70-migration-plan.md) | **The agreed piece-by-piece migration plan**: safety rules, environments, phases with cutover and rollback steps, outcome checks, alerts |
+| [70-migration-plan.md](./70-migration-plan.md) | The migration plan, finished 2026-11-10: safety rules, environments, phases with cutover and rollback steps, outcome checks, alerts |
 | [80-approval-and-source-analysis.md](./80-approval-and-source-analysis.md) | Data analysis: what the reviewer edits on the approval board, when each newsletter arrives, and which sources reach published issues |
 | [../research/](../research/) | Research on free job runners and live AI-news search APIs (checked 2026-11-04), and on how drafting reads a story's article (checked 2026-11-09) |
 
 Each doc starts with an "At a glance" section and a diagram. LLM prompts, output schemas, SQL, and key
 Code-node logic are copied verbatim inside the docs.
 
-## The system in one picture
+## The n8n system in one picture (as of 2026-11-03)
 
 ```mermaid
 flowchart TD
