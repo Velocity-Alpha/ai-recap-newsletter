@@ -68,20 +68,111 @@ function canLead(story: LeadCandidate, sectionKey: string): boolean {
   return true;
 }
 
-/** The selected story the board pre-sets as the lead, and the section it sits in, or null when none can lead. */
-export function proposeLeadStory(sections: readonly LeadSection[]): ProposedLead | null {
+/** Every selected story that can lead, best score first; ties keep board order, Top Stories first. */
+function rankLeadCandidates<S extends LeadCandidate>(
+  sections: readonly { key: string; selected: readonly S[] }[]
+): { story: S; sectionKey: string; score: number }[] {
   const ordered = [
     ...sections.filter((section) => section.key === LEAD_SECTION),
     ...sections.filter((section) => section.key !== LEAD_SECTION),
   ];
+  const ranked = ordered.flatMap((section) =>
+    section.selected
+      .filter((story) => canLead(story, section.key))
+      .map((story) => ({ story, sectionKey: section.key, score: leadScore(story) }))
+  );
+  // Array.prototype.sort is stable, so equal scores keep board order.
+  return ranked.sort((a, b) => b.score - a.score);
+}
 
-  let best: (ProposedLead & { score: number }) | null = null;
-  for (const section of ordered) {
-    for (const story of section.selected) {
-      if (!canLead(story, section.key)) continue;
-      const score = leadScore(story);
-      if (best === null || score > best.score) best = { id: story.id, sectionKey: section.key, score };
-    }
+/** The selected story the board pre-sets as the lead, and the section it sits in, or null when none can lead. */
+export function proposeLeadStory(sections: readonly LeadSection[]): ProposedLead | null {
+  const [best] = rankLeadCandidates(sections);
+  return best ? { id: best.story.id, sectionKey: best.sectionKey } : null;
+}
+
+type SectionOption = { id: number; headline: string; summary: string };
+type BoardSection = { key: string; max: number; selected: SectionOption[]; fill_ins: SectionOption[] };
+type BoardEntry = LeadCandidate & { summary: string | null };
+type LeadBoard = {
+  candidate_sections: BoardSection[];
+  candidate_map: Record<string, BoardEntry>;
+  selected_story_ids: number[];
+  proposed_lead_id?: number | null;
+  proposed_lead_reason?: string | null;
+};
+
+/**
+ * Puts a lead from another section at the top of Top Stories, as the owner does by hand. The section it leaves
+ * promotes its first fill-in, and the last Top Story becomes the first Top Story fill-in. Returns new sections.
+ */
+export function moveLeadToTopStories<T extends BoardSection>(sections: T[], lead: ProposedLead | null): T[] {
+  const copy = sections.map((section) => ({ ...section, selected: [...section.selected], fill_ins: [...section.fill_ins] }));
+  const topStories = copy.find((section) => section.key === LEAD_SECTION);
+  const from = copy.find((section) => section.key === lead?.sectionKey);
+  if (!lead || !topStories || !from || from === topStories) return sections;
+  const story = from.selected.find((option) => option.id === lead.id);
+  if (!story) return sections;
+
+  from.selected = from.selected.filter((option) => option.id !== lead.id);
+  const promoted = from.fill_ins.shift();
+  if (promoted) from.selected.push(promoted);
+
+  topStories.selected = [story, ...topStories.selected];
+  if (topStories.selected.length > topStories.max) {
+    topStories.fill_ins = [...topStories.selected.splice(topStories.max), ...topStories.fill_ins];
   }
-  return best ? { id: best.id, sectionKey: best.sectionKey } : null;
+  return copy;
+}
+
+export type LeadShortlistEntry = {
+  id: number;
+  headline: string;
+  summary: string;
+  section: string;
+  sources: number;
+  score: number;
+};
+
+/** The stories the AI lead pick chooses from: the selected stories that can lead, best score first. */
+export function leadShortlist(board: LeadBoard, limit: number): LeadShortlistEntry[] {
+  const sections = board.candidate_sections.map((section) => ({
+    key: section.key,
+    selected: section.selected.flatMap((option) => board.candidate_map[String(option.id)] ?? []),
+  }));
+  return rankLeadCandidates(sections)
+    .slice(0, limit)
+    .map(({ story, sectionKey, score }) => ({
+      id: story.id,
+      headline: story.headline ?? "",
+      summary: story.summary ?? "",
+      section: sectionKey,
+      sources: storySources(story).length,
+      score,
+    }));
+}
+
+/** The number of stories the AI lead pick sees. */
+export const LEAD_SHORTLIST_SIZE = 8;
+
+/**
+ * Applies the AI's lead pick to a built board: the picked story becomes the proposed lead, with the AI's reason,
+ * at the top of Top Stories. A pick that is not on the board's shortlist is ignored (the board is returned as is).
+ */
+export function applyLeadPick<T extends LeadBoard>(board: T, pick: { leadId: number; reason: string }): T {
+  const onShortlist = leadShortlist(board, LEAD_SHORTLIST_SIZE).some((entry) => entry.id === pick.leadId);
+  if (!onShortlist) return board;
+  const sectionKey = board.candidate_sections.find((section) =>
+    section.selected.some((option) => option.id === pick.leadId)
+  )?.key;
+  if (!sectionKey) return board;
+
+  const candidate_sections = moveLeadToTopStories(board.candidate_sections, { id: pick.leadId, sectionKey });
+  return {
+    ...board,
+    candidate_sections,
+    selected_story_ids: candidate_sections.flatMap((section) => section.selected.map((option) => option.id)),
+    proposed_lead_id: pick.leadId,
+    proposed_lead_reason: pick.reason,
+  };
 }
