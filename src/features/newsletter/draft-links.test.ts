@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   draftHtmlSrc,
+  DraftRequestError,
   draftViewHref,
+  isRefusal,
   jsonPost,
   nativeCommitTarget,
   secondCommitNotice,
@@ -52,6 +54,20 @@ describe("secondCommitNotice", () => {
   it("says nothing for the first commit", () => {
     expect(secondCommitNotice({ currentDraft: null })).toBeNull();
     expect(secondCommitNotice(null)).toBeNull();
+  });
+});
+
+describe("DraftRequestError", () => {
+  it("carries the plain message and the HTTP status, and only a 409 is a refusal", () => {
+    const refused = new DraftRequestError("The issue is already published.", 409);
+
+    expect(refused).toBeInstanceOf(Error);
+    expect(refused).toMatchObject({ name: "DraftRequestError", message: "The issue is already published.", status: 409 });
+    expect(isRefusal(refused)).toBe(true);
+    expect(isRefusal(new DraftRequestError("Staging failed.", 502))).toBe(false);
+    expect(isRefusal(new DraftRequestError("Could not reach the server. Try again.", null))).toBe(false);
+    expect(isRefusal(new Error("The issue is already published."))).toBe(false);
+    expect(isRefusal("409")).toBe(false);
   });
 });
 

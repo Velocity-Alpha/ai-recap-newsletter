@@ -83,9 +83,9 @@ describe("POST /api/approval/drafts/[id]/image (Use this image)", () => {
   it.each([
     [400, new NewImageInputError('"https://elsewhere.example.test/a.jpg" is not an image this site uploaded for 2026-05-21.')],
     [404, new DraftEditError("Draft 41 does not exist.", "missing")],
-    [409, new DraftEditError("Draft v1 for 2026-05-21 is failed. Only a ready draft can be changed.", "not_ready")],
+    [409, new DraftEditError("The draft for 2026-05-21 is failed. Only a ready draft can be changed.", "not_ready")],
     [409, new IssuePublishedError(3, "2026-05-21")],
-    [409, new DraftEditError("Draft v1 is not the newest draft for 2026-05-21: v2 is running. Reload the page.", "not_current")],
+    [409, new DraftEditError("This is not the newest draft for 2026-05-21. Reload the page.", "not_current")],
     [500, new NewImageConfigError("S3_BUCKET is not set on this deploy, so the chosen image cannot be checked.")],
     [502, new NewImageServiceError("The chosen image is not in S3 as a JPEG (HTTP 404).")],
   ])("answers %i with the plain reason", async (status, error) => {

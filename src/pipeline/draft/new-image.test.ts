@@ -326,8 +326,8 @@ describe("newImageErrorResponse", () => {
     expect(newImageErrorResponse(new NewImageInputError("Write a scene first."))).toEqual({ status: 400, error: "Write a scene first." });
     expect(newImageErrorResponse(new NewImageConfigError("S3_BUCKET is not set."))).toEqual({ status: 500, error: "S3_BUCKET is not set." });
     expect(newImageErrorResponse(new DraftEditError("Draft 9 does not exist.", "missing"))).toEqual({ status: 404, error: "Draft 9 does not exist." });
-    expect(newImageErrorResponse(new DraftEditError("Draft v1 is running.", "not_ready"))).toEqual({ status: 409, error: "Draft v1 is running." });
-    expect(newImageErrorResponse(new DraftEditError("Draft v1 is not the newest draft.", "not_current"))).toMatchObject({ status: 409 });
+    expect(newImageErrorResponse(new DraftEditError("The draft is running.", "not_ready"))).toEqual({ status: 409, error: "The draft is running." });
+    expect(newImageErrorResponse(new DraftEditError("This is not the newest draft.", "not_current"))).toMatchObject({ status: 409 });
     expect(newImageErrorResponse(new IssuePublishedError(3, DATE))).toMatchObject({ status: 409, error: expect.stringContaining("already published") });
     expect(newImageErrorResponse(new FeaturedImageError("image", new Error("Vertex returned HTTP 429: Quota")))).toEqual({
       status: 502,

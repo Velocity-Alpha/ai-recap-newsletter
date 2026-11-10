@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { IngestResult } from "@/src/pipeline/ingest/ingest";
-import { buildReadyMessage, createTelegramSender, REVIEW_CHAT_ID, sendToReviewGroup } from "@/src/pipeline/ingest/telegram";
+import { buildReadyMessage, createTelegramSender, REVIEW_CHAT_ID, sendToReviewGroup } from "@/src/pipeline/review-group";
 
 function result(overrides: Partial<IngestResult> = {}): IngestResult {
   return {

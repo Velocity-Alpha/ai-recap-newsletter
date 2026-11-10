@@ -102,9 +102,10 @@ Nine keys. The date in each key is the issue date in New York time.
 - **Severity:** warning.
 - **Meaning:** The draft is ready, but the issue's `status` is still `draft`. The issue has not gone out, or
   publish detection has not noticed it.
-- **Do (fix):** Send the email from GHL. Publish detection marks the issue published when the sent email
-  reaches Gmail. If you did send it and this stays open, read the latest `detect-publish` run. If you will
-  not send today, press "No issue today".
+- **Do (fix):** A ready draft has no email in GHL until it is staged. If nothing is staged, open
+  `/approval/drafts` and press "Stage for sending" first. Then send the email from GHL. Publish detection
+  marks the issue published when the sent email reaches Gmail. If you did send it and this stays open, read
+  the latest `detect-publish` run. If you will not send today, press "No issue today".
 
 ### `site-check-failed:<date>`
 

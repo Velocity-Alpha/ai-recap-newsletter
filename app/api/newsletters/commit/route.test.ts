@@ -370,7 +370,7 @@ describe("POST /api/newsletters/commit", () => {
     expect(response.status).toBe(409);
     expect(json).toMatchObject({
       success: false,
-      error: "The issue for 2026-05-21 (id 3) is already published. Drafting stopped.",
+      error: "The issue for 2026-05-21 (id 3) is already published.",
     });
     expect(fetchMock).not.toHaveBeenCalled();
   });

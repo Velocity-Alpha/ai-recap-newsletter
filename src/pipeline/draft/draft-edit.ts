@@ -1,3 +1,4 @@
+import { normalizeTitle } from "@/src/features/newsletter/draft-links";
 import { DraftEditError, editCurrentDraft, IssuePublishedError, type CurrentDraft } from "@/src/pipeline/draft/draft-store";
 
 /**
@@ -20,7 +21,7 @@ export class DraftTitleError extends Error {
 /** One line of plain text: runs of white space (line breaks too) become one space. */
 export function cleanTitle(value: unknown): string {
   if (typeof value !== "string") throw new DraftTitleError("Send the new title.");
-  const title = value.replace(/\s+/g, " ").trim();
+  const title = normalizeTitle(value);
   if (!title) throw new DraftTitleError("The title is empty. Write a title first.");
   if (title.length > MAX_TITLE_CHARS) {
     throw new DraftTitleError(`The title is ${title.length} characters. Keep it to ${MAX_TITLE_CHARS} or fewer.`);

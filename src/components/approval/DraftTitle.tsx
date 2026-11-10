@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useReducer } from "react";
 
-import { requestTitleChange } from "@/src/features/newsletter/draft-edit-client";
+import { initialTitleState, saveTitle, titleIsDirty, titleReducer } from "@/src/features/newsletter/draft-view-state";
 
 /**
  * The current draft's title, in a field the owner can change (#149). "Save" puts it into the same draft: no new
@@ -24,7 +24,7 @@ const SAVE_BUTTON =
   "rounded-full bg-[var(--text-primary)] px-4 py-1.5 text-sm font-medium text-white transition hover:bg-[var(--watercolor-ink)] disabled:cursor-not-allowed disabled:opacity-60";
 
 export function DraftTitleField({ value, saved, busy, error, onChange, onSave, onReset }: DraftTitleFieldProps) {
-  const changed = value.replace(/\s+/g, " ").trim() !== saved;
+  const changed = titleIsDirty({ value, saved });
   const empty = !value.trim();
 
   return (
@@ -71,40 +71,35 @@ export function DraftTitleField({ value, saved, busy, error, onChange, onSave, o
   );
 }
 
-/** The field with its state. `onChanged` runs after a save, so the page reads the draft again. */
-export default function DraftTitle({ draftId, title, onChanged }: { draftId: number; title: string; onChanged?: () => void }) {
-  const [value, setValue] = useState(title);
-  const [saved, setSaved] = useState(title);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+type DraftTitleProps = {
+  draftId: number;
+  title: string;
+  /** Runs after a save, and after a refusal, so the page reads the draft again. */
+  onChanged?: () => void;
+  /** Told whether the field holds a title that is not saved. Staging waits for it (see StageForSending). */
+  onDirtyChange?: (dirty: boolean) => void;
+};
 
-  async function save() {
-    setBusy(true);
-    setError(null);
-    try {
-      const stored = await requestTitleChange(draftId, value);
-      setSaved(stored);
-      setValue(stored);
-      onChanged?.();
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Could not change the title.");
-    } finally {
-      setBusy(false);
-    }
-  }
+/** The field with its state (draft-view-state.ts). */
+export default function DraftTitle({ draftId, title, onChanged, onDirtyChange }: DraftTitleProps) {
+  const [state, dispatch] = useReducer(titleReducer, title, initialTitleState);
+  const dirty = titleIsDirty(state);
+
+  useEffect(() => {
+    onDirtyChange?.(dirty);
+  }, [dirty, onDirtyChange]);
+  // The field goes away when the draft can no longer be changed: nothing is unsaved then.
+  useEffect(() => () => onDirtyChange?.(false), [onDirtyChange]);
 
   return (
     <DraftTitleField
-      value={value}
-      saved={saved}
-      busy={busy}
-      error={error}
-      onChange={setValue}
-      onSave={() => void save()}
-      onReset={() => {
-        setValue(saved);
-        setError(null);
-      }}
+      value={state.value}
+      saved={state.saved}
+      busy={state.busy}
+      error={state.error}
+      onChange={(value) => dispatch({ type: "typed", value })}
+      onSave={() => void saveTitle(draftId, state.value, { dispatch, onChanged })}
+      onReset={() => dispatch({ type: "cancelled" })}
     />
   );
 }

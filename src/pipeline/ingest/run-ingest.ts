@@ -2,7 +2,7 @@ import type { Prisma } from "@/src/generated/prisma";
 import { createOpenAIExtractor } from "@/src/pipeline/ingest/extract";
 import { ingestStories, type IngestResult, type SourceResult } from "@/src/pipeline/ingest/ingest";
 import { createPrismaIngestStore } from "@/src/pipeline/ingest/ingest-store";
-import { buildReadyMessage, sendToReviewGroup, type ReviewGroupStatus } from "@/src/pipeline/ingest/telegram";
+import { buildReadyMessage, sendToReviewGroup, type ReviewGroupStatus } from "@/src/pipeline/review-group";
 import { createGmailReader, readGmailCredentials } from "@/src/pipeline/publish/gmail-client";
 import { finishRun, logEvent, startRun, type EventLevel, type RunTrigger } from "@/src/pipeline/runs";
 import { readSetting } from "@/src/pipeline/settings";

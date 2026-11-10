@@ -4,12 +4,14 @@ import { articleReadLogData, describeArticleRead, summarizeArticleReads, type Ar
 import {
   claimDraft,
   findDraftToRun,
+  IssuePublishedError,
   loadDraftInputs,
   saveFailedDraft,
   saveReadyDraft,
   setDraftStep,
   titleTakenMessage,
   type IssueUpdate,
+  type ReadyDraftSave,
 } from "@/src/pipeline/draft/draft-store";
 import { draftsLink } from "@/src/pipeline/draft/drafts-link";
 import {
@@ -23,7 +25,7 @@ import {
   type ProduceDraftInput,
   type ProducedDraft,
 } from "@/src/pipeline/draft/produce-draft";
-import { sendToReviewGroup, type ReviewGroupStatus } from "@/src/pipeline/ingest/telegram";
+import { sendToReviewGroup, type ReviewGroupStatus } from "@/src/pipeline/review-group";
 import { raiseIncident, resolveIncident } from "@/src/pipeline/notify";
 import { finishRun, logEvent, startRun, type RunTrigger } from "@/src/pipeline/runs";
 
@@ -78,7 +80,7 @@ export interface RunDraftJobOptions {
   sendTelegram?: (text: string) => Promise<void>;
 }
 
-/** The review group's message once a draft is ready and the issue holds it. */
+/** The review group's message once the issue's newest draft is ready and the issue holds it. */
 export function buildDraftReadyMessage(date: string, link: string): string {
   return `Draft for ${date} is ready for review: ${link}`;
 }
@@ -92,6 +94,8 @@ function plainError(error: unknown, step: DraftJobStep, produced: ProducedDraft 
   if (step === "save" && code === "P2002" && produced) {
     return titleTakenMessage(produced.content.title, "Retry to write a new title.");
   }
+  // The error states only the fact, since a title or image change shows it too. Here it did stop the drafting.
+  if (error instanceof IssuePublishedError) return `${error.message} Drafting stopped.`;
   const message = error instanceof Error ? error.message : String(error);
   return message.length > MAX_ERROR_CHARS ? `${message.slice(0, MAX_ERROR_CHARS)}...` : message;
 }
@@ -203,7 +207,7 @@ export async function runDraftJob(draftId: bigint | number | string, options: Ru
         {
           incidentKey,
           severity: "critical",
-          what: `Draft v${draft.version} for ${date} failed at ${DRAFT_STEP_LABELS[failedStep]}.`,
+          what: `The draft for ${date} failed at ${DRAFT_STEP_LABELS[failedStep]}.`,
           evidence: message,
           link: draftsLink(date, env),
           details: {
@@ -226,7 +230,7 @@ export async function runDraftJob(draftId: bigint | number | string, options: Ru
     deadlineMs,
   );
 
-  let saved: { issue: { id: number; date: string }; issueUpdate: IssueUpdate; produced: ProducedDraft };
+  let saved: { issue: { id: number; date: string }; save: ReadyDraftSave; produced: ProducedDraft };
   try {
     runId = await startRun({ job: DRAFT_JOB, trigger: options.trigger ?? "event" }, now());
     await enter("load");
@@ -252,7 +256,7 @@ export async function runDraftJob(draftId: bigint | number | string, options: Ru
 
     // Not cut short by the deadline: a save that commits after the draft was marked failed would contradict it.
     await enter("save");
-    saved = { issue, produced, issueUpdate: await saveReadyDraft({ ...draft, issueDate: issue.date }, produced, now()) };
+    saved = { issue, produced, save: await saveReadyDraft({ ...draft, issueDate: issue.date }, produced, now()) };
   } catch (error) {
     return failDraft(error);
   } finally {
@@ -260,12 +264,13 @@ export async function runDraftJob(draftId: bigint | number | string, options: Ru
   }
 
   // The draft is saved. Problems with the run log or the incident from here on do not undo that.
-  const { issue, issueUpdate } = saved;
+  const { issue } = saved;
+  const issueUpdate = saved.save.issue;
   const readyRunId: bigint = runId!;
-  // Only for the draft the issue now holds: a draft that a newer one overtook, or that finished after the issue
-  // was published, is not the one to review.
+  // Only for the draft the issue now holds, and only when it is the issue's newest draft. A draft that finished
+  // after the issue was published, or that has a newer draft (ready, running, or failed), is not the one to review.
   let telegram: ReviewGroupStatus | "skipped" = "skipped";
-  if (issueUpdate === "updated") {
+  if (issueUpdate === "updated" && saved.save.newest) {
     telegram = await sendToReviewGroup(buildDraftReadyMessage(issue.date, draftsLink(issue.date, env)), {
       env,
       send: options.sendTelegram,
@@ -284,7 +289,7 @@ export async function runDraftJob(draftId: bigint | number | string, options: Ru
   };
   await bestEffort("run", "finish the run", () => finishRun(readyRunId, { status: "succeeded", stats }, now()));
   await bestEffort("alert", `resolve ${incidentKey}`, () =>
-    resolveIncident(incidentKey, { runId: readyRunId, env, now: now(), link: draftsLink(issue.date, env), note: `Draft v${draft.version} is ready.` }),
+    resolveIncident(incidentKey, { runId: readyRunId, env, now: now(), link: draftsLink(issue.date, env), note: "The draft is ready." }),
   );
   return { status: "ready", draftId: id, runId: readyRunId.toString(), issue: issueUpdate };
 }

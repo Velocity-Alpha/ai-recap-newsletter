@@ -46,6 +46,14 @@ describe("DraftTitleField", () => {
     expect(render({ value: "  Pretend   Lab Ships\tPlanner  " })).not.toMatch(SAVE);
   });
 
+  it("shows no Save on load for a saved title that has double or edge spaces", () => {
+    const saved = " Pretend Lab  Ships Planner ";
+
+    expect(render({ value: saved, saved })).not.toMatch(SAVE);
+    expect(renderToStaticMarkup(<DraftTitle draftId={41} title={saved} />)).not.toMatch(SAVE);
+    expect(render({ value: SAVED, saved })).not.toMatch(SAVE);
+  });
+
   it("does not let the owner save an empty title, but lets them cancel", () => {
     for (const value of ["", "   "]) {
       const html = render({ value });

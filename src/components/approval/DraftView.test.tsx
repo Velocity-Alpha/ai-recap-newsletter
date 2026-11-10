@@ -78,7 +78,7 @@ describe("DraftView", () => {
   it("shows a running draft's steps live, with the current one named", () => {
     const html = render(draft());
 
-    expect(html).toContain("Draft v2");
+    expect(html).toMatch(/<p[^>]*>Draft · 2026-05-21<\/p>/);
     expect(html).toContain("Now: writing");
     expect(html).toMatch(/data-step="read_articles" data-state="done"/);
     expect(html).toMatch(/data-step="write" data-state="current"/);
@@ -86,6 +86,26 @@ describe("DraftView", () => {
     expect(html).toContain("Writing the issue…");
     expect(html).not.toContain("<iframe");
     expect(html).not.toContain("Retry");
+  });
+
+  it("never shows the draft's own number: the owner sees only staged version numbers (#149)", () => {
+    const views = [
+      draft({ version: 7 }),
+      draft({ version: 7, status: "failed", failedStepLabel: "making the image", error: "No image.", retryable: true }),
+      ready({ version: 7 }),
+      ready({ version: 7, editable: false, hasNewerDraft: true }),
+    ];
+
+    for (const view of views) {
+      const html = render(view);
+
+      expect(html).not.toMatch(/\bv7\b/);
+      expect(html).not.toMatch(/draft 7\b/i);
+    }
+    expect(render(views[1])).toContain("Runs this draft again from the start.");
+    expect(render(views[2])).toMatch(/<iframe[^>]*title="Email preview"/);
+    // A staged version's number is the one the owner does see.
+    expect(render(ready({ version: 7, staged: { version: 2, stagedAt: null, serviceName: "GHL", serviceUrl: null } }))).toContain("Staged, v2");
   });
 
   it("says when the job has not started yet", () => {

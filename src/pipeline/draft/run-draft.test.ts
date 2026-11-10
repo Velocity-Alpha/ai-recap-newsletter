@@ -201,7 +201,7 @@ describe("runDraftJob", () => {
       expect.objectContaining({
         incidentKey: `draft.failed:${DATE}`,
         severity: "critical",
-        what: expect.stringContaining(`Draft v1 for ${DATE} failed`),
+        what: expect.stringContaining(`The draft for ${DATE} failed`),
         evidence: expect.stringContaining(message),
         link: DRAFTS_LINK,
       }),
@@ -290,7 +290,7 @@ describe("runDraftJob", () => {
 
     const result = await runDraftJob(draftId, { env: ENV, now: () => NOW, deps: deps() });
 
-    expect(result).toMatchObject({ status: "failed", step: "load", error: expect.stringContaining("already published") });
+    expect(result).toMatchObject({ status: "failed", step: "load", error: `The issue for ${DATE} (id ${issueId}) is already published. Drafting stopped.` });
     expect(issueRow(issueId)).toMatchObject({ title: "Sent issue", html: null });
   });
 
@@ -316,7 +316,7 @@ describe("runDraftJob", () => {
     expect(draftRow(draftId).html).toContain(`data-draft-id="${draftId}"`);
     expect(issueRow(issueId)).toMatchObject({ html: null });
     expect(notify.raiseIncident).toHaveBeenCalledWith(
-      expect.objectContaining({ severity: "critical", what: `Draft v1 for ${DATE} failed at saving the draft.`, evidence: error }),
+      expect.objectContaining({ severity: "critical", what: `The draft for ${DATE} failed at saving the draft.`, evidence: error }),
       expect.anything(),
     );
     expect(sendTelegram).not.toHaveBeenCalled();
@@ -613,6 +613,35 @@ describe("runDraftJob and the review group's message (#149)", () => {
     expect(runLog.finished[0]).toMatchObject({ status: "succeeded", stats: { issue: "newer_draft", telegram: "skipped" } });
   });
 
+  it.each(["running", "failed"] as const)("sends nothing for v1 when a newer draft exists and is %s: v1 is not the one to review", async (status) => {
+    const v1 = await commit();
+    const v2 = await commit();
+    await fakeDb.client.issueDraft.update({ where: { id: BigInt(v2.draftId) }, data: { status } });
+    const sendTelegram = telegramSender();
+
+    const result = await runDraftJob(v1.draftId, { env: PRODUCTION_ENV, now: () => NOW, deps: deps(), sendTelegram });
+
+    // The issue still takes v1, as before: no newer draft is ready.
+    expect(result).toMatchObject({ status: "ready", issue: "updated" });
+    expect(issueRow(v1.issueId).html).toBe(draftRow(v1.draftId).html);
+    expect(sendTelegram).not.toHaveBeenCalled();
+    expect(telegramEvents()).toEqual([]);
+    expect(runLog.finished[0]).toMatchObject({ status: "succeeded", stats: { issue: "updated", telegram: "skipped" } });
+  });
+
+  it("sends the message for v2 when it becomes ready after v1", async () => {
+    const v1 = await commit();
+    const v2 = await commit();
+    const sendTelegram = telegramSender();
+
+    await runDraftJob(v1.draftId, { env: PRODUCTION_ENV, now: () => NOW, deps: deps(), sendTelegram });
+    expect(sendTelegram).not.toHaveBeenCalled();
+    await runDraftJob(v2.draftId, { env: PRODUCTION_ENV, now: () => NOW, deps: deps(), sendTelegram });
+
+    expect(sendTelegram).toHaveBeenCalledTimes(1);
+    expect(sendTelegram).toHaveBeenCalledWith(READY_MESSAGE);
+  });
+
   it("sends nothing for a draft that finished after the issue was published", async () => {
     const { draftId } = await commit();
     const sendTelegram = telegramSender();
@@ -654,7 +683,7 @@ describe("runDraftJob and the review group's message (#149)", () => {
     expect(telegramEvents()).toEqual([{ level: "warn", step: "telegram", message: "Telegram returned HTTP 502." }]);
     expect(runLog.finished).toEqual([expect.objectContaining({ status: "succeeded", stats: expect.objectContaining({ telegram: "failed" }) })]);
     expect(notify.raiseIncident).not.toHaveBeenCalled();
-    expect(notify.resolveIncident).toHaveBeenCalledWith(`draft.failed:${DATE}`, expect.objectContaining({ note: "Draft v1 is ready." }));
+    expect(notify.resolveIncident).toHaveBeenCalledWith(`draft.failed:${DATE}`, expect.objectContaining({ note: "The draft is ready." }));
   });
 
   it("warns, sends nothing, and stays ready when production has no Telegram bot token", async () => {

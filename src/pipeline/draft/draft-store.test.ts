@@ -21,14 +21,17 @@ import {
   DraftEditError,
   DraftNotRetryableError,
   editCurrentDraft,
+  findDraftToRun,
   getDraftHtml,
   getDraftStatus,
   isStuckDraft,
   IssuePublishedError,
   readCurrentDraft,
   retryDraft,
+  saveReadyDraft,
   titleTakenMessage,
 } from "@/src/pipeline/draft/draft-store";
+import type { ProducedDraft } from "@/src/pipeline/draft/produce-draft";
 import { SAMPLE_CONTENT, SAMPLE_OUTLINE } from "@/src/pipeline/draft/draft.fixture";
 import { emailImageUrl, renderIssueEmailHtml } from "@/src/pipeline/draft/email-html";
 import { fakeDb } from "@/src/pipeline/draft/fake-db.fixture";
@@ -101,7 +104,8 @@ describe("createDraft", () => {
     const attempt = createDraft(await outline());
 
     await expect(attempt).rejects.toBeInstanceOf(IssuePublishedError);
-    await expect(attempt).rejects.toThrow(`The issue for ${DATE} (id ${published}) is already published. Drafting stopped.`);
+    // Only the fact: the draft job adds "Drafting stopped." where that is true.
+    await expect(attempt).rejects.toMatchObject({ message: `The issue for ${DATE} (id ${published}) is already published.` });
     expect(fakeDb.state.drafts.rows).toHaveLength(0);
   });
 
@@ -352,7 +356,7 @@ describe("the current draft: title and image changes (#149)", () => {
       const attempt = readCurrentDraft(draft.draftId);
 
       await expect(attempt).rejects.toMatchObject({ name: "DraftEditError", reason: "not_ready" });
-      await expect(attempt).rejects.toThrow(`Draft v1 for ${DATE} is ${status}. Only a ready draft can be changed.`);
+      await expect(attempt).rejects.toThrow(`The draft for ${DATE} is ${status}. Only a ready draft can be changed.`);
     });
 
     it("refuses a ready draft that has no content", async () => {
@@ -370,7 +374,7 @@ describe("the current draft: title and image changes (#149)", () => {
       const attempt = readCurrentDraft(v1.draftId);
 
       await expect(attempt).rejects.toMatchObject({ name: "DraftEditError", reason: "not_current" });
-      await expect(attempt).rejects.toThrow(`Draft v1 is not the newest draft for ${DATE}: v2 is ${status}. Reload the page.`);
+      await expect(attempt).rejects.toThrow(`This is not the newest draft for ${DATE}. Reload the page.`);
     });
 
     it("refuses once the issue is published, or another issue row for the date is", async () => {
@@ -445,6 +449,18 @@ describe("the current draft: title and image changes (#149)", () => {
       expect(stored.contentJson).toEqual(
         toIssueContentJson(content, { issueId: draft.issueId, issueDate: DATE, featuredImageUrl: emailImageUrl(OLD_IMAGE) }),
       );
+    });
+
+    it("keeps a missing image and scene prompt as null, on the draft and on the issue", async () => {
+      const draft = await readyDraft();
+      await fakeDb.client.issueDraft.update({ where: { id: BigInt(draft.draftId) }, data: { featuredImageUrl: null, scenePrompt: null } });
+
+      const changed = await editCurrentDraft(draft.draftId, { title: NEW_TITLE }, { now: () => NOW });
+
+      expect(changed).toMatchObject({ featuredImageUrl: null, scenePrompt: null });
+      expect(draftRow(draft.draftId)).toMatchObject({ featuredImageUrl: null, scenePrompt: null, editedAt: NOW });
+      expect(draftRow(draft.draftId).html).toContain(NEW_TITLE);
+      expect(issueRow(draft.issueId)).toMatchObject({ title: NEW_TITLE, featureImageUrl: null, promptFeaturedImage: null });
     });
 
     it("makes no new draft, no new issue, and no staged version", async () => {
@@ -658,7 +674,7 @@ describe("the current draft: title and image changes (#149)", () => {
         const attempt = editCurrentDraft(v1.draftId, { title: NEW_TITLE }, { now: () => NOW });
 
         await expect(attempt).rejects.toMatchObject({ name: "DraftEditError", reason: "not_current" });
-        await expect(attempt).rejects.toThrow(`Draft v1 is not the newest draft for ${DATE}: v2 is ${status}. Reload the page.`);
+        await expect(attempt).rejects.toThrow(`This is not the newest draft for ${DATE}. Reload the page.`);
         expect(fakeDb.state.locks).toEqual([LOCK]);
         expect(fakeDb.state.drafts.rows).toEqual(before.drafts);
         expect(issueRow(v1.issueId)).toEqual(before.issue);
@@ -690,7 +706,7 @@ describe("the current draft: title and image changes (#149)", () => {
       const attempt = editCurrentDraft(draft.draftId, { image: NEW_IMAGE }, { now: () => NOW });
 
       await expect(attempt).rejects.toMatchObject({ name: "DraftEditError", reason: "not_ready" });
-      await expect(attempt).rejects.toThrow(`Draft v1 for ${DATE} is ${status}. Only a ready draft can be changed.`);
+      await expect(attempt).rejects.toThrow(`The draft for ${DATE} is ${status}. Only a ready draft can be changed.`);
       expect(draftRow(draft.draftId)).toEqual(before.draft);
       expect(issueRow(draft.issueId)).toEqual(before.issue);
     });
@@ -726,6 +742,58 @@ describe("the current draft: title and image changes (#149)", () => {
 
     await fakeDb.client.issue.update({ where: { id: BigInt(v1.issueId) }, data: { publishedAt: NOW } });
     await expect(getDraftStatus(v1.draftId)).resolves.toMatchObject({ issuePublished: true });
+  });
+});
+
+describe("saveReadyDraft", () => {
+  const PRODUCED: ProducedDraft = {
+    content: SAMPLE_CONTENT,
+    html: "<html>as the job made it</html>",
+    featuredImageUrl: "https://assets.example.test/newsletter-dev/2027-01-04-abc.jpg",
+    scenePrompt: "A pretend robot.",
+    unreadStoryIds: [],
+    stepMs: {},
+  };
+
+  async function save(draftId: number) {
+    const draft = await findDraftToRun(draftId);
+    return saveReadyDraft({ ...draft!, issueDate: DATE }, PRODUCED, NOW);
+  }
+
+  it("marks the draft ready, copies it to the issue, and says it is the issue's newest draft", async () => {
+    const v1 = await createDraft(await outline());
+
+    await expect(save(v1.draftId)).resolves.toEqual({ issue: "updated", newest: true });
+    expect(draftRow(v1.draftId)).toMatchObject({ status: "ready", html: PRODUCED.html, finishedAt: NOW });
+    expect(issueRow(v1.issueId)).toMatchObject({ title: SAMPLE_CONTENT.title, html: PRODUCED.html });
+  });
+
+  it.each(["running", "failed"] as const)("still copies v1 to the issue while v2 is %s, but says v1 is not the newest draft", async (status) => {
+    const v1 = await createDraft(await outline());
+    const v2 = await createDraft(await outline());
+    await fakeDb.client.issueDraft.update({ where: { id: BigInt(v2.draftId) }, data: { status } });
+
+    await expect(save(v1.draftId)).resolves.toEqual({ issue: "updated", newest: false });
+    expect(issueRow(v1.issueId)).toMatchObject({ html: PRODUCED.html });
+  });
+
+  it("leaves the issue to a newer ready draft", async () => {
+    const v1 = await createDraft(await outline());
+    const v2 = await createDraft(await outline());
+    await expect(save(v2.draftId)).resolves.toEqual({ issue: "updated", newest: true });
+    await fakeDb.client.issue.update({ where: { id: BigInt(v2.issueId) }, data: { html: "<html>v2</html>" } });
+
+    await expect(save(v1.draftId)).resolves.toEqual({ issue: "newer_draft", newest: false });
+    expect(draftRow(v1.draftId)).toMatchObject({ status: "ready" });
+    expect(issueRow(v1.issueId)).toMatchObject({ html: "<html>v2</html>" });
+  });
+
+  it("changes no issue once one for the date is published", async () => {
+    const v1 = await createDraft(await outline());
+    await issue({ title: "An n8n copy", publishedAt: NOW });
+
+    await expect(save(v1.draftId)).resolves.toEqual({ issue: "published", newest: true });
+    expect(issueRow(v1.issueId)).toMatchObject({ html: null });
   });
 });
 

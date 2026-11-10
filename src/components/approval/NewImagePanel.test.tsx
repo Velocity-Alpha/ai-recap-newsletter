@@ -10,7 +10,6 @@ const noop = () => {};
 function render(props: Partial<NewImagePanelProps> = {}) {
   return renderToStaticMarkup(
     <NewImagePanel
-      version={2}
       currentImageUrl={CURRENT}
       scene="A pretend robot at a desk."
       ideas={{ status: "loading" }}
@@ -36,6 +35,14 @@ describe("NewImagePanel", () => {
     expect(html).not.toMatch(/<textarea[^>]*readonly/i);
     expect(html).toContain("Suggesting scene ideas…");
     expect(html).toContain("Close");
+  });
+
+  it("labels the current image without a draft number (#149)", () => {
+    const html = render();
+
+    expect(html).toMatch(/<figcaption[^>]*>Now<\/figcaption>/);
+    expect(html).toContain('alt="The featured image the draft has now"');
+    expect(html).not.toMatch(/\bv\d/);
   });
 
   it("shows each scene idea as a button that fills the box", () => {

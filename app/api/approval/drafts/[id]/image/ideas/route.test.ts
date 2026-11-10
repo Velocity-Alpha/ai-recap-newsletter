@@ -69,8 +69,8 @@ describe("POST /api/approval/drafts/[id]/image/ideas", () => {
 
   it.each([
     [404, new DraftEditError("Draft 41 does not exist.", "missing")],
-    [409, new DraftEditError("Draft v1 for 2026-05-21 is running. Only a ready draft can be changed.", "not_ready")],
-    [409, new DraftEditError("Draft v1 is not the newest draft for 2026-05-21: v2 is running. Reload the page.", "not_current")],
+    [409, new DraftEditError("The draft for 2026-05-21 is running. Only a ready draft can be changed.", "not_ready")],
+    [409, new DraftEditError("This is not the newest draft for 2026-05-21. Reload the page.", "not_current")],
     [409, new IssuePublishedError(3, "2026-05-21")],
     [502, new NewImageServiceError("Scene ideas failed: Request timed out.")],
   ])("answers %i with the plain reason", async (status, error) => {

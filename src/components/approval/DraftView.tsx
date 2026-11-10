@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import { Check, Loader2, TriangleAlert, X } from "lucide-react";
 
 import { capitalize, DraftStatusPill, formatDraftTime } from "@/src/components/approval/draft-status";
@@ -10,7 +13,7 @@ import type { DraftBoardView, DraftStepState } from "@/src/pipeline/draft/draft-
 /**
  * One draft on the board (#79): its steps while it runs, the email preview when it is ready, and the failed step
  * with "Retry" when it fails. The current draft also gets a title field, "New image", and "Stage for sending"
- * (#149).
+ * (#149). It never shows a draft's own number: the owner sees only staged version numbers.
  */
 
 type DraftViewProps = {
@@ -18,7 +21,7 @@ type DraftViewProps = {
   retryBusy: boolean;
   retryError: string | null;
   onRetry: () => void;
-  /** After a title change, an image change, or a staging: read the draft again. */
+  /** After a title change, an image change, a staging, or a refusal of one of them: read the draft again. */
   onChanged?: () => void;
 };
 
@@ -98,6 +101,8 @@ export default function DraftView({ draft, retryBusy, retryError, onRetry, onCha
   const running = draft.status === "running";
   const failed = draft.status === "failed";
   const showPreview = draft.hasHtml && !running;
+  // A title typed but not saved: "Stage for sending" waits, or the staged version would silently leave it out.
+  const [titleDirty, setTitleDirty] = useState(false);
 
   return (
     <section className="space-y-4">
@@ -105,12 +110,12 @@ export default function DraftView({ draft, retryBusy, retryError, onRetry, onCha
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <p className={KICKER}>
-              Draft v{draft.version}
+              Draft
               {draft.issueDate ? ` · ${draft.issueDate}` : ""}
             </p>
             {draft.editable && draft.subject ? (
               // Keyed on the saved title, so the field starts again from it when the draft is read again.
-              <DraftTitle key={draft.subject} draftId={draft.id} title={draft.subject} onChanged={onChanged} />
+              <DraftTitle key={draft.subject} draftId={draft.id} title={draft.subject} onChanged={onChanged} onDirtyChange={setTitleDirty} />
             ) : (
               <h2 className="mt-2 font-serif text-[clamp(22px,3vw,30px)] leading-tight text-[var(--text-primary)]">
                 {draft.subject ?? (running ? "Writing the issue…" : "No subject yet")}
@@ -159,7 +164,7 @@ export default function DraftView({ draft, retryBusy, retryError, onRetry, onCha
         {draft.retryable ? (
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <RetryButton busy={retryBusy} onRetry={onRetry} />
-            <span className="text-xs text-[var(--text-secondary)]">Runs this draft again from the start, as v{draft.version}.</span>
+            <span className="text-xs text-[var(--text-secondary)]">Runs this draft again from the start.</span>
           </div>
         ) : null}
         {retryError ? <p className={`mt-3 ${WARM_NOTE}`}>{retryError}</p> : null}
@@ -171,7 +176,7 @@ export default function DraftView({ draft, retryBusy, retryError, onRetry, onCha
         ) : null}
 
         <div className="mt-4 border-t border-[var(--border-light)] pt-4">
-          <StageForSending draft={draft} onStaged={onChanged} />
+          <StageForSending draft={draft} titleDirty={titleDirty} onStaged={onChanged} />
         </div>
       </div>
 
@@ -185,7 +190,7 @@ export default function DraftView({ draft, retryBusy, retryError, onRetry, onCha
             key={draft.editedAt ?? "as-made"}
             src={draftHtmlSrc(draft.id)}
             sandbox="allow-popups allow-popups-to-escape-sandbox"
-            title={`Email preview, draft v${draft.version}`}
+            title="Email preview"
             className="h-[80vh] w-full bg-white"
           />
         </div>
