@@ -3,7 +3,7 @@ import type { SideEffectRecord } from "@/src/pipeline/side-effects";
 
 /**
  * The distribution service (GLOSSARY.md): the outside service that sends the issue email. The app only creates
- * an email there when the owner stages a draft for sending (#149, ADR 0004); the owner sends it by hand.
+ * an email there when the owner stages a draft for sending (#149, ADR 0005); the owner sends it by hand.
  */
 export interface DistributionService {
   /** Stored in staged_versions.service. */

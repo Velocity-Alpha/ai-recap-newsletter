@@ -13,6 +13,7 @@ a doc listed under "Read when needed".
 
 - One repo: a Next.js App Router site on Netlify, plus the pipeline jobs (ingest, draft, publish detection,
   checks) as Netlify functions. Job logic is in `src/pipeline/`; `netlify/functions/` holds thin wrappers.
+  Code they import must not import `next/*`: functions do not ship `next` and fail to load.
 - Data: Postgres on Neon through Prisma. Tests: Vitest. Styling: Tailwind CSS 4.
 - The owner sends each issue by hand in GoHighLevel (GHL). GHL emails the subscribers. Subscriber records
   live in both this app and GHL.

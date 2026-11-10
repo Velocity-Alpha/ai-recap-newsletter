@@ -11,7 +11,7 @@ import { withoutHtml, type SideEffectRecord } from "@/src/pipeline/side-effects"
 import { prisma } from "@/src/server/prisma";
 
 /**
- * "Stage for sending" (#149, ADR 0004): copies the current draft into the distribution service as the issue's
+ * "Stage for sending" (#149, ADR 0005): copies the current draft into the distribution service as the issue's
  * next staged version. It runs inside the request, with no background job. A `staging` row holds the version
  * number while the service call runs, so two clicks make one version. A failed call leaves no row and raises
  * `stage.failed:<date>`; the next staging that works resolves it, and `run-checks` closes it when its day is
