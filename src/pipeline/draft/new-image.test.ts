@@ -41,7 +41,7 @@ const NEW_IMAGE = { imageUrl: `https://example-bucket.s3.amazonaws.com/newslette
 
 async function readyDraft() {
   const outline = (await fakeDb.client.approvalOutline.create({
-    data: { issueDate: new Date(`${DATE}T00:00:00.000Z`), payload: SAMPLE_OUTLINE, payloadHash: "h", draftOwner: "native" },
+    data: { issueDate: new Date(`${DATE}T00:00:00.000Z`), payload: SAMPLE_OUTLINE, payloadHash: "h" },
   })) as { id: bigint };
   const created = await createDraft(outline.id);
   await fakeDb.client.issueDraft.update({

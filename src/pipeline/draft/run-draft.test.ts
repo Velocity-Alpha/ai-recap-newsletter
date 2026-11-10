@@ -67,7 +67,7 @@ function deps(overrides: Partial<ProduceDraftDeps> = {}): Partial<ProduceDraftDe
 
 async function commit(): Promise<{ draftId: number; issueId: number; version: number }> {
   const outline = await fakeDb.client.approvalOutline.create({
-    data: { issueDate: new Date(`${DATE}T00:00:00.000Z`), payload: SAMPLE_OUTLINE, payloadHash: "h", draftOwner: "native" },
+    data: { issueDate: new Date(`${DATE}T00:00:00.000Z`), payload: SAMPLE_OUTLINE, payloadHash: "h" },
   });
   return createDraft((outline as { id: bigint }).id);
 }

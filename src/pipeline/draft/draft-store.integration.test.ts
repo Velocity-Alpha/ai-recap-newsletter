@@ -72,7 +72,7 @@ describe.skipIf(!enabled)("draft store on a real database", () => {
 
   async function saveOutline(): Promise<bigint> {
     const row = await prisma.approvalOutline.create({
-      data: { issueDate: day, payload: outline as unknown as Prisma.InputJsonValue, payloadHash: tag, draftOwner: "native" },
+      data: { issueDate: day, payload: outline as unknown as Prisma.InputJsonValue, payloadHash: tag },
       select: { id: true },
     });
     return row.id;

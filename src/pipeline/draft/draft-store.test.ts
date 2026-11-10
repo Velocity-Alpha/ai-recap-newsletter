@@ -42,7 +42,7 @@ const NOW = new Date("2027-01-04T15:00:00.000Z");
 
 async function outline(date = DATE): Promise<bigint> {
   const row = await fakeDb.client.approvalOutline.create({
-    data: { issueDate: new Date(`${date}T00:00:00.000Z`), payload: { ...SAMPLE_OUTLINE, date }, payloadHash: "h", draftOwner: "native" },
+    data: { issueDate: new Date(`${date}T00:00:00.000Z`), payload: { ...SAMPLE_OUTLINE, date }, payloadHash: "h" },
   });
   return (row as { id: bigint }).id;
 }
