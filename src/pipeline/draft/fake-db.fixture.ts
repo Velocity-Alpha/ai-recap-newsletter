@@ -169,7 +169,7 @@ export function createFakeDb() {
         sourceDraftId: null,
       }),
     }),
-    approvalOutline: table(state.outlines, { nextId: id, defaults: () => ({ committedAt: now(), forwardedAt: null }) }),
+    approvalOutline: table(state.outlines, { nextId: id, defaults: () => ({ committedAt: now() }) }),
     story: table(state.stories, { nextId: id, defaults: () => ({}) }),
     publishEvent: table(state.publishEvents, { nextId: id, defaults: () => ({ draftId: null }) }),
     pipelineSetting: table(state.settings, { nextId: id, defaults: () => ({}) }),

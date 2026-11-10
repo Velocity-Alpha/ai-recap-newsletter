@@ -37,7 +37,7 @@ describe("commitNativeDraft", () => {
     const result = await commitNativeDraft(OUTLINE, SITE, options(fetch));
 
     expect(fakeDb.state.outlines.rows).toHaveLength(1);
-    expect(fakeDb.state.outlines.rows[0]).toMatchObject({ draftOwner: "native", payload: OUTLINE });
+    expect(fakeDb.state.outlines.rows[0]).toMatchObject({ payload: OUTLINE });
     expect(result.draft).toMatchObject({ version: 1, issueDate: "2027-01-04" });
     expect(draftRow(result.draft.draftId)).toMatchObject({ status: "running", outlineId: fakeDb.state.outlines.rows[0].id });
     expect(result.start).toEqual({ started: true });

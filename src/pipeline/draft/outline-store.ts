@@ -9,8 +9,6 @@ export async function saveOutline(outline: ApprovalOutline): Promise<{ id: bigin
       issueDate: new Date(`${outline.date}T00:00:00.000Z`),
       payload: outline as unknown as Prisma.InputJsonValue,
       payloadHash: hash,
-      // A leftover column from the move off n8n. It has no default, so it is still written until it is dropped.
-      draftOwner: "native",
     },
     select: { id: true },
   });
