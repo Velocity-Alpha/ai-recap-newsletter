@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   createDraftTemplate,
-  draftTemplateName,
   GHL_API_VERSION,
   type DraftTemplateInput,
 } from "@/src/pipeline/draft/ghl-template";
@@ -57,23 +56,6 @@ function body(call: Call): Record<string, unknown> {
 function headers(call: Call): Record<string, string> {
   return Object.fromEntries(new Headers(call.init.headers).entries());
 }
-
-describe("draftTemplateName", () => {
-  it("is the date, the version and the subject", () => {
-    expect(draftTemplateName(INPUT)).toBe("2026-11-09 v2: Synthetic subject line");
-  });
-
-  it("trims the subject and folds line breaks", () => {
-    expect(draftTemplateName({ ...INPUT, version: 1, subject: "  A long\n subject  " })).toBe("2026-11-09 v1: A long subject");
-  });
-
-  it("refuses a bad date, version or empty subject", () => {
-    expect(() => draftTemplateName({ ...INPUT, issueDate: "2026-11-9" })).toThrow(/YYYY-MM-DD/);
-    expect(() => draftTemplateName({ ...INPUT, version: 0 })).toThrow(/version/);
-    expect(() => draftTemplateName({ ...INPUT, version: 1.5 })).toThrow(/version/);
-    expect(() => draftTemplateName({ ...INPUT, subject: "   " })).toThrow(/subject/);
-  });
-});
 
 describe("createDraftTemplate in production", () => {
   it("creates the template, then sets its HTML, with GHL's headers and n8n's bodies", async () => {

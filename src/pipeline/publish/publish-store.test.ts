@@ -173,22 +173,40 @@ describe("publish store", () => {
     expect(fakeDb.state.publishEvents.rows[0]).toMatchObject({ draftId: BigInt(draftId), stagedVersionId: BigInt(newest) });
   });
 
-  it("does not use a version id that is another issue's or still staging: it goes by the draft id", async () => {
+  it("publishes what the email says when its version id is another issue's, and does not try the draft's other versions", async () => {
     const issueId = await issueRow();
     const draftId = await draftRow(issueId);
-    const own = await stagedRow(issueId, draftId);
+    await stagedRow(issueId, draftId);
     const otherIssue = await issueRow();
     const others = await stagedRow(otherIssue, await draftRow(otherIssue), { html: "<html>another issue</html>" });
-    const unfinished = await stagedRow(issueId, draftId, { version: 2, status: "staging", html: "" });
 
     await store().publish({ issueId, content: emailContent(issueId), storyIds: [], publishedAt: SENT_AT, event: { ...EVENT, issueId, draftId, versionId: others } });
-    expect(fakeDb.state.issues.rows[0]).toMatchObject({ html: STAGED_HTML });
-    expect(fakeDb.state.publishEvents.rows[0]).toMatchObject({ stagedVersionId: BigInt(own) });
 
-    fakeDb.state.issues.rows[0].publishedAt = null;
-    fakeDb.state.issues.rows[0].status = "draft";
-    await store().publish({ issueId, content: emailContent(issueId), storyIds: [], publishedAt: SENT_AT, event: { ...EVENT, gmailMessageId: "m2", issueId, draftId, versionId: unfinished } });
-    expect(fakeDb.state.publishEvents.rows[1]).toMatchObject({ outcome: "published", stagedVersionId: BigInt(own) });
+    expect(fakeDb.state.issues.rows[0]).toMatchObject({ publishedAt: SENT_AT, title: "Title From The Email", html: "<html>v3</html>" });
+    expect(fakeDb.state.publishEvents.rows[0]).toMatchObject({ outcome: "published", draftId: BigInt(draftId), stagedVersionId: null });
+  });
+
+  it("publishes what the email says when its version id is a row that is still staging", async () => {
+    const issueId = await issueRow();
+    const draftId = await draftRow(issueId);
+    await stagedRow(issueId, draftId);
+    const unfinished = await stagedRow(issueId, draftId, { version: 2, status: "staging", html: "" });
+
+    await store().publish({ issueId, content: emailContent(issueId), storyIds: [], publishedAt: SENT_AT, event: { ...EVENT, issueId, draftId, versionId: unfinished } });
+
+    expect(fakeDb.state.issues.rows[0]).toMatchObject({ publishedAt: SENT_AT, title: "Title From The Email", html: "<html>v3</html>" });
+    expect(fakeDb.state.publishEvents.rows[0]).toMatchObject({ outcome: "published", stagedVersionId: null });
+  });
+
+  it("keeps the staged version's id on the event when its copy is not complete, and publishes what the email says", async () => {
+    const issueId = await issueRow();
+    const draftId = await draftRow(issueId);
+    const versionId = await stagedRow(issueId, draftId, { featuredImageUrl: null });
+
+    await store().publish({ issueId, content: emailContent(issueId), storyIds: [], publishedAt: SENT_AT, event: { ...EVENT, issueId, draftId, versionId } });
+
+    expect(fakeDb.state.issues.rows[0]).toMatchObject({ publishedAt: SENT_AT, title: "Title From The Email", html: "<html>v3</html>" });
+    expect(fakeDb.state.publishEvents.rows[0]).toMatchObject({ outcome: "published", stagedVersionId: BigInt(versionId) });
   });
 
   it("records no staged version for an email whose version id matches nothing", async () => {

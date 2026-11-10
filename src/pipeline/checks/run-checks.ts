@@ -1,5 +1,5 @@
 import { resolveAlert } from "@/src/pipeline/alerts";
-import { checkIncidentDate, evaluateChecks, needsSiteCheck, type Finding } from "@/src/pipeline/checks/checks";
+import { dayIncidentDate, evaluateChecks, needsSiteCheck, type Finding } from "@/src/pipeline/checks/checks";
 import { readDayFacts, type DayFacts } from "@/src/pipeline/checks/day-facts";
 import { OUTSIDE_CALLS_BUDGET_MS, withDeadline } from "@/src/pipeline/checks/deadline";
 import { pingHeartbeat, type HeartbeatResult } from "@/src/pipeline/checks/heartbeat";
@@ -82,22 +82,22 @@ async function closeTogether(incidents: OpenIncident[], headline: (count: number
   await postToOpsChat([`RESOLVED: ${headline(told.length)}`, ...lines].join("\n"), notify);
 }
 
-/** Check incidents of earlier dates can no longer pass: their day is over. */
+/** Incidents of earlier dates that end with their day (`dayIncidentDate`): nothing can resolve them any more. */
 async function closeEarlierDates(date: string, notify: RunNotify): Promise<string[]> {
   const stale = (await listOpenIncidents()).filter((alert) => {
-    const incidentDate = checkIncidentDate(alert.incidentKey);
+    const incidentDate = dayIncidentDate(alert.incidentKey);
     return incidentDate !== null && incidentDate < date;
   });
   await closeTogether(
     stale,
-    (count) => `closed ${plural(count, "incident")} from earlier days. Their day is over, so their checks no longer run.`,
+    (count) => `closed ${plural(count, "incident")} from earlier days. Their day is over.`,
     notify,
   );
   return stale.map((alert) => alert.incidentKey);
 }
 
 async function silenceSkippedDate(date: string, notify: RunNotify): Promise<void> {
-  const open = (await listOpenIncidents()).filter((alert) => checkIncidentDate(alert.incidentKey) === date);
+  const open = (await listOpenIncidents()).filter((alert) => dayIncidentDate(alert.incidentKey) === date);
   await closeTogether(
     open,
     (count) => `${date} is a skipped date (no issue today), so its checks are off. Closed ${plural(count, "incident")}.`,

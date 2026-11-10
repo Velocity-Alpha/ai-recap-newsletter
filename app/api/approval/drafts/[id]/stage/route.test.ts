@@ -64,20 +64,29 @@ describe("POST /api/approval/drafts/[id]/stage", () => {
     const { response, json } = await stage("41");
 
     expect(response.status).toBe(200);
-    expect(staging.stageDraft).toHaveBeenCalledWith(41, { confirmRepeat: false });
+    expect(staging.stageDraft).toHaveBeenCalledWith(41, { confirmRepeat: false }, expect.anything());
     expect(json).toEqual({ success: true, staged: STAGED });
+  });
+
+  it("passes APP_ENV read by name, so the build's value decides whether the service call is real", async () => {
+    vi.stubEnv("APP_ENV", "preview");
+
+    await stage("41");
+    vi.unstubAllEnvs();
+
+    expect(staging.stageDraft.mock.calls[0][2]).toMatchObject({ env: { APP_ENV: "preview" } });
   });
 
   it("passes the owner's yes to stage an unchanged draft again", async () => {
     await stage("41", { body: { confirmRepeat: true } });
 
-    expect(staging.stageDraft).toHaveBeenCalledWith(41, { confirmRepeat: true });
+    expect(staging.stageDraft).toHaveBeenCalledWith(41, { confirmRepeat: true }, expect.anything());
   });
 
   it("takes only a real true as the owner's yes", async () => {
     await stage("41", { body: { confirmRepeat: "true" } });
 
-    expect(staging.stageDraft).toHaveBeenCalledWith(41, { confirmRepeat: false });
+    expect(staging.stageDraft).toHaveBeenCalledWith(41, { confirmRepeat: false }, expect.anything());
   });
 
   it("answers 409 with code already_staged and the version, so the page can ask the owner", async () => {
@@ -95,6 +104,7 @@ describe("POST /api/approval/drafts/[id]/stage", () => {
     ["not_ready", 409],
     ["staging_running", 409],
     ["service_failed", 502],
+    ["not_saved", 500],
   ] as const)("answers a %s refusal with HTTP %i and its message", async (code, status) => {
     staging.stageDraft.mockRejectedValue(new StageError(`Refused: ${code}.`, code));
 

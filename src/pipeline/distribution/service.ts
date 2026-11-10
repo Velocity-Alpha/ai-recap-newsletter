@@ -12,9 +12,10 @@ export interface DistributionService {
   displayName: string;
   /**
    * Creates a new email in the service. It never changes or deletes an existing one. `recorded` outside
-   * production: nothing reached the service and the ref is a stand-in.
+   * production: nothing reached the service and the ref is a stand-in. `signal` stops a call that is still
+   * running, so a caller that gave up does not leave an email behind.
    */
-  createEmail(input: { name: string; html: string }): Promise<{ ref: string; url: string | null; mode: "sent" | "recorded" }>;
+  createEmail(input: { name: string; html: string; signal?: AbortSignal }): Promise<{ ref: string; url: string | null; mode: "sent" | "recorded" }>;
 }
 
 export interface DistributionServiceOptions {

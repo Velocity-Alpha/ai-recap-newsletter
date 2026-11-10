@@ -15,7 +15,10 @@ const REFUSAL_STATUS: Record<StageRefusal, number> = {
   staging_running: 409,
   already_staged: 409,
   service_failed: 502,
+  not_saved: 500,
 };
+
+const SERVER_FAULTS: readonly StageRefusal[] = ["service_failed", "not_saved"];
 
 /**
  * "Stage for sending" (#149): copies the current draft into the distribution service as the next staged
@@ -32,7 +35,9 @@ export async function POST(request: Request, context: IdRouteContext) {
   const confirmRepeat = body?.confirmRepeat === true;
 
   try {
-    const staged = await stageDraft(draftId, { confirmRepeat });
+    // APP_ENV by name: Next inlines the build's value there, and it decides whether the service call is real
+    // (docs/architecture.html, "Environments").
+    const staged = await stageDraft(draftId, { confirmRepeat }, { env: { ...process.env, APP_ENV: process.env.APP_ENV } });
     logServerInfo("approval.drafts.stage", { draftId, stagedVersionId: staged.id, version: staged.version, mode: staged.mode });
     return NextResponse.json({ success: true, staged });
   } catch (error) {
@@ -40,7 +45,7 @@ export async function POST(request: Request, context: IdRouteContext) {
       return NextResponse.json({ success: false, code: "published", error: error.message }, { status: 409 });
     }
     if (error instanceof StageError) {
-      if (error.code === "service_failed") logServerWarn("approval.drafts.stage_service_failed", { draftId, error: error.message });
+      if (SERVER_FAULTS.includes(error.code)) logServerWarn(`approval.drafts.stage_${error.code}`, { draftId, error: error.message });
       return NextResponse.json(
         { success: false, code: error.code, error: error.message, ...(error.version === undefined ? {} : { version: error.version }) },
         { status: REFUSAL_STATUS[error.code] },

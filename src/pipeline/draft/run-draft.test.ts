@@ -46,7 +46,7 @@ import { createDraft, createImageDraft, retryDraft } from "@/src/pipeline/draft/
 import { emailImageUrl } from "@/src/pipeline/draft/email-html";
 import { fakeDb } from "@/src/pipeline/draft/fake-db.fixture";
 import { DRAFT_STEPS, NEW_IMAGE_STEPS, readNoArticles, type ProduceDraftDeps } from "@/src/pipeline/draft/produce-draft";
-import { draftsLink, runDraftJob } from "@/src/pipeline/draft/run-draft";
+import { runDraftJob } from "@/src/pipeline/draft/run-draft";
 import { finishRun, startRun } from "@/src/pipeline/runs";
 
 const DATE = SAMPLE_OUTLINE.date;
@@ -660,18 +660,5 @@ describe("runDraftJob for a new image (#116)", () => {
     expect(second.createTemplate).not.toHaveBeenCalled();
     expect(issueRow(v1.issueId)).toEqual(published);
     await expect(createImageDraft(v1.draftId, NEW_IMAGE)).rejects.toThrow("already published");
-  });
-});
-
-describe("draftsLink", () => {
-  it("uses Netlify's URL in production, the deploy's address on previews, and production otherwise", () => {
-    expect(draftsLink(DATE, { APP_ENV: "production", URL: "https://airecap.news/", DEPLOY_PRIME_URL: "https://main--ai-recap.netlify.app" })).toBe(
-      `https://airecap.news/approval/drafts?date=${DATE}`,
-    );
-    expect(draftsLink(DATE, { APP_ENV: "preview", URL: "https://airecap.news", DEPLOY_PRIME_URL: "https://deploy-preview-9--ai-recap.netlify.app" })).toBe(
-      `https://deploy-preview-9--ai-recap.netlify.app/approval/drafts?date=${DATE}`,
-    );
-    expect(draftsLink(DATE, {})).toBe(DRAFTS_LINK);
-    expect(draftsLink(DATE, { APP_ENV: "production" })).toBe(DRAFTS_LINK);
   });
 });

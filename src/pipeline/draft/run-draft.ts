@@ -11,6 +11,7 @@ import {
   setDraftStep,
   type IssueUpdate,
 } from "@/src/pipeline/draft/draft-store";
+import { draftsLink } from "@/src/pipeline/draft/drafts-link";
 import {
   createDraftDeps,
   DraftStepError,
@@ -52,7 +53,6 @@ export const DRAFT_STEP_LABELS: Record<DraftJobStep, string> = {
 };
 
 const MAX_ERROR_CHARS = 2_000;
-const SITE_URL = "https://airecap.news";
 
 /**
  * Netlify stops a background function at 15 minutes, without warning. The job gives up at 13, so it still has
@@ -77,18 +77,6 @@ export interface RunDraftJobOptions {
   deadlineMs?: number;
   /** For the job's own checks, such as the chosen image's HEAD request to S3. Defaults to the global fetch (tests replace it). */
   fetch?: typeof fetch;
-}
-
-/** This deploy's site: Netlify's `URL` in production, the deploy's own address on previews, else production. */
-export function siteUrl(env: Record<string, string | undefined>): string {
-  const candidates = env.APP_ENV === "production" ? [env.URL] : [env.DEPLOY_PRIME_URL, env.URL];
-  const url = candidates.map((value) => value?.trim()).find(Boolean);
-  return (url ?? SITE_URL).replace(/\/+$/, "");
-}
-
-/** The drafts page for a date (#79), where the owner sees the failed step and can retry. */
-export function draftsLink(date: string, env: Record<string, string | undefined> = {}): string {
-  return `${siteUrl(env)}/approval/drafts?date=${encodeURIComponent(date)}`;
 }
 
 export function draftIncidentKey(date: string): string {

@@ -1,11 +1,10 @@
 import type { Prisma } from "@/src/generated/prisma";
 import { distributionServiceFromEnv, type DistributionService } from "@/src/pipeline/distribution/service";
-import { draftChangedSinceStaged } from "@/src/pipeline/distribution/staged-version";
+import { draftChangedSinceStaged, stagedEmailName, stageIncidentKey } from "@/src/pipeline/distribution/staged-version";
 import type { WrittenIssueContent } from "@/src/pipeline/draft/content";
 import { dateKey, IssuePublishedError, lockIssueDate, publishedIssueFor } from "@/src/pipeline/draft/draft-store";
+import { draftsLink } from "@/src/pipeline/draft/drafts-link";
 import { renderIssueEmailHtml } from "@/src/pipeline/draft/email-html";
-import { draftTemplateName } from "@/src/pipeline/draft/ghl-template";
-import { draftsLink } from "@/src/pipeline/draft/run-draft";
 import { raiseIncident, resolveIncident } from "@/src/pipeline/notify";
 import { finishRun, logEvent, startRun } from "@/src/pipeline/runs";
 import { withoutHtml, type SideEffectRecord } from "@/src/pipeline/side-effects";
@@ -15,7 +14,8 @@ import { prisma } from "@/src/server/prisma";
  * "Stage for sending" (#149, ADR 0004): copies the current draft into the distribution service as the issue's
  * next staged version. It runs inside the request, with no background job. A `staging` row holds the version
  * number while the service call runs, so two clicks make one version. A failed call leaves no row and raises
- * `stage.failed:<date>`; the next staging that works resolves it. An older staged version is never changed.
+ * `stage.failed:<date>`; the next staging that works resolves it, and `run-checks` closes it when its day is
+ * over. An older staged version is never changed.
  */
 
 export const STAGE_JOB = "stage-draft";
@@ -39,7 +39,9 @@ export type StageRefusal =
   /** The draft has not changed since the newest staged version, and the owner has not confirmed a repeat. */
   | "already_staged"
   /** The distribution service call failed. Nothing was staged. */
-  | "service_failed";
+  | "service_failed"
+  /** The service made the email, but the staged version could not be saved. The email is in the service. */
+  | "not_saved";
 
 export class StageError extends Error {
   constructor(
@@ -77,10 +79,6 @@ export interface StageDraftDeps {
   service?: DistributionService;
   /** Defaults to `STAGE_TIMEOUT_MS`. */
   timeoutMs?: number;
-}
-
-export function stageIncidentKey(date: string): string {
-  return `stage.failed:${date}`;
 }
 
 function errorText(error: unknown): string {
@@ -214,44 +212,12 @@ export async function stageDraft(
     run.id = await startRun({ job: STAGE_JOB, trigger: "manual" }, now());
   });
 
-  try {
-    const html = renderIssueEmailHtml(
-      reserved.content,
-      { id: Number(reserved.issueId), issueDate },
-      { id: Number(draft.id), featuredImageUrl: reserved.featuredImageUrl ?? "", versionId: Number(reserved.id) },
-    );
-    const name = draftTemplateName({ issueDate, version: reserved.version, subject: reserved.title });
-    const email = await withTimeout(service.createEmail({ name, html }), deps.timeoutMs ?? STAGE_TIMEOUT_MS, `Creating the email in ${service.displayName}`);
-    const stagedAt = now();
-    await prisma.stagedVersion.update({
-      where: { id: reserved.id },
-      data: { status: "staged", html, service: service.key, serviceRef: email.ref, serviceUrl: email.url, stagedAt },
-    });
-
-    await quietly("finish the run log", async () => {
-      if (run.id !== null) await finishRun(run.id, { status: "succeeded", stats: { ...stats, mode: email.mode, serviceRef: email.ref } }, now());
-    });
-    await quietly(`resolve ${incidentKey}`, () =>
-      resolveIncident(incidentKey, { runId: run.id ?? undefined, env, now: now(), link, note: `v${reserved.version} is staged.` }),
-    );
-    return {
-      id: Number(reserved.id),
-      version: reserved.version,
-      issueDate,
-      title: reserved.title,
-      service: service.key,
-      serviceName: service.displayName,
-      serviceRef: email.ref,
-      serviceUrl: email.url,
-      mode: email.mode,
-      stagedAt,
-    };
-  } catch (error) {
-    const message = errorText(error);
+  /** Removes the reserved row, writes the failure to the run log, raises the incident, and gives the error to throw. */
+  const fail = async (code: "service_failed" | "not_saved", message: string, extra: Record<string, unknown> = {}): Promise<StageError> => {
     // Only the row this call reserved, and only while it is not staged: a staged version is never deleted.
     await quietly("delete the staging row", () => prisma.stagedVersion.deleteMany({ where: { id: reserved.id, status: "staging" } }));
     await quietly("finish the run log", async () => {
-      if (run.id !== null) await finishRun(run.id, { status: "failed", error: message, stats }, now());
+      if (run.id !== null) await finishRun(run.id, { status: "failed", error: message, stats: { ...stats, ...extra } }, now());
     });
     await quietly(`raise ${incidentKey}`, () =>
       raiseIncident(
@@ -262,11 +228,70 @@ export async function stageDraft(
           what: `Staging v${reserved.version} for ${issueDate} failed.`,
           evidence: message,
           link,
-          details: { ...stats, runId: run.id === null ? null : String(run.id) },
+          details: { ...stats, ...extra, runId: run.id === null ? null : String(run.id) },
         },
         { runId: run.id ?? undefined, env, now: now() },
       ),
     );
-    throw new StageError(message, "service_failed");
+    return new StageError(message, code);
+  };
+
+  let html: string;
+  let email: Awaited<ReturnType<DistributionService["createEmail"]>>;
+  // Aborted at the timeout, so a call that is still running does not create an email nobody waits for.
+  const giveUp = new AbortController();
+  try {
+    html = renderIssueEmailHtml(
+      reserved.content,
+      { id: Number(reserved.issueId), issueDate },
+      { id: Number(draft.id), featuredImageUrl: reserved.featuredImageUrl ?? "", versionId: Number(reserved.id) },
+    );
+    const name = stagedEmailName({ issueDate, version: reserved.version, title: reserved.title });
+    email = await withTimeout(
+      service.createEmail({ name, html, signal: giveUp.signal }),
+      deps.timeoutMs ?? STAGE_TIMEOUT_MS,
+      `Creating the email in ${service.displayName}`,
+    );
+  } catch (error) {
+    giveUp.abort();
+    throw await fail("service_failed", errorText(error));
   }
+
+  // The email exists now. A failed save must not look like a failed service call, or the owner stages again
+  // and gets a second email with the same name.
+  const stagedAt = now();
+  const save = () =>
+    prisma.stagedVersion.update({
+      where: { id: reserved.id },
+      data: { status: "staged", html, service: service.key, serviceRef: email.ref, serviceUrl: email.url, stagedAt },
+    });
+  try {
+    await save().catch(save);
+  } catch (error) {
+    throw await fail(
+      "not_saved",
+      `The email was created in ${service.displayName} (${email.ref}), but v${reserved.version} could not be saved: ${errorText(error)} ` +
+        `Staging again makes a second email with the same name. Delete ${email.ref} in ${service.displayName} first.`,
+      { serviceRef: email.ref },
+    );
+  }
+
+  await quietly("finish the run log", async () => {
+    if (run.id !== null) await finishRun(run.id, { status: "succeeded", stats: { ...stats, mode: email.mode, serviceRef: email.ref } }, now());
+  });
+  await quietly(`resolve ${incidentKey}`, () =>
+    resolveIncident(incidentKey, { runId: run.id ?? undefined, env, now: now(), link, note: `v${reserved.version} is staged.` }),
+  );
+  return {
+    id: Number(reserved.id),
+    version: reserved.version,
+    issueDate,
+    title: reserved.title,
+    service: service.key,
+    serviceName: service.displayName,
+    serviceRef: email.ref,
+    serviceUrl: email.url,
+    mode: email.mode,
+    stagedAt,
+  };
 }

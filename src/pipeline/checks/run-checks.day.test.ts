@@ -150,7 +150,7 @@ describe("a whole day of checks", () => {
       ingestRun: { id: "42", status: "succeeded", startedAt: new Date("2026-11-11T14:55:00Z") },
     });
     expect(await checkAt("2026-11-11T15:05:00Z", wednesday)).toEqual([
-      "RESOLVED: closed 1 incident from earlier days. Their day is over, so their checks no longer run.",
+      "RESOLVED: closed 1 incident from earlier days. Their day is over.",
     ]);
 
     expect(telegram).toHaveLength(11);

@@ -139,7 +139,7 @@ describe("stageDraft", () => {
     expect(parsed?.content.issue_id).toBe(Number(issueId));
   });
 
-  it("takes the per-date lock before it checks and reserves", async () => {
+  it("takes the per-date lock once", async () => {
     const draftId = await draftRow(await issueRow());
 
     await stageDraft(draftId, {}, { env: ENV, now: () => NOW, service: fakeService().service });
@@ -296,7 +296,73 @@ describe("stageDraft", () => {
     const error = await stageDraft(draftId, {}, { env: ENV, now: () => NOW, service, timeoutMs: 5 }).catch((e: unknown) => e);
 
     expect(error).toEqual(refusal("service_failed"));
-    expect((error as Error).message).toBe("Creating the email in Fake Mail timed out after 0 s.");
+    expect((error as Error).message).toMatch(/^Creating the email in Fake Mail timed out after /);
+    expect(staged()).toHaveLength(0);
+  });
+
+  it("tells the service to stop when it gives up at the timeout", async () => {
+    const draftId = await draftRow(await issueRow());
+    const signals: Array<AbortSignal | undefined> = [];
+    const service: DistributionService = {
+      key: "fake",
+      displayName: "Fake Mail",
+      createEmail: (input) => {
+        signals.push(input.signal);
+        return new Promise(() => {});
+      },
+    };
+
+    await stageDraft(draftId, {}, { env: ENV, now: () => NOW, service, timeoutMs: 5 }).catch(() => undefined);
+
+    expect(signals).toHaveLength(1);
+    expect(signals[0]?.aborted).toBe(true);
+  });
+
+  it("saves the staged version at the second try when the first save fails", async () => {
+    const draftId = await draftRow(await issueRow());
+    const { service, emails } = fakeService();
+    const update = vi.spyOn(fakeDb.client.stagedVersion, "update").mockRejectedValueOnce(new Error("The connection dropped."));
+
+    const result = await stageDraft(draftId, {}, { env: ENV, now: () => NOW, service });
+    update.mockRestore();
+
+    expect(result).toMatchObject({ version: 1, serviceRef: "ref-1" });
+    expect(emails).toHaveLength(1);
+    expect(staged()).toEqual([expect.objectContaining({ status: "staged", serviceRef: "ref-1" })]);
+    expect(notify.raiseIncident).not.toHaveBeenCalled();
+  });
+
+  it("names the created email when the service call worked but the staged version cannot be saved", async () => {
+    const draftId = await draftRow(await issueRow());
+    const { service, emails } = fakeService();
+    const update = vi.spyOn(fakeDb.client.stagedVersion, "update").mockRejectedValue(new Error("The database is down."));
+
+    const error = await stageDraft(draftId, {}, { env: ENV, now: () => NOW, service }).catch((e: unknown) => e);
+    update.mockRestore();
+
+    expect(error).toEqual(refusal("not_saved"));
+    expect((error as Error).message).toBe(
+      "The email was created in Fake Mail (ref-1), but v1 could not be saved: The database is down. " +
+        "Staging again makes a second email with the same name. Delete ref-1 in Fake Mail first.",
+    );
+    expect(emails).toHaveLength(1);
+    expect(staged()).toHaveLength(0);
+    expect(notify.raiseIncident.mock.calls[0][0]).toMatchObject({
+      incidentKey: `stage.failed:${DATE}`,
+      evidence: expect.stringContaining("ref-1"),
+      details: expect.objectContaining({ serviceRef: "ref-1" }),
+    });
+  });
+
+  it("refuses a ready draft that has no title", async () => {
+    const draftId = await draftRow(await issueRow(), { content: { ...SAMPLE_CONTENT, title: "  " } });
+    const { service, emails } = fakeService();
+
+    const error = await stageDraft(draftId, {}, { env: ENV, now: () => NOW, service }).catch((e: unknown) => e);
+
+    expect(error).toEqual(refusal("not_ready"));
+    expect((error as Error).message).toBe(`The draft for ${DATE} has no title. Only a ready draft can be staged.`);
+    expect(emails).toHaveLength(0);
     expect(staged()).toHaveLength(0);
   });
 

@@ -50,6 +50,21 @@ describe("distributionServiceFromEnv", () => {
     expect(email).toEqual({ ref: "tpl_new", url: null, mode: "sent" });
   });
 
+  it("stops a running call when the caller's signal aborts", async () => {
+    const caller = new AbortController();
+    const fetch = vi.fn(
+      (_input: RequestInfo | URL, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () => reject(new Error("The call was stopped.")));
+        }),
+    ) as unknown as typeof globalThis.fetch;
+
+    const email = distributionServiceFromEnv(PRODUCTION_ENV, { fetch }).createEmail({ ...EMAIL, signal: caller.signal });
+    caller.abort();
+
+    await expect(email).rejects.toThrow("The call was stopped.");
+  });
+
   it.each(["preview", "development", undefined])("records the calls and sends nothing when APP_ENV is %j", async (appEnv) => {
     const fetch = vi.fn() as unknown as typeof globalThis.fetch;
     const records: SideEffectRecord[] = [];

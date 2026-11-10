@@ -12,8 +12,8 @@ export function createGhlDistributionService(
   return {
     key: "ghl",
     displayName: "GHL",
-    async createEmail(input) {
-      const template = await createEmailTemplate(input, { env, fetch: options.fetch, record: options.record });
+    async createEmail({ name, html, signal }) {
+      const template = await createEmailTemplate({ name, html }, { env, fetch: options.fetch, record: options.record, signal });
       return { ref: template.templateId, url: template.previewUrl ?? null, mode: template.mode };
     },
   };
