@@ -149,7 +149,7 @@ export function NewImagePanel(props: NewImagePanelProps) {
         <button type="button" className={DARK_BUTTON} onClick={props.onGenerate} disabled={working || !scene.trim()}>
           {busy === "generate" ? "Generating…" : generated ? "Generate again" : "Generate"}
         </button>
-        <span className="text-xs text-[var(--text-secondary)]">Edit the scene and generate again as often as you like.</span>
+        <span className="text-xs text-[var(--text-secondary)]">Edit the scene and generate again.</span>
       </div>
 
       {error ? (

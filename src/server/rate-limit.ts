@@ -23,6 +23,10 @@ export const RATE_LIMITS = {
   verifyCodeByEmail: { name: "verify-code:email", limit: 10, windowSeconds: HOUR },
   /** Tries per sign-in code (keyed by the code's id). The window outlives the code's 10 minutes. */
   signInCodeTries: { name: "sign-in-code", limit: 5, windowSeconds: 15 * MINUTE },
+  /** "New image" Generate per approval session: each call is one Vertex image and one S3 upload. */
+  approvalImageGenerate: { name: "approval-image-generate:session", limit: 20, windowSeconds: HOUR },
+  /** "New image" scene ideas per approval session: each call is one OpenAI call. */
+  approvalImageIdeas: { name: "approval-image-ideas:session", limit: 30, windowSeconds: HOUR },
 } as const satisfies Record<string, RateLimitRule>;
 
 // Keys hold a hash, so the table stores no email or IP address.

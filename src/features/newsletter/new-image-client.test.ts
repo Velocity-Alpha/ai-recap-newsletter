@@ -50,6 +50,13 @@ describe("requestImage", () => {
     );
     await expect(requestImage(41, "x", answer(500, {}))).rejects.toThrow("Could not make the image.");
   });
+
+  it("passes the per-session limit's message on as is", async () => {
+    const tooMany = "Too many images this hour. Try again in about 12 minutes.";
+    await expect(requestImage(41, "x", answer(429, { error: tooMany }))).rejects.toThrow(tooMany);
+    const tooManyIdeas = "Too many scene idea requests this hour. Try again in about a minute.";
+    await expect(requestSceneIdeas(41, answer(429, { error: tooManyIdeas }))).rejects.toThrow(tooManyIdeas);
+  });
 });
 
 describe("requestImageDraft", () => {
