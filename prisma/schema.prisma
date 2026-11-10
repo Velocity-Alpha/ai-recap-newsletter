@@ -225,17 +225,13 @@ model RateLimit {
   @@schema("newsletter")
 }
 
-/// One row per board commit (#75): the normalised outline, its sha256, and who drafted it.
-/// draft_owner and forwarded_at are left from the move off n8n. Nothing reads or writes them; draft_owner has a
-/// default so inserts work without it. Issue #151 drops both.
+/// One row per board commit (#75): the normalised outline and its sha256.
 model ApprovalOutline {
   id          BigInt    @id @default(autoincrement())
   issueDate   DateTime  @map("issue_date") @db.Date
   payload     Json
   payloadHash String    @map("payload_hash")
-  draftOwner  String    @default("native") @map("draft_owner")
   committedAt DateTime  @default(now()) @map("committed_at") @db.Timestamptz(6)
-  forwardedAt DateTime? @map("forwarded_at") @db.Timestamptz(6)
 
   @@index([issueDate, committedAt(sort: Desc)])
   @@map("approval_outlines")
