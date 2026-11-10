@@ -139,7 +139,7 @@ describe("DraftView", () => {
     expect(html).not.toContain("Retry");
   });
 
-  it("has no GHL link or template id of its own: the distribution service shows only with a staged version (#149)", () => {
+  it("has no service link or template id of its own: the distribution service shows only with a staged version (#149)", () => {
     const html = render(ready());
 
     expect(html).not.toContain("GHL");

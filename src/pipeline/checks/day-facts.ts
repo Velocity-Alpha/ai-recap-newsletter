@@ -72,19 +72,17 @@ function earliest(...dates: Array<Date | null>): Date | null {
 }
 
 /**
- * Reads the facts from the tables n8n and the native jobs write today:
+ * Reads the facts from these tables:
  * - stories: counted by ingest time (`createdAt` in the New York day), not by `stories.day`. `day` is the
  *   newsletter's own date, often the day before for late senders, so by `day` several sources look empty
  *   most mornings (on the production copy, AI Breakfast on 7 of 8 Tuesdays; by ingest time, 1 of 8).
  *   The same weekday in the 8 weeks before gives the thin-day median. Which sources are expected on a
  *   weekday is fixed per source (`expectedOn` in sources.ts), not read from this history.
- * - commit: stories whose `queued_for_publication_date` is the date (n8n sets it on commit). n8n stores no
- *   commit time, so it is about the earlier of the first draft row and the queued stories' last update.
- * - drafts: `issues` rows for the date (n8n inserts one per commit). Ready = the row has its email HTML.
+ * - commit: stories whose `queued_for_publication_date` is the date (the commit sets it). The commit time is
+ *   about the earlier of the issue row's creation and the queued stories' last update.
+ * - drafts: the `issues` row for the date. Ready = the row has its email HTML.
  * - published: that issue's `status`.
  * - staged: the issue's newest staged version and whether the draft changed after it (`stagedFacts`, #149).
- * When native drafting lands, read the commit from `approval_outlines.committed_at` (#75) and the drafts from
- * `issue_drafts` with status `ready` (#76) here. The checks do not change.
  */
 export async function readDayFacts(date: string): Promise<DayFacts> {
   const warnings: string[] = [];

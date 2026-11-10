@@ -6,6 +6,7 @@ import {
   draftViewHref,
   isRefusal,
   jsonPost,
+  currentDraftHref,
   nativeCommitTarget,
   secondCommitNotice,
 } from "@/src/features/newsletter/draft-links";
@@ -27,6 +28,18 @@ describe("draft links", () => {
     expect(draftViewHref("2026-05-21")).toBe("/approval/drafts?date=2026-05-21");
     expect(draftViewHref("2026-05-21", 41)).toBe("/approval/drafts?date=2026-05-21&draft=41");
     expect(draftHtmlSrc(41)).toBe("/api/approval/drafts/41/html");
+  });
+});
+
+describe("currentDraftHref", () => {
+  it("links an older draft's page to the date's draft page, which shows the current draft", () => {
+    expect(currentDraftHref("2026-05-21", 42, 41)).toBe("/approval/drafts?date=2026-05-21");
+  });
+
+  it("is null when the page shows the current draft, or the date has none", () => {
+    expect(currentDraftHref("2026-05-21", 42, 42)).toBeNull();
+    expect(currentDraftHref("2026-05-21", null, 41)).toBeNull();
+    expect(currentDraftHref("2026-05-21", undefined, null)).toBeNull();
   });
 });
 

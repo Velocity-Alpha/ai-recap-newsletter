@@ -6,8 +6,9 @@ import { useSearchParams } from "next/navigation";
 
 import DraftList from "@/components/approval/DraftList";
 import DraftView from "@/components/approval/DraftView";
-import { jsonPost } from "@/src/features/newsletter/draft-links";
+import { currentDraftHref, jsonPost } from "@/src/features/newsletter/draft-links";
 import { nextDraftPoll, type DraftPollOutcome } from "@/src/features/newsletter/draft-polling";
+import { issueStateText, stagedChangeNote } from "@/src/pipeline/distribution/issue-state";
 import type { DateDraftsView, DraftBoardView } from "@/src/pipeline/draft/draft-board";
 
 // The draft page (#79, #149): the date's current draft (live progress, preview, or failure) and its staged
@@ -53,8 +54,12 @@ function DraftsForDate({ date, requestedId }: { date: string; requestedId: numbe
   const selectedId = requestedId ?? list?.currentDraft?.id ?? null;
   const draftStatus = draft?.status;
   const stagedVersion = draft?.staged?.version;
+  const draftEditedAt = draft?.editedAt;
+  const currentHref = currentDraftHref(date, list?.currentDraft?.id, selectedId);
+  const changeNote = list ? stagedChangeNote(list.state) : null;
 
-  // The staged versions again whenever the shown draft changes status or gets a new staged version.
+  // The date's state and staged versions again whenever the shown draft changes status, gets a new staged
+  // version, or gets a new title or image.
   useEffect(() => {
     let active = true;
     fetch(`/api/approval/drafts?${new URLSearchParams({ date })}`, { cache: "no-store" })
@@ -71,7 +76,7 @@ function DraftsForDate({ date, requestedId }: { date: string; requestedId: numbe
     return () => {
       active = false;
     };
-  }, [date, draftStatus, stagedVersion]);
+  }, [date, draftStatus, stagedVersion, draftEditedAt]);
 
   // The shown draft, every few seconds while it runs. Errors slow the polling down; see nextDraftPoll.
   useEffect(() => {
@@ -95,7 +100,7 @@ function DraftsForDate({ date, requestedId }: { date: string; requestedId: numbe
         } else {
           errors += 1;
           outcome = { kind: "error", httpStatus: response.status };
-          message = String(body.error ?? `Could not read draft ${selectedId}.`);
+          message = String(body.error ?? "Could not read this draft.");
         }
       } catch {
         if (!active) return;
@@ -139,6 +144,20 @@ function DraftsForDate({ date, requestedId }: { date: string; requestedId: numbe
         </Link>
         <p className="mt-6 text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--accent-primary)]">Draft</p>
         <h1 className="mt-2 font-serif text-[clamp(28px,4vw,40px)] leading-tight text-[var(--text-primary)]">{formatDate(date)}</h1>
+        {list ? (
+          <p className="mt-2 text-sm text-[var(--text-secondary)]" data-date-state={list.state.kind}>
+            <span className="font-semibold text-[var(--text-primary)]">{issueStateText(list.state)}</span>
+            {changeNote ? <span className="ml-2 text-[var(--accent-warm)]">{changeNote}</span> : null}
+          </p>
+        ) : null}
+        {currentHref ? (
+          <p className="mt-2 text-sm text-[var(--accent-warm)]">
+            This is an older draft.{" "}
+            <Link href={currentHref} className="font-medium underline">
+              Open the current draft
+            </Link>
+          </p>
+        ) : null}
 
         <div className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
           <div>
@@ -166,7 +185,7 @@ function DraftsForDate({ date, requestedId }: { date: string; requestedId: numbe
             {listError ? (
               <p className="text-sm text-[var(--accent-warm)]">{listError}</p>
             ) : list ? (
-              <DraftList stagedVersions={list.stagedVersions ?? []} />
+              <DraftList stagedVersions={list.stagedVersions} />
             ) : null}
           </aside>
         </div>

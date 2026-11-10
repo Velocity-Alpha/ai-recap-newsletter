@@ -134,7 +134,7 @@ Nine keys. The date in each key is the issue date in New York time.
   title is one known cause; the message then says so.
 - **Do (check, fix, retry):** The incident message links to the drafts page for the date
   (`/approval/drafts?date=<date>`). Steps (from PR #133):
-  1. Open `/approval/drafts?date=<YYYY-MM-DD>`. It lists every draft for the date.
+  1. Open `/approval/drafts?date=<YYYY-MM-DD>`. It shows the date's current draft and its staged versions.
   2. Read the failed step and the error on the failed draft. Fix the cause if it is outside the code, for
      example an API key or a quota.
   3. Press "Retry". The page offers it for a draft that failed, and for a draft stuck in running: one that

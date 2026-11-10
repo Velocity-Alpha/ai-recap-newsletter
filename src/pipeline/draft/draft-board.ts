@@ -88,7 +88,7 @@ export interface StagedVersionEntry extends StagedSummary {
   title: string;
   /** The newest staged version: the one to send. */
   latest: boolean;
-  /** A sent email carried this version. */
+  /** A sent email carried this version. "Mark as published" does not count: no email was seen. */
   sent: boolean;
 }
 
@@ -100,6 +100,9 @@ export interface DateDraftsView {
   /** Newest first. */
   stagedVersions: StagedVersionEntry[];
 }
+
+/** publish_events.mode of "Mark as published" (manual-publish.ts). */
+const MANUAL_MODE = "manual";
 
 const START_LABEL = "starting the draft job";
 
@@ -188,14 +191,16 @@ async function loadStagedSummary(issueId: number): Promise<StagedSummary | null>
  * The ids of the staged versions a sent email carried. An email staged before #149 names only its draft: it
  * counts for that draft's newest staged version, as in publish detection.
  */
-async function loadSentVersionIds(issueIds: number[], versions: StagedVersionRow[]): Promise<Set<number>> {
-  if (versions.length === 0) return new Set();
+async function loadSentVersionIds(issueId: number | null, versions: StagedVersionRow[]): Promise<Set<number>> {
+  if (issueId === null || versions.length === 0) return new Set();
   const events = await prisma.publishEvent.findMany({
-    where: { issueId: { in: issueIds.map((id) => BigInt(id)) } },
-    select: { stagedVersionId: true, draftId: true },
+    where: { issueId: BigInt(issueId) },
+    select: { mode: true, stagedVersionId: true, draftId: true },
   });
   const sent = new Set<number>();
   for (const event of events) {
+    // A manual event names the newest staged version, but no sent email was seen.
+    if (event.mode === MANUAL_MODE) continue;
     if (event.stagedVersionId !== null) sent.add(Number(event.stagedVersionId));
     else if (event.draftId !== null) {
       // `versions` is newest first.
@@ -220,7 +225,7 @@ export async function readDraftForBoard(draftId: number, now: Date): Promise<Dra
 /** The date's state, current draft, and staged versions. `date` is YYYY-MM-DD. */
 export async function readDateForBoard(date: string): Promise<DateDraftsView> {
   const facts = await readDateIssueFacts(date);
-  const sent = await loadSentVersionIds(facts.issueIds, facts.stagedVersions);
+  const sent = await loadSentVersionIds(facts.issueId, facts.stagedVersions);
   return {
     state: issueState(facts),
     currentDraft: facts.newestDraft && { id: facts.newestDraft.id, edited: facts.newestDraft.editedAt !== null },

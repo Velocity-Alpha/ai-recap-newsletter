@@ -44,7 +44,7 @@ function seedStaged(issueId: bigint, draftId: bigint, data: Record<string, unkno
       status: "staged",
       title: "Pretend Lab Plans A Week",
       featuredImageUrl: "https://assets.example.test/a.jpg",
-      service: "ghl",
+      service: "pretend_mail",
       serviceUrl: "https://preview.example.test/v1",
       stagedAt: STAGED_AT,
       ...data,
@@ -58,7 +58,7 @@ describe("readDateIssueFacts", () => {
   it("gives no draft and nothing staged for a date with no issue", async () => {
     const facts = await readDateIssueFacts(DATE);
 
-    expect(facts).toEqual({ issueIds: [], published: false, newestDraft: null, newestStaged: null, stagedVersions: [] });
+    expect(facts).toEqual({ issueId: null, published: false, newestDraft: null, newestStaged: null, stagedVersions: [] });
     expect(issueState(facts)).toEqual({ kind: "no_outline" });
   });
 
@@ -90,7 +90,7 @@ describe("readDateIssueFacts", () => {
       title: "Pretend Lab Plans A Week",
       featuredImageUrl: "https://assets.example.test/a.jpg",
       stagedAt: STAGED_AT,
-      service: "ghl",
+      service: "pretend_mail",
       serviceUrl: null,
     });
     expect(facts.newestDraft?.editedAt).toEqual(EDITED);
@@ -112,7 +112,7 @@ describe("readDateIssueFacts", () => {
     const facts = await readDateIssueFacts(DATE);
 
     expect(facts.published).toBe(true);
-    expect(facts.issueIds).toEqual([Number(issueId)]);
+    expect(facts.issueId).toBe(Number(issueId));
   });
 
   it("reads nothing from another date", async () => {

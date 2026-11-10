@@ -111,7 +111,6 @@ type ApprovalBoardProps = {
       published_at: string | null;
     } | null;
   } | null;
-  /** The date's drafts (#79). Null if they could not be read. */
   /** The date's state, current draft, and staged versions. Null if the read failed. */
   drafting?: DateDraftsView | null;
 };

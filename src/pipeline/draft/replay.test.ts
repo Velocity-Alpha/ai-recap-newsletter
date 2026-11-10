@@ -110,7 +110,7 @@ describe("replayDraft", () => {
     expect(Object.keys(result.report.timings)).toEqual(["read_articles", "write", "validate", "image", "html"]);
   });
 
-  it("makes no email in the distribution service: no draft row, no network, and no GHL template in the report", async () => {
+  it("makes no email in the distribution service: no draft row, no network, and no service template in the report", async () => {
     const writer: IssueWriter = vi.fn(async () => structuredClone(SAMPLE_CONTENT));
     const network = vi.fn(async () => new Response("{}", { status: 200 }));
     vi.stubGlobal("fetch", network);
@@ -128,7 +128,7 @@ describe("replayDraft", () => {
     expect(network).not.toHaveBeenCalled();
   });
 
-  it("reports no GHL template for a failed replay either", async () => {
+  it("reports no service template for a failed replay either", async () => {
     const writer: IssueWriter = vi.fn(async () => Promise.reject(new Error("The writer refused: no.")));
 
     const result = await replayDraft({ outline: SAMPLE_OUTLINE, stories: SAMPLE_APPROVED, n8nIssue: issue }, { writer });
@@ -204,7 +204,7 @@ describe("renderReplayIndex", () => {
     expect(html).toContain("Bad &lt;b&gt;");
   });
 
-  it("names the steps it timed and whose images they are, with no GHL step", () => {
+  it("names the steps it timed and whose images they are, with no distribution service step", () => {
     const html = renderReplayIndex([]);
 
     expect(html).toContain("<p>Steps timed: read_articles, write, validate, image, html. Images are n8n's.</p>");

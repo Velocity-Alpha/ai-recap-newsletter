@@ -124,7 +124,7 @@ async function reserveVersion(
       select: { id: true, status: true, content: true, featuredImageUrl: true, scenePrompt: true },
     });
     if (!newest || newest.id !== draft.id) {
-      throw new StageError(`Draft ${draft.id} is not the newest draft for ${issueDate}. Reload the page and stage the newest draft.`, "not_current");
+      throw new StageError(`This is not the newest draft for ${issueDate}. Reload the page and stage the newest draft.`, "not_current");
     }
     const content = newest.content as unknown as WrittenIssueContent | null;
     const title = typeof content?.title === "string" ? content.title.replace(/\s+/g, " ").trim() : "";

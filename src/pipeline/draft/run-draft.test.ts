@@ -370,7 +370,7 @@ describe("runDraftJob", () => {
     expect(notify.resolveIncident).toHaveBeenCalledWith(`draft.failed:${DATE}`, expect.anything());
   });
 
-  it("never calls the distribution service: it has no GHL step, even in production with the GHL settings", async () => {
+  it("never calls the distribution service: it has no step for it, even in production with the service's settings", async () => {
     const { draftId } = await commit();
     const env = { ...PRODUCTION_ENV, GHL_PRIVATE_INTEGRATION_TOKEN: "pit-test-token-0000", GHL_LOCATION_ID: "loc_test", GHL_USER_ID: "user_test" };
     const network = vi.fn(async () => new Response("{}", { status: 200 }));

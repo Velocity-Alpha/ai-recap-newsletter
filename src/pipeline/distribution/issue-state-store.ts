@@ -20,8 +20,8 @@ export interface StagedVersionRow {
 }
 
 export interface DateIssueFacts extends IssueStateFacts {
-  /** The issues for the date. In practice one. */
-  issueIds: number[];
+  /** The date's issue (`issues.issue_date` is unique). Null when the date has none. */
+  issueId: number | null;
   newestDraft: (NonNullable<IssueStateFacts["newestDraft"]> & { editedAt: Date | null }) | null;
   newestStaged: StagedVersionRow | null;
   /** Every staged version for the date, newest first. */
@@ -30,11 +30,11 @@ export interface DateIssueFacts extends IssueStateFacts {
 
 /** `date` is YYYY-MM-DD. */
 export async function readDateIssueFacts(date: string): Promise<DateIssueFacts> {
-  const issues = await prisma.issue.findMany({ where: { issueDate: new Date(`${date}T00:00:00.000Z`) }, select: { id: true, status: true } });
-  const published = issues.some((issue) => issue.status === ISSUE_PUBLISHED);
-  if (issues.length === 0) return { issueIds: [], published, newestDraft: null, newestStaged: null, stagedVersions: [] };
+  const issue = await prisma.issue.findFirst({ where: { issueDate: new Date(`${date}T00:00:00.000Z`) }, select: { id: true, status: true } });
+  if (!issue) return { issueId: null, published: false, newestDraft: null, newestStaged: null, stagedVersions: [] };
 
-  const issueId = { in: issues.map((issue) => issue.id) };
+  const issueId = issue.id;
+  // The draft's title is only in its content (jsonb), so the whole content is read: one row for each call.
   const [draft, staged] = await Promise.all([
     prisma.issueDraft.findFirst({
       where: { issueId },
@@ -51,8 +51,8 @@ export async function readDateIssueFacts(date: string): Promise<DateIssueFacts> 
   const title = (draft?.content as { title?: unknown } | null)?.title;
   const stagedVersions = staged.map((row) => ({ ...row, id: Number(row.id), draftId: Number(row.draftId) }));
   return {
-    issueIds: issues.map((issue) => Number(issue.id)),
-    published,
+    issueId: Number(issue.id),
+    published: issue.status === ISSUE_PUBLISHED,
     newestDraft: draft && {
       id: Number(draft.id),
       status: draft.status,

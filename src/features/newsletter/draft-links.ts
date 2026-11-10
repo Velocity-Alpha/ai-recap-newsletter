@@ -3,12 +3,21 @@
 import type { DateDraftsView } from "@/src/pipeline/draft/draft-board";
 
 /** What the commit dialog needs to know about the date's drafts. */
-export type DraftingSummary = Pick<DateDraftsView, "currentDraft">;
+type DraftingSummary = Pick<DateDraftsView, "currentDraft">;
 
 export function draftViewHref(date: string, draftId?: number): string {
   const params = new URLSearchParams({ date });
   if (draftId !== undefined) params.set("draft", String(draftId));
   return `/approval/drafts?${params}`;
+}
+
+/**
+ * The link from an older draft's page to the date's current draft. Null when the page already shows the
+ * current draft, or the date has none.
+ */
+export function currentDraftHref(date: string, currentDraftId: number | null | undefined, shownId: number | null): string | null {
+  if (typeof currentDraftId !== "number" || currentDraftId === shownId) return null;
+  return draftViewHref(date);
 }
 
 export function draftHtmlSrc(draftId: number): string {
@@ -53,7 +62,7 @@ export function isRefusal(error: unknown): boolean {
   return error instanceof DraftRequestError && error.status === 409;
 }
 
-export const EDITS_REPLACED_NOTICE = "This replaces the current draft, including your title and image changes.";
+const EDITS_REPLACED_NOTICE = "This replaces the current draft, including your title and image changes.";
 
 /** Shown before a commit when the date already has a draft. It never gives a draft row's number (#149). */
 export function secondCommitNotice(drafting: DraftingSummary | null): string | null {

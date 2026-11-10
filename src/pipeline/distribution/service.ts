@@ -24,6 +24,9 @@ export interface DistributionServiceOptions {
   fetch?: typeof fetch;
 }
 
+/** The one place that picks the service. A different service is one new implementation and a change here. */
+const CURRENT = { ...GHL_SERVICE, create: createGhlDistributionService };
+
 const DISPLAY_NAMES: Record<string, string> = { [GHL_SERVICE.key]: GHL_SERVICE.displayName };
 
 /** The owner's name for the service a staged version was made in (staged_versions.service). */
@@ -33,13 +36,13 @@ export function distributionServiceName(key: string): string {
 
 /** The owner's name for the service that new staged versions go to. */
 export function currentDistributionServiceName(): string {
-  return GHL_SERVICE.displayName;
+  return CURRENT.displayName;
 }
 
-/** The one place that picks the service. A different service is one new implementation and a change here. */
+/** The service that new staged versions go to (`CURRENT`). */
 export function distributionServiceFromEnv(
   env: Record<string, string | undefined> = process.env,
   options: DistributionServiceOptions = {},
 ): DistributionService {
-  return createGhlDistributionService(env, options);
+  return CURRENT.create(env, options);
 }
