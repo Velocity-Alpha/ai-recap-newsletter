@@ -18,7 +18,7 @@ on its own. One source can fail without stopping the others. For each source it 
    (`storyGuid`), drops stories with no usable link, and checks each URL for a paywall (`checkPaywall`).
 5. Saves the rows (`IngestStore.upsertStories`) and moves the bookmark (`writeBookmark`).
 
-The result is a `SourceResult` with a `SourceStatus`: `ok`, `no_new`, `partial` or `failed`.
+The result is a `SourceResult` with an `items` count (emails, feed snapshots or posts) and a `SourceStatus`: `ok`, `no_new`, `partial` or `failed`.
 `run-ingest.ts` writes one run-log line per source.
 
 ## Add an email source
@@ -65,6 +65,10 @@ Use this when the source is a beehiiv publication with a public website, like In
 over email when the mailbox is not subscribed, or when the email is only a digest. Do not add a publication
 both ways. Its stories would be saved twice.
 
+"beehiiv" is a source kind (`beehiiv_site`), never a source key. Each publication gets its own key. Old
+`stories.source` values such as `beehiiv` come from n8n, and `SUBSCRIBER_PROVIDER=beehiiv` is about
+subscriber lists, not sources.
+
 1. Add a `BeehiivSiteSource` to `STORY_SOURCES`:
 
    ```ts
@@ -74,13 +78,22 @@ both ways. Its stories would be saved twice.
 2. Nothing else is needed. `ingestBeehiivSiteSource` in `ingest.ts` does the rest.
 
 What it reads (`beehiiv-site.ts`):
-- `{siteUrl}/sitemap.xml`. Posts are the URLs under `/p/`. A post is read when its `lastmod` day is on or
-  after the cutoff day. At most 10 posts are read per run.
-- Each post page. The `Article` ld+json block gives `datePublished` and `isAccessibleForFree`. Paid posts
-  are skipped. The body is the element with id `content-blocks`.
+- `{siteUrl}/sitemap.xml`. Posts are the URLs under `/p/` on the site's host (`www.` or not). A post is
+  read when its `lastmod` day (UTC) is on or after the cutoff day. A sitemap with no posts fails the source.
+- Each post page, newest first, at most 30 per run. If more posts changed, the run reads the 30 newest and
+  records an error.
+- The `Article` ld+json block gives `datePublished` and `isAccessibleForFree`. Only an explicit false
+  means paid. Paid posts and posts at or before the cutoff are skipped before the body is read.
+- The body is the element with id `content-blocks`. A free, new post without it is an error.
 
-How dates work: the issue date is the New York date of `datePublished`. The bookmark moves to
-`datePublished`. Each story gets its date from the extractor, with the issue date as the fallback.
+Stories that link to the publication's own site are dropped. They count as stories without a link.
+
+How dates work: the issue date is the New York date of `datePublished`. Each story gets its date from
+the extractor, with the issue date as the fallback.
+
+The bookmark moves to the newest `datePublished` read. If any page fails, or the 30-page cap was hit, the
+bookmark does not move in that run. The good posts are still saved, and the next run reads them again
+harmlessly.
 
 Why this design: [ADR 0003](../adr/0003-beehiiv-site-source.md).
 
