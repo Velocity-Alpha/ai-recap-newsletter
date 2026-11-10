@@ -234,3 +234,107 @@ describe("ingestStories: feeds", () => {
     expect(result.sources[0]).toMatchObject({ status: "no_new" });
   });
 });
+
+describe("ingestStories: beehiiv sites", () => {
+  const SITE: StorySource = { key: "example_ai", name: "Example AI", kind: "beehiiv_site", siteUrl: "https://news.example.org", expectedOn: [] };
+  const SITEMAP_URL = "https://news.example.org/sitemap.xml";
+
+  function sitemap(entries: { slug: string; lastmod?: string; host?: string }[]) {
+    const urls = entries
+      .map(({ slug, lastmod, host }) => `<url><loc>https://${host ?? "news.example.org"}/p/${slug}</loc>${lastmod ? `<lastmod>${lastmod}</lastmod>` : ""}</url>`)
+      .join("");
+    return `<urlset><url><loc>https://news.example.org/</loc><lastmod>2026-11-09</lastmod></url>${urls}</urlset>`;
+  }
+
+  function post(slug: string, publishedAt: string, free = "True") {
+    return () =>
+      new Response(
+        `<script type="application/ld+json">{"@type":"Article","datePublished":"${publishedAt}","isAccessibleForFree":"${free}"}</script>` +
+          `<div id="content-blocks"><p>body of ${slug}</p></div>`,
+      );
+  }
+
+  const extractFromBody = () =>
+    vi.fn(async (input: ExtractionInput) => [story({ published_at: "2026-11-08", url: `https://example.org/${input.text.split(" ").pop()}` })]);
+
+  it("saves stories with their own day, passes the New York issue date, and moves the bookmark to datePublished", async () => {
+    const { store, rows, marks } = memoryStore({ example_ai: new Date(NOW.getTime() - 48 * HOUR) });
+    const fetch = fakeFetch({
+      [SITEMAP_URL]: () => new Response(sitemap([{ slug: "monday", lastmod: "2026-11-09" }])),
+      "https://news.example.org/p/monday": post("monday", "2026-11-09T03:01:00.000Z"),
+    });
+    const extract = extractFromBody();
+
+    const result = await ingestStories({ gmail: fakeGmail([]).gmail, fetch, extract, store, now: NOW, sources: [SITE] });
+
+    expect(extract.mock.calls[0][0]).toMatchObject({ sourceDate: "2026-11-08", text: "body of monday" });
+    expect([...rows.values()]).toEqual([expect.objectContaining({ day: "2026-11-08", source: "example_ai", url: "https://example.org/monday" })]);
+    expect(marks.get("example_ai")).toEqual(new Date("2026-11-09T03:01:00.000Z"));
+    expect(result.sources[0]).toMatchObject({ status: "ok", emails: 1, stories: 1 });
+  });
+
+  it("skips posts at or before the bookmark and paid posts without calling the model", async () => {
+    const bookmark = new Date("2026-11-09T03:01:00.000Z");
+    const { store } = memoryStore({ example_ai: bookmark });
+    const fetch = fakeFetch({
+      [SITEMAP_URL]: () => new Response(sitemap([{ slug: "seen", lastmod: "2026-11-09" }, { slug: "paid", lastmod: "2026-11-09" }])),
+      "https://news.example.org/p/seen": post("seen", bookmark.toISOString()),
+      "https://news.example.org/p/paid": post("paid", "2026-11-09T05:00:00.000Z", "False"),
+    });
+    const extract = vi.fn();
+
+    const result = await ingestStories({ gmail: fakeGmail([]).gmail, fetch, extract, store, now: NOW, sources: [SITE] });
+
+    expect(extract).not.toHaveBeenCalled();
+    expect(store.writeBookmark).not.toHaveBeenCalled();
+    expect(result.sources[0]).toMatchObject({ status: "no_new", emails: 0 });
+  });
+
+  it("keeps the bookmark before a failed post and still saves the newer one", async () => {
+    const { store, marks } = memoryStore({ example_ai: new Date(NOW.getTime() - 48 * HOUR) });
+    const fetch = fakeFetch({
+      [SITEMAP_URL]: () =>
+        new Response(sitemap([{ slug: "first", lastmod: "2026-11-08" }, { slug: "broken", lastmod: "2026-11-09" }, { slug: "last", lastmod: "2026-11-09" }])),
+      "https://news.example.org/p/first": post("first", "2026-11-08T03:00:00.000Z"),
+      "https://news.example.org/p/broken": () => new Response("gone", { status: 500 }),
+      "https://news.example.org/p/last": post("last", "2026-11-09T03:00:00.000Z"),
+    });
+    const extract = extractFromBody();
+
+    const result = await ingestStories({ gmail: fakeGmail([]).gmail, fetch, extract, store, now: NOW, sources: [SITE] });
+
+    expect(extract.mock.calls.map(([input]) => input.text)).toEqual(["body of first", "body of last"]);
+    expect(result.sources[0]).toMatchObject({
+      status: "partial",
+      emails: 3,
+      stories: 2,
+      errors: ["https://news.example.org/p/broken: HTTP 500."],
+    });
+    expect(marks.get("example_ai")).toEqual(new Date("2026-11-08T03:00:00.000Z"));
+  });
+
+  it("reports a sitemap HTTP error as a failed source", async () => {
+    const { store } = memoryStore();
+    const fetch = fakeFetch({ [SITEMAP_URL]: () => new Response("", { status: 503 }) });
+    const result = await ingestStories({ gmail: fakeGmail([]).gmail, fetch, extract: vi.fn(), store, now: NOW, sources: [SITE] });
+    expect(result.sources[0]).toMatchObject({ status: "failed", errors: ["Example AI sitemap returned HTTP 503."] });
+    expect(store.writeBookmark).not.toHaveBeenCalled();
+  });
+
+  it("fetches only recent same-host posts with a lastmod, at most 10", async () => {
+    const { store } = memoryStore();
+    const recent = Array.from({ length: 12 }, (_, index) => ({ slug: `p${index}`, lastmod: index < 2 ? "2026-11-07" : "2026-11-09" }));
+    const fetch = fakeFetch({
+      [SITEMAP_URL]: () =>
+        new Response(
+          sitemap([...recent, { slug: "old", lastmod: "2026-11-05" }, { slug: "undated" }, { slug: "elsewhere", lastmod: "2026-11-09", host: "other.example.org" }]),
+        ),
+    });
+
+    await ingestStories({ gmail: fakeGmail([]).gmail, fetch, extract: vi.fn(async () => []), store, now: NOW, sources: [SITE] });
+
+    const pages = fetch.mock.calls.map(([input]) => String(input)).filter((href) => href.includes("/p/"));
+    // The cutoff is 2026-11-06 14:55 UTC, so lastmod 2026-11-06 onward counts; the 10 newest win.
+    expect(pages.sort()).toEqual(recent.slice(2).map(({ slug }) => `https://news.example.org/p/${slug}`).sort());
+  });
+});

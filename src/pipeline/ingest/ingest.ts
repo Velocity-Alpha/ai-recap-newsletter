@@ -1,3 +1,4 @@
+import { listSitemapPosts, readBeehiivPost } from "@/src/pipeline/ingest/beehiiv-site";
 import { htmlToText } from "@/src/pipeline/ingest/email-text";
 import type { ExtractedStory, Extractor } from "@/src/pipeline/ingest/extract";
 import {
@@ -8,7 +9,13 @@ import {
 } from "@/src/pipeline/ingest/feeds";
 import { checkPaywall } from "@/src/pipeline/ingest/paywall";
 import { BROWSER_USER_AGENT, resolveTrackingLinks } from "@/src/pipeline/ingest/redirects";
-import { STORY_SOURCES, type FeedSource, type GmailSource, type StorySource } from "@/src/pipeline/ingest/sources";
+import {
+  STORY_SOURCES,
+  type BeehiivSiteSource,
+  type FeedSource,
+  type GmailSource,
+  type StorySource,
+} from "@/src/pipeline/ingest/sources";
 import { cleanStoryUrl, storyGuid } from "@/src/pipeline/ingest/url";
 import type { GmailReader } from "@/src/pipeline/publish/gmail-client";
 
@@ -72,6 +79,9 @@ export interface IngestResult {
 const LOOKBACK_MS = 72 * 3_600_000;
 const EMAIL_LIMIT = 20;
 const PAYWALL_CONCURRENCY = 6;
+/** Most beehiiv posts read per run, so an outage cannot set off a large backfill. */
+const BEEHIIV_POST_LIMIT = 10;
+const BEEHIIV_CONCURRENCY = 4;
 const NEW_YORK_DATE = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" });
 
 export function newYorkDate(date: Date): string {
@@ -183,6 +193,59 @@ async function ingestFeedSource(source: FeedSource, deps: IngestDeps, result: So
   await deps.store.writeBookmark(source.key, deps.now);
 }
 
+async function fetchPage(url: string, fetchImpl: typeof fetch): Promise<Response> {
+  return fetchImpl(url, { headers: { "user-agent": BROWSER_USER_AGENT }, signal: AbortSignal.timeout(20_000) });
+}
+
+async function ingestBeehiivSiteSource(source: BeehiivSiteSource, deps: IngestDeps, result: SourceResult): Promise<void> {
+  const bookmark = await deps.store.readBookmark(source.key);
+  const cutoff = new Date(Math.max(bookmark?.getTime() ?? 0, deps.now.getTime() - LOOKBACK_MS));
+  const site = new URL(source.siteUrl);
+  const response = await fetchPage(new URL("/sitemap.xml", site).href, deps.fetch);
+  if (!response.ok) throw new Error(`${source.name} sitemap returned HTTP ${response.status}.`);
+
+  // `lastmod` is only a day, so a post seen earlier today is fetched again and then skipped below by
+  // `publishedAt <= cutoff`, with no model call.
+  const cutoffDay = cutoff.toISOString().slice(0, 10);
+  const candidates = listSitemapPosts(await response.text())
+    .filter((post) => post.lastmod !== null && post.lastmod >= cutoffDay && new URL(post.url).host === site.host)
+    .sort((a, b) => b.lastmod!.localeCompare(a.lastmod!))
+    .slice(0, BEEHIIV_POST_LIMIT);
+
+  const pages = await mapInBatches(candidates, BEEHIIV_CONCURRENCY, async (candidate) => {
+    try {
+      const page = await fetchPage(candidate.url, deps.fetch);
+      if (!page.ok) throw new Error(`HTTP ${page.status}.`);
+      return { url: candidate.url, post: readBeehiivPost(await page.text()) };
+    } catch (error) {
+      // A failed page has no publish time; its lastmod day is the earliest it can block the bookmark.
+      return { url: candidate.url, failedAt: new Date(`${candidate.lastmod}T00:00:00Z`), error: message(error) };
+    }
+  });
+  const items = pages
+    .filter((page) => !page.post || (page.post.publishedAt > cutoff && page.post.free))
+    .sort((a, b) => (a.post?.publishedAt ?? a.failedAt!).getTime() - (b.post?.publishedAt ?? b.failedAt!).getTime());
+
+  // Same rule as emails: the bookmark only moves past posts that all succeeded.
+  let advanceTo: Date | null = null;
+  let blocked = false;
+  for (const item of items) {
+    result.emails += 1;
+    try {
+      if (!item.post) throw new Error(item.error);
+      const stories = await deps.extract({ sourceDate: newYorkDate(item.post.publishedAt), text: item.post.text });
+      const { rows, skippedNoLink } = await toRows(stories, { source: source.key, fetch: deps.fetch });
+      result.stories += await deps.store.upsertStories(rows);
+      result.skippedNoLink += skippedNoLink;
+      if (!blocked) advanceTo = item.post.publishedAt;
+    } catch (error) {
+      blocked = true;
+      result.errors.push(`${item.url}: ${message(error)}`);
+    }
+  }
+  if (advanceTo) await deps.store.writeBookmark(source.key, advanceTo);
+}
+
 function finalStatus(result: SourceResult): SourceStatus {
   if (result.errors.length === 0) return result.emails === 0 ? "no_new" : "ok";
   return result.emails > result.errors.length ? "partial" : "failed";
@@ -204,8 +267,22 @@ export async function ingestStories(deps: IngestDeps): Promise<IngestResult> {
         errors: [],
       };
       try {
-        if (source.kind === "gmail") await ingestEmailSource(source, deps, result);
-        else await ingestFeedSource(source, deps, result, targetDate);
+        switch (source.kind) {
+          case "gmail":
+            await ingestEmailSource(source, deps, result);
+            break;
+          case "beehiiv_site":
+            await ingestBeehiivSiteSource(source, deps, result);
+            break;
+          case "product_hunt":
+          case "hugging_face":
+            await ingestFeedSource(source, deps, result, targetDate);
+            break;
+          default: {
+            const unknown: never = source;
+            throw new Error(`Unknown source kind: ${JSON.stringify(unknown)}`);
+          }
+        }
       } catch (error) {
         result.errors.push(message(error));
       }
