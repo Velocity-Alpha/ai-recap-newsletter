@@ -3,24 +3,26 @@ import { parse } from "node-html-parser";
 import { htmlToText } from "@/src/pipeline/ingest/email-text";
 
 /**
- * Reads a beehiiv publication's public website: the post list from `sitemap.xml` and each post from its
- * schema.org Article data and its `#content-blocks` element. Pure functions; the caller fetches.
+ * Reads a beehiiv publication's public website: the post list from `sitemap.xml`, and each post's
+ * schema.org Article data and `#content-blocks` element. Pure functions; the caller fetches.
  */
 
 export interface SitemapPost {
   url: string;
-  /** YYYY-MM-DD, the day the post last changed (not when it was published). */
+  /** YYYY-MM-DD, the UTC day the post last changed (not when it was published). */
   lastmod: string | null;
 }
 
-export interface BeehiivPost {
+export interface PostMeta {
   publishedAt: Date;
   free: boolean;
-  text: string;
 }
 
-function decodeXml(value: string): string {
-  return value
+function xmlValue(raw: string): string {
+  return raw
+    .trim()
+    .replace(/^<!\[CDATA\[([\s\S]*)\]\]>$/, "$1")
+    .trim()
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"')
@@ -28,65 +30,60 @@ function decodeXml(value: string): string {
     .replace(/&amp;/g, "&");
 }
 
+function isPostUrl(url: string): boolean {
+  try {
+    return new URL(url).pathname.startsWith("/p/");
+  } catch {
+    return false;
+  }
+}
+
 export function listSitemapPosts(xml: string): SitemapPost[] {
   const posts: SitemapPost[] = [];
   for (const [, entry] of xml.matchAll(/<url>([\s\S]*?)<\/url>/g)) {
-    const loc = entry.match(/<loc>\s*([\s\S]*?)\s*<\/loc>/)?.[1];
+    const loc = entry.match(/<loc>([\s\S]*?)<\/loc>/)?.[1];
     if (!loc) continue;
-    const url = decodeXml(loc);
-    let path: string;
-    try {
-      path = new URL(url).pathname;
-    } catch {
-      continue;
-    }
-    if (!path.startsWith("/p/")) continue;
-    const lastmod = entry.match(/<lastmod>\s*(\d{4}-\d{2}-\d{2})/)?.[1] ?? null;
-    posts.push({ url, lastmod });
+    const url = xmlValue(loc);
+    if (!isPostUrl(url)) continue;
+    const lastmod = entry.match(/<lastmod>([\s\S]*?)<\/lastmod>/)?.[1];
+    posts.push({ url, lastmod: lastmod ? (xmlValue(lastmod).match(/^\d{4}-\d{2}-\d{2}/)?.[0] ?? null) : null });
   }
   return posts;
 }
 
-type JsonObject = Record<string, unknown>;
-
-function isArticle(value: unknown): value is JsonObject {
-  if (!value || typeof value !== "object") return false;
-  const type = (value as JsonObject)["@type"];
-  return type === "Article" || (Array.isArray(type) && type.includes("Article"));
-}
-
-function findArticle(root: ReturnType<typeof parse>): JsonObject | null {
-  for (const script of root.querySelectorAll('script[type="application/ld+json"]')) {
+function findArticle(html: string): Record<string, unknown> | null {
+  for (const script of parse(html).querySelectorAll('script[type="application/ld+json"]')) {
     let data: unknown;
     try {
-      data = JSON.parse(script.text);
+      // rawText: the decoded text would turn an escaped `&quot;` in a headline into a bare quote.
+      data = JSON.parse(script.rawText);
     } catch {
       continue;
     }
-    const graph = data && typeof data === "object" && !Array.isArray(data) ? (data as JsonObject)["@graph"] : undefined;
-    const candidates = Array.isArray(data) ? data : Array.isArray(graph) ? graph : [data];
-    const article = candidates.find(isArticle);
-    if (article) return article;
+    if (data && typeof data === "object" && !Array.isArray(data) && (data as Record<string, unknown>)["@type"] === "Article") {
+      return data as Record<string, unknown>;
+    }
   }
   return null;
 }
 
-export function readBeehiivPost(html: string): BeehiivPost {
-  const root = parse(html, { comment: false });
-  const article = findArticle(root);
+export function readPostMeta(html: string): PostMeta {
+  const article = findArticle(html);
   if (!article) throw new Error("beehiiv post has no Article data.");
 
   const publishedAt = new Date(typeof article.datePublished === "string" ? article.datePublished : NaN);
   if (Number.isNaN(publishedAt.getTime())) throw new Error("beehiiv post has no valid datePublished.");
 
-  // beehiiv writes the flag as the string "True" or "False".
+  // beehiiv writes the flag as the string "True" or "False". Only an explicit false means paid.
   const access = article.isAccessibleForFree;
-  const free = access === undefined || access === true || (typeof access === "string" && access.toLowerCase() === "true");
+  const free = !(access === false || (typeof access === "string" && access.toLowerCase() === "false"));
+  return { publishedAt, free };
+}
 
-  const content = root.getElementById("content-blocks");
+export function readPostText(html: string): string {
+  const content = parse(html, { comment: false }).getElementById("content-blocks");
   if (!content) throw new Error("beehiiv post has no #content-blocks element.");
   const text = htmlToText(content.outerHTML);
   if (!text) throw new Error("beehiiv post has no text.");
-
-  return { publishedAt, free, text };
+  return text;
 }

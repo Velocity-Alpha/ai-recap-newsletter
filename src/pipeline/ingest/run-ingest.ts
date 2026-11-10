@@ -48,7 +48,7 @@ function defaultIngest(env: Record<string, string | undefined>) {
 
 function sourceEvent(source: SourceResult): { level: EventLevel; message: string } {
   if (source.status === "failed") return { level: "error", message: `${source.name}: failed. ${source.errors.join(" ")}` };
-  const counts = `${source.emails} email(s), ${source.stories} stories, ${source.skippedNoLink} without a link.`;
+  const counts = `${source.items} item(s), ${source.stories} stories, ${source.skippedNoLink} without a link.`;
   if (source.status === "partial") {
     return { level: "warn", message: `${source.name}: partial, ${counts} Errors: ${source.errors.join(" ")}` };
   }
@@ -136,7 +136,7 @@ export async function runIngest(runner: PipelineRunner, options: RunIngestOption
     targetDate: result.targetDate,
     storiesSaved: result.storiesSaved,
     telegram,
-    sources: result.sources.map(({ source, status, emails, stories, skippedNoLink }) => ({ source, status, emails, stories, skippedNoLink })),
+    sources: result.sources.map(({ source, status, items, stories, skippedNoLink }) => ({ source, status, items, stories, skippedNoLink })),
   };
   await finishRun(
     runId,

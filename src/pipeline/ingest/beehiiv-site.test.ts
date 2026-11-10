@@ -1,18 +1,20 @@
 import { describe, expect, it } from "vitest";
 
-import { listSitemapPosts, readBeehiivPost } from "@/src/pipeline/ingest/beehiiv-site";
+import { listSitemapPosts, readPostMeta, readPostText } from "@/src/pipeline/ingest/beehiiv-site";
 
 describe("listSitemapPosts", () => {
-  it("lists only /p/ posts, with lastmod or null, and decodes entities", () => {
+  it("lists only /p/ posts, with lastmod or null, and decodes entities and CDATA", () => {
     const xml = `<?xml version="1.0"?><urlset>
       <url><loc>https://news.example.org/</loc><lastmod>2026-11-10</lastmod></url>
       <url><loc>https://news.example.org/p/first-post</loc><lastmod>2026-11-10</lastmod></url>
       <url><loc>https://news.example.org/p/a&amp;b</loc></url>
+      <url><loc><![CDATA[https://news.example.org/p/wrapped]]></loc><lastmod><![CDATA[2026-11-09]]></lastmod></url>
       <url><loc>https://news.example.org/archive</loc></url>
     </urlset>`;
     expect(listSitemapPosts(xml)).toEqual([
       { url: "https://news.example.org/p/first-post", lastmod: "2026-11-10" },
       { url: "https://news.example.org/p/a&b", lastmod: null },
+      { url: "https://news.example.org/p/wrapped", lastmod: "2026-11-09" },
     ]);
   });
 });
@@ -22,33 +24,44 @@ function page(ld: string[], body = '<div id="content-blocks"><p>Intro <a href="h
   return `<html><head>${blocks}<style>.a{}</style></head><body><script>var x=1;</script>${body}<footer>Footer</footer></body></html>`;
 }
 
-const ARTICLE = '{"@type":"Article","datePublished":"2026-11-10T03:01:00.000Z","isAccessibleForFree":"True"}';
+const article = (free?: string) =>
+  `{"@type":"Article","headline":"A post","datePublished":"2026-11-10T03:01:00.000Z"${free === undefined ? "" : `,"isAccessibleForFree":${free}`}}`;
 
-describe("readBeehiivPost", () => {
-  it("reads the Article date, free flag and the content-blocks text only", () => {
-    const html = page(['{"@type":"BreadcrumbList"}', "{not json", ARTICLE, '{"@type":"FAQPage"}']);
-    const post = readBeehiivPost(html);
-    expect(post.publishedAt).toEqual(new Date("2026-11-10T03:01:00.000Z"));
-    expect(post.free).toBe(true);
-    expect(post.text).toContain("Intro [Story X](https://example.org/x)");
-    expect(post.text).not.toContain("Footer");
-    expect(post.text).not.toContain("var x");
+describe("readPostMeta", () => {
+  it("reads the Article date and free flag, skipping other and broken blocks", () => {
+    const meta = readPostMeta(page(['{"@type":"BreadcrumbList"}', "{not json", article('"True"'), '{"@type":"FAQPage"}']));
+    expect(meta).toEqual({ publishedAt: new Date("2026-11-10T03:01:00.000Z"), free: true });
   });
 
-  it("reads paid posts, boolean flags, a missing flag, arrays and @graph", () => {
-    expect(readBeehiivPost(page([ARTICLE.replace('"True"', '"False"')])).free).toBe(false);
-    expect(readBeehiivPost(page([ARTICLE.replace('"True"', "false")])).free).toBe(false);
-    expect(readBeehiivPost(page(['{"@type":"Article","datePublished":"2026-11-10T03:01:00Z"}'])).free).toBe(true);
-    expect(readBeehiivPost(page([`{"@graph":[${ARTICLE}]}`])).free).toBe(true);
-    expect(readBeehiivPost(page([`[${ARTICLE}]`])).free).toBe(true);
+  it("reads the script's raw text, so entities in a headline do not break the JSON", () => {
+    const html = page(['{"@type":"Article","headline":"Say &quot;hi&quot; &amp; go","datePublished":"2026-11-10T03:01:00Z"}']);
+    expect(readPostMeta(html).free).toBe(true);
   });
 
-  it("throws clear errors when a part is missing", () => {
-    expect(() => readBeehiivPost(page(['{"@type":"FAQPage"}']))).toThrow("beehiiv post has no Article data.");
-    expect(() => readBeehiivPost(page(['{"@type":"Article","datePublished":"soon"}']))).toThrow(
-      "beehiiv post has no valid datePublished.",
-    );
-    expect(() => readBeehiivPost(page([ARTICLE], "<div>no blocks</div>"))).toThrow("beehiiv post has no #content-blocks element.");
-    expect(() => readBeehiivPost(page([ARTICLE], '<div id="content-blocks"> </div>'))).toThrow("beehiiv post has no text.");
+  it("treats only an explicit false as paid", () => {
+    expect(readPostMeta(page([article('"False"')])).free).toBe(false);
+    expect(readPostMeta(page([article('"false"')])).free).toBe(false);
+    expect(readPostMeta(page([article("false")])).free).toBe(false);
+    for (const free of [undefined, "null", "true", '"True"']) expect(readPostMeta(page([article(free)])).free).toBe(true);
+  });
+
+  it("throws clear errors when the Article or its date is missing", () => {
+    expect(() => readPostMeta(page(['{"@type":"FAQPage"}']))).toThrow("beehiiv post has no Article data.");
+    expect(() => readPostMeta(page([`[${article()}]`]))).toThrow("beehiiv post has no Article data.");
+    expect(() => readPostMeta(page(['{"@type":"Article","datePublished":"soon"}']))).toThrow("beehiiv post has no valid datePublished.");
+  });
+});
+
+describe("readPostText", () => {
+  it("reads only the content-blocks element, with links", () => {
+    const text = readPostText(page([]));
+    expect(text).toContain("Intro [Story X](https://example.org/x)");
+    expect(text).not.toContain("Footer");
+    expect(text).not.toContain("var x");
+  });
+
+  it("throws when the body is missing or empty", () => {
+    expect(() => readPostText(page([], "<div>no blocks</div>"))).toThrow("beehiiv post has no #content-blocks element.");
+    expect(() => readPostText(page([], '<div id="content-blocks"> </div>'))).toThrow("beehiiv post has no text.");
   });
 });
