@@ -3,7 +3,7 @@ import { logServerError, logServerInfo } from "@/src/server/observability";
 import { CANDIDATE_SECTION_CONFIGS, type SectionKey } from "@/src/features/newsletter/section-config";
 import { storyUrlKey } from "@/src/features/newsletter/story-url";
 import { findUnsentDrafts } from "@/src/features/newsletter/unsent-drafts";
-import { proposeLeadStory, storySources } from "@/src/features/newsletter/lead-story";
+import { moveLeadToTopStories, proposeLeadStory, storySources } from "@/src/features/newsletter/lead-story";
 
 export interface StoryRecord {
   id: number;
@@ -65,6 +65,8 @@ export interface ApprovalOutlineData {
    * Absent on boards cached before #58.
    */
   proposed_lead_id?: number | null;
+  /** Why the AI lead pick chose the proposed lead. Absent when the score chose it. */
+  proposed_lead_reason?: string | null;
   /** Earlier drafts that were never sent, and whether their stories are back in this board's pool. */
   unsent_drafts: UnsentDraftNotice[];
   /**
@@ -658,31 +660,6 @@ function createSectionBlueprints(
       selected: section.selected.map(toOption),
       fill_ins: section.fill_ins.map(toOption),
     }));
-}
-
-/**
- * Puts a lead proposed from another section at the top of Top Stories, as the owner does by hand (#58). The
- * section it leaves promotes its first fill-in, and the last Top Story becomes the first Top Story fill-in.
- */
-function moveLeadToTopStories(
-  sections: CandidateSection[],
-  lead: { id: number; sectionKey: string } | null
-): CandidateSection[] {
-  const topStories = sections.find((section) => section.key === "headlines");
-  const from = sections.find((section) => section.key === lead?.sectionKey);
-  if (!lead || !topStories || !from || from === topStories) return sections;
-  const story = from.selected.find((option) => option.id === lead.id);
-  if (!story) return sections;
-
-  from.selected = from.selected.filter((option) => option.id !== lead.id);
-  const promoted = from.fill_ins.shift();
-  if (promoted) from.selected.push(promoted);
-
-  topStories.selected = [story, ...topStories.selected];
-  if (topStories.selected.length > topStories.max) {
-    topStories.fill_ins = [...topStories.selected.splice(topStories.max), ...topStories.fill_ins];
-  }
-  return sections;
 }
 
 /**
