@@ -34,9 +34,9 @@ function ingestResult(failed = false): IngestResult {
     targetDate: "2026-11-09",
     storiesSaved: 5,
     sources: [
-      { source: "rundown_ai", name: "The Rundown", status: "ok", items: 1, stories: 5, skippedNoLink: 1, errors: [] },
+      { source: "rundown_ai", name: "The Rundown", status: "ok", documents: 1, stories: 5, skippedNoLink: 1, errors: [] },
       ...(failed
-        ? [{ source: "tldr", name: "TLDR", status: "failed" as const, items: 0, stories: 0, skippedNoLink: 0, errors: ["HTTP 500"] }]
+        ? [{ source: "tldr", name: "TLDR", status: "failed" as const, documents: 0, stories: 0, skippedNoLink: 0, errors: ["HTTP 500"] }]
         : []),
     ],
   };
@@ -75,7 +75,7 @@ describe("runIngest", () => {
     expect(result).toMatchObject({ status: "ran", runId: "7", telegram: "sent" });
     expect(sendTelegram).toHaveBeenCalledWith(expect.stringContaining("Today's stories are in: 5 new."));
     expect(events.map((event) => `${event.level} ${event.step}: ${event.message}`)).toEqual([
-      "info source: The Rundown: ok, 1 item(s), 5 stories, 1 without a link.",
+      "info source: The Rundown: ok, 1 document(s), 5 stories, 1 without a link.",
       "info telegram: Sent the ready message.",
     ]);
     expect(runs).toEqual([{ status: "succeeded", stats: expect.objectContaining({ storiesSaved: 5 }) }]);

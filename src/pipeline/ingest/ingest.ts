@@ -1,4 +1,4 @@
-import { listSitemapPosts, readPostMeta, readPostText, type PostMeta } from "@/src/pipeline/ingest/beehiiv-site";
+import { listSitemapPosts, readPostMeta, readPostText, type PostMeta, type SitemapPost } from "@/src/pipeline/ingest/beehiiv-site";
 import { htmlToText } from "@/src/pipeline/ingest/email-text";
 import type { ExtractedStory, ExtractionInput, Extractor } from "@/src/pipeline/ingest/extract";
 import {
@@ -62,8 +62,8 @@ export interface SourceResult {
   source: string;
   name: string;
   status: SourceStatus;
-  /** Items read: emails, feed snapshots or posts. */
-  items: number;
+  /** Emails, feed snapshots or posts read. */
+  documents: number;
   stories: number;
   /** Stories with no usable link (none, or a link to the source's own site). */
   skippedNoLink: number;
@@ -81,8 +81,8 @@ const LOOKBACK_MS = 72 * 3_600_000;
 const FETCH_TIMEOUT_MS = 20_000;
 const EMAIL_LIMIT = 20;
 const PAYWALL_CONCURRENCY = 6;
-/** Most beehiiv post pages read per run. More is reported as an error, so a backlog is seen, not dropped. */
-const BEEHIIV_PAGE_LIMIT = 30;
+/** Most beehiiv post pages read per run (the page cap). More is reported as an error, so a backlog is seen. */
+export const BEEHIIV_PAGE_LIMIT = 30;
 const BEEHIIV_PAGE_CONCURRENCY = 4;
 const NEW_YORK_DATE = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" });
 
@@ -158,36 +158,44 @@ async function toRows(
   return { rows, skippedNoLink };
 }
 
-/** Extracts stories from one item's text and saves them. */
-async function saveStories(input: ExtractionInput, context: RowContext, deps: IngestDeps, result: SourceResult): Promise<void> {
+/** Extracts stories from one document's text and saves them. */
+async function extractAndSave(options: { input: ExtractionInput; rows: RowContext; deps: IngestDeps; result: SourceResult }): Promise<void> {
+  const { input, rows: context, deps, result } = options;
   const stories = await deps.extract(input);
   const { rows, skippedNoLink } = await toRows(stories, { ...context, fetch: deps.fetch });
   result.stories += await deps.store.upsertStories(rows);
   result.skippedNoLink += skippedNoLink;
 }
 
+/** Counts one failed document. `finalStatus` relies on one error per failed document. */
+function recordFailure(result: SourceResult, label: string, error: unknown): void {
+  result.documents += 1;
+  result.errors.push(`${label}: ${message(error)}`);
+}
+
 /**
- * Runs items oldest first, counting each and recording failures. Returns the time the bookmark may move to:
- * the last item of the unbroken run of successes from the oldest, so a failed item is tried again next run.
- * `blocked` keeps the bookmark where it is.
+ * Runs documents oldest first, counting each and recording failures. Returns the time the bookmark may move
+ * to: the last success of the unbroken run from the oldest, and strictly before the first failure's time,
+ * because the next run reads only what is strictly after the bookmark.
  */
 async function processInOrder<T>(
-  items: T[],
-  options: { result: SourceResult; label: (item: T) => string; at: (item: T) => Date; run: (item: T) => Promise<void>; blocked?: boolean },
+  documents: T[],
+  options: { result: SourceResult; label: (document: T) => string; at: (document: T) => Date; run: (document: T) => Promise<void> },
 ): Promise<Date | null> {
-  let advanceTo: Date | null = null;
-  let blocked = options.blocked ?? false;
-  for (const item of [...items].sort((a, b) => options.at(a).getTime() - options.at(b).getTime())) {
-    options.result.items += 1;
+  const succeeded: Date[] = [];
+  let firstFailure: Date | null = null;
+  for (const document of [...documents].sort((a, b) => options.at(a).getTime() - options.at(b).getTime())) {
     try {
-      await options.run(item);
-      if (!blocked) advanceTo = options.at(item);
+      await options.run(document);
+      options.result.documents += 1;
+      if (!firstFailure) succeeded.push(options.at(document));
     } catch (error) {
-      blocked = true;
-      options.result.errors.push(`${options.label(item)}: ${message(error)}`);
+      recordFailure(options.result, options.label(document), error);
+      firstFailure ??= options.at(document);
     }
   }
-  return advanceTo;
+  const limit = firstFailure;
+  return (limit ? succeeded.filter((at) => at < limit) : succeeded).at(-1) ?? null;
 }
 
 async function ingestEmailSource(source: GmailSource, deps: IngestDeps, result: SourceResult): Promise<void> {
@@ -206,7 +214,7 @@ async function ingestEmailSource(source: GmailSource, deps: IngestDeps, result: 
         ? await resolveTrackingLinks(raw, source.trackingLinks, { fetch: deps.fetch })
         : raw;
       const text = source.body === "html" && mail.html ? htmlToText(resolved) : resolved;
-      await saveStories({ sourceDate: newYorkDate(mail.sentAt), text }, { source: source.key }, deps, result);
+      await extractAndSave({ input: { sourceDate: newYorkDate(mail.sentAt), text }, rows: { source: source.key }, deps, result });
     },
   });
   if (advanceTo) await deps.store.writeBookmark(source.key, advanceTo);
@@ -224,41 +232,51 @@ async function ingestFeedSource(source: FeedSource, deps: IngestDeps, result: So
       : buildHuggingFaceText(body, { cutoff, targetDate });
   if (feed.count === 0) return;
 
-  result.items += 1;
+  result.documents += 1;
   // Feed items carry no reliable story date (n8n dated papers by arXiv date, which kept 95 of 319 off the
   // board), so they take the run's date.
-  await saveStories({ sourceDate: targetDate, text: feed.text }, { source: source.key, fixedDay: targetDate }, deps, result);
+  await extractAndSave({
+    input: { sourceDate: targetDate, text: feed.text },
+    rows: { source: source.key, fixedDay: targetDate },
+    deps,
+    result,
+  });
   await deps.store.writeBookmark(source.key, deps.now);
 }
 
-/** Post pages changed on or after the cutoff's day, newest first, at most `BEEHIIV_PAGE_LIMIT`. */
-async function listChangedPosts(source: BeehiivSiteSource, cutoff: Date, deps: IngestDeps): Promise<{ urls: string[]; overflow?: string }> {
+/**
+ * Post pages changed on or after `cutoffDay`, newest lastmod first, then in sitemap order, at most
+ * `BEEHIIV_PAGE_LIMIT`. `changed` counts all of them.
+ */
+async function listChangedPosts(
+  source: BeehiivSiteSource,
+  host: string,
+  cutoffDay: string,
+  deps: IngestDeps,
+): Promise<{ urls: string[]; changed: number }> {
   const response = await fetchPage(new URL("/sitemap.xml", source.siteUrl).href, deps.fetch);
   if (!response.ok) throw new Error(`${source.name} sitemap returned HTTP ${response.status}.`);
-  const host = siteHost(source.siteUrl);
   const posts = listSitemapPosts(await response.text()).filter((post) => siteHost(post.url) === host);
   if (posts.length === 0) throw new Error(`${source.name} sitemap lists no posts.`);
 
   // beehiiv's lastmod is the UTC day (checked 2026-11-10 against posts published at 03:01Z and 14:11Z).
-  const cutoffDay = cutoff.toISOString().slice(0, 10);
   const changed = posts
-    .flatMap((post) => (post.lastmod !== null && post.lastmod >= cutoffDay ? [{ url: post.url, lastmod: post.lastmod }] : []))
-    .sort((a, b) => b.lastmod.localeCompare(a.lastmod));
-  const overflow =
-    changed.length > BEEHIIV_PAGE_LIMIT
-      ? `${source.name}: ${changed.length} posts changed since ${cutoffDay}; read the ${BEEHIIV_PAGE_LIMIT} newest.`
-      : undefined;
-  return { urls: changed.slice(0, BEEHIIV_PAGE_LIMIT).map((post) => post.url), overflow };
+    .filter((post): post is SitemapPost & { lastmod: string } => post.lastmod !== null && post.lastmod >= cutoffDay)
+    .sort((a, b) => b.lastmod.localeCompare(a.lastmod)); // stable, so ties keep sitemap order
+  return { urls: changed.slice(0, BEEHIIV_PAGE_LIMIT).map((post) => post.url), changed: changed.length };
 }
 
 type PostPage = { ok: true; url: string; html: string; meta: PostMeta } | { ok: false; url: string; error: string };
 
-async function readPostPage(url: string, fetchImpl: typeof fetch): Promise<PostPage> {
+async function readPostPage(url: string, deps: IngestDeps): Promise<PostPage> {
   try {
-    const response = await fetchPage(url, fetchImpl);
+    const response = await fetchPage(url, deps.fetch);
     if (!response.ok) throw new Error(`HTTP ${response.status}.`);
     const html = await response.text();
-    return { ok: true, url, html, meta: readPostMeta(html) };
+    const meta = readPostMeta(html);
+    // A future date would move the bookmark past every post until then.
+    if (meta.publishedAt > deps.now) throw new Error(`datePublished is in the future (${meta.publishedAt.toISOString()}).`);
+    return { ok: true, url, html, meta };
   } catch (error) {
     return { ok: false, url, error: message(error) };
   }
@@ -266,35 +284,41 @@ async function readPostPage(url: string, fetchImpl: typeof fetch): Promise<PostP
 
 async function ingestBeehiivSiteSource(source: BeehiivSiteSource, deps: IngestDeps, result: SourceResult): Promise<void> {
   const cutoff = await readCutoff(source.key, deps);
-  const { urls, overflow } = await listChangedPosts(source, cutoff, deps);
-  const pages = await mapInBatches(urls, BEEHIIV_PAGE_CONCURRENCY, (url) => readPostPage(url, deps.fetch));
+  const host = siteHost(source.siteUrl);
+  const cutoffDay = cutoff.toISOString().slice(0, 10);
+  const { urls, changed } = await listChangedPosts(source, host, cutoffDay, deps);
+  const pages = await mapInBatches(urls, BEEHIIV_PAGE_CONCURRENCY, (url) => readPostPage(url, deps));
 
-  // A post whose page failed has no known date, so any failure (or unread overflow) keeps the bookmark.
-  const failed = pages.flatMap((page) => (page.ok ? [] : [`${page.url}: ${page.error}`]));
-  result.items += failed.length;
-  result.errors.push(...failed, ...(overflow ? [overflow] : []));
+  for (const page of pages) if (!page.ok) recordFailure(result, page.url, page.error);
+  if (changed > urls.length) {
+    // The unread posts count as one failed document, so the status still compares documents with errors.
+    recordFailure(result, source.name, `${changed} posts changed since ${cutoffDay}; read ${urls.length}. New posts may be among the unread ones.`);
+  }
+  // A failed page has no known date, and unread posts may be new, so either keeps the bookmark.
+  const nothingFailed = result.errors.length === 0;
 
   // lastmod is only a day, so a post read earlier today is fetched again and skipped here, with no model call.
-  const posts = pages.flatMap((page) => (page.ok && page.meta.free && page.meta.publishedAt > cutoff ? [page] : []));
+  const posts = pages.filter(
+    (page): page is Extract<PostPage, { ok: true }> => page.ok && page.meta.free && page.meta.publishedAt > cutoff,
+  );
   const advanceTo = await processInOrder(posts, {
     result,
-    blocked: failed.length > 0 || overflow !== undefined,
     label: (post) => post.url,
     at: (post) => post.meta.publishedAt,
     run: (post) =>
-      saveStories(
-        { sourceDate: newYorkDate(post.meta.publishedAt), text: readPostText(post.html) },
-        { source: source.key, ownHost: siteHost(source.siteUrl) },
+      extractAndSave({
+        input: { sourceDate: newYorkDate(post.meta.publishedAt), text: readPostText(post.html) },
+        rows: { source: source.key, ownHost: host },
         deps,
         result,
-      ),
+      }),
   });
-  if (advanceTo) await deps.store.writeBookmark(source.key, advanceTo);
+  if (advanceTo && nothingFailed) await deps.store.writeBookmark(source.key, advanceTo);
 }
 
 function finalStatus(result: SourceResult): SourceStatus {
-  if (result.errors.length === 0) return result.items === 0 ? "no_new" : "ok";
-  return result.items > result.errors.length ? "partial" : "failed";
+  if (result.errors.length === 0) return result.documents === 0 ? "no_new" : "ok";
+  return result.documents > result.errors.length ? "partial" : "failed";
 }
 
 export async function ingestStories(deps: IngestDeps): Promise<IngestResult> {
@@ -307,7 +331,7 @@ export async function ingestStories(deps: IngestDeps): Promise<IngestResult> {
         source: source.key,
         name: source.name,
         status: "ok",
-        items: 0,
+        documents: 0,
         stories: 0,
         skippedNoLink: 0,
         errors: [],
