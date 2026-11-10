@@ -1,6 +1,7 @@
 # Each commit makes a new draft and a new GHL template
 
-- **Status:** Accepted, 2026-11-09 (owner).
+- **Status:** Replaced on 2026-11-10 by [ADR 0004](./0004-draft-staged-for-sending-by-the-owner.md). Kept as a
+  record. Still true: one issue per date, and each commit makes a new draft of it.
 
 There is one issue per date, and each issue has one or more drafts. Every commit, and every accepted image
 change, makes a new draft with its own new GHL email template, named like `2026-11-09 v2: <subject>`. The

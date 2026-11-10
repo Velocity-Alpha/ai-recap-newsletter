@@ -29,10 +29,23 @@ describe("draft links", () => {
 });
 
 describe("secondCommitNotice", () => {
-  it("warns before a second native commit for a date", () => {
+  it("warns before a second native commit for a date that the new draft replaces the current one", () => {
     expect(secondCommitNotice({ drafts: [{ id: 40, version: 1, status: "ready" }], nextVersion: 2 })).toBe(
-      "This makes draft v2 and a new GHL template. Earlier drafts stay in GHL.",
+      "This makes draft v2. It replaces the current draft as the one to review and stage.",
     );
+  });
+
+  it("names the version the commit makes, and no distribution service", () => {
+    const notice = secondCommitNotice({
+      drafts: [
+        { id: 41, version: 2, status: "failed" },
+        { id: 40, version: 1, status: "ready" },
+      ],
+      nextVersion: 3,
+    });
+
+    expect(notice).toBe("This makes draft v3. It replaces the current draft as the one to review and stage.");
+    expect(notice).not.toContain("GHL");
   });
 
   it("says nothing for the first commit", () => {

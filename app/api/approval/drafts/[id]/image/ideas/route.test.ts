@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { IssuePublishedError, NewImageError } from "@/src/pipeline/draft/draft-store";
+import { DraftEditError, IssuePublishedError } from "@/src/pipeline/draft/draft-store";
 import { createApprovalSessionToken } from "@/src/server/approval-auth";
 import { RATE_LIMITS } from "@/src/server/rate-limit";
 import type { RateLimitStore } from "@/src/server/rate-limit-store";
@@ -68,8 +68,9 @@ describe("POST /api/approval/drafts/[id]/image/ideas", () => {
   });
 
   it.each([
-    [404, new NewImageError("Draft 41 does not exist.", "missing")],
-    [409, new NewImageError("Draft 41 is running. Only a ready draft can get a new image.", "not_ready")],
+    [404, new DraftEditError("Draft 41 does not exist.", "missing")],
+    [409, new DraftEditError("Draft v1 for 2026-05-21 is running. Only a ready draft can be changed.", "not_ready")],
+    [409, new DraftEditError("Draft v1 is not the newest draft for 2026-05-21: v2 is running. Reload the page.", "not_current")],
     [409, new IssuePublishedError(3, "2026-05-21")],
     [502, new NewImageServiceError("Scene ideas failed: Request timed out.")],
   ])("answers %i with the plain reason", async (status, error) => {

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { distributionServiceFromEnv } from "@/src/pipeline/distribution/service";
+import { GHL_SERVICE } from "@/src/pipeline/distribution/ghl";
+import { distributionServiceFromEnv, distributionServiceName } from "@/src/pipeline/distribution/service";
 import type { SideEffectRecord } from "@/src/pipeline/side-effects";
 
 const PRODUCTION_ENV = {
@@ -15,6 +16,26 @@ const EMAIL = { name: "2026-11-09 v3: Synthetic subject line", html: "<html><bod
 function json(body: unknown): Response {
   return new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } });
 }
+
+describe("distributionServiceName", () => {
+  it("gives the owner's name for the service a staged version was made in", () => {
+    expect(distributionServiceName("ghl")).toBe("GHL");
+    expect(distributionServiceName(GHL_SERVICE.key)).toBe(GHL_SERVICE.displayName);
+  });
+
+  it("agrees with the service the env picks", () => {
+    const service = distributionServiceFromEnv({ APP_ENV: "development" });
+
+    expect(distributionServiceName(service.key)).toBe(service.displayName);
+  });
+
+  it("gives the key itself for a service it does not know, so an old staged version still has a name", () => {
+    expect(distributionServiceName("pretend-mailer")).toBe("pretend-mailer");
+    // Keys are matched as stored: "ghl" is the only known one.
+    expect(distributionServiceName("GHL")).toBe("GHL");
+    expect(distributionServiceName("Ghl")).toBe("Ghl");
+  });
+});
 
 describe("distributionServiceFromEnv", () => {
   it("gives the service's key for the database and its name for the owner", () => {

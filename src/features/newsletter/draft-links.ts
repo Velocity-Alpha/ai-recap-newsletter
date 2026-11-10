@@ -27,7 +27,7 @@ export function jsonPost(body: unknown = {}): RequestInit {
 /** Shown before a commit when the date already has drafts. */
 export function secondCommitNotice(drafting: DraftingSummary | null): string | null {
   if (!drafting || drafting.drafts.length === 0) return null;
-  return `This makes draft v${drafting.nextVersion} and a new GHL template. Earlier drafts stay in GHL.`;
+  return `This makes draft v${drafting.nextVersion}. It replaces the current draft as the one to review and stage.`;
 }
 
 /**

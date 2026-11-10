@@ -1,4 +1,4 @@
-import { createGhlDistributionService } from "@/src/pipeline/distribution/ghl";
+import { createGhlDistributionService, GHL_SERVICE } from "@/src/pipeline/distribution/ghl";
 import type { SideEffectRecord } from "@/src/pipeline/side-effects";
 
 /**
@@ -22,6 +22,13 @@ export interface DistributionServiceOptions {
   /** Gets each call outside production (see side-effects). */
   record?: (entry: SideEffectRecord) => void | Promise<void>;
   fetch?: typeof fetch;
+}
+
+const DISPLAY_NAMES: Record<string, string> = { [GHL_SERVICE.key]: GHL_SERVICE.displayName };
+
+/** The owner's name for the service a staged version was made in (staged_versions.service). */
+export function distributionServiceName(key: string): string {
+  return DISPLAY_NAMES[key] ?? key;
 }
 
 /** The one place that picks the service. A different service is one new implementation and a change here. */

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { IngestResult } from "@/src/pipeline/ingest/ingest";
-import { buildReadyMessage, createTelegramSender, REVIEW_CHAT_ID } from "@/src/pipeline/ingest/telegram";
+import { buildReadyMessage, createTelegramSender, REVIEW_CHAT_ID, sendToReviewGroup } from "@/src/pipeline/ingest/telegram";
 
 function result(overrides: Partial<IngestResult> = {}): IngestResult {
   return {
@@ -64,5 +64,79 @@ describe("createTelegramSender", () => {
     const failure = send("Hello");
     await expect(failure).rejects.toThrow("Telegram sendMessage failed with HTTP 401 (Unauthorized).");
     await expect(failure).rejects.not.toThrow("123:abc");
+  });
+});
+
+describe("sendToReviewGroup", () => {
+  type Logged = { level: string; step: string; message: string; data?: unknown };
+
+  function runLog() {
+    const events: Logged[] = [];
+    return { events, log: async (event: Logged) => void events.push(event) };
+  }
+
+  it("sends the text in production and logs that it was sent", async () => {
+    const send = vi.fn(async () => undefined);
+    const { events, log } = runLog();
+
+    const status = await sendToReviewGroup("Hello", { env: { APP_ENV: "production" }, send, log });
+
+    expect(status).toBe("sent");
+    expect(send).toHaveBeenCalledWith("Hello");
+    expect(events).toEqual([{ level: "info", step: "telegram", message: "Sent the ready message." }]);
+  });
+
+  it.each(["preview", "development", undefined])("records the text and sends nothing when APP_ENV is %j", async (appEnv) => {
+    const send = vi.fn();
+    const { events, log } = runLog();
+
+    const status = await sendToReviewGroup("Hello", { env: { APP_ENV: appEnv, TELEGRAM_REVIEW_BOT_TOKEN: "123:abc" }, send, log });
+
+    expect(status).toBe("recorded");
+    expect(send).not.toHaveBeenCalled();
+    expect(events).toEqual([{ level: "info", step: "telegram", message: "Not sent outside production. Recorded the text.", data: { text: "Hello" } }]);
+  });
+
+  it("warns and sends nothing in production without the bot token", async () => {
+    const { events, log } = runLog();
+
+    const status = await sendToReviewGroup("Hello", { env: { APP_ENV: "production" }, log });
+
+    expect(status).toBe("not_configured");
+    expect(events).toEqual([{ level: "warn", step: "telegram", message: "Missing setting: TELEGRAM_REVIEW_BOT_TOKEN. Not sent." }]);
+  });
+
+  it("turns a failed send into a warning and does not throw", async () => {
+    const send = vi.fn(async () => {
+      throw new Error("Telegram sendMessage failed with HTTP 401 (Unauthorized).");
+    });
+    const { events, log } = runLog();
+
+    const status = await sendToReviewGroup("Hello", { env: { APP_ENV: "production" }, send, log });
+
+    expect(status).toBe("failed");
+    expect(events).toEqual([{ level: "warn", step: "telegram", message: "Telegram sendMessage failed with HTTP 401 (Unauthorized)." }]);
+  });
+
+  it("does not throw when the run log itself fails", async () => {
+    const log = vi.fn(async () => {
+      throw new Error("The run log is down.");
+    });
+
+    const status = await sendToReviewGroup("Hello", { env: { APP_ENV: "development" }, log });
+
+    expect(status).toBe("failed");
+  });
+
+  it("still says sent when the message went out and only the run log failed", async () => {
+    const send = vi.fn(async () => undefined);
+    const log = vi.fn(async () => {
+      throw new Error("The run log is down.");
+    });
+
+    const status = await sendToReviewGroup("Hello", { env: { APP_ENV: "production" }, send, log });
+
+    expect(status).toBe("sent");
+    expect(send).toHaveBeenCalledWith("Hello");
   });
 });

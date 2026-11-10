@@ -13,8 +13,6 @@ const ENTRY = {
   status: "running",
   subject: null,
   failedStepLabel: null,
-  ghlTemplateId: null,
-  ghlPreviewUrl: null,
   sent: false,
   current: false,
   createdAt: "2026-05-21T14:00:00.000Z",

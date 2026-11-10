@@ -13,18 +13,7 @@ import {
   type WrittenIssueContent,
 } from "@/src/pipeline/draft/content";
 import { renderIssueEmailHtml } from "@/src/pipeline/draft/email-html";
-import {
-  createDraftTemplate,
-  GhlTemplateError,
-  type DraftTemplateInput,
-  type DraftTemplateResult,
-} from "@/src/pipeline/draft/ghl-template";
-import {
-  checkUploadedImage,
-  makeFeaturedImage,
-  type FeaturedImage,
-  type FeaturedImageInput,
-} from "@/src/pipeline/draft/image/featured-image";
+import { makeFeaturedImage, type FeaturedImage, type FeaturedImageInput } from "@/src/pipeline/draft/image/featured-image";
 import type { ApprovalOutline } from "@/src/pipeline/draft/outline";
 import { assertValidContent, findContentProblems } from "@/src/pipeline/draft/validate";
 import {
@@ -34,56 +23,33 @@ import {
   type IssueWriter,
   type WriterInput,
 } from "@/src/pipeline/draft/writer";
-import type { SideEffectRecord } from "@/src/pipeline/side-effects";
 
 /**
- * Turns a committed outline into a draft's content, email HTML, featured image, and GHL template. No database:
- * the draft job (run-draft.ts) loads the inputs and saves the result, and the replay script calls this directly.
+ * Turns a committed outline into a draft's content, featured image, and email HTML. No database, and no call to
+ * the distribution service: only "Stage for sending" creates an email there (ADR 0004). The draft job
+ * (run-draft.ts) loads the inputs and saves the result, and the replay script calls this directly.
  */
 
-export const DRAFT_STEPS = ["read_articles", "write", "validate", "image", "html", "ghl"] as const;
+export const DRAFT_STEPS = ["read_articles", "write", "validate", "image", "html"] as const;
 export type DraftStep = (typeof DRAFT_STEPS)[number];
 
-/** A "New image" draft's steps (#116): the content is copied from its source draft, so nothing is read or written. */
-export const NEW_IMAGE_STEPS = ["image", "html", "ghl"] as const satisfies readonly DraftStep[];
-
-interface DraftTarget {
+export interface ProduceDraftInput {
   issue: { id: number; /** YYYY-MM-DD */ date: string };
-  draft: { id: number; version: number };
-}
-
-/** A commit's draft: every step, from the outline. */
-export interface ProduceDraftInput extends DraftTarget {
+  draft: { id: number };
   outline: ApprovalOutline;
   /** The approved stories by section, with the board's link and note edits applied (approved-stories.ts). */
   stories: ApprovedSections;
 }
 
-/** A "New image" draft (#116): the source draft's written content, with the image the owner chose. */
-export interface NewImageDraftInput extends DraftTarget {
-  source: { content: WrittenIssueContent; unreadStoryIds: number[] };
-  image: FeaturedImage;
-}
-
-export function isNewImageInput(input: ProduceDraftInput | NewImageDraftInput): input is NewImageDraftInput {
-  return "source" in input;
-}
-
 /** Reads the articles of feature-section stories, for the issue being drafted. */
 export type ReadArticles = (stories: ApprovedStory[], context?: ReadContext) => Promise<ArticleText[]>;
 export type MakeImage = (input: FeaturedImageInput) => Promise<FeaturedImage>;
-export type CreateTemplate = (input: DraftTemplateInput) => Promise<DraftTemplateResult>;
-/** Checks the image a "New image" draft was given before it goes into the email. Throws a plain error. */
-export type CheckImage = (image: FeaturedImage, issueDate: string) => Promise<FeaturedImage> | FeaturedImage;
 
 export interface ProduceDraftDeps {
   /** `createDraftDeps` gives the article reader (#120); `readNoArticles` skips reading. */
   readArticles: ReadArticles;
   writer: IssueWriter;
   makeImage: MakeImage;
-  /** "New image" drafts only. Without it, the image only has to be there. */
-  checkImage?: CheckImage;
-  createTemplate: CreateTemplate;
   /** Called as each step starts. A rewrite runs `write` and `validate` a second time. */
   onStep?: (step: DraftStep) => void | Promise<void>;
   /** Called as the rewrite starts, with how many problems the first draft had. */
@@ -99,19 +65,13 @@ export interface ProducedDraft {
   html: string;
   featuredImageUrl: string;
   scenePrompt: string;
-  ghlTemplateId: string;
-  ghlPreviewUrl: string | null;
-  /** `recorded` outside production: nothing reached GHL. */
-  ghlMode: DraftTemplateResult["mode"];
   /** Feature-section stories whose article was not read. The board marks them "source not read". */
   unreadStoryIds: number[];
   stepMs: Partial<Record<DraftStep, number>>;
 }
 
 /** What a failed draft had made before the failing step. */
-export type PartialDraft = Partial<
-  Pick<ProducedDraft, "content" | "unreadStoryIds" | "featuredImageUrl" | "scenePrompt" | "html" | "ghlTemplateId" | "ghlPreviewUrl">
->;
+export type PartialDraft = Partial<Pick<ProducedDraft, "content" | "unreadStoryIds" | "featuredImageUrl" | "scenePrompt" | "html">>;
 
 /** A failed step. The message is the cause's own message, for the board and the incident. */
 export class DraftStepError extends Error {
@@ -167,14 +127,7 @@ export function imageContextFor(content: WrittenIssueContent): FeaturedImageInpu
   };
 }
 
-function chosenImage(image: FeaturedImage): FeaturedImage {
-  if (!image.imageUrl.trim() || !image.scenePrompt.trim()) {
-    throw new Error("This draft has no chosen image. Make a new image from the ready draft again.");
-  }
-  return image;
-}
-
-export async function produceDraft(input: ProduceDraftInput | NewImageDraftInput, deps: ProduceDraftDeps): Promise<ProducedDraft> {
+export async function produceDraft(input: ProduceDraftInput, deps: ProduceDraftDeps): Promise<ProducedDraft> {
   const now = deps.now ?? (() => Date.now());
   const readArticles = deps.readArticles;
   const partial: PartialDraft = {};
@@ -195,46 +148,29 @@ export async function produceDraft(input: ProduceDraftInput | NewImageDraftInput
     }
   }
 
-  const { issue, draft } = input;
+  const { issue, draft, stories: sections } = input;
 
-  /** Reads, writes, and checks the content: a commit's draft only. */
-  const write = async (outline: ProduceDraftInput) => {
-    const sections = outline.stories;
-    const articles = await step("read_articles", () => readArticles(featureStories(sections), { issueId: issue.id }));
-    partial.unreadStoryIds = unreadArticleStoryIds(sections, articles);
+  const articles = await step("read_articles", () => readArticles(featureStories(sections), { issueId: issue.id }));
+  const unreadStoryIds = unreadArticleStoryIds(sections, articles);
+  partial.unreadStoryIds = unreadStoryIds;
 
-    const writerInput: WriterInput = { sections, leadStoryId: outline.outline.leadStoryId, articles };
-    let written = await step("write", () => deps.writer(writerInput));
-    partial.content = written;
+  const writerInput: WriterInput = { sections, leadStoryId: input.outline.leadStoryId, articles };
+  let content = await step("write", () => deps.writer(writerInput));
+  partial.content = content;
 
-    const problems = await step("validate", () => findContentProblems(written, sections));
-    if (problems.length > 0) {
-      // The writer varies from run to run, so one rewrite with the problems listed often fixes a miss.
-      const previous = written;
-      written = await step("write", async () => {
-        await deps.onRewrite?.(problems.length);
-        return deps.writer({ ...writerInput, revision: { previous, problems } });
-      });
-      partial.content = written;
-      await step("validate", () => assertValidContent(written, sections));
-    }
-    return written;
-  };
-
-  let content: WrittenIssueContent;
-  if (isNewImageInput(input)) {
-    content = structuredClone(input.source.content);
+  const problems = await step("validate", () => findContentProblems(content, sections));
+  if (problems.length > 0) {
+    // The writer varies from run to run, so one rewrite with the problems listed often fixes a miss.
+    const previous = content;
+    content = await step("write", async () => {
+      await deps.onRewrite?.(problems.length);
+      return deps.writer({ ...writerInput, revision: { previous, problems } });
+    });
     partial.content = content;
-    partial.unreadStoryIds = [...input.source.unreadStoryIds];
-  } else {
-    content = await write(input);
+    await step("validate", () => assertValidContent(content, sections));
   }
 
-  const image = await step("image", async () => {
-    if (!isNewImageInput(input)) return deps.makeImage({ issueDate: issue.date, context: imageContextFor(content) });
-    const chosen = chosenImage(input.image);
-    return deps.checkImage ? deps.checkImage(chosen, issue.date) : chosen;
-  });
+  const image = await step("image", () => deps.makeImage({ issueDate: issue.date, context: imageContextFor(content) }));
   partial.featuredImageUrl = image.imageUrl;
   partial.scenePrompt = image.scenePrompt;
 
@@ -243,43 +179,19 @@ export async function produceDraft(input: ProduceDraftInput | NewImageDraftInput
   );
   partial.html = html;
 
-  const template = await step("ghl", async () => {
-    try {
-      return await deps.createTemplate({ issueDate: issue.date, version: draft.version, subject: content.title, html });
-    } catch (error) {
-      // GHL made the template but setting its HTML failed: keep the id, so the owner can find it.
-      if (error instanceof GhlTemplateError && error.templateId) partial.ghlTemplateId = error.templateId;
-      throw error;
-    }
-  });
-
-  return {
-    content,
-    html,
-    featuredImageUrl: image.imageUrl,
-    scenePrompt: image.scenePrompt,
-    ghlTemplateId: template.templateId,
-    ghlPreviewUrl: template.previewUrl ?? null,
-    ghlMode: template.mode,
-    unreadStoryIds: partial.unreadStoryIds ?? [],
-    stepMs,
-  };
+  return { content, html, featuredImageUrl: image.imageUrl, scenePrompt: image.scenePrompt, unreadStoryIds, stepMs };
 }
 
 export interface DraftDepsOptions {
-  /** Gets each GHL call outside production. */
-  record?: (entry: SideEffectRecord) => void | Promise<void>;
   /** Gets every feature-section story's read outcome, for the run log. */
   onArticleReads?: (reads: ArticleReadReport[]) => void | Promise<void>;
   /** Gets saved-copy problems, which never fail the step. */
   onArticleWarning?: (message: string) => void | Promise<void>;
   /** Gets other read-step news, such as old saved text cleared. */
   onArticleInfo?: (message: string) => void | Promise<void>;
-  /** The "New image" check's HEAD request (tests). */
-  fetch?: typeof fetch;
 }
 
-/** The real services. GHL only sends in production; elsewhere `record` gets each call. */
+/** The real services: the article reader, the writer, and the image maker. */
 export function createDraftDeps(
   env: Record<string, string | undefined> = process.env,
   options: DraftDepsOptions = {},
@@ -302,7 +214,5 @@ export function createDraftDeps(
         scene: { apiKey: env.OPENAI_API_KEY },
         image: { apiKey: env.VERTEX_API_KEY },
       }),
-    checkImage: (image, issueDate) => checkUploadedImage(image, issueDate, { appEnv: env.APP_ENV, bucket: env.S3_BUCKET, fetch: options.fetch }),
-    createTemplate: (input) => createDraftTemplate(input, { env, record: options.record }),
   };
 }

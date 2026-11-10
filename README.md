@@ -109,11 +109,12 @@ Mutation routes:
 - `POST /api/subscriber/sign-out`
 - `GET|POST /api/subscriber/unsubscribe` with a signed `token`
 - `POST /api/subscriber/unsubscribe/webhook` with `Authorization: Bearer <GHL_UNSUBSCRIBE_WEBHOOK_SECRET>` or `x-webhook-secret`
-- `POST /api/newsletters/commit` commits an approved outline: it saves the story changes, makes the next draft, and starts `draft-issue-background`
+- `POST /api/newsletters/commit` commits an approved outline: it saves the story changes, makes the next draft, and starts `draft-issue-background`. It creates no email in the distribution service
+- `PATCH /api/approval/drafts/[id]` with `{ title }` changes the title of the issue's newest ready draft, in the same draft and on the issue row. An empty title or one over 200 characters answers 400; a title another issue uses answers 409 (approval session)
 - `POST /api/approval/drafts/[id]/retry` runs a failed or stuck draft again from the start (approval session)
-- `POST /api/approval/drafts/[id]/image/ideas` three scene ideas for "New image" on a ready draft, from one GPT-6 Luna call (approval session; 30 per session per hour, then 429)
+- `POST /api/approval/drafts/[id]/image/ideas` three scene ideas for "New image" on the issue's newest ready draft, from one GPT-6 Luna call (approval session; 30 per session per hour, then 429)
 - `POST /api/approval/drafts/[id]/image/generate` makes one image from `{ scenePrompt }` plus the fixed style prompt and uploads it to S3; it makes no draft (approval session; 20 per session per hour, then 429)
-- `POST /api/approval/drafts/[id]/image` "Use this image": `{ imageUrl, scenePrompt }` from "generate" becomes the issue's next draft, with the same text, new HTML, and a new GHL template; it starts `draft-issue-background` (approval session)
+- `POST /api/approval/drafts/[id]/image` "Use this image": `{ imageUrl, scenePrompt }` from "generate" replaces the image of the same draft and of the issue row, and the draft's HTML is built again. It makes no draft and starts no job (approval session)
 - `POST /api/approval/drafts/[id]/stage` "Stage for sending": copies the issue's newest ready draft into the distribution service (GHL) as the next staged version, named `<YYYY-MM-DD> v<n>: <title>`. Body `{ confirmRepeat?: boolean }`: an unchanged draft answers 409 with code `already_staged` until `confirmRepeat` is true. It runs in the request and starts no job. Outside production the call is recorded and nothing reaches GHL (approval session)
 - `POST /api/approval/skipped-dates` with `{ date, note? }` marks a skipped date, and `DELETE /api/approval/skipped-dates?date=` undoes it, until that day is over (approval session). Used by "No issue today" on `/approval`.
 - `POST /api/approval/issues/[id]/publish` publishes an unpublished draft from its stored email HTML (approval session). Used by the "Mark as published" button on `/approval/issues`. It sends no email.
@@ -153,7 +154,7 @@ Required:
 - `OPENAI_API_KEY` — story extraction, dedup, the lead pick, and drafting
 - `GMAIL_OAUTH_CLIENT_ID`, `GMAIL_OAUTH_CLIENT_SECRET`, `GMAIL_OAUTH_REFRESH_TOKEN` — read-only access to the seed inbox, for the ingest and publish jobs
 - `PUBLISH_SEED_RECIPIENTS` — the one monitor seed address. Each send also reaches the owner's `+` alias in the same inbox; without this filter the publish job reads every send twice
-- `TELEGRAM_REVIEW_BOT_TOKEN` — production only; the ingest job's "stories are ready" message
+- `TELEGRAM_REVIEW_BOT_TOKEN` — production only; the ingest job's "stories are ready" message and the draft job's "draft is ready for review" message
 - `TELEGRAM_OPS_CHAT_ID` — production only; the "AI Recap Ops" chat where the review bot posts ops alerts (`src/pipeline/notify/`). Never the review group. Without it, alerts are not sent.
 - `HEALTHCHECKS_PING_URL` — production only; the Healthchecks.io ping URL for the daily summary. `run-checks` pings it after the 18:00 summary. Without it, the run log records "not configured".
 - `RESEND_API_KEY`
@@ -167,14 +168,14 @@ Required:
 - `APPROVAL_LEAD_PICK` (optional) — `off` skips the AI lead pick, so the board keeps the scored lead
 - `FOR_BRANDS_WEBHOOK_URL` if you want to override the default for-brands destination
 - `NEXT_PUBLIC_SITE_URL`
-- `GHL_PRIVATE_INTEGRATION_TOKEN`, `GHL_LOCATION_ID`, `GHL_USER_ID` — production only; the draft job creates a new GHL email template per draft. Outside production the GHL calls are recorded, not sent.
+- `GHL_PRIVATE_INTEGRATION_TOKEN`, `GHL_LOCATION_ID`, `GHL_USER_ID` — production only; "Stage for sending" creates a new GHL email template for each staged version. Outside production the GHL calls are recorded, not sent.
 - `VERTEX_API_KEY`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_REGION`, `S3_BUCKET` — the draft job's featured image (`src/pipeline/draft/image`). Outside production the image still uploads, but only under `newsletter-dev/`; the prefix comes from `APP_ENV`.
 
 Optional:
 
 - `PRODUCTION_DATABASE_URL` for running Prisma production migration commands from your local machine
 - `NEON_PROJECT_ID` for `npm run db:reset-dev`
-- `TELEGRAM_REVIEW_CHAT_ID` to send the "stories are ready" message to another chat
+- `TELEGRAM_REVIEW_CHAT_ID` to send the review group's messages ("stories are ready", "draft is ready for review") to another chat
 - `NEWSLETTER_RUNTIME_DB_ROLE` to override the runtime role name used by the bootstrap scripts. Defaults to `newsletter_web`.
 - `JINA_API_KEY` and `GITHUB_TOKEN` for the draft job's article reader (`src/pipeline/draft/articles`). Both work without a key: Jina Reader is the last fallback and is sent the key as a Bearer header only if set (higher rate limit); the GitHub token only raises the README API's rate limit.
 

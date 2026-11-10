@@ -2,11 +2,11 @@
 
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 
 import DraftList from "@/components/approval/DraftList";
 import DraftView from "@/components/approval/DraftView";
-import { draftViewHref, jsonPost } from "@/src/features/newsletter/draft-links";
+import { jsonPost } from "@/src/features/newsletter/draft-links";
 import { nextDraftPoll, type DraftPollOutcome } from "@/src/features/newsletter/draft-polling";
 import type { DraftBoardView, DraftListEntry } from "@/src/pipeline/draft/draft-board";
 
@@ -43,20 +43,20 @@ function Message({ children }: { children: React.ReactNode }) {
 }
 
 function DraftsForDate({ date, requestedId }: { date: string; requestedId: number | null }) {
-  const router = useRouter();
   const [list, setList] = useState<DraftListState | null>(null);
   const [listError, setListError] = useState<string | null>(null);
   const [draft, setDraft] = useState<DraftBoardView | null>(null);
   const [draftError, setDraftError] = useState<string | null>(null);
   const [retryBusy, setRetryBusy] = useState(false);
   const [retryError, setRetryError] = useState<string | null>(null);
-  // Bumped after "Retry", to read the draft again and poll while it runs.
+  // Bumped after "Retry", a title or image change, or a staging, to read the draft again (and poll while it runs).
   const [reload, setReload] = useState(0);
 
   const selectedId = requestedId ?? list?.drafts[0]?.id ?? null;
   const draftStatus = draft?.status;
+  const draftSubject = draft?.subject;
 
-  // The list again whenever the shown draft changes status, so it shows the new status too.
+  // The list again whenever the shown draft changes status or title, so it shows the new one too.
   useEffect(() => {
     let active = true;
     fetch(`/api/approval/drafts?${new URLSearchParams({ date })}`, { cache: "no-store" })
@@ -73,7 +73,7 @@ function DraftsForDate({ date, requestedId }: { date: string; requestedId: numbe
     return () => {
       active = false;
     };
-  }, [date, draftStatus]);
+  }, [date, draftStatus, draftSubject]);
 
   // The shown draft, every few seconds while it runs. Errors slow the polling down; see nextDraftPoll.
   useEffect(() => {
@@ -150,7 +150,7 @@ function DraftsForDate({ date, requestedId }: { date: string; requestedId: numbe
                 retryBusy={retryBusy}
                 retryError={retryError}
                 onRetry={handleRetry}
-                onNewImageDraft={(draftId) => router.push(draftViewHref(date, draftId))}
+                onChanged={() => setReload((value) => value + 1)}
               />
             ) : draftError ? (
               <Message>{draftError}</Message>

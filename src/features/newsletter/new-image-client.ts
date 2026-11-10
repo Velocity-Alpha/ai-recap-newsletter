@@ -39,17 +39,8 @@ export async function requestImage(draftId: number, scenePrompt: string, fetcher
   return body.image as FeaturedImage;
 }
 
-/**
- * "Use this image": the new draft's id. When the draft was made but its job did not start, it still returns the id
- * (with the error), so the page can show that draft with "Retry".
- */
-export async function requestImageDraft(
-  draftId: number,
-  image: FeaturedImage,
-  fetcher: Fetch = fetch,
-): Promise<{ draftId: number; error: string | null }> {
+/** "Use this image": puts the image into the draft. The draft keeps its id and version. */
+export async function requestUseImage(draftId: number, image: FeaturedImage, fetcher: Fetch = fetch): Promise<void> {
   const { response, body } = await post(fetcher, `/api/approval/drafts/${draftId}/image`, image);
-  const made = (body.draft as { draftId?: unknown } | undefined)?.draftId;
-  if (typeof made !== "number") throw new Error(reason(body, "Could not make the new draft."));
-  return { draftId: made, error: response.ok ? null : reason(body, "The new draft's job did not start.") };
+  if (!response.ok || body.success !== true) throw new Error(reason(body, "Could not change the image."));
 }

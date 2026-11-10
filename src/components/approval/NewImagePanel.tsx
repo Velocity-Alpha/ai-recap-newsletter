@@ -4,20 +4,20 @@ import { useState } from "react";
 import Image from "next/image";
 import { ImageIcon, Loader2, X } from "lucide-react";
 
-import { requestImage, requestImageDraft, requestSceneIdeas } from "@/src/features/newsletter/new-image-client";
+import { requestImage, requestSceneIdeas, requestUseImage } from "@/src/features/newsletter/new-image-client";
 import type { DraftBoardView } from "@/src/pipeline/draft/draft-board";
 import type { FeaturedImage } from "@/src/pipeline/draft/image/featured-image";
 import type { SceneIdea } from "@/src/pipeline/draft/image/scene-ideas";
 
 /**
- * "New image" on a ready draft (#116): the current image and scene prompt, three scene ideas, "Generate" as often as
- * needed, then "Use this image", which makes a new draft with the same text (ADR 0002).
+ * "New image" on the current draft (#116, #149): the current image and scene prompt, three scene ideas, "Generate"
+ * as often as needed, then "Use this image", which puts the image into the same draft (ADR 0004).
  */
 
 export type IdeasState = { status: "loading" } | { status: "ready"; ideas: SceneIdea[] } | { status: "error"; error: string };
 
 export type NewImagePanelProps = {
-  /** The version of the draft the image is changed from. */
+  /** The version of the draft whose image changes. */
   version: number;
   currentImageUrl: string | null;
   scene: string;
@@ -113,9 +113,9 @@ export function NewImagePanel(props: NewImagePanelProps) {
               </div>
               <div className="flex flex-wrap items-center gap-3">
                 <button type="button" className={DARK_BUTTON} onClick={props.onChoose} disabled={working}>
-                  {busy === "choose" ? "Making the draft…" : "Use this image"}
+                  {busy === "choose" ? "Saving…" : "Use this image"}
                 </button>
-                <span className="text-xs text-[var(--text-secondary)]">Makes a new draft with this image and the same text.</span>
+                <span className="text-xs text-[var(--text-secondary)]">Puts this image into the draft. The text stays the same.</span>
               </div>
             </>
           ) : (
@@ -166,7 +166,7 @@ function messageOf(error: unknown): string {
 }
 
 /** The "New image" button, and its panel once opened. Ideas load when the panel first opens. */
-export default function NewImage({ draft, onCreated }: { draft: DraftBoardView; onCreated?: (draftId: number) => void }) {
+export default function NewImage({ draft, onChanged }: { draft: DraftBoardView; onChanged?: () => void }) {
   const [open, setOpen] = useState(false);
   const [scene, setScene] = useState(draft.scenePrompt ?? "");
   const [ideas, setIdeas] = useState<IdeasState | null>(null);
@@ -206,12 +206,13 @@ export default function NewImage({ draft, onCreated }: { draft: DraftBoardView; 
     setError(null);
     try {
       // The image's own scene goes with it, even if the box was edited after "Generate".
-      const made = await requestImageDraft(draft.id, generated);
-      // Stays busy while the page moves to the new draft, so a second click cannot make another one.
-      if (onCreated) onCreated(made.draftId);
-      else setBusy(null);
+      await requestUseImage(draft.id, generated);
+      setGenerated(null);
+      setOpen(false);
+      onChanged?.();
     } catch (reason) {
       setError(messageOf(reason));
+    } finally {
       setBusy(null);
     }
   }

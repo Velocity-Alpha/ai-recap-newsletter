@@ -75,9 +75,22 @@ describe("NewImagePanel", () => {
     const html = render({ generated: NEW_IMAGE });
     expect(html).toMatch(new RegExp(`<img[^>]*src="${NEW_IMAGE.imageUrl}"`));
     expect(html).toMatch(/<button[^>]*>Use this image<\/button>/);
-    expect(html).toContain("Makes a new draft with this image and the same text.");
     expect(html).toMatch(/<button[^>]*>Generate again<\/button>/);
-    expect(render({ generated: NEW_IMAGE, busy: "choose" })).toMatch(/<button[^>]*disabled=""[^>]*>Making the draft…<\/button>/);
+  });
+
+  it("says Use this image changes this draft in place, and makes no new draft (#149)", () => {
+    const html = render({ generated: NEW_IMAGE });
+
+    expect(html).toContain("Puts this image into the draft. The text stays the same.");
+    expect(html).not.toContain("new draft");
+  });
+
+  it("shows Use this image as busy while the image is saved", () => {
+    const html = render({ generated: NEW_IMAGE, busy: "choose" });
+
+    expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Saving…<\/button>/);
+    expect(html).not.toMatch(/<button[^>]*>Use this image<\/button>/);
+    expect(html).not.toContain("Making the draft");
   });
 
   it("shows an error in plain words", () => {

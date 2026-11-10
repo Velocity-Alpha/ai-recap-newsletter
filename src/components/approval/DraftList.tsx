@@ -29,7 +29,6 @@ export default function DraftList({ date, drafts, selectedId }: { date: string; 
               >
                 <p className="text-xs uppercase tracking-[0.14em] text-[var(--text-secondary)]">
                   v{draft.version} · {formatDraftTime(draft.createdAt)}
-                  {draft.sourceVersion !== null ? ` · New image of v${draft.sourceVersion}` : ""}
                 </p>
                 <p className="mt-1 truncate font-serif text-base text-[var(--text-primary)]">
                   {draft.subject ?? (draft.status === "failed" ? `Failed at ${draft.failedStepLabel ?? "an unknown step"}` : "No subject yet")}
@@ -45,18 +44,6 @@ export default function DraftList({ date, drafts, selectedId }: { date: string; 
             </div>
             {draft.status === "failed" && draft.subject ? (
               <p className="mt-1 text-xs text-red-700">Failed at {draft.failedStepLabel ?? "an unknown step"}</p>
-            ) : null}
-            {draft.ghlPreviewUrl ? (
-              <a
-                href={draft.ghlPreviewUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="mt-2 inline-block text-xs text-[var(--text-secondary)] underline underline-offset-2 hover:text-[var(--accent-primary)]"
-              >
-                Open in GHL
-              </a>
-            ) : draft.ghlTemplateId ? (
-              <p className="mt-2 text-xs text-[var(--text-muted)]">GHL template {draft.ghlTemplateId}</p>
             ) : null}
           </li>
         );

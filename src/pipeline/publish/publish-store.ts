@@ -1,7 +1,6 @@
 import type { Prisma, PrismaClient } from "@/src/generated/prisma";
 import { ISSUE_DRAFT } from "@/src/features/newsletter/issue-status";
 import { sentVersionIssueFields } from "@/src/pipeline/distribution/staged-version-store";
-import { sentDraftIssueFields } from "@/src/pipeline/draft/draft-store";
 import type { PublishEventInput, PublishStore } from "@/src/pipeline/publish/detect-publish";
 import type { PublishMode } from "@/src/pipeline/publish/publish-decision";
 import { prisma } from "@/src/server/prisma";
@@ -16,6 +15,7 @@ export interface DraftIssue {
 
 export interface PrismaPublishStore extends PublishStore {
   findDraft(id: number): Promise<DraftIssue | null>;
+  newestStagedHtml(issueId: number): Promise<string | null>;
   listRecentIssues(limit: number): Promise<DraftIssue[]>;
 }
 
@@ -78,16 +78,12 @@ export function createPrismaPublishStore(client: PrismaClient = prisma): PrismaP
         // be older than the newest draft.
         const sentVersion =
           event.versionId === null && event.draftId === null ? null : await sentVersionIssueFields(tx, issueId, event);
-        // Until the draft job stops making its own email (#149, step 2), a draft can have an email and no staged
-        // version. Such an email names no version, and the issue then takes that draft.
-        const sentDraft =
-          sentVersion || event.versionId !== null || event.draftId === null ? null : await sentDraftIssueFields(tx, issueId, event.draftId);
         // Only an unpublished issue changes, so a second copy or a later resend never moves published_at.
         const updated = await tx.issue.updateMany({
           where: { id: BigInt(issueId), status: ISSUE_DRAFT },
           data: {
             publishedAt,
-            ...(sentVersion?.fields ?? sentDraft ?? {
+            ...(sentVersion?.fields ?? {
               contentJson: content as unknown as Prisma.InputJsonValue,
               ...(content.title ? { title: content.title } : {}),
             }),
@@ -105,6 +101,16 @@ export function createPrismaPublishStore(client: PrismaClient = prisma): PrismaP
         await tx.publishEvent.createMany({ data: [eventData({ ...event, versionId, outcome })], skipDuplicates: true });
         return outcome;
       });
+    },
+
+    /** The email HTML of the issue's newest staged version: what the owner sends. Null when nothing is staged. */
+    async newestStagedHtml(issueId: number): Promise<string | null> {
+      const row = await client.stagedVersion.findFirst({
+        where: { issueId: BigInt(issueId), status: "staged" },
+        orderBy: { version: "desc" },
+        select: { html: true },
+      });
+      return row?.html || null;
     },
 
     async findDraft(id: number) {

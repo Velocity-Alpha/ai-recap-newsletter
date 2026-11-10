@@ -55,9 +55,9 @@ The newsletter for one date. There is at most one issue per date.
 _Avoid_: edition, campaign. Say "GitHub issue" for a ticket.
 
 **Draft**:
-One generated version of an issue's email, with its own GHL template. Each commit, and each accepted image
-change, makes a new draft. The latest draft is the current one.
-_Avoid_: template (GHL's copy of a draft), version, preview
+The working copy of an issue: body, title, and image. A commit makes it. The owner can change its title and
+its image. Nothing outside the app sees it. The newest draft of an issue is the current one.
+_Avoid_: template, version, preview
 
 **Stage for sending**:
 The owner's click that copies the current draft into the distribution service.

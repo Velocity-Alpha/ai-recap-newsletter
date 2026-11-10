@@ -42,27 +42,37 @@ vi.mock("@/src/pipeline/draft/articles/article-store", async (importOriginal) =>
 import { htmlPage, jinaAnswer, jinaUrl, prose } from "@/src/pipeline/draft/articles/fake-web.fixture";
 import { toIssueContentJson, type WrittenIssueContent } from "@/src/pipeline/draft/content";
 import { SAMPLE_APPROVED, SAMPLE_CONTENT, SAMPLE_OUTLINE } from "@/src/pipeline/draft/draft.fixture";
-import { createDraft, createImageDraft, retryDraft } from "@/src/pipeline/draft/draft-store";
+import { createDraft, retryDraft } from "@/src/pipeline/draft/draft-store";
 import { emailImageUrl } from "@/src/pipeline/draft/email-html";
 import { fakeDb } from "@/src/pipeline/draft/fake-db.fixture";
-import { DRAFT_STEPS, NEW_IMAGE_STEPS, readNoArticles, type ProduceDraftDeps } from "@/src/pipeline/draft/produce-draft";
-import { runDraftJob } from "@/src/pipeline/draft/run-draft";
-import { finishRun, startRun } from "@/src/pipeline/runs";
+import { DRAFT_STEPS, readNoArticles, type ProduceDraftDeps } from "@/src/pipeline/draft/produce-draft";
+import { buildDraftReadyMessage, DRAFT_STEP_LABELS, runDraftJob } from "@/src/pipeline/draft/run-draft";
+import { finishRun, logEvent, startRun } from "@/src/pipeline/runs";
 
 const DATE = SAMPLE_OUTLINE.date;
 const NOW = new Date("2027-01-04T15:00:00.000Z");
 const IMAGE_URL = "https://assets.example.test/newsletter-dev/2027-01-04-abc.jpg";
 const DRAFTS_LINK = `https://airecap.news/approval/drafts?date=${DATE}`;
 const ENV = { APP_ENV: "development" };
+const PRODUCTION_ENV = { APP_ENV: "production" };
+const READY_MESSAGE = `Draft for ${DATE} is ready for review: ${DRAFTS_LINK}`;
 
 function deps(overrides: Partial<ProduceDraftDeps> = {}): Partial<ProduceDraftDeps> {
   return {
     readArticles: vi.fn(readNoArticles),
     writer: vi.fn(async () => structuredClone(SAMPLE_CONTENT)),
     makeImage: vi.fn(async () => ({ imageUrl: IMAGE_URL, scenePrompt: "A pretend robot folds towels." })),
-    createTemplate: vi.fn(async () => ({ templateId: "tpl-1", previewUrl: "https://preview.example.test/tpl-1", mode: "sent" as const })),
     ...overrides,
   };
+}
+
+/** A stand-in for the real Telegram sender. */
+function telegramSender() {
+  return vi.fn<(text: string) => Promise<void>>(async () => undefined);
+}
+
+function telegramEvents() {
+  return runLog.events.filter((event) => event.step === "telegram");
 }
 
 async function commit(): Promise<{ draftId: number; issueId: number; version: number }> {
@@ -121,8 +131,6 @@ describe("runDraftJob", () => {
       content: SAMPLE_CONTENT,
       featuredImageUrl: IMAGE_URL,
       scenePrompt: "A pretend robot folds towels.",
-      ghlTemplateId: "tpl-1",
-      ghlPreviewUrl: "https://preview.example.test/tpl-1",
       unreadStoryIds: [501, 502, 503, 504],
       startedAt: NOW,
       finishedAt: NOW,
@@ -137,10 +145,24 @@ describe("runDraftJob", () => {
       contentJson: toIssueContentJson(SAMPLE_CONTENT, { issueId, issueDate: DATE, featuredImageUrl: emailImageUrl(IMAGE_URL) }),
       publishedAt: null,
     });
-    expect(runLog.events.map((event) => event.step)).toEqual(["load", ...DRAFT_STEPS, "save"]);
+    // The last event is the review group's message, which is only recorded outside production.
+    expect(runLog.events.map((event) => event.step)).toEqual(["load", ...DRAFT_STEPS, "save", "telegram"]);
     expect(runLog.finished).toEqual([
-      expect.objectContaining({ status: "succeeded", stats: expect.objectContaining({ draftId, version: 1, issue: "updated" }) }),
+      {
+        status: "succeeded",
+        stats: {
+          draftId,
+          issueId,
+          version: 1,
+          issueDate: DATE,
+          issue: "updated",
+          telegram: "recorded",
+          unreadStoryIds: [501, 502, 503, 504],
+          stepMs: expect.any(Object),
+        },
+      },
     ]);
+    expect(Object.keys(runLog.finished[0].stats!.stepMs as object)).toEqual(["load", ...DRAFT_STEPS]);
     expect(notify.resolveIncident).toHaveBeenCalledWith(`draft.failed:${DATE}`, expect.objectContaining({ runId: BigInt(7) }));
     expect(notify.raiseIncident).not.toHaveBeenCalled();
   });
@@ -151,19 +173,29 @@ describe("runDraftJob", () => {
     ["write", { writer: vi.fn(writerFailure) }, "The writer refused: no."],
     ["validate", { writer: vi.fn(async (): Promise<WrittenIssueContent> => ({ ...SAMPLE_CONTENT, title: "Short" })) }, "The title has 1 word"],
     ["image", { makeImage: vi.fn(async () => Promise.reject(new Error("Vertex returned HTTP 429."))) }, "Vertex returned HTTP 429."],
-    ["ghl", { createTemplate: vi.fn(async () => Promise.reject(new Error("GHL create template failed with HTTP 401."))) }, "HTTP 401"],
   ];
 
   it.each(failures)("marks the draft failed at %s, leaves the issue alone, and raises a critical incident", async (step, overrides, message) => {
     const { draftId, issueId } = await commit();
+    const sendTelegram = telegramSender();
 
-    const result = await runDraftJob(draftId, { env: ENV, now: () => NOW, deps: deps(overrides) });
+    const result = await runDraftJob(draftId, { env: PRODUCTION_ENV, now: () => NOW, deps: deps(overrides), sendTelegram });
+
+    // A failed draft is not ready for review, so the review group hears nothing.
+    expect(sendTelegram).not.toHaveBeenCalled();
+    expect(telegramEvents()).toEqual([]);
 
     expect(result).toMatchObject({ status: "failed", draftId, runId: "7", step });
     expect(draftRow(draftId)).toMatchObject({ status: "failed", failedStep: step, currentStep: null, finishedAt: NOW });
     expect(draftRow(draftId).error).toContain(message);
     expect(issueRow(issueId)).toMatchObject({ title: `AI Recap draft ${DATE}`, html: null, contentJson: null });
-    expect(runLog.finished).toEqual([expect.objectContaining({ status: "failed" })]);
+    expect(runLog.finished).toEqual([
+      {
+        status: "failed",
+        error: expect.stringContaining(message),
+        stats: { draftId, version: 1, issueDate: DATE, failedStep: step, stepMs: expect.any(Object) },
+      },
+    ]);
     expect(runLog.events.at(-1)).toMatchObject({ level: "error", step });
     expect(notify.raiseIncident).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -234,7 +266,7 @@ describe("runDraftJob", () => {
 
     expect(result).toMatchObject({ status: "ready" });
     expect(draftRow(draftId)).toMatchObject({ status: "ready", content: SAMPLE_CONTENT });
-    expect(stepHistory()).toEqual(["load", "read_articles", "write", "validate", "write", "validate", "image", "html", "ghl", "save", null]);
+    expect(stepHistory()).toEqual(["load", "read_articles", "write", "validate", "write", "validate", "image", "html", "save", null]);
     const rewrites = runLog.events.filter((event) => event.level === "warn");
     expect(rewrites).toEqual([
       { level: "warn", step: "write", message: "The written issue failed 1 check. Writing it once more with the problems listed.", data: { problems: 1 } },
@@ -266,13 +298,28 @@ describe("runDraftJob", () => {
     const { draftId, issueId } = await commit();
     fakeDb.state.issueUpdateError = Object.assign(new Error("Unique constraint failed on the fields: (`slug`)"), { code: "P2002" });
 
-    const result = await runDraftJob(draftId, { env: ENV, now: () => NOW, deps: deps() });
+    const sendTelegram = telegramSender();
 
-    expect(result).toMatchObject({ status: "failed", step: "save" });
-    // The GHL template exists, so the failed draft keeps its link.
-    expect(draftRow(draftId)).toMatchObject({ status: "failed", failedStep: "save", ghlTemplateId: "tpl-1" });
-    expect(draftRow(draftId).error).toContain(`Another issue already uses the title "${SAMPLE_CONTENT.title}"`);
+    const result = await runDraftJob(draftId, { env: PRODUCTION_ENV, now: () => NOW, deps: deps(), sendTelegram });
+
+    const error = `Another issue already uses the title "${SAMPLE_CONTENT.title}", and titles must be unique. Retry to write a new title.`;
+    expect(result).toEqual({ status: "failed", draftId, runId: "7", step: "save", error });
+    // The failed draft keeps what it made, so the owner can see it.
+    expect(draftRow(draftId)).toMatchObject({
+      status: "failed",
+      failedStep: "save",
+      error,
+      content: SAMPLE_CONTENT,
+      featuredImageUrl: IMAGE_URL,
+      scenePrompt: "A pretend robot folds towels.",
+    });
+    expect(draftRow(draftId).html).toContain(`data-draft-id="${draftId}"`);
     expect(issueRow(issueId)).toMatchObject({ html: null });
+    expect(notify.raiseIncident).toHaveBeenCalledWith(
+      expect.objectContaining({ severity: "critical", what: `Draft v1 for ${DATE} failed at saving the draft.`, evidence: error }),
+      expect.anything(),
+    );
+    expect(sendTelegram).not.toHaveBeenCalled();
   });
 
   it("never lets an older draft replace a newer ready one on the issue", async () => {
@@ -319,23 +366,31 @@ describe("runDraftJob", () => {
     expect(fakeDb.state.drafts.rows).toHaveLength(1);
     expect(draftRow(draftId)).toMatchObject({ version, status: "ready", failedStep: null, error: null });
     expect(stepHistory().filter((step) => step === "read_articles")).toHaveLength(2);
-    expect(second.createTemplate).toHaveBeenCalledWith(expect.objectContaining({ version }));
+    expect(second.writer).toHaveBeenCalledTimes(1);
     expect(notify.resolveIncident).toHaveBeenCalledWith(`draft.failed:${DATE}`, expect.anything());
   });
 
-  it("records GHL calls outside production in the run log, without the HTML", async () => {
+  it("never calls the distribution service: it has no GHL step, even in production with the GHL settings", async () => {
     const { draftId } = await commit();
-    // No createTemplate: the job's own GHL step runs, which is a dry run outside production.
-    const rest = deps();
-    delete rest.createTemplate;
+    const env = { ...PRODUCTION_ENV, GHL_PRIVATE_INTEGRATION_TOKEN: "pit-test-token-0000", GHL_LOCATION_ID: "loc_test", GHL_USER_ID: "user_test" };
+    const network = vi.fn(async () => new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", network);
 
-    const result = await runDraftJob(draftId, { env: ENV, now: () => NOW, deps: rest });
+    try {
+      const result = await runDraftJob(draftId, { env, now: () => NOW, deps: deps(), sendTelegram: telegramSender() });
 
-    expect(result).toMatchObject({ status: "ready" });
-    expect(draftRow(draftId).ghlTemplateId).toBe(`dry-run-${DATE}-v1`);
-    const recorded = runLog.events.filter((event) => event.step === "ghl" && event.data);
-    expect(recorded.map((event) => (event.data as { action: string }).action)).toEqual(["createTemplate", "setTemplateHtml"]);
-    expect(JSON.stringify(recorded)).not.toContain("<html");
+      expect(result).toMatchObject({ status: "ready", issue: "updated" });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+
+    expect(network).not.toHaveBeenCalled();
+    expect(Object.keys(DRAFT_STEP_LABELS)).toEqual(["load", "read_articles", "write", "validate", "image", "html", "save"]);
+    expect(stepHistory()).not.toContain("ghl");
+    expect(runLog.events.map((event) => event.step)).not.toContain("ghl");
+    expect(runLog.finished[0].stats).not.toHaveProperty("ghlMode");
+    // Only "Stage for sending" makes a staged version (ADR 0004).
+    expect(fakeDb.state.stagedVersions.rows).toEqual([]);
   });
 
   it("does nothing when another invocation has already claimed the draft", async () => {
@@ -481,184 +536,159 @@ describe("runDraftJob", () => {
   });
 });
 
-describe("runDraftJob for a new image (#116)", () => {
-  const IMAGE_ENV = { APP_ENV: "development", S3_BUCKET: "example-bucket" };
-  const NEW_IMAGE = {
-    imageUrl: `https://example-bucket.s3.amazonaws.com/newsletter-dev/${DATE}-def456.jpg`,
-    scenePrompt: "A pretend lighthouse on a rock.",
-  };
-  // The image step's HEAD request to S3: the chosen file is there, as a JPEG.
-  const s3Head = vi.fn<typeof fetch>(async () => new Response(null, { status: 200, headers: { "content-type": "image/jpeg" } }));
-  beforeEach(() => s3Head.mockClear());
+describe("runDraftJob and the review group's message (#149)", () => {
+  it("writes the message from the issue date and the drafts page link", () => {
+    expect(buildDraftReadyMessage("2027-01-04", "https://airecap.news/approval/drafts?date=2027-01-04")).toBe(
+      "Draft for 2027-01-04 is ready for review: https://airecap.news/approval/drafts?date=2027-01-04",
+    );
+  });
 
-  async function readyV1() {
+  it("tells the review group in production that the draft is ready, with the link to the drafts page", async () => {
+    const { draftId } = await commit();
+    const sendTelegram = telegramSender();
+
+    const result = await runDraftJob(draftId, { env: PRODUCTION_ENV, now: () => NOW, deps: deps(), sendTelegram });
+
+    expect(result).toEqual({ status: "ready", draftId, runId: "7", issue: "updated" });
+    expect(sendTelegram).toHaveBeenCalledTimes(1);
+    expect(sendTelegram).toHaveBeenCalledWith(READY_MESSAGE);
+    expect(telegramEvents()).toEqual([{ level: "info", step: "telegram", message: "Sent the ready message." }]);
+    expect(runLog.finished[0]).toMatchObject({ status: "succeeded", stats: { issue: "updated", telegram: "sent" } });
+    expect(notify.raiseIncident).not.toHaveBeenCalled();
+  });
+
+  it("sends the message only after the draft is saved and the issue holds it", async () => {
+    const { draftId, issueId } = await commit();
+    const seen: Array<{ draft: unknown; issueHtml: unknown; runFinished: number }> = [];
+    const sendTelegram = vi.fn(async () => {
+      seen.push({ draft: draftRow(draftId).status, issueHtml: issueRow(issueId).html, runFinished: runLog.finished.length });
+    });
+
+    await runDraftJob(draftId, { env: PRODUCTION_ENV, now: () => NOW, deps: deps(), sendTelegram });
+
+    // Sent before the run is finished, so the run's stats can say how it went.
+    expect(seen).toEqual([{ draft: "ready", issueHtml: draftRow(draftId).html, runFinished: 0 }]);
+    expect(runLog.events.map((event) => event.step)).toEqual(["load", ...DRAFT_STEPS, "save", "telegram"]);
+  });
+
+  it("links the message to this deploy's site", async () => {
+    const { draftId } = await commit();
+    const sendTelegram = telegramSender();
+    const env = { ...PRODUCTION_ENV, URL: "https://www.example.test/", DEPLOY_PRIME_URL: "https://deploy-preview-9--ai-recap.netlify.app" };
+
+    await runDraftJob(draftId, { env, now: () => NOW, deps: deps(), sendTelegram });
+
+    expect(sendTelegram).toHaveBeenCalledWith(`Draft for ${DATE} is ready for review: https://www.example.test/approval/drafts?date=${DATE}`);
+  });
+
+  it.each(["development", "preview", undefined])("records the message in the run log and sends nothing when APP_ENV is %j", async (appEnv) => {
+    const { draftId } = await commit();
+    const sendTelegram = telegramSender();
+
+    const result = await runDraftJob(draftId, { env: { APP_ENV: appEnv }, now: () => NOW, deps: deps(), sendTelegram });
+
+    expect(result).toMatchObject({ status: "ready", issue: "updated" });
+    expect(sendTelegram).not.toHaveBeenCalled();
+    expect(telegramEvents()).toEqual([
+      { level: "info", step: "telegram", message: "Not sent outside production. Recorded the text.", data: { text: READY_MESSAGE } },
+    ]);
+    expect(runLog.finished[0].stats).toMatchObject({ telegram: "recorded" });
+  });
+
+  it("sends nothing for an older draft that a newer ready one overtook", async () => {
     const v1 = await commit();
-    await runDraftJob(v1.draftId, { env: IMAGE_ENV, fetch: s3Head, now: () => NOW, deps: deps() });
-    expect(draftRow(v1.draftId).status).toBe("ready");
-    fakeDb.state.drafts.updates.length = 0;
+    const v2 = await commit();
+    const sendTelegram = telegramSender();
+    await runDraftJob(v2.draftId, { env: PRODUCTION_ENV, now: () => NOW, deps: deps(), sendTelegram });
+    expect(sendTelegram).toHaveBeenCalledTimes(1);
+    sendTelegram.mockClear();
     runLog.events.length = 0;
     runLog.finished.length = 0;
-    notify.raiseIncident.mockClear();
-    notify.resolveIncident.mockClear();
-    return { v1, v1Row: structuredClone(draftRow(v1.draftId)) };
-  }
 
-  const tpl2 = () => vi.fn(async () => ({ templateId: "tpl-2", previewUrl: "https://preview.example.test/tpl-2", mode: "sent" as const }));
+    const result = await runDraftJob(v1.draftId, { env: PRODUCTION_ENV, now: () => NOW, deps: deps(), sendTelegram });
 
-  it("copies the source's content, runs only image, html, and GHL, and makes a new GHL template", async () => {
-    const { v1, v1Row } = await readyV1();
-    const v2 = await createImageDraft(v1.draftId, NEW_IMAGE, { now: () => NOW });
-    const second = deps({ createTemplate: tpl2() });
+    expect(result).toMatchObject({ status: "ready", issue: "newer_draft" });
+    expect(sendTelegram).not.toHaveBeenCalled();
+    expect(telegramEvents()).toEqual([]);
+    expect(runLog.finished[0]).toMatchObject({ status: "succeeded", stats: { issue: "newer_draft", telegram: "skipped" } });
+  });
 
-    const result = await runDraftJob(v2.draftId, { env: IMAGE_ENV, fetch: s3Head, now: () => NOW, deps: second });
-
-    expect(result).toEqual({ status: "ready", draftId: v2.draftId, runId: "7", issue: "updated" });
-    expect(stepHistory()).toEqual(["load", ...NEW_IMAGE_STEPS, "save", null]);
-    expect(runLog.events.map((event) => event.step)).toEqual(["load", ...NEW_IMAGE_STEPS, "save"]);
-    expect(second.writer).not.toHaveBeenCalled();
-    expect(second.makeImage).not.toHaveBeenCalled();
-    expect(s3Head).toHaveBeenCalledWith(NEW_IMAGE.imageUrl, expect.objectContaining({ method: "HEAD" }));
-    expect(second.createTemplate).toHaveBeenCalledWith(
-      expect.objectContaining({ issueDate: DATE, version: 2, subject: SAMPLE_CONTENT.title }),
-    );
-    expect(draftRow(v2.draftId)).toMatchObject({
-      version: 2,
-      status: "ready",
-      content: v1Row.content,
-      unreadStoryIds: v1Row.unreadStoryIds,
-      featuredImageUrl: NEW_IMAGE.imageUrl,
-      scenePrompt: NEW_IMAGE.scenePrompt,
-      ghlTemplateId: "tpl-2",
+  it("sends nothing for a draft that finished after the issue was published", async () => {
+    const { draftId } = await commit();
+    const sendTelegram = telegramSender();
+    const readArticles = vi.fn(async (stories: Parameters<typeof readNoArticles>[0]) => {
+      await fakeDb.client.issue.create({ data: { title: "An n8n copy", issueDate: new Date(`${DATE}T00:00:00.000Z`), publishedAt: NOW } });
+      return readNoArticles(stories);
     });
-    expect(draftRow(v2.draftId).html).toContain(`data-draft-id="${v2.draftId}"`);
-    expect(draftRow(v2.draftId).html).toContain(NEW_IMAGE.imageUrl);
-    // v1 and its GHL template stay as they were (ADR 0002).
-    expect(draftRow(v1.draftId)).toEqual(v1Row);
-    expect(runLog.finished).toEqual([
-      expect.objectContaining({ status: "succeeded", stats: expect.objectContaining({ sourceDraftId: v1.draftId, version: 2 }) }),
-    ]);
+
+    const result = await runDraftJob(draftId, { env: PRODUCTION_ENV, now: () => NOW, deps: deps({ readArticles }), sendTelegram });
+
+    expect(result).toMatchObject({ status: "ready", issue: "published" });
+    expect(sendTelegram).not.toHaveBeenCalled();
+    expect(telegramEvents()).toEqual([]);
+    expect(runLog.finished[0]).toMatchObject({ status: "succeeded", stats: { issue: "published", telegram: "skipped" } });
   });
 
-  it("never reads articles: the job's own reader stays idle, and the source's unread stories carry over", async () => {
-    const { v1, v1Row } = await readyV1();
-    const v2 = await createImageDraft(v1.draftId, NEW_IMAGE, { now: () => NOW });
-    articleStore.findRead.mockReset().mockResolvedValue([]);
-    articleStore.save.mockReset().mockResolvedValue(undefined);
-    articleStore.clearOldText.mockReset().mockResolvedValue(0);
-    // No readArticles: the job's own reader (#120) is the one that must not run.
-    const rest = deps({ createTemplate: tpl2() });
-    delete rest.readArticles;
+  it("records nothing outside production either when the issue does not hold the draft", async () => {
+    const v1 = await commit();
+    const v2 = await commit();
+    await runDraftJob(v2.draftId, { env: ENV, now: () => NOW, deps: deps() });
+    runLog.events.length = 0;
+    runLog.finished.length = 0;
 
-    const result = await runDraftJob(v2.draftId, { env: IMAGE_ENV, fetch: s3Head, now: () => NOW, deps: rest });
+    await runDraftJob(v1.draftId, { env: ENV, now: () => NOW, deps: deps() });
 
-    expect(result).toMatchObject({ status: "ready" });
-    expect(articleStore.clearOldText).not.toHaveBeenCalled();
-    expect(articleStore.findRead).not.toHaveBeenCalled();
-    expect(articleStore.save).not.toHaveBeenCalled();
-    expect(runLog.events.filter((event) => event.step === "read_articles")).toEqual([]);
-    expect(draftRow(v2.draftId).unreadStoryIds).toEqual(v1Row.unreadStoryIds);
+    expect(telegramEvents()).toEqual([]);
+    expect(runLog.finished[0].stats).toMatchObject({ issue: "newer_draft", telegram: "skipped" });
   });
 
-  it("puts the new image on the unpublished issue, with the same title and text", async () => {
-    const { v1 } = await readyV1();
-    const v2 = await createImageDraft(v1.draftId, NEW_IMAGE, { now: () => NOW });
+  it("only warns when the message cannot be sent: the draft stays ready and no incident is raised", async () => {
+    const { draftId, issueId } = await commit();
+    const sendTelegram = vi.fn(async () => Promise.reject(new Error("Telegram returned HTTP 502.")));
 
-    await runDraftJob(v2.draftId, { env: IMAGE_ENV, fetch: s3Head, now: () => NOW, deps: deps({ createTemplate: tpl2() }) });
+    const result = await runDraftJob(draftId, { env: PRODUCTION_ENV, now: () => NOW, deps: deps(), sendTelegram });
 
-    expect(issueRow(v1.issueId)).toMatchObject({
-      title: SAMPLE_CONTENT.title,
-      excerpt: SAMPLE_CONTENT.excerpt,
-      html: draftRow(v2.draftId).html,
-      featureImageUrl: NEW_IMAGE.imageUrl,
-      promptFeaturedImage: NEW_IMAGE.scenePrompt,
-      contentJson: toIssueContentJson(SAMPLE_CONTENT, { issueId: v1.issueId, issueDate: DATE, featuredImageUrl: emailImageUrl(NEW_IMAGE.imageUrl) }),
-      publishedAt: null,
-    });
+    expect(result).toEqual({ status: "ready", draftId, runId: "7", issue: "updated" });
+    expect(draftRow(draftId)).toMatchObject({ status: "ready", failedStep: null, error: null });
+    expect(issueRow(issueId).html).toBe(draftRow(draftId).html);
+    expect(telegramEvents()).toEqual([{ level: "warn", step: "telegram", message: "Telegram returned HTTP 502." }]);
+    expect(runLog.finished).toEqual([expect.objectContaining({ status: "succeeded", stats: expect.objectContaining({ telegram: "failed" }) })]);
+    expect(notify.raiseIncident).not.toHaveBeenCalled();
+    expect(notify.resolveIncident).toHaveBeenCalledWith(`draft.failed:${DATE}`, expect.objectContaining({ note: "Draft v1 is ready." }));
   });
 
-  it("fails at image when the chosen image is not one this site uploaded, and the issue keeps v1", async () => {
-    const { v1 } = await readyV1();
-    const issueBefore = structuredClone(issueRow(v1.issueId));
-    const v2 = await createImageDraft(v1.draftId, { ...NEW_IMAGE, imageUrl: "https://elsewhere.example.test/picture.jpg" }, { now: () => NOW });
-    const second = deps({ createTemplate: tpl2() });
+  it("warns, sends nothing, and stays ready when production has no Telegram bot token", async () => {
+    const { draftId } = await commit();
 
-    const result = await runDraftJob(v2.draftId, { env: IMAGE_ENV, fetch: s3Head, now: () => NOW, deps: second });
+    const result = await runDraftJob(draftId, { env: PRODUCTION_ENV, now: () => NOW, deps: deps() });
 
-    expect(result).toMatchObject({ status: "failed", draftId: v2.draftId, step: "image" });
-    expect(draftRow(v2.draftId)).toMatchObject({ status: "failed", failedStep: "image" });
-    expect(draftRow(v2.draftId).error).toContain("is not an image this site uploaded");
-    expect(second.createTemplate).not.toHaveBeenCalled();
-    expect(s3Head).not.toHaveBeenCalled();
-    expect(issueRow(v1.issueId)).toEqual(issueBefore);
-    // v1 is still ready and on the issue, so this is a warning, not a critical incident.
-    expect(notify.raiseIncident).toHaveBeenCalledWith(
-      expect.objectContaining({ severity: "warning", what: `Draft v2 for ${DATE} failed at making the image.` }),
-      expect.anything(),
-    );
+    expect(result).toMatchObject({ status: "ready", issue: "updated" });
+    expect(telegramEvents()).toEqual([{ level: "warn", step: "telegram", message: "Missing setting: TELEGRAM_REVIEW_BOT_TOKEN. Not sent." }]);
+    expect(runLog.finished[0].stats).toMatchObject({ telegram: "not_configured" });
+    expect(notify.raiseIncident).not.toHaveBeenCalled();
   });
 
-  it("fails at image when the chosen file is not in S3", async () => {
-    const { v1 } = await readyV1();
-    const v2 = await createImageDraft(v1.draftId, NEW_IMAGE, { now: () => NOW });
-    const missing = vi.fn<typeof fetch>(async () => new Response(null, { status: 404, headers: { "content-type": "application/xml" } }));
-    const second = deps({ createTemplate: tpl2() });
+  it("stays ready when the run log cannot take the message's event", async () => {
+    const { draftId } = await commit();
+    const sendTelegram = telegramSender();
+    const events = vi.mocked(logEvent);
+    const record = events.getMockImplementation()!;
+    events.mockImplementation(((runId, event) => {
+      if (event.step === "telegram") return Promise.reject(new Error("pipeline_events is down"));
+      return record(runId, event);
+    }) as typeof logEvent);
 
-    const result = await runDraftJob(v2.draftId, { env: IMAGE_ENV, fetch: missing, now: () => NOW, deps: second });
+    try {
+      const result = await runDraftJob(draftId, { env: PRODUCTION_ENV, now: () => NOW, deps: deps(), sendTelegram });
 
-    expect(result).toMatchObject({ status: "failed", step: "image", error: "The chosen image is not in S3 as a JPEG (HTTP 404)." });
-    expect(second.createTemplate).not.toHaveBeenCalled();
-  });
+      expect(result).toMatchObject({ status: "ready", issue: "updated" });
+    } finally {
+      events.mockImplementation(record);
+    }
 
-  it("asks for a new commit when the copied title clashes with another issue, since a retry copies the same title", async () => {
-    const { v1 } = await readyV1();
-    const v2 = await createImageDraft(v1.draftId, NEW_IMAGE, { now: () => NOW });
-    fakeDb.state.issueUpdateError = Object.assign(new Error("Unique constraint failed on the fields: (`slug`)"), { code: "P2002" });
-
-    const result = await runDraftJob(v2.draftId, { env: IMAGE_ENV, fetch: s3Head, now: () => NOW, deps: deps({ createTemplate: tpl2() }) });
-
-    expect(result).toMatchObject({ status: "failed", step: "save" });
-    expect(draftRow(v2.draftId).error).toBe(
-      `Another issue already uses the title "${SAMPLE_CONTENT.title}", and titles must be unique. Commit again for a new title.`,
-    );
-  });
-
-  it("retries a failed new image draft with the same image and content, and still writes nothing", async () => {
-    const { v1 } = await readyV1();
-    const v2 = await createImageDraft(v1.draftId, NEW_IMAGE, { now: () => NOW });
-    const ghlDown = vi.fn(async () => Promise.reject(new Error("GHL create template failed with HTTP 502.")));
-    await runDraftJob(v2.draftId, { env: IMAGE_ENV, fetch: s3Head, now: () => NOW, deps: deps({ createTemplate: ghlDown }) });
-    expect(draftRow(v2.draftId)).toMatchObject({ status: "failed", failedStep: "ghl" });
-
-    await retryDraft(v2.draftId, { now: () => NOW });
-    const again = deps({ createTemplate: tpl2() });
-    const result = await runDraftJob(v2.draftId, { env: IMAGE_ENV, fetch: s3Head, now: () => NOW, deps: again });
-
-    expect(result).toMatchObject({ status: "ready", draftId: v2.draftId });
-    expect(again.writer).not.toHaveBeenCalled();
-    expect(stepHistory().filter((step) => step === "write")).toEqual([]);
-    expect(stepHistory().filter((step) => step === "image")).toHaveLength(2);
-    expect(draftRow(v2.draftId)).toMatchObject({
-      version: 2,
-      status: "ready",
-      content: SAMPLE_CONTENT,
-      featuredImageUrl: NEW_IMAGE.imageUrl,
-      scenePrompt: NEW_IMAGE.scenePrompt,
-      ghlTemplateId: "tpl-2",
-    });
-  });
-
-  it("stops at load when the issue was published after the image was chosen, and never changes the published issue", async () => {
-    const { v1 } = await readyV1();
-    const v2 = await createImageDraft(v1.draftId, NEW_IMAGE, { now: () => NOW });
-    await fakeDb.client.issue.update({ where: { id: BigInt(v1.issueId) }, data: { publishedAt: NOW } });
-    const published = structuredClone(issueRow(v1.issueId));
-    const second = deps({ createTemplate: tpl2() });
-
-    const result = await runDraftJob(v2.draftId, { env: IMAGE_ENV, fetch: s3Head, now: () => NOW, deps: second });
-
-    expect(result).toMatchObject({ status: "failed", step: "load", error: expect.stringContaining("already published") });
-    expect(second.createTemplate).not.toHaveBeenCalled();
-    expect(issueRow(v1.issueId)).toEqual(published);
-    await expect(createImageDraft(v1.draftId, NEW_IMAGE)).rejects.toThrow("already published");
+    expect(sendTelegram).toHaveBeenCalledWith(READY_MESSAGE);
+    expect(draftRow(draftId).status).toBe("ready");
+    expect(runLog.finished[0]).toMatchObject({ status: "succeeded", stats: { telegram: "sent" } });
+    expect(notify.raiseIncident).not.toHaveBeenCalled();
   });
 });

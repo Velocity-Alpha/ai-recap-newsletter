@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const runLog = vi.hoisted(() => ({ started: [] as unknown[], events: [] as unknown[], finished: [] as unknown[] }));
+const runLog = vi.hoisted(() => ({ started: [] as unknown[] }));
 
 vi.mock("@/src/server/prisma", async () => {
   const { fakeDb } = await import("@/src/pipeline/draft/fake-db.fixture");
@@ -11,34 +11,33 @@ vi.mock("@/src/pipeline/runs", () => ({
     runLog.started.push(input);
     return BigInt(9);
   }),
-  logEvent: vi.fn(async (_runId: bigint, event: unknown) => {
-    runLog.events.push(event);
-  }),
-  finishRun: vi.fn(async (_runId: bigint, result: unknown) => {
-    runLog.finished.push(result);
-  }),
+  logEvent: vi.fn(async () => {}),
+  finishRun: vi.fn(async () => {}),
 }));
 
+import { toIssueContentJson } from "@/src/pipeline/draft/content";
 import {
   createDraft,
-  createImageDraft,
+  DraftEditError,
   DraftNotRetryableError,
-  findDraftToRun,
+  editCurrentDraft,
   getDraftHtml,
   getDraftStatus,
   isStuckDraft,
   IssuePublishedError,
   listDraftsForDate,
-  loadNewImageInputs,
-  readImageSource,
+  readCurrentDraft,
   retryDraft,
+  titleTakenMessage,
 } from "@/src/pipeline/draft/draft-store";
 import { SAMPLE_CONTENT, SAMPLE_OUTLINE } from "@/src/pipeline/draft/draft.fixture";
+import { emailImageUrl, renderIssueEmailHtml } from "@/src/pipeline/draft/email-html";
 import { fakeDb } from "@/src/pipeline/draft/fake-db.fixture";
 
 const DATE = "2027-01-04";
 const DAY = new Date(`${DATE}T00:00:00.000Z`);
 const NOW = new Date("2027-01-04T15:00:00.000Z");
+const LOCK = ["SELECT pg_advisory_xact_lock(hashtext(?))", `issue-date:${DATE}`];
 
 async function outline(date = DATE): Promise<bigint> {
   const row = await fakeDb.client.approvalOutline.create({
@@ -52,11 +51,17 @@ async function issue(data: Record<string, unknown> = {}): Promise<bigint> {
   return (row as { id: bigint }).id;
 }
 
+function draftRow(draftId: number) {
+  return fakeDb.state.drafts.rows.find((row) => row.id === BigInt(draftId))!;
+}
+
+function issueRow(issueId: number) {
+  return fakeDb.state.issues.rows.find((row) => row.id === BigInt(issueId))!;
+}
+
 beforeEach(() => {
   fakeDb.reset();
   runLog.started.length = 0;
-  runLog.events.length = 0;
-  runLog.finished.length = 0;
 });
 
 describe("createDraft", () => {
@@ -69,7 +74,7 @@ describe("createDraft", () => {
     expect(fakeDb.state.issues.rows[0]).toMatchObject({ issueDate: DAY, publishedAt: null, title: `AI Recap draft ${DATE}` });
     expect(created).toEqual({ draftId: expect.any(Number), issueId: Number(fakeDb.state.issues.rows[0].id), version: 1, issueDate: DATE });
     expect(fakeDb.state.drafts.rows[0]).toMatchObject({ issueId: fakeDb.state.issues.rows[0].id, version: 1, outlineId, status: "running" });
-    expect(fakeDb.state.locks).toEqual([["SELECT pg_advisory_xact_lock(hashtext(?))", `issue-date:${DATE}`]]);
+    expect(fakeDb.state.locks).toEqual([LOCK]);
   });
 
   it("never makes a second issue for a date: the next commit is v2 of the same issue", async () => {
@@ -154,28 +159,42 @@ describe("retryDraft", () => {
       startedAt: null,
       finishedAt: null,
     });
-    expect(runLog.started).toEqual([]);
   });
 
-  it("logs the old GHL template id before clearing it, since the retry makes a new template", async () => {
+  it("clears everything the failed attempt made: the image, its scene prompt, the HTML, and the edit time", async () => {
     const created = await failedDraft();
     await fakeDb.client.issueDraft.update({
       where: { id: BigInt(created.draftId) },
-      data: { failedStep: "save", ghlTemplateId: "tpl-old", ghlPreviewUrl: "https://preview.example.test/tpl-old" },
+      data: {
+        failedStep: "save",
+        content: SAMPLE_CONTENT,
+        html: "<html>half made</html>",
+        featuredImageUrl: "https://assets.example.test/newsletter-dev/2027-01-04-old.jpg",
+        scenePrompt: "A pretend robot.",
+        unreadStoryIds: [502],
+        editedAt: new Date(NOW.getTime() - 60_000),
+      },
     });
 
     await retryDraft(created.draftId, { now: () => NOW });
 
-    expect(runLog.started).toEqual([{ job: "draft-retry", trigger: "manual" }]);
-    expect(runLog.events).toEqual([
-      expect.objectContaining({
-        step: "retry",
-        message: expect.stringContaining("tpl-old"),
-        data: expect.objectContaining({ draftId: created.draftId, ghlTemplateId: "tpl-old" }),
-      }),
-    ]);
-    expect(runLog.finished).toEqual([expect.objectContaining({ status: "succeeded" })]);
-    expect(fakeDb.state.drafts.rows[0]).toMatchObject({ ghlTemplateId: null, ghlPreviewUrl: null });
+    expect(draftRow(created.draftId)).toMatchObject({
+      status: "running",
+      content: null,
+      html: null,
+      featuredImageUrl: null,
+      scenePrompt: null,
+      unreadStoryIds: [],
+      editedAt: null,
+    });
+  });
+
+  it("writes no run log", async () => {
+    const created = await failedDraft();
+
+    await retryDraft(created.draftId, { now: () => NOW });
+
+    expect(runLog.started).toEqual([]);
   });
 
   it("refuses when another issue row for the date is published", async () => {
@@ -201,6 +220,10 @@ describe("retryDraft", () => {
     await expect(retryDraft(created.draftId, { now: () => NOW })).rejects.toBeInstanceOf(IssuePublishedError);
   });
 
+  it("names a draft that does not exist", async () => {
+    await expect(retryDraft(999, { now: () => NOW })).rejects.toThrow("Draft 999 does not exist.");
+  });
+
   it("retries a draft stuck in running longer than a background function can live", async () => {
     const created = await failedDraft();
     await fakeDb.client.issueDraft.update({
@@ -224,10 +247,15 @@ describe("retryDraft", () => {
   });
 });
 
-describe("new image drafts (#116)", () => {
+describe("the current draft: title and image changes (#149)", () => {
   const OLD_IMAGE = "https://assets.example.test/newsletter-dev/2027-01-04-old.jpg";
+  const OLD_SCENE = "A pretend robot.";
+  const OLD_HTML = "<html>v1 as the job made it</html>";
   const NEW_IMAGE = { imageUrl: "https://assets.example.test/newsletter-dev/2027-01-04-new.jpg", scenePrompt: "A pretend lighthouse." };
+  const NEW_TITLE = "A Sample Robot Learns To Fold";
+  const FINISHED = new Date("2027-01-04T14:00:00.000Z");
 
+  /** v1 of the date's issue, ready, and copied to the issue row as the draft job does. */
   async function readyDraft() {
     const created = await createDraft(await outline());
     await fakeDb.client.issueDraft.update({
@@ -235,181 +263,489 @@ describe("new image drafts (#116)", () => {
       data: {
         status: "ready",
         content: SAMPLE_CONTENT,
-        html: "<html>v1</html>",
+        html: OLD_HTML,
         featuredImageUrl: OLD_IMAGE,
-        scenePrompt: "A pretend robot.",
-        ghlTemplateId: "tpl-1",
+        scenePrompt: OLD_SCENE,
         unreadStoryIds: [502],
-        startedAt: NOW,
-        finishedAt: NOW,
+        startedAt: FINISHED,
+        finishedAt: FINISHED,
+      },
+    });
+    await fakeDb.client.issue.update({
+      where: { id: BigInt(created.issueId) },
+      data: {
+        title: SAMPLE_CONTENT.title,
+        html: OLD_HTML,
+        featureImageUrl: OLD_IMAGE,
+        promptFeaturedImage: OLD_SCENE,
+        excerpt: SAMPLE_CONTENT.excerpt,
+        contentJson: { title: SAMPLE_CONTENT.title },
       },
     });
     fakeDb.state.locks.length = 0;
     return created;
   }
 
-  it("reads the ready draft a new image starts from", async () => {
-    const source = await readyDraft();
-
-    await expect(readImageSource(source.draftId)).resolves.toEqual({
-      draftId: source.draftId,
-      issueId: source.issueId,
-      version: 1,
-      issueDate: DATE,
-      content: SAMPLE_CONTENT,
-      featuredImageUrl: OLD_IMAGE,
-      scenePrompt: "A pretend robot.",
+  async function stagedVersionOf(draft: { draftId: number; issueId: number }) {
+    await fakeDb.client.stagedVersion.create({
+      data: {
+        issueId: BigInt(draft.issueId),
+        draftId: BigInt(draft.draftId),
+        version: 1,
+        title: SAMPLE_CONTENT.title,
+        html: "<html>staged version 1</html>",
+        featuredImageUrl: OLD_IMAGE,
+        scenePrompt: OLD_SCENE,
+        serviceRef: "example-ref-1",
+        stagedAt: FINISHED,
+      },
     });
-  });
+  }
 
-  it("makes the next draft of the same issue: same outline, the source's id, and the chosen image, under the date's lock", async () => {
-    const source = await readyDraft();
-    const sourceRow = structuredClone(fakeDb.state.drafts.rows[0]);
+  function titleClash(): Error {
+    return Object.assign(new Error("Unique constraint failed on the fields: (`slug`)"), { code: "P2002" });
+  }
 
-    const created = await createImageDraft(source.draftId, NEW_IMAGE, { now: () => NOW });
+  describe("readCurrentDraft", () => {
+    it("reads the issue's newest draft when it is ready", async () => {
+      const draft = await readyDraft();
 
-    expect(created).toEqual({ draftId: expect.any(Number), issueId: source.issueId, version: 2, issueDate: DATE });
-    expect(fakeDb.state.issues.rows).toHaveLength(1);
-    const row = fakeDb.state.drafts.rows.find((draft) => draft.id === BigInt(created.draftId));
-    expect(row).toMatchObject({
-      issueId: BigInt(source.issueId),
-      version: 2,
-      outlineId: sourceRow.outlineId,
-      sourceDraftId: BigInt(source.draftId),
-      status: "running",
-      queuedAt: NOW,
-      featuredImageUrl: NEW_IMAGE.imageUrl,
-      scenePrompt: NEW_IMAGE.scenePrompt,
-      content: null,
-      html: null,
-      ghlTemplateId: null,
+      await expect(readCurrentDraft(draft.draftId)).resolves.toEqual({
+        draftId: draft.draftId,
+        issueId: draft.issueId,
+        version: 1,
+        issueDate: DATE,
+        content: SAMPLE_CONTENT,
+        featuredImageUrl: OLD_IMAGE,
+        scenePrompt: OLD_SCENE,
+      });
     });
-    // The source draft and its GHL template are left as they were.
-    expect(fakeDb.state.drafts.rows[0]).toEqual(sourceRow);
-    expect(fakeDb.state.locks).toEqual([["SELECT pg_advisory_xact_lock(hashtext(?))", `issue-date:${DATE}`]]);
-  });
 
-  it("refuses when any issue row for the date is published, and creates nothing", async () => {
-    const source = await readyDraft();
-    const other = await issue({ title: "An n8n copy", publishedAt: NOW });
+    it("changes nothing and takes no lock", async () => {
+      const draft = await readyDraft();
+      const before = structuredClone({ draft: draftRow(draft.draftId), issue: issueRow(draft.issueId) });
 
-    await expect(createImageDraft(source.draftId, NEW_IMAGE, { now: () => NOW })).rejects.toThrow(`(id ${other}) is already published`);
-    await expect(readImageSource(source.draftId)).rejects.toBeInstanceOf(IssuePublishedError);
-    expect(fakeDb.state.drafts.rows).toHaveLength(1);
-  });
+      await readCurrentDraft(draft.draftId);
 
-  it("refuses a draft that is not ready, or does not exist", async () => {
-    const running = await createDraft(await outline());
+      expect(draftRow(draft.draftId)).toEqual(before.draft);
+      expect(issueRow(draft.issueId)).toEqual(before.issue);
+      expect(fakeDb.state.locks).toEqual([]);
+    });
 
-    await expect(createImageDraft(running.draftId, NEW_IMAGE)).rejects.toMatchObject({ name: "NewImageError", reason: "not_ready" });
-    await expect(createImageDraft(999, NEW_IMAGE)).rejects.toMatchObject({ name: "NewImageError", reason: "missing" });
-    await expect(readImageSource(running.draftId)).rejects.toThrow("Only a ready draft can get a new image");
-    expect(fakeDb.state.drafts.rows).toHaveLength(1);
-  });
+    it("refuses a draft that does not exist", async () => {
+      const attempt = readCurrentDraft(999);
 
-  it.each(["running", "ready"] as const)(
-    "refuses a new image from v1 while v2 is %s, under the date's lock, since the new draft would put v1's older text back",
-    async (status) => {
-      const source = await readyDraft();
+      await expect(attempt).rejects.toBeInstanceOf(DraftEditError);
+      await expect(attempt).rejects.toMatchObject({ name: "DraftEditError", reason: "missing", message: "Draft 999 does not exist." });
+    });
+
+    it("refuses a draft whose issue has no date", async () => {
+      const draft = await readyDraft();
+      await fakeDb.client.issue.update({ where: { id: BigInt(draft.issueId) }, data: { issueDate: null } });
+
+      await expect(readCurrentDraft(draft.draftId)).rejects.toMatchObject({ reason: "missing", message: `Draft ${draft.draftId} has no issue date.` });
+    });
+
+    it.each(["running", "failed"] as const)("refuses the newest draft while it is %s", async (status) => {
+      const draft = await createDraft(await outline());
+      await fakeDb.client.issueDraft.update({ where: { id: BigInt(draft.draftId) }, data: { status } });
+
+      const attempt = readCurrentDraft(draft.draftId);
+
+      await expect(attempt).rejects.toMatchObject({ name: "DraftEditError", reason: "not_ready" });
+      await expect(attempt).rejects.toThrow(`Draft v1 for ${DATE} is ${status}. Only a ready draft can be changed.`);
+    });
+
+    it("refuses a ready draft that has no content", async () => {
+      const draft = await readyDraft();
+      await fakeDb.client.issueDraft.update({ where: { id: BigInt(draft.draftId) }, data: { content: null } });
+
+      await expect(readCurrentDraft(draft.draftId)).rejects.toMatchObject({ reason: "not_ready" });
+    });
+
+    it.each(["running", "ready", "failed"] as const)("refuses v1 once a newer draft exists, even a %s one", async (status) => {
+      const v1 = await readyDraft();
       const v2 = await createDraft(await outline());
-      if (status === "ready") {
-        await fakeDb.client.issueDraft.update({ where: { id: BigInt(v2.draftId) }, data: { status: "ready", content: SAMPLE_CONTENT } });
-      }
-      fakeDb.state.locks.length = 0;
+      await fakeDb.client.issueDraft.update({ where: { id: BigInt(v2.draftId) }, data: { status, content: SAMPLE_CONTENT } });
 
-      const attempt = createImageDraft(source.draftId, NEW_IMAGE, { now: () => NOW });
+      const attempt = readCurrentDraft(v1.draftId);
 
-      await expect(attempt).rejects.toMatchObject({ name: "NewImageError", reason: "not_current" });
-      await expect(attempt).rejects.toThrow(`Draft v1 is not the newest draft: v2 is ${status}.`);
-      expect(fakeDb.state.locks).toEqual([["SELECT pg_advisory_xact_lock(hashtext(?))", `issue-date:${DATE}`]]);
-      expect(fakeDb.state.drafts.rows).toHaveLength(2);
-      // Ideas and Generate refuse too, before any model or Vertex call.
-      await expect(readImageSource(source.draftId)).rejects.toMatchObject({ reason: "not_current" });
-      await expect(getDraftStatus(source.draftId)).resolves.toMatchObject({ hasNewerDraft: true });
-      const listed = await listDraftsForDate(DATE);
-      expect(listed.map((draft) => [draft.version, draft.hasNewerDraft])).toEqual([
-        [2, false],
-        [1, true],
-      ]);
-    },
-  );
+      await expect(attempt).rejects.toMatchObject({ name: "DraftEditError", reason: "not_current" });
+      await expect(attempt).rejects.toThrow(`Draft v1 is not the newest draft for ${DATE}: v2 is ${status}. Reload the page.`);
+    });
 
-  it("still allows a new image from v1 when the newer v2 failed", async () => {
-    const source = await readyDraft();
+    it("refuses once the issue is published, or another issue row for the date is", async () => {
+      const draft = await readyDraft();
+      const other = await issue({ title: "An n8n copy", publishedAt: NOW });
+
+      await expect(readCurrentDraft(draft.draftId)).rejects.toThrow(`(id ${other}) is already published`);
+
+      await fakeDb.client.issue.deleteMany({ where: { id: other } });
+      await fakeDb.client.issue.update({ where: { id: BigInt(draft.issueId) }, data: { publishedAt: NOW } });
+      await expect(readCurrentDraft(draft.draftId)).rejects.toBeInstanceOf(IssuePublishedError);
+    });
+  });
+
+  describe("editCurrentDraft: a new title", () => {
+    it("puts the title into the same draft row, builds its email HTML again, and sets the edit time", async () => {
+      const draft = await readyDraft();
+
+      const changed = await editCurrentDraft(draft.draftId, { title: NEW_TITLE }, { now: () => NOW });
+
+      const content = { ...SAMPLE_CONTENT, title: NEW_TITLE };
+      expect(changed).toEqual({
+        draftId: draft.draftId,
+        issueId: draft.issueId,
+        version: 1,
+        issueDate: DATE,
+        content,
+        featuredImageUrl: OLD_IMAGE,
+        scenePrompt: OLD_SCENE,
+      });
+      const row = draftRow(draft.draftId);
+      expect(row).toMatchObject({
+        id: BigInt(draft.draftId),
+        issueId: BigInt(draft.issueId),
+        version: 1,
+        status: "ready",
+        content,
+        featuredImageUrl: OLD_IMAGE,
+        scenePrompt: OLD_SCENE,
+        unreadStoryIds: [502],
+        finishedAt: FINISHED,
+        editedAt: NOW,
+      });
+      expect(row.html).toBe(
+        renderIssueEmailHtml(content, { id: draft.issueId, issueDate: DATE }, { id: draft.draftId, featuredImageUrl: OLD_IMAGE }),
+      );
+      expect(row.html).toContain(NEW_TITLE);
+      expect(row.html).not.toContain(SAMPLE_CONTENT.title);
+      expect(row.html).toContain(`url=${OLD_IMAGE}"`);
+      expect(row.html).toContain(`data-issue-id="${draft.issueId}"`);
+      expect(row.html).toContain(`data-draft-id="${draft.draftId}"`);
+      // The draft's own HTML is the preview: only a staged version's email carries a version id.
+      expect(row.html).not.toContain("data-version-id");
+    });
+
+    it("updates the issue row to match: title, HTML, image, scene prompt, excerpt, and content", async () => {
+      const draft = await readyDraft();
+
+      await editCurrentDraft(draft.draftId, { title: NEW_TITLE }, { now: () => NOW });
+
+      const content = { ...SAMPLE_CONTENT, title: NEW_TITLE };
+      const stored = issueRow(draft.issueId);
+      expect(stored).toMatchObject({
+        title: NEW_TITLE,
+        html: draftRow(draft.draftId).html,
+        featureImageUrl: OLD_IMAGE,
+        promptFeaturedImage: OLD_SCENE,
+        excerpt: SAMPLE_CONTENT.excerpt,
+        issueDate: DAY,
+        publishedAt: null,
+      });
+      expect(stored.contentJson).toEqual(
+        toIssueContentJson(content, { issueId: draft.issueId, issueDate: DATE, featuredImageUrl: emailImageUrl(OLD_IMAGE) }),
+      );
+    });
+
+    it("makes no new draft, no new issue, and no staged version", async () => {
+      const draft = await readyDraft();
+
+      await editCurrentDraft(draft.draftId, { title: NEW_TITLE }, { now: () => NOW });
+
+      expect(fakeDb.state.drafts.rows).toHaveLength(1);
+      expect(fakeDb.state.issues.rows).toHaveLength(1);
+      expect(fakeDb.state.stagedVersions.rows).toHaveLength(0);
+      expect(runLog.started).toEqual([]);
+    });
+
+    it("runs under the date's lock", async () => {
+      const draft = await readyDraft();
+
+      await editCurrentDraft(draft.draftId, { title: NEW_TITLE }, { now: () => NOW });
+
+      expect(fakeDb.state.locks).toEqual([LOCK]);
+    });
+
+    it("leaves a staged version as it was: it keeps its own copy", async () => {
+      const draft = await readyDraft();
+      await stagedVersionOf(draft);
+      const before = structuredClone(fakeDb.state.stagedVersions.rows);
+
+      await editCurrentDraft(draft.draftId, { title: NEW_TITLE }, { now: () => NOW });
+
+      expect(fakeDb.state.stagedVersions.rows).toEqual(before);
+      expect(fakeDb.state.stagedVersions.updates).toEqual([]);
+    });
+
+    it("undoes everything and says the title is taken when another issue already has it", async () => {
+      const draft = await readyDraft();
+      const before = structuredClone({ draft: draftRow(draft.draftId), issue: issueRow(draft.issueId) });
+      fakeDb.state.issueUpdateError = titleClash();
+
+      const error = await editCurrentDraft(draft.draftId, { title: NEW_TITLE }, { now: () => NOW }).catch((reason: unknown) => reason);
+
+      expect(error).toBeInstanceOf(DraftEditError);
+      expect(error).toMatchObject({
+        name: "DraftEditError",
+        reason: "title_taken",
+        message: titleTakenMessage(NEW_TITLE, "Use a different title."),
+      });
+      expect(draftRow(draft.draftId)).toEqual(before.draft);
+      expect(issueRow(draft.issueId)).toEqual(before.issue);
+      expect(fakeDb.state.drafts.rows).toHaveLength(1);
+    });
+
+    it("can be changed again after a taken title", async () => {
+      const draft = await readyDraft();
+      fakeDb.state.issueUpdateError = titleClash();
+      await editCurrentDraft(draft.draftId, { title: NEW_TITLE }, { now: () => NOW }).catch(() => null);
+
+      await expect(editCurrentDraft(draft.draftId, { title: "Another Pretend Title" }, { now: () => NOW })).resolves.toMatchObject({ version: 1 });
+
+      expect(draftRow(draft.draftId)).toMatchObject({ content: { ...SAMPLE_CONTENT, title: "Another Pretend Title" }, editedAt: NOW });
+      expect(issueRow(draft.issueId)).toMatchObject({ title: "Another Pretend Title" });
+    });
+
+    it("passes on any other database error, and undoes the draft's change", async () => {
+      const draft = await readyDraft();
+      const before = structuredClone(draftRow(draft.draftId));
+      fakeDb.state.issueUpdateError = new Error("database down");
+
+      await expect(editCurrentDraft(draft.draftId, { title: NEW_TITLE }, { now: () => NOW })).rejects.toThrow("database down");
+
+      expect(draftRow(draft.draftId)).toEqual(before);
+    });
+  });
+
+  describe("editCurrentDraft: a new image", () => {
+    it("puts the image and its scene prompt into the same draft row, and builds its email HTML again", async () => {
+      const draft = await readyDraft();
+
+      const changed = await editCurrentDraft(draft.draftId, { image: NEW_IMAGE }, { now: () => NOW });
+
+      expect(changed).toEqual({
+        draftId: draft.draftId,
+        issueId: draft.issueId,
+        version: 1,
+        issueDate: DATE,
+        content: SAMPLE_CONTENT,
+        featuredImageUrl: NEW_IMAGE.imageUrl,
+        scenePrompt: NEW_IMAGE.scenePrompt,
+      });
+      const row = draftRow(draft.draftId);
+      expect(row).toMatchObject({
+        version: 1,
+        status: "ready",
+        content: SAMPLE_CONTENT,
+        featuredImageUrl: NEW_IMAGE.imageUrl,
+        scenePrompt: NEW_IMAGE.scenePrompt,
+        editedAt: NOW,
+      });
+      expect(row.html).toBe(
+        renderIssueEmailHtml(SAMPLE_CONTENT, { id: draft.issueId, issueDate: DATE }, { id: draft.draftId, featuredImageUrl: NEW_IMAGE.imageUrl }),
+      );
+      expect(row.html).toContain(`url=${NEW_IMAGE.imageUrl}"`);
+      expect(row.html).not.toContain(OLD_IMAGE);
+      expect(row.html).toContain(SAMPLE_CONTENT.title);
+    });
+
+    it("updates the issue row to match, keeping the title", async () => {
+      const draft = await readyDraft();
+
+      await editCurrentDraft(draft.draftId, { image: NEW_IMAGE }, { now: () => NOW });
+
+      const stored = issueRow(draft.issueId);
+      expect(stored).toMatchObject({
+        title: SAMPLE_CONTENT.title,
+        html: draftRow(draft.draftId).html,
+        featureImageUrl: NEW_IMAGE.imageUrl,
+        promptFeaturedImage: NEW_IMAGE.scenePrompt,
+        excerpt: SAMPLE_CONTENT.excerpt,
+      });
+      expect(stored.contentJson).toEqual(
+        toIssueContentJson(SAMPLE_CONTENT, { issueId: draft.issueId, issueDate: DATE, featuredImageUrl: emailImageUrl(NEW_IMAGE.imageUrl) }),
+      );
+    });
+
+    it("makes no new draft and no staged version, leaves a staged version as it was, and runs under the date's lock", async () => {
+      const draft = await readyDraft();
+      await stagedVersionOf(draft);
+      const before = structuredClone(fakeDb.state.stagedVersions.rows);
+
+      await editCurrentDraft(draft.draftId, { image: NEW_IMAGE }, { now: () => NOW });
+
+      expect(fakeDb.state.drafts.rows).toHaveLength(1);
+      expect(fakeDb.state.stagedVersions.rows).toEqual(before);
+      expect(fakeDb.state.locks).toEqual([LOCK]);
+    });
+
+    it("does not call a unique clash a taken title, since the title did not change", async () => {
+      const draft = await readyDraft();
+      const before = structuredClone(draftRow(draft.draftId));
+      fakeDb.state.issueUpdateError = titleClash();
+
+      const error = await editCurrentDraft(draft.draftId, { image: NEW_IMAGE }, { now: () => NOW }).catch((reason: unknown) => reason);
+
+      expect(error).not.toBeInstanceOf(DraftEditError);
+      expect(error).toMatchObject({ code: "P2002" });
+      expect(draftRow(draft.draftId)).toEqual(before);
+    });
+  });
+
+  it("keeps an earlier title change when the image changes, and the other way round", async () => {
+    const draft = await readyDraft();
+    const later = new Date(NOW.getTime() + 60_000);
+
+    await editCurrentDraft(draft.draftId, { title: NEW_TITLE }, { now: () => NOW });
+    await editCurrentDraft(draft.draftId, { image: NEW_IMAGE }, { now: () => later });
+
+    const row = draftRow(draft.draftId);
+    expect(row).toMatchObject({ version: 1, content: { ...SAMPLE_CONTENT, title: NEW_TITLE }, featuredImageUrl: NEW_IMAGE.imageUrl, editedAt: later });
+    expect(row.html).toContain(NEW_TITLE);
+    expect(row.html).toContain(`url=${NEW_IMAGE.imageUrl}"`);
+    expect(issueRow(draft.issueId)).toMatchObject({ title: NEW_TITLE, featureImageUrl: NEW_IMAGE.imageUrl, html: row.html });
+    expect(fakeDb.state.drafts.rows).toHaveLength(1);
+
+    await editCurrentDraft(draft.draftId, { title: "Another Pretend Title" }, { now: () => later });
+    expect(draftRow(draft.draftId)).toMatchObject({ featuredImageUrl: NEW_IMAGE.imageUrl, scenePrompt: NEW_IMAGE.scenePrompt });
+    expect(draftRow(draft.draftId).html).toContain(`url=${NEW_IMAGE.imageUrl}"`);
+  });
+
+  describe("editCurrentDraft: refusals", () => {
+    const EDITS = [
+      ["a new title", { title: NEW_TITLE }],
+      ["a new image", { image: NEW_IMAGE }],
+    ] as const;
+
+    it.each(EDITS)("refuses %s for a draft that does not exist", async (_name, edit) => {
+      await readyDraft();
+
+      await expect(editCurrentDraft(999, edit, { now: () => NOW })).rejects.toMatchObject({ name: "DraftEditError", reason: "missing" });
+      expect(fakeDb.state.locks).toEqual([]);
+    });
+
+    it.each(EDITS)("refuses %s once the issue is published, and never changes it", async (_name, edit) => {
+      const draft = await readyDraft();
+      await fakeDb.client.issue.update({ where: { id: BigInt(draft.issueId) }, data: { publishedAt: NOW } });
+      const before = structuredClone({ draft: draftRow(draft.draftId), issue: issueRow(draft.issueId) });
+
+      const attempt = editCurrentDraft(draft.draftId, edit, { now: () => NOW });
+
+      await expect(attempt).rejects.toBeInstanceOf(IssuePublishedError);
+      await expect(attempt).rejects.toThrow(`The issue for ${DATE} (id ${draft.issueId}) is already published.`);
+      expect(draftRow(draft.draftId)).toEqual(before.draft);
+      expect(issueRow(draft.issueId)).toEqual(before.issue);
+    });
+
+    it("refuses when another issue row for the date is published", async () => {
+      const draft = await readyDraft();
+      const before = structuredClone(draftRow(draft.draftId));
+      const other = await issue({ title: "An n8n copy", publishedAt: NOW });
+
+      await expect(editCurrentDraft(draft.draftId, { title: NEW_TITLE }, { now: () => NOW })).rejects.toThrow(`(id ${other}) is already published`);
+      expect(draftRow(draft.draftId)).toEqual(before);
+    });
+
+    it.each(["running", "ready", "failed"] as const)(
+      "refuses to change v1 once v2 exists and is %s, under the date's lock, and changes neither draft",
+      async (status) => {
+        const v1 = await readyDraft();
+        const v2 = await createDraft(await outline());
+        await fakeDb.client.issueDraft.update({ where: { id: BigInt(v2.draftId) }, data: { status, content: SAMPLE_CONTENT } });
+        fakeDb.state.locks.length = 0;
+        const before = structuredClone({ drafts: fakeDb.state.drafts.rows, issue: issueRow(v1.issueId) });
+
+        const attempt = editCurrentDraft(v1.draftId, { title: NEW_TITLE }, { now: () => NOW });
+
+        await expect(attempt).rejects.toMatchObject({ name: "DraftEditError", reason: "not_current" });
+        await expect(attempt).rejects.toThrow(`Draft v1 is not the newest draft for ${DATE}: v2 is ${status}. Reload the page.`);
+        expect(fakeDb.state.locks).toEqual([LOCK]);
+        expect(fakeDb.state.drafts.rows).toEqual(before.drafts);
+        expect(issueRow(v1.issueId)).toEqual(before.issue);
+      },
+    );
+
+    it("changes v2, the newest draft, and leaves v1 alone", async () => {
+      const v1 = await readyDraft();
+      const v2 = await createDraft(await outline());
+      await fakeDb.client.issueDraft.update({
+        where: { id: BigInt(v2.draftId) },
+        data: { status: "ready", content: SAMPLE_CONTENT, html: "<html>v2</html>", featuredImageUrl: OLD_IMAGE, scenePrompt: OLD_SCENE },
+      });
+      const v1Before = structuredClone(draftRow(v1.draftId));
+
+      await expect(editCurrentDraft(v2.draftId, { title: NEW_TITLE }, { now: () => NOW })).resolves.toMatchObject({ draftId: v2.draftId, version: 2 });
+
+      expect(draftRow(v1.draftId)).toEqual(v1Before);
+      expect(draftRow(v2.draftId)).toMatchObject({ version: 2, editedAt: NOW });
+      expect(draftRow(v2.draftId).html).toContain(`data-draft-id="${v2.draftId}"`);
+      expect(issueRow(v1.issueId)).toMatchObject({ title: NEW_TITLE, html: draftRow(v2.draftId).html });
+    });
+
+    it.each(["running", "failed"] as const)("refuses a draft that is %s, and changes nothing", async (status) => {
+      const draft = await createDraft(await outline());
+      await fakeDb.client.issueDraft.update({ where: { id: BigInt(draft.draftId) }, data: { status, content: SAMPLE_CONTENT } });
+      const before = structuredClone({ draft: draftRow(draft.draftId), issue: issueRow(draft.issueId) });
+
+      const attempt = editCurrentDraft(draft.draftId, { image: NEW_IMAGE }, { now: () => NOW });
+
+      await expect(attempt).rejects.toMatchObject({ name: "DraftEditError", reason: "not_ready" });
+      await expect(attempt).rejects.toThrow(`Draft v1 for ${DATE} is ${status}. Only a ready draft can be changed.`);
+      expect(draftRow(draft.draftId)).toEqual(before.draft);
+      expect(issueRow(draft.issueId)).toEqual(before.issue);
+    });
+  });
+
+  it("writes the taken-title message with the title and what to do next", () => {
+    expect(titleTakenMessage("Pretend Title", "Use a different title.")).toBe(
+      'Another issue already uses the title "Pretend Title", and titles must be unique. Use a different title.',
+    );
+  });
+
+  it("shows the board the edit time, and that an older draft has a newer one whatever its status", async () => {
+    const v1 = await readyDraft();
+
+    await expect(getDraftStatus(v1.draftId)).resolves.toMatchObject({ editedAt: null, hasNewerDraft: false, issuePublished: false });
+
+    await editCurrentDraft(v1.draftId, { title: NEW_TITLE }, { now: () => NOW });
+    await expect(getDraftStatus(v1.draftId)).resolves.toMatchObject({
+      subject: NEW_TITLE,
+      editedAt: NOW,
+      featuredImageUrl: OLD_IMAGE,
+      scenePrompt: OLD_SCENE,
+      hasNewerDraft: false,
+    });
+
     const v2 = await createDraft(await outline());
-    await fakeDb.client.issueDraft.update({ where: { id: BigInt(v2.draftId) }, data: { status: "failed", failedStep: "write" } });
+    for (const status of ["running", "failed", "ready"] as const) {
+      await fakeDb.client.issueDraft.update({ where: { id: BigInt(v2.draftId) }, data: { status } });
 
-    await expect(getDraftStatus(source.draftId)).resolves.toMatchObject({ hasNewerDraft: false });
-    await expect(createImageDraft(source.draftId, NEW_IMAGE, { now: () => NOW })).resolves.toMatchObject({ version: 3 });
-  });
+      await expect(getDraftStatus(v1.draftId)).resolves.toMatchObject({ hasNewerDraft: true });
+      await expect(getDraftStatus(v2.draftId)).resolves.toMatchObject({ hasNewerDraft: false });
+      const listed = await listDraftsForDate(DATE);
+      expect(listed.map((draft) => [draft.version, draft.hasNewerDraft, draft.editedAt])).toEqual([
+        [2, false, null],
+        [1, true, NOW],
+      ]);
+    }
 
-  it("gives the job the source's content and the chosen image", async () => {
-    const source = await readyDraft();
-    const created = await createImageDraft(source.draftId, NEW_IMAGE);
-    const draft = await findDraftToRun(created.draftId);
-
-    expect(draft).toMatchObject({ sourceDraftId: BigInt(source.draftId), version: 2 });
-    await expect(loadNewImageInputs(draft!)).resolves.toEqual({
-      source: { content: SAMPLE_CONTENT, unreadStoryIds: [502] },
-      image: NEW_IMAGE,
-    });
-  });
-
-  it("keeps a failed new-image draft's chosen image on retry, since it is the draft's input", async () => {
-    const source = await readyDraft();
-    const created = await createImageDraft(source.draftId, NEW_IMAGE);
-    const id = BigInt(created.draftId);
-    await fakeDb.client.issueDraft.update({
-      where: { id },
-      data: { status: "failed", failedStep: "ghl", error: "GHL said no.", startedAt: NOW, finishedAt: NOW, content: SAMPLE_CONTENT, html: "<html/>" },
-    });
-
-    await expect(retryDraft(created.draftId, { now: () => NOW })).resolves.toEqual(created);
-
-    expect(fakeDb.state.drafts.rows.find((row) => row.id === id)).toMatchObject({
-      status: "running",
-      sourceDraftId: BigInt(source.draftId),
-      featuredImageUrl: NEW_IMAGE.imageUrl,
-      scenePrompt: NEW_IMAGE.scenePrompt,
-      content: null,
-      html: null,
-    });
-  });
-
-  it("shows the board which draft a new image came from, its image and scene, and whether the issue is published", async () => {
-    const source = await readyDraft();
-    const created = await createImageDraft(source.draftId, NEW_IMAGE);
-
-    await expect(getDraftStatus(created.draftId)).resolves.toMatchObject({
-      sourceDraftId: source.draftId,
-      sourceVersion: 1,
-      featuredImageUrl: NEW_IMAGE.imageUrl,
-      scenePrompt: NEW_IMAGE.scenePrompt,
-      issuePublished: false,
-    });
-    await expect(getDraftStatus(source.draftId)).resolves.toMatchObject({ sourceDraftId: null, sourceVersion: null, featuredImageUrl: OLD_IMAGE });
-    const listed = await listDraftsForDate(DATE);
-    expect(listed.map((draft) => [draft.version, draft.sourceVersion])).toEqual([
-      [2, 1],
-      [1, null],
-    ]);
-
-    await fakeDb.client.issue.update({ where: { id: BigInt(source.issueId) }, data: { publishedAt: NOW } });
-    await expect(getDraftStatus(source.draftId)).resolves.toMatchObject({ issuePublished: true });
+    await fakeDb.client.issue.update({ where: { id: BigInt(v1.issueId) }, data: { publishedAt: NOW } });
+    await expect(getDraftStatus(v1.draftId)).resolves.toMatchObject({ issuePublished: true });
   });
 });
 
 describe("draft reads for the board", () => {
-  it("lists every draft for the date, newest first, with subject, status, GHL link, and which one was sent", async () => {
+  it("lists every draft for the date, newest first, with subject, status, and which one was sent", async () => {
     const v1 = await createDraft(await outline());
     const v2 = await createDraft(await outline());
     await fakeDb.client.issueDraft.update({
       where: { id: BigInt(v1.draftId) },
-      data: { status: "ready", content: SAMPLE_CONTENT, html: "<html>v1</html>", ghlTemplateId: "t1", ghlPreviewUrl: "https://p/1", finishedAt: NOW },
+      data: { status: "ready", content: SAMPLE_CONTENT, html: "<html>v1</html>", finishedAt: NOW },
     });
     await fakeDb.client.issueDraft.update({
       where: { id: BigInt(v2.draftId) },
-      data: { status: "failed", failedStep: "ghl", error: "GHL said no.", finishedAt: NOW },
+      data: { status: "failed", failedStep: "save", error: "The database said no.", finishedAt: NOW },
     });
     await fakeDb.client.publishEvent.create({ data: { mode: "native", outcome: "published", draftId: BigInt(v1.draftId) } });
     await createDraft(await outline("2027-01-05"));
@@ -426,11 +762,10 @@ describe("draft reads for the board", () => {
       issueDate: DATE,
       subject: SAMPLE_CONTENT.title,
       hasHtml: true,
-      ghlTemplateId: "t1",
-      ghlPreviewUrl: "https://p/1",
       finishedAt: NOW,
+      editedAt: null,
     });
-    expect(drafts[0]).toMatchObject({ subject: null, failedStep: "ghl", error: "GHL said no.", hasHtml: false });
+    expect(drafts[0]).toMatchObject({ subject: null, failedStep: "save", error: "The database said no.", hasHtml: false });
     await expect(listDraftsForDate("2027-02-01")).resolves.toEqual([]);
   });
 
@@ -451,16 +786,28 @@ describe("draft reads for the board", () => {
       failedStep: null,
       error: null,
       hasHtml: false,
-      ghlTemplateId: null,
-      ghlPreviewUrl: null,
       unreadStoryIds: [501, 503],
       startedAt: NOW,
       finishedAt: null,
+      editedAt: null,
     });
     await expect(getDraftStatus(999)).resolves.toBeNull();
     await expect(getDraftHtml(created.draftId)).resolves.toBeNull();
 
     await fakeDb.client.issueDraft.update({ where: { id: BigInt(created.draftId) }, data: { html: "<html>draft</html>" } });
     await expect(getDraftHtml(created.draftId)).resolves.toBe("<html>draft</html>");
+  });
+
+  it("carries no distribution service fields and no source draft: a draft is not an email in the service", async () => {
+    const created = await createDraft(await outline());
+
+    const view = await getDraftStatus(created.draftId);
+    const [listed] = await listDraftsForDate(DATE);
+
+    for (const read of [view, listed]) {
+      for (const gone of ["ghlTemplateId", "ghlPreviewUrl", "sourceDraftId", "sourceVersion"]) {
+        expect(read).not.toHaveProperty(gone);
+      }
+    }
   });
 });
