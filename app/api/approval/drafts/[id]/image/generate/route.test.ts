@@ -3,6 +3,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { IssuePublishedError } from "@/src/pipeline/draft/draft-store";
 import { FeaturedImageError } from "@/src/pipeline/draft/image/featured-image";
 import { createApprovalSessionToken } from "@/src/server/approval-auth";
+import { RATE_LIMITS } from "@/src/server/rate-limit";
+import type { RateLimitStore } from "@/src/server/rate-limit-store";
+
+const limits = vi.hoisted(() => ({ store: null as RateLimitStore | null }));
+vi.mock("@/src/server/rate-limit-store", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/src/server/rate-limit-store")>()),
+  getRateLimitStore: () => limits.store,
+}));
 
 const newImage = vi.hoisted(() => ({ generateImageForDraft: vi.fn() }));
 vi.mock("@/src/pipeline/draft/new-image", async (importOriginal) => ({
@@ -12,11 +20,12 @@ vi.mock("@/src/pipeline/draft/new-image", async (importOriginal) => ({
 
 import { POST } from "@/app/api/approval/drafts/[id]/image/generate/route";
 import { NewImageInputError } from "@/src/pipeline/draft/new-image";
+import { createMemoryRateLimitStore } from "@/src/server/rate-limit-store";
 
 const IMAGE = { imageUrl: "https://example-bucket.s3.amazonaws.com/newsletter-dev/2026-05-21-abc123.jpg", scenePrompt: "A lamp." };
 
-async function generate(id: string, body: unknown, signedIn = true) {
-  const token = await createApprovalSessionToken();
+async function generate(id: string, body: unknown, signedIn = true, session?: string) {
+  const token = session ?? (await createApprovalSessionToken());
   const response = await POST(
     new Request(`https://deploy-preview-9--ai-recap.netlify.app/api/approval/drafts/${id}/image/generate`, {
       method: "POST",
@@ -31,6 +40,7 @@ async function generate(id: string, body: unknown, signedIn = true) {
 describe("POST /api/approval/drafts/[id]/image/generate", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    limits.store = createMemoryRateLimitStore();
     process.env.APPROVAL_PASSWORD = "approval-secret";
     process.env.SESSION_SECRET = "test-session-secret";
     newImage.generateImageForDraft.mockResolvedValue(IMAGE);
@@ -87,5 +97,31 @@ describe("POST /api/approval/drafts/[id]/image/generate", () => {
 
     expect(response.status).toBe(500);
     expect(json).toEqual({ error: "Could not make the image." });
+  });
+
+  it(`allows ${RATE_LIMITS.approvalImageGenerate.limit} images per session in an hour`, async () => {
+    const session = await createApprovalSessionToken();
+    for (let i = 0; i < RATE_LIMITS.approvalImageGenerate.limit; i++) {
+      const { response } = await generate("41", { scenePrompt: "A lamp." }, true, session);
+      expect(response.status).toBe(200);
+    }
+    expect(newImage.generateImageForDraft).toHaveBeenCalledTimes(RATE_LIMITS.approvalImageGenerate.limit);
+  });
+
+  it("answers 429 in plain words past the limit, without making an image", async () => {
+    const session = await createApprovalSessionToken();
+    for (let i = 0; i < RATE_LIMITS.approvalImageGenerate.limit; i++) await generate("41", { scenePrompt: "A lamp." }, true, session);
+    newImage.generateImageForDraft.mockClear();
+
+    const { response, json } = await generate("41", { scenePrompt: "A lamp." }, true, session);
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get("retry-after")).toMatch(/^\d+$/);
+    expect(json.error).toMatch(/^Too many images this hour\. Try again in about (a minute|\d+ minutes)\.$/);
+    expect(newImage.generateImageForDraft).not.toHaveBeenCalled();
+
+    // Another session has its own count.
+    const other = await generate("41", { scenePrompt: "A lamp." });
+    expect(other.response.status).toBe(200);
   });
 });

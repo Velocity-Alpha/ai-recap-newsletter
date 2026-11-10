@@ -2,6 +2,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { IssuePublishedError, NewImageError } from "@/src/pipeline/draft/draft-store";
 import { createApprovalSessionToken } from "@/src/server/approval-auth";
+import { RATE_LIMITS } from "@/src/server/rate-limit";
+import type { RateLimitStore } from "@/src/server/rate-limit-store";
+
+const limits = vi.hoisted(() => ({ store: null as RateLimitStore | null }));
+vi.mock("@/src/server/rate-limit-store", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/src/server/rate-limit-store")>()),
+  getRateLimitStore: () => limits.store,
+}));
 
 const newImage = vi.hoisted(() => ({ suggestIdeasForDraft: vi.fn() }));
 vi.mock("@/src/pipeline/draft/new-image", async (importOriginal) => ({
@@ -11,11 +19,12 @@ vi.mock("@/src/pipeline/draft/new-image", async (importOriginal) => ({
 
 import { POST } from "@/app/api/approval/drafts/[id]/image/ideas/route";
 import { NewImageServiceError } from "@/src/pipeline/draft/new-image";
+import { createMemoryRateLimitStore } from "@/src/server/rate-limit-store";
 
 const IDEAS = [{ label: "Lighthouse", scene: "A pretend lighthouse on a rock." }];
 
-async function ideas(id: string, signedIn = true) {
-  const token = await createApprovalSessionToken();
+async function ideas(id: string, signedIn = true, session?: string) {
+  const token = session ?? (await createApprovalSessionToken());
   const response = await POST(
     new Request(`https://deploy-preview-9--ai-recap.netlify.app/api/approval/drafts/${id}/image/ideas`, {
       method: "POST",
@@ -29,6 +38,7 @@ async function ideas(id: string, signedIn = true) {
 describe("POST /api/approval/drafts/[id]/image/ideas", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    limits.store = createMemoryRateLimitStore();
     process.env.APPROVAL_PASSWORD = "approval-secret";
     process.env.SESSION_SECRET = "test-session-secret";
     newImage.suggestIdeasForDraft.mockResolvedValue(IDEAS);
@@ -78,5 +88,30 @@ describe("POST /api/approval/drafts/[id]/image/ideas", () => {
 
     expect(response.status).toBe(500);
     expect(json).toEqual({ error: "Could not suggest scene ideas." });
+  });
+
+  it(`allows ${RATE_LIMITS.approvalImageIdeas.limit} idea requests per session in an hour`, async () => {
+    const session = await createApprovalSessionToken();
+    for (let i = 0; i < RATE_LIMITS.approvalImageIdeas.limit; i++) {
+      const { response } = await ideas("41", true, session);
+      expect(response.status).toBe(200);
+    }
+    expect(newImage.suggestIdeasForDraft).toHaveBeenCalledTimes(RATE_LIMITS.approvalImageIdeas.limit);
+  });
+
+  it("answers 429 in plain words past the limit, without a model call", async () => {
+    const session = await createApprovalSessionToken();
+    for (let i = 0; i < RATE_LIMITS.approvalImageIdeas.limit; i++) await ideas("41", true, session);
+    newImage.suggestIdeasForDraft.mockClear();
+
+    const { response, json } = await ideas("41", true, session);
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get("retry-after")).toMatch(/^\d+$/);
+    expect(json.error).toMatch(/^Too many scene idea requests this hour\. Try again in about (a minute|\d+ minutes)\.$/);
+    expect(newImage.suggestIdeasForDraft).not.toHaveBeenCalled();
+
+    const other = await ideas("41");
+    expect(other.response.status).toBe(200);
   });
 });
