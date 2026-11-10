@@ -201,7 +201,7 @@ describe("runDraftJob", () => {
       expect.objectContaining({
         incidentKey: `draft.failed:${DATE}`,
         severity: "critical",
-        what: expect.stringContaining(`Draft v1 for ${DATE} failed`),
+        what: expect.stringContaining(`The draft for ${DATE} failed`),
         evidence: expect.stringContaining(message),
         link: DRAFTS_LINK,
       }),
@@ -316,7 +316,7 @@ describe("runDraftJob", () => {
     expect(draftRow(draftId).html).toContain(`data-draft-id="${draftId}"`);
     expect(issueRow(issueId)).toMatchObject({ html: null });
     expect(notify.raiseIncident).toHaveBeenCalledWith(
-      expect.objectContaining({ severity: "critical", what: `Draft v1 for ${DATE} failed at saving the draft.`, evidence: error }),
+      expect.objectContaining({ severity: "critical", what: `The draft for ${DATE} failed at saving the draft.`, evidence: error }),
       expect.anything(),
     );
     expect(sendTelegram).not.toHaveBeenCalled();
@@ -683,7 +683,7 @@ describe("runDraftJob and the review group's message (#149)", () => {
     expect(telegramEvents()).toEqual([{ level: "warn", step: "telegram", message: "Telegram returned HTTP 502." }]);
     expect(runLog.finished).toEqual([expect.objectContaining({ status: "succeeded", stats: expect.objectContaining({ telegram: "failed" }) })]);
     expect(notify.raiseIncident).not.toHaveBeenCalled();
-    expect(notify.resolveIncident).toHaveBeenCalledWith(`draft.failed:${DATE}`, expect.objectContaining({ note: "Draft v1 is ready." }));
+    expect(notify.resolveIncident).toHaveBeenCalledWith(`draft.failed:${DATE}`, expect.objectContaining({ note: "The draft is ready." }));
   });
 
   it("warns, sends nothing, and stays ready when production has no Telegram bot token", async () => {

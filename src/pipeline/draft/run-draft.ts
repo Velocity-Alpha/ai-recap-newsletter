@@ -207,7 +207,7 @@ export async function runDraftJob(draftId: bigint | number | string, options: Ru
         {
           incidentKey,
           severity: "critical",
-          what: `Draft v${draft.version} for ${date} failed at ${DRAFT_STEP_LABELS[failedStep]}.`,
+          what: `The draft for ${date} failed at ${DRAFT_STEP_LABELS[failedStep]}.`,
           evidence: message,
           link: draftsLink(date, env),
           details: {
@@ -289,7 +289,7 @@ export async function runDraftJob(draftId: bigint | number | string, options: Ru
   };
   await bestEffort("run", "finish the run", () => finishRun(readyRunId, { status: "succeeded", stats }, now()));
   await bestEffort("alert", `resolve ${incidentKey}`, () =>
-    resolveIncident(incidentKey, { runId: readyRunId, env, now: now(), link: draftsLink(issue.date, env), note: `Draft v${draft.version} is ready.` }),
+    resolveIncident(incidentKey, { runId: readyRunId, env, now: now(), link: draftsLink(issue.date, env), note: "The draft is ready." }),
   );
   return { status: "ready", draftId: id, runId: readyRunId.toString(), issue: issueUpdate };
 }
