@@ -17,8 +17,8 @@ function paperPage(text: string) {
 }
 
 describe("readArticle", () => {
-  it("uses the #115 order and timeouts: site adapter 20 s, fetch 12 s, Jina 30 s", () => {
-    expect(DEFAULT_TIMEOUTS).toEqual({ adapter: 20_000, fetch: 12_000, jina: 30_000 });
+  it("gives each method's network part a limit (site adapter 20 s, fetch 20 s, Jina 30 s) and every text part 20 s", () => {
+    expect(DEFAULT_TIMEOUTS).toEqual({ adapter: 20_000, fetch: 20_000, jina: 30_000, text: 20_000 });
   });
 
   it("reads a paper with its site adapter first", async () => {
@@ -79,13 +79,13 @@ describe("readArticle", () => {
     await expect(readArticle(STORY, { fetch: web.fetch })).resolves.toMatchObject({ status: "blocked", error: "fetch: HTTP 403. jina: A bot check or block page." });
   });
 
-  it("cuts a method off at its timeout, even if it ignores the abort, and moves on", async () => {
+  it("cuts a method off at its network limit, even if it ignores the abort, and moves on", async () => {
     const web = fakeWeb({ [STORY]: hang, [jinaUrl(STORY)]: jinaAnswer(STORY, prose("rescued")) });
 
     const read = await readArticle(STORY, { fetch: web.fetch, timeouts: { fetch: 20 } });
 
     expect(read).toMatchObject({ status: "read", method: "jina" });
-    expect(read.attempts[0]).toMatchObject({ method: "fetch", outcome: "failed", error: "Timed out after 0.02 s." });
+    expect(read.attempts[0]).toMatchObject({ method: "fetch", outcome: "failed", error: "Network part timed out after 0.02 s." });
   });
 
   it("stops, without trying another method, when the step's deadline signal fires", async () => {
@@ -135,25 +135,68 @@ describe("readArticle", () => {
     expect(parse.mock.calls.map(([job]) => job.kind)).toEqual(["markdown"]);
   });
 
-  it("stops the parse at the method's timeout, as the worker is stopped, and moves on", async () => {
+  it("stops the parse at the text limit, as the worker is stopped, and moves on", async () => {
     const web = fakeWeb({ [STORY]: htmlPage(prose("slow")), [jinaUrl(STORY)]: jinaAnswer(STORY, prose("rescued")) });
     const stopped: unknown[] = [];
-    // Stands in for the worker: it ends only when its signal aborts.
-    const slowParse: HtmlParser = (job, signal) =>
+    // Stands in for the worker: it gets its slot at once, then ends only when its signal aborts.
+    const slowParse: HtmlParser = (job, signal, onStart) =>
       job.kind !== "readable"
-        ? parseInThisThread(job, signal)
-        : new Promise((_resolve, reject) =>
+        ? parseInThisThread(job, signal, onStart)
+        : new Promise((_resolve, reject) => {
+            onStart?.();
             signal.addEventListener("abort", () => {
               stopped.push(signal.reason);
               reject(signal.reason);
-            }),
-          );
+            });
+          });
 
-    const read = await readArticle(STORY, { fetch: web.fetch, parse: slowParse, timeouts: { fetch: 30 } });
+    const read = await readArticle(STORY, { fetch: web.fetch, parse: slowParse, timeouts: { text: 30 } });
 
-    expect(stopped).toEqual([expect.objectContaining({ message: "Timed out after 0.03 s." })]);
+    expect(stopped).toEqual([expect.objectContaining({ message: "Text part timed out after 0.03 s." })]);
     expect(read).toMatchObject({ status: "read", method: "jina" });
-    expect(read.attempts[0]).toMatchObject({ method: "fetch", outcome: "failed", error: "Timed out after 0.03 s." });
+    expect(read.attempts[0]).toMatchObject({ method: "fetch", outcome: "failed", error: "Text part timed out after 0.03 s." });
+  });
+
+  it("reads a page whose text job waits for a worker slot longer than the page's network limit", async () => {
+    const web = fakeWeb({ [STORY]: htmlPage(prose("queued")) });
+    // Stands in for a busy worker pool: the slot comes after 80 ms, past the 30 ms network limit.
+    const queuedParse: HtmlParser = (job, signal, onStart) =>
+      new Promise((resolve) => setTimeout(resolve, 80)).then(() => parseInThisThread(job, signal, onStart));
+
+    const read = await readArticle(STORY, { fetch: web.fetch, parse: queuedParse, timeouts: { fetch: 30, text: 1_000 } });
+
+    expect(read).toMatchObject({ status: "read", method: "fetch" });
+    expect(read.text).toContain("queued pretend lab");
+  });
+
+  it("records how long each attempt waited for its host and worker slots, and how long its text part took", async () => {
+    let clock = 0;
+    const limiter = new HostLimiter(1);
+    // Another read holds the host slot for 50 ms.
+    const busy = limiter.run("news.example.com", new AbortController().signal, async () => {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      clock += 50;
+    });
+    const web = fakeWeb({
+      [STORY]: () => {
+        clock += 100;
+        return htmlPage(prose("timed"))();
+      },
+    });
+    // 300 ms in the worker queue, then 200 ms of text work.
+    const parse: HtmlParser = async (job, signal, onStart) => {
+      clock += 300;
+      onStart?.();
+      const text = await parseInThisThread(job, signal);
+      clock += 200;
+      return text;
+    };
+
+    const read = await readArticle(STORY, { fetch: web.fetch, limiter, parse, now: () => clock });
+    await busy;
+
+    expect(read.attempts).toEqual([expect.objectContaining({ method: "fetch", outcome: "read", ms: 650, waitMs: 350, textMs: 200 })]);
+    expect(read.ms).toBe(650);
   });
 
   it("starts a method's clock once its host slot is free, so waiting on another read does not use up its timeout", async () => {
@@ -178,15 +221,5 @@ describe("readArticle", () => {
     expect(web.calls).toEqual([STORY]);
     expect(read).toMatchObject({ status: "failed", method: null, error: "fetch: Refused 127.0.0.1: a private address." });
     expect(read.attempts).toHaveLength(1);
-  });
-
-  it("times each method and the whole read with the given clock", async () => {
-    let clock = 1_000;
-    const web = fakeWeb({ [STORY]: htmlPage("Short."), [jinaUrl(STORY)]: jinaAnswer(STORY, prose("timed")) });
-
-    const read = await readArticle(STORY, { fetch: web.fetch, now: () => (clock += 100) });
-
-    expect(read.attempts.map((attempt) => attempt.ms)).toEqual([100, 100]);
-    expect(read.ms).toBe(500);
   });
 });

@@ -8,20 +8,24 @@ import { matchSiteAdapter } from "@/src/pipeline/draft/articles/site-adapters";
 import { MethodError, type ArticleMethod, type MethodContext, type MethodText } from "@/src/pipeline/draft/articles/types";
 
 /**
- * Reads one article with the #115 order: a site adapter when the host has one (20 s), then the page with
- * Readability (12 s), then Jina Reader (30 s). The first text that passes the quality check wins. When none
- * does, the article is unread, and its status is the strongest reason seen: paywalled, then blocked, then failed.
- * A method's timeout starts when its first request gets a host slot, so waiting behind other stories on the same
- * host does not use it up. A link the address guard refuses, at any hop, stops the chain: Jina is not asked either.
+ * Reads one article with the #115 order: a site adapter when the host has one, then the page with Readability,
+ * then Jina Reader. The first text that passes the quality check wins. When none does, the article is unread, and
+ * its status is the strongest reason seen: paywalled, then blocked, then failed.
+ * A method's limits count its work only (#170). Its network part runs from its first request's host slot to the
+ * body; its text part from the text job's worker slot to the text. Waiting for a slot, behind other stories on the
+ * same host or other pages' text jobs, uses up neither: only the read step's deadline limits it.
+ * A link the address guard refuses, at any hop, stops the chain: Jina is not asked either.
  */
 
+/** The network part's limit for each kind of method, and the text part's limit for all of them. */
 export interface MethodTimeouts {
   adapter: number;
   fetch: number;
   jina: number;
+  text: number;
 }
 
-export const DEFAULT_TIMEOUTS: MethodTimeouts = { adapter: 20_000, fetch: 12_000, jina: 30_000 };
+export const DEFAULT_TIMEOUTS: MethodTimeouts = { adapter: 20_000, fetch: 20_000, jina: 30_000, text: 20_000 };
 
 /** Text beyond this is not kept (full papers run to ~87,000 characters; the writer uses the first 20,000). */
 export const MAX_TEXT_CHARS = 50_000;
@@ -29,6 +33,10 @@ export const MAX_TEXT_CHARS = 50_000;
 export interface ArticleAttempt {
   method: ArticleMethod;
   ms: number;
+  /** Of `ms`, the time spent waiting for a host slot and a text worker slot. Missing on reads saved before #170. */
+  waitMs?: number;
+  /** Of `ms`, the time of the text part (worker slot to text). Missing when no text job started. */
+  textMs?: number;
   /** Characters of text the method returned. */
   chars: number;
   /** `read`, or how this method's text failed. */
@@ -67,11 +75,62 @@ export interface ReadArticleOptions {
   githubToken?: string;
 }
 
+type MethodPart = "network" | "text";
+
 class MethodTimeout extends Error {
-  constructor(ms: number) {
-    super(`Timed out after ${ms / 1000} s.`);
+  constructor(part: MethodPart, ms: number) {
+    super(`${part === "network" ? "Network" : "Text"} part timed out after ${ms / 1000} s.`);
     this.name = "MethodTimeout";
   }
+}
+
+/**
+ * One method's clocks: the network and text limits, and the attempt's timings. Each part's limit starts when the
+ * part gets its slot; the time before that is waiting.
+ */
+function methodClock(now: () => number, limits: Record<MethodPart, number>, abort: (reason: MethodTimeout) => void) {
+  const started = now();
+  let networkStarted: number | null = null;
+  let textAsked: number | null = null;
+  let textStarted: number | null = null;
+  let textEnded: number | null = null;
+  let networkTimer: ReturnType<typeof setTimeout> | undefined;
+  let textTimer: ReturnType<typeof setTimeout> | undefined;
+
+  return {
+    /** A request got its host slot. The network limit starts at the first. */
+    startNetwork() {
+      if (networkStarted !== null || textAsked !== null) return;
+      networkStarted = now();
+      networkTimer = setTimeout(() => abort(new MethodTimeout("network", limits.network)), limits.network);
+    },
+    /** The body is in and the text job is queued: the network part is over. */
+    askText() {
+      clearTimeout(networkTimer);
+      textAsked ??= now();
+    },
+    /** The text job got its worker slot. */
+    startText() {
+      if (textStarted !== null) return;
+      textStarted = now();
+      textTimer = setTimeout(() => abort(new MethodTimeout("text", limits.text)), limits.text);
+    },
+    endText() {
+      clearTimeout(textTimer);
+      if (textStarted !== null) textEnded ??= now();
+    },
+    stop() {
+      clearTimeout(networkTimer);
+      clearTimeout(textTimer);
+    },
+    timings(): { ms: number; waitMs: number; textMs?: number } {
+      const end = now();
+      const hostWait = (networkStarted ?? textAsked ?? end) - started;
+      const workerWait = textAsked === null ? 0 : (textStarted ?? end) - textAsked;
+      const textMs = textStarted === null ? undefined : (textEnded ?? end) - textStarted;
+      return { ms: end - started, waitMs: hostWait + workerWait, ...(textMs === undefined ? {} : { textMs }) };
+    },
+  };
 }
 
 const STATUS_RANK: Record<NotReadStatus, number> = { paywalled: 3, blocked: 2, failed: 1 };
@@ -131,29 +190,32 @@ export async function readArticle(url: string, options: ReadArticleOptions): Pro
     if (options.signal?.aborted) break;
 
     const controller = new AbortController();
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const startClock = () => {
-      timer ??= setTimeout(() => controller.abort(new MethodTimeout(step.timeoutMs)), step.timeoutMs);
-    };
+    const clock = methodClock(now, { network: step.timeoutMs, text: timeouts.text }, (reason) => controller.abort(reason));
     // With no limiter there is no slot to wait for, so the clock starts now.
-    if (!options.limiter) startClock();
+    if (!options.limiter) clock.startNetwork();
     const onDeadline = () => controller.abort(options.signal?.reason);
     options.signal?.addEventListener("abort", onDeadline, { once: true });
     const context: MethodContext = {
       fetch: options.fetch,
       signal: controller.signal,
-      parse,
+      parse: async (job, signal) => {
+        clock.askText();
+        try {
+          return await parse(job, signal, () => clock.startText());
+        } finally {
+          clock.endText();
+        }
+      },
       limiter: options.limiter,
-      onStart: startClock,
+      onStart: () => clock.startNetwork(),
       jinaApiKey: options.jinaApiKey,
       githubToken: options.githubToken,
     };
-    const attemptStarted = now();
     try {
       // The race stops a method that ignores its abort signal.
       const result = await Promise.race([step.run(context), rejectOnAbort(controller.signal)]);
       const verdict = checkArticleText(result.text, result.httpStatus);
-      const attempt = { method: step.method, ms: now() - attemptStarted, chars: result.text.length, httpStatus: result.httpStatus };
+      const attempt = { method: step.method, ...clock.timings(), chars: result.text.length, httpStatus: result.httpStatus };
       if (verdict.ok) {
         attempts.push({ ...attempt, outcome: "read" });
         return {
@@ -171,11 +233,11 @@ export async function readArticle(url: string, options: ReadArticleOptions): Pro
       attempts.push({ ...attempt, outcome: verdict.status, error: verdict.reason });
     } catch (error) {
       const outcome = error instanceof MethodError ? error.status : "failed";
-      attempts.push({ method: step.method, ms: now() - attemptStarted, chars: 0, outcome, error: errorMessage(error) });
+      attempts.push({ method: step.method, ...clock.timings(), chars: 0, outcome, error: errorMessage(error) });
       // A redirect or DNS answer pointing at a private address: no other method should go there either.
       if (error instanceof RefusedUrlError) break;
     } finally {
-      clearTimeout(timer);
+      clock.stop();
       options.signal?.removeEventListener("abort", onDeadline);
     }
   }

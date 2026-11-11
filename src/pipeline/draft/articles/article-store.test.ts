@@ -82,7 +82,7 @@ describe("prismaArticleStore.save", () => {
         chars: 19,
         ms: 1_200,
         error: null,
-        attempts: [{ method: "jina", ms: 1_100, chars: 19, outcome: "read", httpStatus: 200 }],
+        attempts: [{ method: "jina", ms: 1_100, waitMs: 400, textMs: 50, chars: 19, outcome: "read", httpStatus: 200 }],
       },
       {
         storyId: 502,
@@ -94,7 +94,7 @@ describe("prismaArticleStore.save", () => {
         chars: 0,
         ms: 300,
         error: "fetch: HTTP 403.",
-        attempts: [{ method: "fetch", ms: 300, chars: 0, outcome: "blocked", httpStatus: 403, error: "HTTP 403." }],
+        attempts: [{ method: "fetch", ms: 300, waitMs: 120, chars: 0, outcome: "blocked", httpStatus: 403, error: "HTTP 403." }],
       },
     ];
 

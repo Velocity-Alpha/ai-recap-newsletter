@@ -7,8 +7,8 @@ import { DEFAULT_DEADLINE_MS, readArticles } from "@/src/pipeline/draft/articles
 const story = (id: number, url: string) => ({ id, url });
 
 describe("readArticles", () => {
-  it("gives the whole step a 60 s deadline by default", () => {
-    expect(DEFAULT_DEADLINE_MS).toBe(60_000);
+  it("gives the whole step a 120 s deadline by default", () => {
+    expect(DEFAULT_DEADLINE_MS).toBe(120_000);
   });
 
   it("returns text for each story it read and `unread` for the rest, in story order, with each story's diagnostics", async () => {

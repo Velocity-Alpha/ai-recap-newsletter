@@ -13,12 +13,13 @@ import { parseJobText, type ParseJob } from "@/src/pipeline/draft/articles/html-
  * scripts) there is no JavaScript file to start, so the work stays in this thread, behind the HTML guard only.
  */
 
-export type HtmlParser = (job: ParseJob, signal: AbortSignal) => Promise<string>;
+/** Does one text job. `onStart` is called when the job gets its worker slot, so its text limit can start then. */
+export type HtmlParser = (job: ParseJob, signal: AbortSignal, onStart?: () => void) => Promise<string>;
 
 /** #120 review: enough for real pages (the largest tried used under 100 MB), far below the function's memory. */
 export const WORKER_HEAP_MB = 256;
-/** Workers at once, across every story being read. Two hostile pages at the heap limit still fit in the function. */
-export const MAX_WORKERS = 2;
+/** Workers at once, across every story being read. Three hostile pages at the heap limit (768 MB) still fit in the 1,024 MB function. */
+export const MAX_WORKERS = 3;
 
 const WORKER_KEY = "aiRecapHtmlWorker";
 
@@ -47,8 +48,9 @@ export class HtmlParseError extends Error {
 }
 
 /** In this thread. Only the HTML guard protects it. */
-export const parseInThisThread: HtmlParser = async (job, signal) => {
+export const parseInThisThread: HtmlParser = async (job, signal, onStart) => {
   if (signal.aborted) throw signal.reason;
+  onStart?.();
   return parseJobText(job);
 };
 
@@ -91,7 +93,11 @@ function runInWorker(entry: URL, job: ParseJob, signal: AbortSignal, heapMb: num
 export function createWorkerParser(entry: URL, options: { heapMb?: number; maxWorkers?: number } = {}): HtmlParser {
   const heapMb = options.heapMb ?? WORKER_HEAP_MB;
   const slots = new HostLimiter(options.maxWorkers ?? MAX_WORKERS);
-  return (job, signal) => slots.run("worker", signal, () => runInWorker(entry, job, signal, heapMb));
+  return (job, signal, onStart) =>
+    slots.run("worker", signal, () => {
+      onStart?.();
+      return runInWorker(entry, job, signal, heapMb);
+    });
 }
 
 /** True when this module runs as built JavaScript, so a worker can start from it. */
