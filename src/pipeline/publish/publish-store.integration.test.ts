@@ -8,7 +8,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { PublishEventInput } from "@/src/pipeline/publish/detect-publish";
 import { createPrismaPublishStore } from "@/src/pipeline/publish/publish-store";
 import { parseSentEmail } from "@/src/pipeline/publish/sent-email-parser";
-import { PLACEHOLDER_ISSUE, renderIssueEmail } from "@/src/pipeline/publish/sent-email.fixture";
+import { PLACEHOLDER_ISSUE, renderIssueEmail, type FixtureIssue } from "@/src/pipeline/publish/sent-email.fixture";
 import { prisma } from "@/src/server/prisma";
 
 function endpoint(url: string | undefined) {
@@ -35,11 +35,47 @@ describe.skipIf(!enabled)("publish store on a real database", () => {
     storyIds = stories.map((story) => story.id);
   });
 
+  const extraIssueIds: bigint[] = [];
+  const outlineIds: bigint[] = [];
+
   afterAll(async () => {
-    await prisma.publishEvent.deleteMany({ where: { issueId: BigInt(issueId) } });
+    const issueIds = [BigInt(issueId), ...extraIssueIds];
+    await prisma.issueStory.deleteMany({ where: { issueId: { in: issueIds } } });
+    await prisma.publishEvent.deleteMany({ where: { issueId: { in: issueIds } } });
+    await prisma.issueDraft.deleteMany({ where: { issueId: { in: issueIds } } });
+    await prisma.approvalOutline.deleteMany({ where: { id: { in: outlineIds } } });
     await prisma.story.deleteMany({ where: { id: { in: storyIds } } });
-    await prisma.issue.deleteMany({ where: { id: BigInt(issueId) } });
+    await prisma.issue.deleteMany({ where: { id: { in: issueIds } } });
   });
+
+  async function draftIssue(): Promise<number> {
+    // The slug comes from the title and is unique, so each test issue gets its own title.
+    const issue = await prisma.issue.create({ data: { title: `${tag} draft ${extraIssueIds.length + 2}` }, select: { id: true } });
+    extraIssueIds.push(issue.id);
+    return Number(issue.id);
+  }
+
+  /** The sent email of an issue that holds the two test stories: one top story, one quick hit. */
+  function sentEmail(id: number) {
+    const issue: FixtureIssue = {
+      ...PLACEHOLDER_ISSUE,
+      issueId: id,
+      // (title, published_at) is unique on issues, and publish takes the title from the email.
+      title: `Placeholder Title ${id}`,
+      headlines: [{ story_id: storyIds[0], url: "https://news.example.test/story-a", headline: "Headline A" }],
+      research: [],
+      tools: [],
+      quickHits: [{ story_id: storyIds[1], url: "https://hits.example.test/f", link_text: "Hit F", text: "says F." }],
+    };
+    return parseSentEmail(renderIssueEmail(issue, { received: true }))!;
+  }
+
+  const issueStories = (id: number) =>
+    prisma.issueStory.findMany({
+      where: { issueId: BigInt(id) },
+      orderBy: { storyId: "asc" },
+      select: { storyId: true, section: true, position: true, url: true, isLead: true },
+    });
 
   function event(gmailMessageId: string): PublishEventInput {
     return {
@@ -87,6 +123,61 @@ describe.skipIf(!enabled)("publish store on a real database", () => {
     });
     expect(events.map((row) => row.outcome)).toEqual(["published", "already_published"]);
     expect(events.map((row) => row.draftId)).toEqual([BigInt(41), BigInt(41)]);
+  });
+
+  it("writes one row for each story of the sent email, with the lead of the outline of the draft the email names", async () => {
+    const id = await draftIssue();
+    const outline = await prisma.approvalOutline.create({
+      data: { issueDate: new Date("2026-11-03T00:00:00.000Z"), payload: { leadStoryId: storyIds[1] }, payloadHash: tag },
+      select: { id: true },
+    });
+    outlineIds.push(outline.id);
+    const draft = await prisma.issueDraft.create({
+      data: { issueId: BigInt(id), version: 1, outlineId: outline.id, status: "ready" },
+      select: { id: true },
+    });
+    const sent = sentEmail(id);
+    const publishedAt = new Date("2026-11-03T23:30:00.000Z");
+    const named = { ...event("d"), issueId: id, draftId: Number(draft.id) };
+
+    const first = await store.publish({ issueId: id, content: sent.content, storyIds: sent.storyIds, publishedAt, event: named });
+
+    expect(first).toBe("published");
+    const rows = [
+      { storyId: storyIds[0], section: "headlines", position: 1, url: "https://news.example.test/story-a", isLead: false },
+      { storyId: storyIds[1], section: "quick_hits", position: 1, url: "https://hits.example.test/f", isLead: true },
+    ].sort((a, b) => a.storyId - b.storyId);
+    expect(await issueStories(id)).toEqual(rows);
+
+    // A second copy of the email, changed in between, finds the issue published and writes nothing.
+    const again = { ...sent.content, headlines: [], tools: sent.content.quick_hits.map((hit) => ({ ...hit, detail: "" })), quick_hits: [] };
+    const second = await store.publish({ issueId: id, content: again, storyIds: sent.storyIds, publishedAt, event: { ...named, gmailMessageId: `${tag}-e` } });
+
+    expect(second).toBe("already_published");
+    expect(await issueStories(id)).toEqual(rows);
+  });
+
+  it("leaves is_lead null when the sent email names no draft", async () => {
+    const id = await draftIssue();
+    const sent = sentEmail(id);
+
+    await store.publish({
+      issueId: id,
+      content: sent.content,
+      storyIds: sent.storyIds,
+      publishedAt: new Date("2026-11-03T23:30:00.000Z"),
+      event: { ...event("f"), issueId: id, draftId: null },
+    });
+
+    expect((await issueStories(id)).map((row) => [row.storyId, row.isLead])).toEqual(
+      [...storyIds].sort((a, b) => a - b).map((storyId) => [storyId, null]),
+    );
+  });
+
+  it("rejects a section outside the four story sections", async () => {
+    await expect(
+      prisma.issueStory.create({ data: { issueId: BigInt(issueId), storyId: storyIds[0], section: "overview", position: 1 } }),
+    ).rejects.toThrow();
   });
 
   it("records a message once per mode and reports which messages it has seen", async () => {

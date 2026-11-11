@@ -132,6 +132,7 @@ export function createFakeDb() {
     stories: { rows: [], updates: [] } as FakeTable,
     publishEvents: { rows: [], updates: [] } as FakeTable,
     stagedVersions: { rows: [], updates: [] } as FakeTable,
+    issueStories: { rows: [], updates: [] } as FakeTable,
     settings: { rows: [], updates: [] } as FakeTable,
     locks: [] as unknown[][],
     /** Makes the next issue update fail with this error (then clears). */
@@ -184,6 +185,7 @@ export function createFakeDb() {
     approvalOutline: table(state.outlines, { nextId: id, defaults: () => ({ committedAt: now() }) }),
     story: table(state.stories, { nextId: id, defaults: () => ({}) }),
     publishEvent: table(state.publishEvents, { nextId: id, defaults: () => ({ draftId: null, stagedVersionId: null }) }),
+    issueStory: table(state.issueStories, { nextId: id, defaults: () => ({ createdAt: now() }) }),
     pipelineSetting: table(state.settings, { nextId: id, defaults: () => ({}) }),
     $executeRaw: async (strings: TemplateStringsArray, ...values: unknown[]) => {
       state.locks.push([strings.join("?"), ...values]);
@@ -197,11 +199,13 @@ export function createFakeDb() {
         stories: state.stories.rows,
         publishEvents: state.publishEvents.rows,
         stagedVersions: state.stagedVersions.rows,
+        issueStories: state.issueStories.rows,
       });
       try {
         return await run(client);
       } catch (error) {
         state.stagedVersions.rows = snapshot.stagedVersions;
+        state.issueStories.rows = snapshot.issueStories;
         state.issues.rows = snapshot.issues;
         state.drafts.rows = snapshot.drafts;
         state.outlines.rows = snapshot.outlines;
@@ -216,7 +220,7 @@ export function createFakeDb() {
     state,
     client,
     reset() {
-      for (const key of ["issues", "drafts", "outlines", "stories", "publishEvents", "stagedVersions", "settings"] as const) {
+      for (const key of ["issues", "drafts", "outlines", "stories", "publishEvents", "stagedVersions", "issueStories", "settings"] as const) {
         state[key].rows = [];
         state[key].updates = [];
       }
