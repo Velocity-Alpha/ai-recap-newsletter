@@ -256,11 +256,7 @@ export function scoreWriter(outcomes: WriterOutcome[]): Metric[] {
   return [...codeMetrics(outcomes), ...judgeMetrics(outcomes), ...goldenMetrics(outcomes)];
 }
 
-/**
- * The results table's columns: the writer gives about 30 metrics, all kept in the stored rows. Rows from before
- * d1da5b8 timed the judge in p50/p95 and compared each effort with low, so their "Writer p50 s", "Writer max s" and
- * preference-vs-low columns are kept too; a column no row has is left out.
- */
+/** The results table's columns: the writer gives about 30 metrics, all kept in the stored rows. */
 export function writerColumns(): string[] {
   const golden = pairMetricNames(GOLDEN);
   return [
@@ -282,8 +278,5 @@ export function writerColumns(): string[] {
     golden.wins,
     golden.ties,
     golden.preference,
-    pairMetricNames("low").preference,
-    "Writer p50 s",
-    "Writer max s",
   ];
 }

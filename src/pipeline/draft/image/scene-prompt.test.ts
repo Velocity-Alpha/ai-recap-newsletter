@@ -83,9 +83,9 @@ describe("writeScenePrompt", () => {
     expect((await sentCall()).request.model).toBe("gpt-6-luna");
   });
 
-  it("calls at medium effort", async () => {
-    expect(SCENE_PROMPT_EFFORT).toBe("medium");
-    expect((await sentCall()).request.reasoning).toEqual({ effort: "medium" });
+  it("calls at high effort", async () => {
+    expect(SCENE_PROMPT_EFFORT).toBe("high");
+    expect((await sentCall()).request.reasoning).toEqual({ effort: "high" });
   });
 
   it("sends 2.2.1's instructions and the context as input", async () => {

@@ -12,13 +12,10 @@ import { modelFields, type ModelOverrides, type ReasoningEffort } from "@/src/li
 
 export const EXTRACTION_MODEL = "gpt-6-luna";
 /**
- * Medium, from evals/results/extraction.md (the low and medium rows of d1da5b8: 2 runs of 12 issues each, judge at
- * high). Medium covers more of the stories in the text (recall 339 of 358, 93–96% per run, against 329 of 364,
- * 90–91%) and misses fewer per issue (0.79 against 1.46). It puts more stories in the right category (287 of 319,
- * 89–91%, against 248 of 315, 77–80%) and rates importance closer (309 of 319 within 1, against 290 of 315).
- * Against it: URL right is 322 of 329 (98%) against 321 of 323 (99–100%); most of those links only drop a query
- * string or a trailing slash and still open the page. Faithful stories are within noise (91% against 92%). It costs
- * $0.0025 a call against $0.0016, and its p95 of 63.4 s is inside the 120 s timeout.
+ * Medium, from evals/results/extraction.md (58 issues, 2 runs each, scored against golden values). Against medium,
+ * low finds fewer of the golden stories (recall −6 pts, 95% range −8 to −3), puts fewer in the golden category
+ * (−5 pts, −7 to −2) and misses 2.75 stories per issue against 1.97. High is no better on any metric, and its p95
+ * of 105 s is close to the 120 s timeout.
  */
 export const EXTRACTION_EFFORT: ReasoningEffort = "medium";
 

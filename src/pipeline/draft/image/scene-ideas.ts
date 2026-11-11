@@ -21,9 +21,10 @@ import {
 
 export const SCENE_IDEAS_COUNT = 3;
 /**
- * The model is SCENE_PROMPT_MODEL. Medium, from evals/results/scene-ideas.md (2 runs of 10 issues each). High
- * keeps more ideas to one supporting element (50 of 60 against 43 of 60), but the call runs in a web request with
- * a 45 s timeout: high's call p95 is 44.5 s and 1 of its 20 calls failed, while medium's call p95 is 20 s with none.
+ * The model is SCENE_PROMPT_MODEL. Medium, from evals/results/scene-ideas.md (100 issues, 2 runs each). Low is
+ * worse than medium on no extras (−22 pts, 95% range −29 to −16), clearly different ideas (−12, −19 to −7) and a
+ * lead identifier shown (−13, −20 to −6). High has more ideas with no extras (+12 pts), but the call runs in a web
+ * request with a 45 s timeout: 17 of high's 200 calls timed out, and its p95 is 43.5 s.
  */
 export const SCENE_IDEAS_EFFORT: ReasoningEffort = "medium";
 /** The board waits for this call, and a route must finish inside Netlify's 60 s. */

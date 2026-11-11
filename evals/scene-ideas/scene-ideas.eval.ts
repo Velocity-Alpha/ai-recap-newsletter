@@ -68,11 +68,9 @@ it("scene ideas: hard rules, judged rules, and latency against the route's timeo
       "J: columns are the judge's grade (rubric.ts, which quotes the prompt's rules), over the runs it graded (the " +
         "Graded column; judged idea columns are of 3 ideas per graded run). The judge is given the golden lead story " +
         "and its identifiers. 'An idea shows the lead': one idea shows the golden lead; 'an idea shows a lead " +
-        "identifier': and visibly shows one of its identifiers. Rows from before the golden values (10 issues) had the " +
-        "judge find the lead itself.",
+        "identifier': and visibly shows one of its identifiers.",
       `The call runs in a web request with a ${SCENE_IDEAS_TIMEOUT_MS / 1000} s timeout and no retry: a slower call ` +
-        `is an error. 'Done in ${SCENE_IDEAS_TIMEOUT_MS / 1000} s' and p50/p95 time the call alone. Rows with git sha ` +
-        "035179c+changes (before d1da5b8) counted ungraded runs as J: misses, timed the judge in p50/p95, and have the call alone in 'Call p50 s' and 'Call p95 s'.",
+        `is an error. 'Done in ${SCENE_IDEAS_TIMEOUT_MS / 1000} s' and p50/p95 time the call alone.`,
     ],
     settings,
     items,

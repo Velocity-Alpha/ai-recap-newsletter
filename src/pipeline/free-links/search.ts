@@ -7,18 +7,18 @@ import { siteOf } from "@/src/pipeline/free-links/sites";
  * The web search for free links (#59): one OpenAI request with the web search tool, for a story whose link is
  * paywalled and that has no free link among our own stories. The request and the prompt are those of issue #59;
  * the recorded answers in `__fixtures__/search-answers.json` were made with them at the API default effort,
- * medium, so keep the prompt equal. Measured at medium, 3 runs of 10 stories (evals/results/free-links.md):
- * 3.37 web searches and $0.0368 for each request, 18.5 s p50 and 35.6 s p95.
+ * medium, so keep the prompt equal.
  */
 
 export const SEARCH_MODEL = "gpt-6-luna";
 /**
- * Medium, from evals/results/free-links.md (3 runs of 10 stories each). It found a usable link for 22 of 30
- * stories (70–80% per run) against 24 of 30 (70–90%) at none: the ranges overlap, so that is noise. None costs
- * 2.3 times as much ($0.0832 against $0.0368 a request, 7.77 web searches against 3.37), its p95 is 101.1 s
- * against the 120 s limit, and 1 of its 30 requests failed.
+ * Low, from evals/results/free-links.md (100 stories, 1 run each, against medium). Low finds as many usable links:
+ * a usable link where the golden value has one for 69 of 94 stories at both, stories with a usable link 71 against
+ * 70 (+1 pt, 95% range −9 to +11), and kept links that report the same news 87% against 88% (−1 pt, −6 to +6).
+ * It costs 2.3 cents a story against 3.4, and its p95 is 18.5 s against 29.7 s, of the 120 s limit. It returns more
+ * links on paywalled sites and more that are too short, which the page check drops before saving.
  */
-export const SEARCH_EFFORT: ReasoningEffort = "medium";
+export const SEARCH_EFFORT: ReasoningEffort = "low";
 const REQUEST_OPTIONS = { timeout: 120_000, maxRetries: 1 };
 
 export interface SearchStory {

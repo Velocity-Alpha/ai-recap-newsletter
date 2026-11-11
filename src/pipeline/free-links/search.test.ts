@@ -58,9 +58,9 @@ describe("searchFreeLinks", () => {
     expect((await sentCall()).request.model).toBe("gpt-6-luna");
   });
 
-  it("calls at medium effort", async () => {
-    expect(SEARCH_EFFORT).toBe("medium");
-    expect((await sentCall()).request.reasoning).toEqual({ effort: "medium" });
+  it("calls at low effort", async () => {
+    expect(SEARCH_EFFORT).toBe("low");
+    expect((await sentCall()).request.reasoning).toEqual({ effort: "low" });
   });
 
   it("gives the call a 120 s limit", async () => {

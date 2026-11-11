@@ -12,12 +12,12 @@ import { withRetries } from "@/src/pipeline/draft/image/retry";
 
 export const SCENE_PROMPT_MODEL = "gpt-6-luna";
 /**
- * Medium, from evals/results/scene-prompt.md (2 runs of 10 issues each). It kept all hard rules in 17 of 20
- * runs, against 19 of 20 at high and 18 of 20 at the API default, which is medium too: so a gap of this size
- * is noise, and high costs about twice as much ($0.0014 against $0.000737 a call). Medium's call p95 is 16.7 s,
- * inside the 120 s timeout.
+ * High, from evals/results/scene-prompt.md (100 issues, 2 runs each, against medium). High keeps all hard rules in
+ * 184 of 200 runs against 156 of 200 (+14 pts, 95% range +7 to +21), and no extras in 200 of 200 against 193 of
+ * 200; the lead depicted and a lead identifier shown are level. Low is worse on hard rules (−17 pts, −24 to −9).
+ * High costs 0.14 cents a call against 0.08, and its p95 is 44 s of the 120 s timeout, in a background step.
  */
-export const SCENE_PROMPT_EFFORT: ReasoningEffort = "medium";
+export const SCENE_PROMPT_EFFORT: ReasoningEffort = "high";
 export const SCENE_PROMPT_TIMEOUT_MS = 120_000;
 export const SCENE_PROMPT_RETRIES = 2;
 

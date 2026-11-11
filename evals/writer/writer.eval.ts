@@ -66,14 +66,13 @@ it("writer: code checks, faithfulness grades and wins against the golden issue, 
       `The issue writer on ${cases.length} issues (${cases[cases.length - 1]?.date} to ${cases[0]?.date}; evals/writer/manifest.json), ` +
         "built by evals/writer/build-dataset.ts from the Neon dev branch (read-only) as drafting builds the writer's input. " +
         "Sections and board order: issue_stories (the sent email) for published issues, the board's commit for 2026-11-09 " +
-        "(a draft, the only issue with a board commit). Rows with git sha 035179c+changes (n = 12) ran on the first 6 of these issues.",
+        "(a draft, the only issue with a board commit).",
       `Article text for the ${coverage.features} feature stories: ${coverage.saved} saved copies (story_articles), ` +
         `${coverage.read} read by the repo's article reader on the build day, ${coverage.unread} not read (summaries only).`,
       `No issue had owner notes, so the eval adds ${EVAL_NOTES.length} of its own to each issue (evals/writer/notes.ts), each checked in code.`,
       "Every metric reads the first draft, except \"Checks pass after rewrite\", which runs production's one rewrite. " +
         "Cost per call and p50/p95 include the rewrites; p50/p95 are the writer calls alone (the writer times out at " +
-        "240 s in production). Rows with git sha 035179c+changes (before d1da5b8) timed the judge in p50/p95 too, and " +
-        "have the writer calls alone in \"Writer p50 s\" and \"Writer max s\".",
+        "240 s in production).",
       "The judge grades each first draft against the writer's exact input (evals/writer/rubric.ts, which imports the " +
         "writer's rules from writer.ts): unsupported claims counted per story, each bullet, each note, and editorial " +
         "quality on anchored 1-5; (judge) counts are over the graded runs.",
@@ -81,8 +80,9 @@ it("writer: code checks, faithfulness grades and wins against the golden issue, 
         "(evals/data/writer/golden.json, not committed; evals/writer/golden-todo.md). The pairwise judge compares each " +
         "first draft with it, blind and in random order, without the article text; \"vs golden\" counts are over the " +
         "graded runs, and a run that errored is a loss. Since the reference is fixed, win rates compare across efforts " +
-        "and models. Rows with git sha 035179c+changes compared each effort with low instead. The table shows chosen " +
-        "columns; all metrics are in the stored rows.",
+        "and models. They are relative, not a quality score: GPT-6 Luna drafts beat the Opus reference, which suggests " +
+        "the judge, an OpenAI model, may favour its own family's style. The table shows chosen columns; all metrics are " +
+        "in the stored rows.",
     ],
     settings,
     items: cases,

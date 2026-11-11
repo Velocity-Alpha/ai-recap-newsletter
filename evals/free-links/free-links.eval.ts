@@ -154,10 +154,7 @@ it("free links: usable links found by the web search, at each effort", async () 
         "chose by hand; the search is told that site is paywalled and the check drops the story's own site, so this counts " +
         "a returned link on the owner's site before the check.",
       `Cost per call: the search call's tokens plus $${WEB_SEARCH_USD_PER_CALL} per web search call (OpenAI pricing, ` +
-        "2026-11-10). p50/p95 time the search call alone (production: a background job, 120 s timeout, one retry). " +
-        "Rows with git sha 035179c+changes or d42bcb1+changes (before d1da5b8): 'Cost per call' is tokens only (the " +
-        "total is 'Cost per story ¢'), p50/p95 include " +
-        "reads and the judge (the search alone is 'Search p50 s'), and the judge cost is of the config that first found a link.",
+        "2026-11-10). p50/p95 time the search call alone (production: a background job, 120 s timeout, one retry).",
     ],
     settings,
     items,

@@ -59,8 +59,7 @@ it("extraction: stories from past issues, against golden", async () => {
       "Saved per issue: stories with a usable link, as ingestion saves them. Dev DB: the Neon dev branch `stories` rows of the " +
         "same source and day, which the production or n8n extractor made from the email (The Signal 2026-10-25 is under n8n's " +
         "`tldr_ai` label); issues with fewer than 3 such rows have none. Dev DB URLs found: those rows' links that this run also saved.",
-      "p50/p95 time the extraction call alone. Rows from before the golden values (git sha 78ec0c8 and earlier) ran 12 issues " +
-        "and the judge counted recall, category, importance and URL by its own reading of the rules: they are not comparable.",
+      "p50/p95 time the extraction call alone.",
     ],
     settings,
     items,

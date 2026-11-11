@@ -26,11 +26,11 @@ import {
 
 export const WRITER_MODEL = "gpt-6-luna";
 /**
- * High, from evals/results/writer.md (12 runs over 6 issues). The choice rests on two judge counts: 0.33
- * unsupported claims per issue against 1.08 at low, and the eval's notes followed in 35 of 36 against 28 of 36. It
- * does not rest on the pairwise judge, where high against low is a tie (0.5). High costs $0.0043 a call against
- * $0.0021 at low, about 0.2 cents more per issue, and its slowest call took 59.8 s against the 240 s timeout.
- * Twelve runs is a small sample.
+ * High, from evals/results/writer.md (30 issues, 2 runs each). The judge finds the eval's notes followed in 176 of
+ * 180 at high, against 165 of 180 at medium (−6 pts, 95% range −11 to −2) and 138 of 180 at low. Against the Claude
+ * Opus reference issue, high wins 40 of 60, medium 32 (−13 pts, −30 to +3) and low 25 (−25 pts, −42 to −8). The
+ * judge finds about 1 unsupported claim per issue at every effort. High costs 0.42 cents a call against 0.28 at
+ * medium, and its p95 is 70 s of the 240 s timeout.
  */
 export const WRITER_EFFORT: ReasoningEffort = "high";
 

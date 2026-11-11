@@ -6,15 +6,19 @@ money, so `npm test` never runs them.
 
 ## Current choices
 
+Each effort was set on a full sweep over the test sets below. Text is graded by a `gpt-6.1-terra` judge on the
+flex tier, mostly against golden values made by Claude Opus (see [Golden values](#golden-values)). A range is the
+95% interval of the difference against the production effort (see [Results](#results)).
+
 | Call | Effort | Why | Results |
 |---|---|---|---|
-| Story extraction (`src/pipeline/ingest/extract.ts`) | medium | Medium covers more of the stories in the text (recall 339 of 358 against 329 of 364; the repeat ranges do not overlap), misses fewer per issue (0.79 against 1.46), puts more stories in the right category (287 of 319 against 248 of 315) and rates importance closer (309 of 319 within 1, against 290 of 315). Against it: URL right is 322 of 329 against 321 of 323, mostly links that drop a query string or a trailing slash and still open the page. Faithful stories are within noise. $0.0025 a call against $0.0016; p95 63.4 s of the 120 s timeout. | [extraction.md](results/extraction.md) |
-| Lead pick (`src/features/newsletter/openai-lead-pick.ts`) | low | Effort does not change the pick: the AI lead is the owner's lead in 15 or 16 of 30 runs over 10 boards at every effort from none to high (9 of 30 for the scored lead alone). Low was its setting before the evals. | [lead-pick.md](results/lead-pick.md) |
-| Repeat check (`src/pipeline/repeats/`, Decisions API) | n/a | The Decisions API takes no effort. | [repeats.md](results/repeats.md) |
-| Issue writer (`src/pipeline/draft/writer.ts`) | high | Two judge counts over 12 runs of 6 issues: 0.33 unsupported claims per issue against 1.08 at low, and notes followed in 35 of 36 against 28 of 36. Not the pairwise judge, where high against low is a tie (0.5). $0.0043 a call against $0.0021, about 0.2 cents more per issue; the slowest call took 59.8 s of the 240 s timeout. | [writer.md](results/writer.md) |
-| Scene prompt (`src/pipeline/draft/image/scene-prompt.ts`) | medium | All hard rules in 17 of 20 runs, against 19 of 20 at high and 18 of 20 at the API default, which is medium too: a gap of this size is noise. High costs about twice as much ($0.0014 a call against $0.000737). | [scene-prompt.md](results/scene-prompt.md) |
-| Scene ideas (`src/pipeline/draft/image/scene-ideas.ts`) | medium | High keeps more ideas to one supporting element (50 of 60 against 43 of 60), but its call p95 is 44.5 s against the 45 s timeout of the web request, and 1 of its 20 calls failed. | [scene-ideas.md](results/scene-ideas.md) |
-| Free-link search (`src/pipeline/free-links/search.ts`) | medium | A usable link for 22 of 30 stories over 3 runs (70–80% per run), against 24 of 30 (70–90%) at none: the ranges overlap. None costs 2.3 times as much ($0.0832 a request against $0.0368), its p95 is 101.1 s against the 120 s limit, and 1 of its 30 requests failed. | [free-links.md](results/free-links.md) |
+| Story extraction (`src/pipeline/ingest/extract.ts`) | medium | 58 issues × 2. Low finds fewer golden stories (recall −6 pts, −8 to −3), puts fewer in the golden category (−5 pts, −7 to −2) and misses 2.75 per issue against 1.97. High is no better on any metric, and its p95 is 105 s of the 120 s timeout. | [extraction.md](results/extraction.md) |
+| Lead pick (`src/features/newsletter/openai-lead-pick.ts`) | low | 11 boards × 3. The AI lead is the owner's lead in 22 of 33 runs at low, against 18 of 33 at none, medium and high. Only 11 boards have a lead the owner committed, so this is weak evidence; low is the cheapest effort that is not worse. | [lead-pick.md](results/lead-pick.md) |
+| Repeat check (`src/pipeline/repeats/`, Decisions API) | n/a | The Decisions API takes no effort. 303 pairs (60 with golden labels): same news → sure in 100 of 145, sure or similar in 140 of 145; different → sure in 0 of 129. | [repeats.md](results/repeats.md) |
+| Issue writer (`src/pipeline/draft/writer.ts`) | high | 30 issues × 2. Notes followed (judge) 176 of 180, against 165 at medium (−6 pts, −11 to −2) and 138 at low. Wins against the Opus reference issue 40 of 60, against 32 at medium (−13 pts, −30 to +3) and 25 at low (−25 pts, −42 to −8). About 1 unsupported claim per issue at every effort. 0.42 cents a call against 0.28; p95 70 s of the 240 s timeout. | [writer.md](results/writer.md) |
+| Scene prompt (`src/pipeline/draft/image/scene-prompt.ts`) | high | 100 issues × 2. All hard rules in 184 of 200 runs against 156 at medium (+14 pts, +7 to +21), no extras in 200 of 200 against 193; lead depicted and lead identifiers level. Low is worse on hard rules (−17 pts, −24 to −9). 0.14 cents a call against 0.08; p95 44 s of the 120 s timeout, in a background step. | [scene-prompt.md](results/scene-prompt.md) |
+| Scene ideas (`src/pipeline/draft/image/scene-ideas.ts`) | medium | 100 issues × 2. Low is worse on no extras (−22 pts, −29 to −16), clearly different ideas (−12 pts, −19 to −7) and a lead identifier shown (−13 pts, −20 to −6). High has more ideas with no extras (+12 pts), but 17 of its 200 calls failed the 45 s timeout of the web request (p95 43.5 s). | [scene-ideas.md](results/scene-ideas.md) |
+| Free-link search (`src/pipeline/free-links/search.ts`) | low | 100 stories × 1. A usable link where the golden value has one for 69 of 94 at low and medium; stories with a usable link 71 against 70 (+1 pt, −9 to +11); kept links that report the same news 87% against 88% (−1 pt, −6 to +6). 2.3 cents a story against 3.4; p95 18.5 s against 29.7 s of the 120 s limit. More paywalled or too-short links, which the page check drops before saving. | [free-links.md](results/free-links.md) |
 
 The code comment at each effort constant gives the evidence it was set on. Change the constant and its comment
 together, from a results file.
@@ -80,7 +84,7 @@ The columns, after the eval's metrics:
   `21/30 (70%), +6 pts (−2 to +14)`. The interval is a paired bootstrap (2,000 resamples, fixed seed) that
   resamples items, each with all its repeats, so it shows how much of the gap is the test set's noise. An interval
   that spans 0 is no evidence of a difference. A count that does not add up item by item gets no difference.
-  The difference is stored in the row's JSON; older rows have none and show none.
+  The difference is stored in the row's JSON.
 - `Errors`: runs whose call threw. An error is a miss in every count of the run.
 - `Graded`: runs the judge graded, of the runs it tried. Judged counts are over the graded runs.
 - `p50`, `p95`: the time of the model calls of one run, without rate-limit waits. Grading is not timed.
@@ -92,8 +96,8 @@ The columns, after the eval's metrics:
 - A line under the table gives the cost of shared work (see below), which is in neither cost column.
 
 A column with no value in any row is left out. An eval can choose its metric columns (the writer does); every
-metric stays in the stored rows. Rows with a git sha from before d1da5b8 timed the judge in p50 and p95; each
-eval's notes name those rows and say which of their columns hold the call alone.
+metric stays in the stored rows. Rows run on a different test set are not comparable: when a test set changes,
+drop the old rows from the stored JSON and run `npm run eval:rerender`.
 
 ## Data, and the rule on third-party text
 
@@ -108,7 +112,10 @@ kinds from the Neon `dev` branch (read-only, `evals/lib/dev-db.ts`) or public pa
 ## Golden values
 
 A golden value is the answer a stronger model than the one under test gave for an item; here Claude Opus, run
-from Claude Code. The judge compares each output to it. A golden file is JSON:
+from Claude Code. The judge compares each output to it. Extraction, free links, the scene evals and the writer
+have golden values; the repeat check has them for its 60 new pairs; the lead pick scores against the owner's own lead
+instead. A judge may favour its own family's style: GPT-6 Luna drafts beat the Opus reference issue 40 of 60 times,
+so the writer's win rate compares efforts and models, and is not an absolute quality score. A golden file is JSON:
 `{ "about", "producer" (e.g. "claude-opus-5-5"), "entries": { <item id>: { "inputHash", "date", "value" } } }`.
 It lives at `evals/<task>/golden.json` (committed), or at `evals/data/<task>/golden.json` (git ignores it) when
 the values come from third-party text.

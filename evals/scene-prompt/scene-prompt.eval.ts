@@ -65,9 +65,8 @@ it("scene prompt: hard rules and judged rules", async () => {
       "J: columns are the judge's grade (rubric.ts, which quotes the prompt's rules), counted over the runs it graded " +
         "(the Graded column). The judge is given the golden lead story and its identifiers. 'Depicts lead': the scene " +
         "shows the golden lead; 'shows a lead identifier': and visibly shows one of its identifiers; 'no misread': it " +
-        "shows none of the golden misreads. Rows from before the golden values (10 issues) had the judge find the lead itself.",
-      "p50/p95: the call site alone (up to 3 attempts). Rows with git sha 035179c+changes (before d1da5b8) counted a run the " +
-        "judge could not grade as a J: miss, timed the judge in p50/p95, and have the call alone in 'Call p50 s' and 'Call p95 s'.",
+        "shows none of the golden misreads.",
+      "p50/p95: the call site alone (up to 3 attempts).",
     ],
     settings,
     items,

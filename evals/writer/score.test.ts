@@ -227,8 +227,10 @@ describe("writerColumns", () => {
     expect(writerColumns()).toEqual(expect.arrayContaining(["Wins vs golden (pairwise)", "Preference vs golden (win + tie/2)"]));
   });
 
-  it("keeps the old rows' comparison with low", () => {
-    expect(writerColumns()).toEqual(expect.arrayContaining(["Preference vs low (win + tie/2)"]));
+  it("has no columns of the rows from before the golden issue", () => {
+    for (const old of ["Preference vs low (win + tie/2)", "Writer p50 s", "Writer max s"]) {
+      expect(writerColumns()).not.toContain(old);
+    }
   });
 
   it("names the code checks with the writer's own limits", () => {

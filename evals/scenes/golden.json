@@ -1,5 +1,1531 @@
 {
   "about": "Scene evals: for each published issue (keyed by date), the lead story (1-based Top Story number the subject line is about) and 1-4 concrete identifiers of its news a scene should show, with optional misreads. Our own text only. evals/scenes/golden-todo.md.",
   "producer": "claude-opus-5-5",
-  "entries": {}
+  "entries": {
+    "2026-03-14": {
+      "inputHash": "44ff8137dd82d1a4",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "Google DeepMind",
+          "Gemini Embedding 2"
+        ],
+        "forbidden_misreads": [
+          "Gemini constellation",
+          "Anthropic Claude"
+        ]
+      }
+    },
+    "2026-03-26": {
+      "inputHash": "870526392f6f04a7",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "Anthropic",
+          "Claude Code",
+          "Auto Mode"
+        ],
+        "forbidden_misreads": [
+          "a humanoid robot breaking free",
+          "Google Lyria 3 Pro"
+        ]
+      }
+    },
+    "2026-03-27": {
+      "inputHash": "06715d2e7be59042",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "Google",
+          "Gemini 3.1 Flash Live"
+        ],
+        "forbidden_misreads": [
+          "Gemini constellation",
+          "Anthropic court ruling"
+        ]
+      }
+    },
+    "2026-03-31": {
+      "inputHash": "00394eb1662765e2",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 2,
+        "identifiers": [
+          "Mistral",
+          "GPU rack",
+          "data center in France"
+        ],
+        "forbidden_misreads": [
+          "Alibaba.com Accio Work",
+          "Rebellions inference chip"
+        ]
+      }
+    },
+    "2026-04-01": {
+      "inputHash": "c394f77efeebc84f",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "OpenAI",
+          "funding round"
+        ],
+        "forbidden_misreads": [
+          "a market crash",
+          "Claude Code source leak",
+          "Ray-Ban Meta glasses"
+        ]
+      }
+    },
+    "2026-04-03": {
+      "inputHash": "cc4533c5bdec1be5",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "Google DeepMind",
+          "Gemma 4"
+        ],
+        "forbidden_misreads": [
+          "Anthropic Coefficient Bio",
+          "Perplexity tax product"
+        ]
+      }
+    },
+    "2026-04-06": {
+      "inputHash": "33e45ad4e00cf55d",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "Anthropic",
+          "Coefficient Bio",
+          "drug discovery lab"
+        ],
+        "forbidden_misreads": [
+          "OpenClaw agent platform"
+        ]
+      }
+    },
+    "2026-04-08": {
+      "inputHash": "e6461548b7f6c10b",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "Anthropic",
+          "Claude Mythos",
+          "Project Glasswing"
+        ],
+        "forbidden_misreads": [
+          "OpenAI leadership"
+        ]
+      }
+    },
+    "2026-04-09": {
+      "inputHash": "fbc942d8b5f62b43",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "Poke",
+          "funding round"
+        ],
+        "forbidden_misreads": [
+          "Anthropic Claude",
+          "Meta Muse Spark"
+        ]
+      }
+    },
+    "2026-04-13": {
+      "inputHash": "fbb5b8533265cd9b",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "Meta",
+          "Muse Spark",
+          "Meta AI"
+        ],
+        "forbidden_misreads": [
+          "Anthropic Claude Mythos",
+          "OpenAI ChatGPT Pro"
+        ]
+      }
+    },
+    "2026-04-15": {
+      "inputHash": "cb3a5a251a61699d",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "OpenAI",
+          "GPT-5.4-Cyber"
+        ],
+        "forbidden_misreads": [
+          "a hacker attacking",
+          "Gemini Robotics robot"
+        ]
+      }
+    },
+    "2026-04-16": {
+      "inputHash": "83f8d6be00320418",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "OpenAI",
+          "Codex"
+        ],
+        "forbidden_misreads": [
+          "Allbirds GPU rental",
+          "Gemini Mac app"
+        ]
+      }
+    },
+    "2026-04-20": {
+      "inputHash": "9b1c15b1bfd2610a",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "OpenAI",
+          "departing senior executives"
+        ],
+        "forbidden_misreads": [
+          "Gemini Mac app",
+          "Sora video app"
+        ]
+      }
+    },
+    "2026-04-21": {
+      "inputHash": "192a4e03942fc074",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "Amazon",
+          "Anthropic",
+          "AWS data center"
+        ],
+        "forbidden_misreads": [
+          "Apple",
+          "Google Marvell TPU"
+        ]
+      }
+    },
+    "2026-04-23": {
+      "inputHash": "f7bdd594805219f0",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 2,
+        "identifiers": [
+          "OpenAI",
+          "Workspace Agents",
+          "Codex"
+        ],
+        "forbidden_misreads": [
+          "Google Workspace Intelligence",
+          "Anthropic Amazon compute deal"
+        ]
+      }
+    },
+    "2026-04-24": {
+      "inputHash": "7948f379f85a296f",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 2,
+        "identifiers": [
+          "Nvidia",
+          "Vast Data"
+        ],
+        "forbidden_misreads": [
+          "OpenAI GPT-5.5",
+          "Anthropic"
+        ]
+      }
+    },
+    "2026-04-27": {
+      "inputHash": "4faa27546967036a",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "OpenAI",
+          "GPT-5.5",
+          "Codex"
+        ],
+        "forbidden_misreads": [
+          "Google investment in Anthropic",
+          "UAE government"
+        ]
+      }
+    },
+    "2026-04-29": {
+      "inputHash": "fdbba73012ab3294",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "Elon Musk",
+          "OpenAI",
+          "federal courtroom witness stand"
+        ],
+        "forbidden_misreads": [
+          "Google Pentagon deal"
+        ]
+      }
+    },
+    "2026-04-30": {
+      "inputHash": "bcebf7da8a5c643b",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "Meta",
+          "Manus"
+        ],
+        "forbidden_misreads": [
+          "OpenAI Cybersecurity Action Plan"
+        ]
+      }
+    },
+    "2026-05-04": {
+      "inputHash": "990c728d423b23a5",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "xAI",
+          "Grok 4.3"
+        ],
+        "forbidden_misreads": [
+          "Anthropic funding round",
+          "Maryland grocery store"
+        ]
+      }
+    },
+    "2026-05-06": {
+      "inputHash": "12e1a142d599ee1a",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "ChatGPT",
+          "OpenAI",
+          "ad campaign"
+        ],
+        "forbidden_misreads": [
+          "mini data center on a home",
+          "U.S. government model inspection"
+        ]
+      }
+    },
+    "2026-05-08": {
+      "inputHash": "f955fdcbaf6b19fd",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "Meta",
+          "Hatch",
+          "Instagram and Facebook"
+        ],
+        "forbidden_misreads": [
+          "a hatching egg",
+          "SpaceXAI rocket"
+        ]
+      }
+    },
+    "2026-05-11": {
+      "inputHash": "7ac90a4f6be16019",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "Grok Connectors",
+          "Grok"
+        ],
+        "forbidden_misreads": [
+          "Isomorphic Labs",
+          "Greek constitution"
+        ]
+      }
+    },
+    "2026-05-12": {
+      "inputHash": "98dde986b9378b2d",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "OpenAI Deployment Company",
+          "OpenAI",
+          "Tomoro"
+        ],
+        "forbidden_misreads": [
+          "Gemini 3.1 Flash-Lite",
+          "hackers"
+        ]
+      }
+    },
+    "2026-05-14": {
+      "inputHash": "71a5c8ce85fbf7b8",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "Anthropic",
+          "Claude Code"
+        ],
+        "forbidden_misreads": [
+          "Isomorphic Labs",
+          "Google zero-day"
+        ]
+      }
+    },
+    "2026-05-15": {
+      "inputHash": "bbe2a72ea7b4859e",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "OpenAI",
+          "Apple",
+          "Siri"
+        ],
+        "forbidden_misreads": [
+          "a handshake celebrating the partnership",
+          "Microsoft"
+        ]
+      }
+    },
+    "2026-05-20": {
+      "inputHash": "bc7eded2e97c9bad",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "Gemini 3.5 Flash",
+          "Google"
+        ],
+        "forbidden_misreads": [
+          "the Gemini constellation",
+          "Andrej Karpathy at Anthropic"
+        ]
+      }
+    },
+    "2026-05-21": {
+      "inputHash": "924cc9aeef3890c6",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 2,
+        "identifiers": [
+          "Codex",
+          "OpenAI",
+          "a locked laptop"
+        ],
+        "forbidden_misreads": [
+          "Trump's China visit",
+          "GitHub code exposure"
+        ]
+      }
+    },
+    "2026-05-26": {
+      "inputHash": "5f011591dc7ae1dd",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "Grok Build",
+          "xAI"
+        ],
+        "forbidden_misreads": [
+          "Claude Code",
+          "Codex"
+        ]
+      }
+    },
+    "2026-05-27": {
+      "inputHash": "c109a3fd94091986",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "OpenRouter",
+          "CapitalG"
+        ]
+      }
+    },
+    "2026-06-01": {
+      "inputHash": "640a43bcabf211f5",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "Google AI Threat Defense",
+          "Google Cloud",
+          "Mandiant"
+        ],
+        "forbidden_misreads": [
+          "xAI Grok Build",
+          "a home cleaner with a head-mounted camera"
+        ]
+      }
+    },
+    "2026-06-02": {
+      "inputHash": "a4db9ed999511812",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "Codex",
+          "OpenAI",
+          "a Windows 11 laptop"
+        ],
+        "forbidden_misreads": [
+          "Anthropic Conway",
+          "Instagram"
+        ]
+      }
+    },
+    "2026-06-03": {
+      "inputHash": "ae1631d1b07821a9",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 3,
+        "identifiers": [
+          "Cosmos 3",
+          "NVIDIA",
+          "a self-driving car"
+        ],
+        "forbidden_misreads": [
+          "Nemotron 3 Ultra",
+          "the White House"
+        ]
+      }
+    },
+    "2026-06-05": {
+      "inputHash": "484b5529d299e8d2",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "Anthropic",
+          "Mythos"
+        ],
+        "forbidden_misreads": [
+          "a scene from Greek mythology",
+          "Meta Business Agent"
+        ]
+      }
+    },
+    "2026-06-08": {
+      "inputHash": "1e823a8256ab62d6",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "OpenAI",
+          "the White House"
+        ],
+        "forbidden_misreads": [
+          "ChatGPT superapp",
+          "SpaceX"
+        ]
+      }
+    },
+    "2026-06-10": {
+      "inputHash": "e3cd7c8030afba47",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 2,
+        "identifiers": [
+          "Claude Fable 5",
+          "Claude Mythos 5",
+          "Anthropic"
+        ],
+        "forbidden_misreads": [
+          "Apple Siri",
+          "Moonshot Kimi"
+        ]
+      }
+    },
+    "2026-06-11": {
+      "inputHash": "f0bcc19d6c9d1b4a",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "Siri AI",
+          "Apple",
+          "an iPhone"
+        ],
+        "forbidden_misreads": [
+          "a SpaceX satellite",
+          "OpenAI IPO"
+        ]
+      }
+    },
+    "2026-06-16": {
+      "inputHash": "a1956a4f85c86125",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "Anthropic",
+          "Fable 5",
+          "Mythos 5"
+        ],
+        "forbidden_misreads": [
+          "SpaceX Nasdaq listing",
+          "an open letter"
+        ]
+      }
+    },
+    "2026-06-17": {
+      "inputHash": "6fa5d67a199a5970",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "GLM-5.2",
+          "Z.ai"
+        ],
+        "forbidden_misreads": [
+          "Cursor Origin",
+          "Qualcomm glasses"
+        ]
+      }
+    },
+    "2026-06-18": {
+      "inputHash": "21458e7ba9553d75",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 3,
+        "identifiers": [
+          "G7 summit table",
+          "Anthropic"
+        ],
+        "forbidden_misreads": [
+          "Android 17",
+          "Sakana AI"
+        ]
+      }
+    },
+    "2026-06-22": {
+      "inputHash": "bbcd57bb9e024c39",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 3,
+        "identifiers": [
+          "Sakana AI"
+        ],
+        "forbidden_misreads": [
+          "John Jumper",
+          "AlphaFold protein structure",
+          "HappyOyster open world"
+        ]
+      }
+    },
+    "2026-06-23": {
+      "inputHash": "38313bb666a1186b",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "SpaceX",
+          "Reflection AI",
+          "Project Colossus data center"
+        ],
+        "forbidden_misreads": [
+          "Anthropic Cowork"
+        ]
+      }
+    },
+    "2026-06-25": {
+      "inputHash": "77310dc126b87a01",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "Intercept",
+          "a nasal spray",
+          "an indoor air purifier"
+        ],
+        "forbidden_misreads": [
+          "OpenAI Jalapeño chip",
+          "Anthropic hiring Gemini researchers"
+        ]
+      }
+    },
+    "2026-06-26": {
+      "inputHash": "b01be6d90865aae0",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "OpenAI",
+          "the White House"
+        ],
+        "forbidden_misreads": [
+          "Anthropic Fable 5",
+          "Sakana AI Fugu"
+        ]
+      }
+    },
+    "2026-06-30": {
+      "inputHash": "ede7d109af55a965",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "GPT-5.6",
+          "OpenAI"
+        ],
+        "forbidden_misreads": [
+          "Google capping Meta's Gemini use",
+          "Anthropic in Austria"
+        ]
+      }
+    },
+    "2026-07-01": {
+      "inputHash": "6a369196e512b538",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "Claude Science",
+          "Anthropic",
+          "a 3D protein structure model"
+        ],
+        "forbidden_misreads": [
+          "Fable 5 return"
+        ]
+      }
+    },
+    "2026-07-02": {
+      "inputHash": "ff68d3fedb68210d",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "Claude Sonnet 5",
+          "Anthropic"
+        ],
+        "forbidden_misreads": [
+          "a written sonnet poem",
+          "DeepSeek V4",
+          "Google Nano Banana 2 Lite"
+        ]
+      }
+    },
+    "2026-07-07": {
+      "inputHash": "a780e5a6dd8aa0e2",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 2,
+        "identifiers": [
+          "GPT-5.6 Ultra",
+          "Codex",
+          "OpenAI"
+        ],
+        "forbidden_misreads": [
+          "Alibaba",
+          "Claude Code",
+          "GPT-Realtime-2.1 voice agent"
+        ]
+      }
+    },
+    "2026-07-08": {
+      "inputHash": "0f6160a565394b18",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "GPT-5.6",
+          "OpenAI"
+        ],
+        "forbidden_misreads": [
+          "SpaceXAI Grok-4.5",
+          "Beijing"
+        ]
+      }
+    },
+    "2026-07-14": {
+      "inputHash": "bd4501af6153d4c8",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "GPT-5.6 Sol",
+          "OpenAI"
+        ],
+        "forbidden_misreads": [
+          "Claude Cowork",
+          "Microsoft MDASH"
+        ]
+      }
+    },
+    "2026-07-15": {
+      "inputHash": "f6449df1a983a46d",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "OpenAI",
+          "screen-free smart speaker with a camera",
+          "LoveFrom"
+        ]
+      }
+    },
+    "2026-07-17": {
+      "inputHash": "209fe298086486ae",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 2,
+        "identifiers": [
+          "Claude Code",
+          "Anthropic",
+          "migration rulebook"
+        ],
+        "forbidden_misreads": [
+          "Moonshot Kimi K3"
+        ]
+      }
+    },
+    "2026-07-21": {
+      "inputHash": "5f3623b2473ca550",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 2,
+        "identifiers": [
+          "Xiaomi",
+          "Xiaomi-Robotics-1",
+          "robot arm manipulating objects"
+        ]
+      }
+    },
+    "2026-07-22": {
+      "inputHash": "e05606533f843605",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 3,
+        "identifiers": [
+          "Anthropic",
+          "stack of books",
+          "judge's gavel"
+        ],
+        "forbidden_misreads": [
+          "a legislature passing a copyright bill",
+          "OpenAI models breaching Hugging Face"
+        ]
+      }
+    },
+    "2026-07-24": {
+      "inputHash": "fce485ca64247242",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "Health in ChatGPT",
+          "Apple Health",
+          "medical records"
+        ],
+        "forbidden_misreads": [
+          "Claude voice"
+        ]
+      }
+    },
+    "2026-07-27": {
+      "inputHash": "062235912fadcf9b",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 3,
+        "identifiers": [
+          "Chinese humanoid robot",
+          "U.S. House",
+          "military base"
+        ],
+        "forbidden_misreads": [
+          "a humanoid robot welcomed into the military",
+          "Sam Altman"
+        ]
+      }
+    },
+    "2026-07-30": {
+      "inputHash": "625cd215e9591902",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "Microsoft",
+          "MAI-Cyber-1-Flash",
+          "MDASH"
+        ],
+        "forbidden_misreads": [
+          "xAI Grok Build Mode"
+        ]
+      }
+    },
+    "2026-07-31": {
+      "inputHash": "640ea53534110af1",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "OpenAI",
+          "ChatGPT for Academic Researchers",
+          "research lab scientists"
+        ],
+        "forbidden_misreads": [
+          "Sam Altman on Capitol Hill"
+        ]
+      }
+    },
+    "2026-08-04": {
+      "inputHash": "c9d6d9fb9a51920e",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "White House",
+          "OpenAI",
+          "Anthropic"
+        ],
+        "forbidden_misreads": [
+          "Gemini Robotics 2 humanoid"
+        ]
+      }
+    },
+    "2026-08-05": {
+      "inputHash": "d80637c126016bd9",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "Liquid AI",
+          "LFM2.5-2.6B",
+          "phone running the model locally"
+        ],
+        "forbidden_misreads": [
+          "Suno"
+        ]
+      }
+    },
+    "2026-08-10": {
+      "inputHash": "22c410dd00e8e6e5",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "Grok",
+          "Imagine Image 2.0",
+          "xAI"
+        ],
+        "forbidden_misreads": [
+          "Moonshot Kimi K3"
+        ]
+      }
+    },
+    "2026-08-11": {
+      "inputHash": "eda973c7c8e829d6",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "OpenAI",
+          "GPT-5.6-Cyber",
+          "Daybreak"
+        ],
+        "forbidden_misreads": [
+          "Grok Imagine 2.0"
+        ]
+      }
+    },
+    "2026-08-12": {
+      "inputHash": "34da03ede2cf69da",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "Grok Bot",
+          "SpaceXAI",
+          "cloud computer"
+        ],
+        "forbidden_misreads": [
+          "Cursor Review"
+        ]
+      }
+    },
+    "2026-08-17": {
+      "inputHash": "6560f5ca98c70e89",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "Google Sheets",
+          "Gemini",
+          "Sheets canvas"
+        ],
+        "forbidden_misreads": [
+          "Pixel 11 phone",
+          "Gemini the constellation"
+        ]
+      }
+    },
+    "2026-08-18": {
+      "inputHash": "19e5ea7be68e3c5e",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "Cursor",
+          "Origin",
+          "GitHub"
+        ],
+        "forbidden_misreads": [
+          "ByteDance Seedance"
+        ]
+      }
+    },
+    "2026-08-21": {
+      "inputHash": "749dcea76bf86102",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "Meta",
+          "Muse Video"
+        ],
+        "forbidden_misreads": [
+          "Stripe"
+        ]
+      }
+    },
+    "2026-08-26": {
+      "inputHash": "0041fe7d8f1162e0",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "Perplexity",
+          "Portable Computer",
+          "NVIDIA"
+        ],
+        "forbidden_misreads": [
+          "OpenAI Jalapeño chip"
+        ]
+      }
+    },
+    "2026-09-01": {
+      "inputHash": "e76905ef31b983ab",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "Anthropic",
+          "Claude Cowork",
+          "built-in browser"
+        ],
+        "forbidden_misreads": [
+          "Meta Muse Code"
+        ]
+      }
+    },
+    "2026-09-03": {
+      "inputHash": "67190919da7164a9",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "OpenAI",
+          "Astra"
+        ],
+        "forbidden_misreads": [
+          "Meta Muse"
+        ]
+      }
+    },
+    "2026-09-07": {
+      "inputHash": "534b8a7bdb7c12db",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "OpenAI",
+          "GPT-6 Astra",
+          "Stargate GPU data center"
+        ],
+        "forbidden_misreads": [
+          "Claude Commerce Agents"
+        ]
+      }
+    },
+    "2026-09-09": {
+      "inputHash": "89818ba672861651",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "Google DeepMind",
+          "AlphaGenome Atlas",
+          "DNA double helix"
+        ],
+        "forbidden_misreads": [
+          "ChatGPT Images 2.5"
+        ]
+      }
+    },
+    "2026-09-10": {
+      "inputHash": "9788fa61b679d184",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "OpenAI",
+          "agent swarm"
+        ],
+        "forbidden_misreads": [
+          "a swarm of bees",
+          "Meta Muse"
+        ]
+      }
+    },
+    "2026-09-14": {
+      "inputHash": "1883f323ab805fdd",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "Claude Mythos 5",
+          "Anthropic",
+          "PyPI"
+        ],
+        "forbidden_misreads": [
+          "a children's sandbox",
+          "Suno v6"
+        ]
+      }
+    },
+    "2026-09-15": {
+      "inputHash": "0f97cccdb3985363",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "Siri",
+          "Apple",
+          "iPhone"
+        ],
+        "forbidden_misreads": [
+          "Claude or GPT powering Siri",
+          "Claude Money"
+        ]
+      }
+    },
+    "2026-09-17": {
+      "inputHash": "be3b37c455dec00e",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 2,
+        "identifiers": [
+          "Claude",
+          "Claude Cowork",
+          "Anthropic"
+        ],
+        "forbidden_misreads": [
+          "a cow",
+          "Jensen Huang"
+        ]
+      }
+    },
+    "2026-09-18": {
+      "inputHash": "4c736fc0ddd9d1ec",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 3,
+        "identifiers": [
+          "Google",
+          "CC family agent",
+          "shared family calendar"
+        ],
+        "forbidden_misreads": [
+          "DeepSeek-V4.1-Flash"
+        ]
+      }
+    },
+    "2026-09-22": {
+      "inputHash": "b4eb4c9e19590a23",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "Meta",
+          "Muse app",
+          "iPhone App Store"
+        ]
+      }
+    },
+    "2026-09-25": {
+      "inputHash": "a5acbaaa3bf42a9f",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 2,
+        "identifiers": [
+          "OpenAI",
+          "ChatGPT Pro Max"
+        ],
+        "forbidden_misreads": [
+          "Qwen mobile agents"
+        ]
+      }
+    },
+    "2026-09-28": {
+      "inputHash": "d24cdbf3ed2fd216",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "Meta",
+          "Meta VR Glasses",
+          "compute puck",
+          "Muse Charm"
+        ],
+        "forbidden_misreads": [
+          "Microsoft Copilot"
+        ]
+      }
+    },
+    "2026-09-30": {
+      "inputHash": "2cb8d9287820c0d5",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "OpenAI",
+          "GPT-6.1 Astra"
+        ],
+        "forbidden_misreads": [
+          "Google Project Astra",
+          "a launch celebration",
+          "AMD World Labs deal"
+        ]
+      }
+    },
+    "2026-10-01": {
+      "inputHash": "b65227e3b7dad5b8",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "OpenAI",
+          "GPT-6.1 Sol",
+          "Ultrafast tier",
+          "Codex"
+        ],
+        "forbidden_misreads": [
+          "Google Gemini 4 Argon",
+          "the Sun"
+        ]
+      }
+    },
+    "2026-10-05": {
+      "inputHash": "1c9bca03363b4d92",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "OpenAI",
+          "ChatGPT image generation",
+          "labeled ad"
+        ],
+        "forbidden_misreads": [
+          "David Robinson's resignation"
+        ]
+      }
+    },
+    "2026-10-06": {
+      "inputHash": "6e39914271d3edbe",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "OpenAI",
+          "textGrain watermark",
+          "ChatGPT"
+        ],
+        "forbidden_misreads": [
+          "a visible handwritten signature"
+        ]
+      }
+    },
+    "2026-10-07": {
+      "inputHash": "398555eb9aae3949",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "Hark",
+          "Hark Pro",
+          "movie tickets"
+        ],
+        "forbidden_misreads": [
+          "herald angels (the word hark)",
+          "Mistral Large 4"
+        ]
+      }
+    },
+    "2026-10-09": {
+      "inputHash": "92598c183345cc1a",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "OpenAI",
+          "ChatGPT for Teens",
+          "Common Sense Media"
+        ],
+        "forbidden_misreads": [
+          "GPT-6 Intelligent UI launch"
+        ]
+      }
+    },
+    "2026-10-12": {
+      "inputHash": "bc60e838743dbe74",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "Atomic Machines",
+          "Matter Compiler factory",
+          "PrimeSwitch"
+        ],
+        "forbidden_misreads": [
+          "a software code compiler"
+        ]
+      }
+    },
+    "2026-10-14": {
+      "inputHash": "140bf98a088f993c",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "Physical Intelligence",
+          "Pi API",
+          "robot arm"
+        ],
+        "forbidden_misreads": [
+          "the mathematical constant pi",
+          "Anthropic Scion"
+        ]
+      }
+    },
+    "2026-10-15": {
+      "inputHash": "188334eab7a30898",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "Apple",
+          "OpenAI",
+          "courtroom",
+          "confidential files"
+        ],
+        "forbidden_misreads": [
+          "hidden recording device",
+          "apple the fruit"
+        ]
+      }
+    },
+    "2026-10-20": {
+      "inputHash": "54fea9ebefb4f998",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 2,
+        "identifiers": [
+          "DeepSeek",
+          "V4.1-Flash-1017",
+          "Search and Fetch APIs"
+        ],
+        "forbidden_misreads": [
+          "OpenAI rogue agent incidents",
+          "hidden recording device"
+        ]
+      }
+    },
+    "2026-10-21": {
+      "inputHash": "17bf99d7536dbc01",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "Google",
+          "Gemini 4 Argon",
+          "Antigravity"
+        ],
+        "forbidden_misreads": [
+          "argon gas",
+          "the Gemini constellation",
+          "Meta Muse Wonder"
+        ]
+      }
+    },
+    "2026-10-26": {
+      "inputHash": "15fd5ede8b448455",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "Moonshot AI",
+          "Kimi K3.1 Pro"
+        ],
+        "forbidden_misreads": [
+          "Anthropic Claude Duet"
+        ]
+      }
+    },
+    "2026-10-27": {
+      "inputHash": "12ee0c3a62f1dab2",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "Anthropic",
+          "Nasdaq listing bell",
+          "S-1 filing"
+        ],
+        "forbidden_misreads": [
+          "SpaceX GPU financing"
+        ]
+      }
+    },
+    "2026-10-28": {
+      "inputHash": "0145540dc56d3a82",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 2,
+        "identifiers": [
+          "Google DeepMind",
+          "Genie 4",
+          "interactive virtual world"
+        ],
+        "forbidden_misreads": [
+          "a genie from a lamp",
+          "Claude drug discovery"
+        ]
+      }
+    },
+    "2026-10-29": {
+      "inputHash": "48272b1d1199444d",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "Google",
+          "Gemini 4 Carbon"
+        ],
+        "forbidden_misreads": [
+          "the Gemini constellation",
+          "Meta Waddle World"
+        ]
+      }
+    },
+    "2026-10-30": {
+      "inputHash": "5f516898dfa1af8f",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 2,
+        "identifiers": [
+          "Claude",
+          "CarPlay",
+          "car interior"
+        ],
+        "forbidden_misreads": [
+          "ChatGPT API credits",
+          "Nvidia Meta investment"
+        ]
+      }
+    },
+    "2026-11-02": {
+      "inputHash": "a14eaae269d61d24",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 1,
+        "identifiers": [
+          "data center",
+          "ballot box",
+          "OpenAI"
+        ],
+        "forbidden_misreads": [
+          "Cursor fake Claude Code malware"
+        ]
+      }
+    },
+    "2026-11-03": {
+      "inputHash": "94c8ce7abf10fe3a",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 2,
+        "identifiers": [
+          "OpenAI",
+          "ChatGPT"
+        ],
+        "forbidden_misreads": [
+          "OpenAI funding cut",
+          "Anthropic safety residency"
+        ]
+      }
+    },
+    "2026-11-04": {
+      "inputHash": "c67d87ce852ec81a",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 3,
+        "identifiers": [
+          "DeepSeek",
+          "Huawei Ascend chips",
+          "DeepSeek V5"
+        ],
+        "forbidden_misreads": [
+          "Nvidia GPUs",
+          "Apple Siri"
+        ]
+      }
+    },
+    "2026-11-05": {
+      "inputHash": "d308fba008ec1cf7",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 2,
+        "identifiers": [
+          "OpenAI",
+          "GPT-6 Astra",
+          "MIT"
+        ],
+        "forbidden_misreads": [
+          "Google Project Astra",
+          "voters and data center ballots"
+        ]
+      }
+    },
+    "2026-11-06": {
+      "inputHash": "b2170b26b4d5cb5b",
+      "date": "2026-11-11",
+      "value": {
+        "lead_story": 3,
+        "identifiers": [
+          "OpenAI",
+          "Images 2.6",
+          "animated GIF"
+        ],
+        "forbidden_misreads": [
+          "GPT-6 Cyber"
+        ]
+      }
+    }
+  }
 }

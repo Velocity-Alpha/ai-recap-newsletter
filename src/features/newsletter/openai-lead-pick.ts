@@ -15,10 +15,9 @@ import { logServerError, logServerInfo } from "@/src/server/observability";
 
 export const LEAD_PICK_MODEL = "gpt-6-luna";
 /**
- * Low, from evals/results/lead-pick.md (30 runs over 10 archived boards). Effort does not change the pick: the AI
- * lead is the owner's lead in 15 of 30 runs at none and high and 16 of 30 at low and medium, against 9 of 30 for
- * the scored lead alone. Every effort is cheap ($0.000073 a call at none, $0.000116 at low); low was the effort
- * before the eval, and a one-run gap gives no reason to move.
+ * Low, from evals/results/lead-pick.md (11 boards, 3 runs each). The AI lead is the owner's lead in 22 of 33 runs
+ * at low, against 18 of 33 at none, medium and high. Only 11 boards have a lead the owner committed, so this is weak
+ * evidence; low is the cheapest effort that is not worse.
  */
 export const LEAD_PICK_EFFORT: ReasoningEffort = "low";
 
