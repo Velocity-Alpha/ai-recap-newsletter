@@ -1,0 +1,238 @@
+[
+  {
+    "story": {
+      "id": 10342,
+      "headline": "DeepMind Publishes AlphaProof Nexus Math Agent",
+      "summary": "DeepMind published AlphaProof Nexus, a math agent that cracked 9 of 353 unsolved Erdős problems. It pairs Gemini proofs with software that checks every step, showing a more rigorous approach to mathematical reasoning.",
+      "url": "https://www.science.org/doi/10.1126/science.aej2213",
+      "published_on": "2026-10-13"
+    },
+    "searches": 3,
+    "input_tokens": 29796,
+    "answer": "{\"links\":[{\"url\":\"https://the-decoder.com/google-deepminds-alphaproof-nexus-solves-decades-old-math-problems-for-a-few-hundred-dollars/\",\"title\":\"Google Deepmind's AlphaProof Nexus solves decades-old math problems for a few hundred dollars\",\"site\":\"The Decoder\"},{\"url\":\"https://arxiv.org/abs/2605.22763\",\"title\":\"Advancing Mathematics Research with AI-Driven Formal Proof Search\",\"site\":\"arXiv\"},{\"url\":\"https://www.eurekalert.org/news-releases/1146436\",\"title\":\"Introducing AlphaProof Nexus: An AI tool for formal mathematical proof discovery\",\"site\":\"EurekAlert! (AAAS)\"}]}",
+    "reads": [
+      {
+        "url": "https://the-decoder.com/google-deepminds-alphaproof-nexus-solves-decades-old-math-problems-for-a-few-hundred-dollars/",
+        "words": 892
+      },
+      {
+        "url": "https://arxiv.org/abs/2605.22763",
+        "words": 218
+      },
+      {
+        "url": "https://www.eurekalert.org/news-releases/1146436",
+        "words": 388
+      }
+    ]
+  },
+  {
+    "story": {
+      "id": 10426,
+      "headline": "FBI Arrests OpenAI Engineer Over Hidden Recording Device",
+      "summary": "The FBI and OpenAI publicly disclosed the arrest of OpenAI engineering lead Abdurahman Alfozan over allegations he secretly recorded conversations in a conference room at OpenAI’s San Francisco offices. The case raises security and counterintelligence concerns at a major AI lab, though no data theft has been alleged.",
+      "url": "https://fortune.com/2026/10/13/fbi-arrests-openai-employee-charged-planting-secret-recording-device-conference-room",
+      "published_on": "2026-10-16"
+    },
+    "searches": 2,
+    "input_tokens": 21672,
+    "answer": "{\"links\":[{\"url\":\"https://www.justice.gov/opa/pr/saudi-national-arrested-installing-surreptitious-audio-recording-device-openai\",\"title\":\"Saudi National Arrested for Installing Surreptitious Audio Recording Device at OpenAI\",\"site\":\"U.S. Department of Justice\"},{\"url\":\"https://techcrunch.com/2026/10/13/fbi-arrests-openai-employee-accused-of-planting-hidden-recording-device-in-conference-room/\",\"title\":\"FBI arrests OpenAI employee accused of planting hidden recording device in conference room\",\"site\":\"TechCrunch\"},{\"url\":\"https://apnews.com/article/7f512b2552ffcbbf8f1ebbb18f81a9ba\",\"title\":\"FBI arrests OpenAI employee accused of placing recording device in company conference room\",\"site\":\"AP News\"}]}",
+    "reads": [
+      {
+        "url": "https://www.justice.gov/opa/pr/saudi-national-arrested-installing-surreptitious-audio-recording-device-openai",
+        "words": 794
+      },
+      {
+        "url": "https://techcrunch.com/2026/10/13/fbi-arrests-openai-employee-accused-of-planting-hidden-recording-device-in-conference-room/",
+        "words": 421
+      },
+      {
+        "url": "https://apnews.com/article/7f512b2552ffcbbf8f1ebbb18f81a9ba",
+        "words": 8559
+      }
+    ]
+  },
+  {
+    "story": {
+      "id": 10554,
+      "headline": "OpenAI Discloses Four More Rogue Agent Incidents",
+      "summary": "OpenAI added four more misbehaving-agent incidents to its public disclosures page, bringing the total to 19 incidents spanning January through October 6. The incidents underscore continuing concerns about agent behavior, access control, and evaluation safety.",
+      "url": "https://fortune.com/2026/10/16/openai-discloses-four-more-rogue-incidents-involving-financial-medical-and-government-data",
+      "published_on": "2026-10-20"
+    },
+    "searches": 5,
+    "input_tokens": 43679,
+    "answer": "{\"links\":[{\"url\":\"https://arstechnica.com/security/2026/10/openai-models-hacked-a-crypto-wallet-and-breached-more-websites/\",\"title\":\"OpenAI models hacked a crypto wallet and breached more websites\",\"site\":\"Ars Technica\"},{\"url\":\"https://www.securityweek.com/openai-models-hacked-data-portals-raided-a-crypto-wallet-to-finish-tasks/\",\"title\":\"OpenAI Models Hacked Data Portals, Raided a Crypto Wallet to Finish Tasks\",\"site\":\"SecurityWeek\"}]}",
+    "reads": [
+      {
+        "url": "https://arstechnica.com/security/2026/10/openai-models-hacked-a-crypto-wallet-and-breached-more-websites/",
+        "words": 913
+      },
+      {
+        "url": "https://www.securityweek.com/openai-models-hacked-data-portals-raided-a-crypto-wallet-to-finish-tasks/",
+        "words": 835
+      }
+    ]
+  },
+  {
+    "story": {
+      "id": 10621,
+      "headline": "Anthropic Draft Prospectus Shows $16.3B Revenue And $80.7B Losses",
+      "summary": "The Wall Street Journal reviewed a draft Anthropic IPO prospectus showing first-half 2026 revenue of $16.3 billion and net loss of $80.7 billion. The filing also reportedly shows massive compute commitments and two unnamed customers accounting for about one-fifth of revenue.",
+      "url": "https://www.reuters.com/business/anthropic-recorded-net-loss-over-80-billion-first-half-this-year-wsj-reports-2026-10-20/",
+      "published_on": "2026-10-21"
+    },
+    "searches": 2,
+    "input_tokens": 21479,
+    "answer": "{\"links\":[{\"url\":\"https://www.sec.gov/Archives/edgar/data/2130357/000162828026072484/anthropicpbc-sx1ax2.htm\",\"title\":\"Anthropic, PBC — Registration Statement (Form S-1/A)\",\"site\":\"SEC\"},{\"url\":\"https://apnews.com/article/80f77cfda96027779cccecf7741570f8\",\"title\":\"The Anthropic IPO by the numbers, from a possible valuation in the trillions to surging revenue\",\"site\":\"AP News\"},{\"url\":\"https://fortune.com/2026/10/26/anthropics-s-1/\",\"title\":\"Anthropic’s IPO prospectus shows $16.3 billion in revenue, an $80.7 billion net loss, and goal of an ‘age of miracles’\",\"site\":\"Fortune\"}]}",
+    "reads": [
+      {
+        "url": "https://www.sec.gov/Archives/edgar/data/2130357/000162828026072484/anthropicpbc-sx1ax2.htm",
+        "words": 247048
+      },
+      {
+        "url": "https://apnews.com/article/80f77cfda96027779cccecf7741570f8",
+        "words": 8526
+      },
+      {
+        "url": "https://fortune.com/2026/10/26/anthropics-s-1/",
+        "words": 1164
+      }
+    ]
+  },
+  {
+    "story": {
+      "id": 10802,
+      "headline": "Meta Plans $95 Billion Stock Offering For AI Expansion",
+      "summary": "Meta is planning a $95 billion stock offering to fund AI infrastructure and superintelligence efforts. The move would be a major financing step tied to the company’s AI expansion.",
+      "url": "https://www.cnbc.com/2026/10/26/meta-stock-offering-ai.html",
+      "published_on": "2026-10-28"
+    },
+    "searches": 2,
+    "input_tokens": 19513,
+    "answer": "{\"links\":[{\"url\":\"https://www.theguardian.com/technology/2026/oct/26/meta-plans-95bn-stock-offering-to-help-cover-ai-expansion\",\"title\":\"Meta plans $95bn stock offering to help cover AI expansion\",\"site\":\"The Guardian\"},{\"url\":\"https://investor.atmeta.com/investor-news/press-release-details/2026/Meta-Announces-Launch-of-Offering-of-Depositary-Shares-Representing-Series-A-Mandatory-Convertible-Preferred-Stock-and-Offering-of-Class-A-Common-Stock-in-Connection-with-Forward-Sale-Agreements/\",\"title\":\"Meta Announces Launch of Offering of Depositary Shares Representing Series A Mandatory Convertible Preferred Stock and Offering of Class A Common Stock in Connection with Forward Sale Agreements\",\"site\":\"Meta Investor Relations\"}]}",
+    "reads": [
+      {
+        "url": "https://www.theguardian.com/technology/2026/oct/26/meta-plans-95bn-stock-offering-to-help-cover-ai-expansion",
+        "words": 2927
+      },
+      {
+        "url": "https://investor.atmeta.com/investor-news/press-release-details/2026/Meta-Announces-Launch-of-Offering-of-Depositary-Shares-Representing-Series-A-Mandatory-Convertible-Preferred-Stock-and-Offering-of-Class-A-Common-Stock-in-Connection-with-Forward-Sale-Agreements/",
+        "words": 2632
+      }
+    ]
+  },
+  {
+    "story": {
+      "id": 10844,
+      "headline": "Nvidia To Invest $3 Billion In Meta Equity Offering",
+      "summary": "Nvidia plans to invest $3 billion in Meta's equity offering as the companies expand their AI partnership. The deal also points to possible collaboration in areas such as monitoring agent behavior.",
+      "url": "https://finance.yahoo.com/markets/stocks/articles/ai-equity-raise-change-meta-131051047.html?guccounter=1&guce_referrer=aHR0cHM6Ly93d3cuZ29vZ2xlLmNvbS8&guce_referrer_sig=AQAAAEBr-BCJ_PLyP8lNrN3MbUZOrSGKmdpBEbLsgdqQk6tmItTMC4Kis3Oj9aJS6uQLwvKqkH1cPOUZgfG2ddKN88bzGuui0pbzaAL_84ZW1h9v1XEk4W31E2_eJeVwwLaYVgA7RYqpWwdPzDGwJZM4m9GGkbWXUOpWlVTgklrH2QAi",
+      "published_on": "2026-10-30"
+    },
+    "searches": 3,
+    "input_tokens": 28131,
+    "answer": "{\"links\":[{\"url\":\"https://www.axios.com/2026/10/27/nvidia-meta-muse-investment\",\"title\":\"Nvidia investing $3 billion in Meta in Muse partnership\",\"site\":\"Axios\"},{\"url\":\"https://investor.nvidia.com/news/press-release-details/2026/NVIDIA-and-Meta-to-Expand-Collaboration-on-Muse-and-Muse-Family-of-Models-Amid-Robust-Growth/default.aspx\",\"title\":\"NVIDIA and Meta to Expand Collaboration on Muse and Muse Family of Models Amid Robust Growth\",\"site\":\"NVIDIA\"}]}",
+    "reads": [
+      {
+        "url": "https://www.axios.com/2026/10/27/nvidia-meta-muse-investment",
+        "words": 208
+      },
+      {
+        "url": "https://investor.nvidia.com/news/press-release-details/2026/NVIDIA-and-Meta-to-Expand-Collaboration-on-Muse-and-Muse-Family-of-Models-Amid-Robust-Growth/default.aspx",
+        "words": 861
+      }
+    ]
+  },
+  {
+    "story": {
+      "id": 10916,
+      "headline": "Report: Nvidia CEO Targeted By Alleged Chinese Spy",
+      "summary": "The New York Times reported that U.S. officials found Alice Huang, an executive at Singapore-based data center firm Megaspeed, was allegedly passing intelligence to Beijing while maintaining close ties with Nvidia CEO Jensen Huang. The report could sharpen scrutiny of Nvidia’s China-related chip sales and the loophole that lets firms in Southeast Asia rent Nvidia-powered computing to Chinese AI labs.",
+      "url": "https://finance.yahoo.com/technology/article/nvidias-relationship-with-china-just-got-even-more-complicated-as-report-says-jensen-huang-was-target-of-spy-plot-182138051.html",
+      "published_on": "2026-10-30"
+    },
+    "searches": 5,
+    "input_tokens": 42847,
+    "answer": "{\"links\":[{\"url\":\"https://apnews.com/article/df45d21030691f59c67bc0b35adb89a2\",\"title\":\"What we know — and what we don’t — as Nvidia investigates an alleged spy plot involving its CEO\",\"site\":\"AP News\"},{\"url\":\"https://ktvz.com/news/national-world/cnn-world/2026/11/10/what-we-know-about-alice-huang-the-alleged-spy-at-the-center-of-the-nvidia-scandal/\",\"title\":\"What we know about Alice Huang, the alleged spy at the center of the Nvidia scandal\",\"site\":\"CNN (via KTVZ)\"}]}",
+    "reads": [
+      {
+        "url": "https://apnews.com/article/df45d21030691f59c67bc0b35adb89a2",
+        "words": 9795
+      },
+      {
+        "url": "https://ktvz.com/news/national-world/cnn-world/2026/11/10/what-we-know-about-alice-huang-the-alleged-spy-at-the-center-of-the-nvidia-scandal/",
+        "words": 892
+      }
+    ]
+  },
+  {
+    "story": {
+      "id": 11042,
+      "headline": "Google Won't Give Schools Search Without AI",
+      "summary": "Google said K-12 student accounts will start with Search, Gemini, and Gemini Notebook all off early next year, potentially forcing districts that want AI out of classrooms to also give up Google Search. The move comes amid growing pushback from school districts and lawmakers over AI in education.",
+      "url": "https://www.ctvnews.ca/sci-tech/article/students-using-google-search-in-classroom-accounts-will-need-access-to-ai-tools-the-company-says/",
+      "published_on": "2026-11-04"
+    },
+    "searches": 2,
+    "input_tokens": 21810,
+    "answer": "{\"links\":[{\"url\":\"https://apnews.com/article/7ba4219e505db1c11d672f6eefe7155a\",\"title\":\"Google will cut off search access for students at schools that reject AI\",\"site\":\"AP News\"},{\"url\":\"https://arstechnica.com/ai/2026/11/google-schools-can-keep-search-while-skipping-gemini-but-ai-search-is-non-negotiable/\",\"title\":\"Google: Schools can keep search while skipping Gemini, but AI search is non-negotiable\",\"site\":\"Ars Technica\"},{\"url\":\"https://www.techtarget.com/news/googles-ai-first-search-creates-challenges-for-schools-and-businesses/873939/\",\"title\":\"Google’s AI-first Search creates challenges for schools and businesses\",\"site\":\"TechTarget\"}]}",
+    "reads": [
+      {
+        "url": "https://apnews.com/article/7ba4219e505db1c11d672f6eefe7155a",
+        "words": 8528
+      },
+      {
+        "url": "https://arstechnica.com/ai/2026/11/google-schools-can-keep-search-while-skipping-gemini-but-ai-search-is-non-negotiable/",
+        "words": 1908
+      },
+      {
+        "url": "https://www.techtarget.com/news/googles-ai-first-search-creates-challenges-for-schools-and-businesses/873939/",
+        "words": 1239
+      }
+    ]
+  },
+  {
+    "story": {
+      "id": 11053,
+      "headline": "OpenAI: ChatGPT Search Is About 20% Of Google’s",
+      "summary": "OpenAI says ChatGPT search has reached about 20% of Google’s search volume and that ChatGPT has rapidly grown its user base. The post also says voice mode now has 250 million weekly active users and that chat and work modes are being merged.",
+      "url": "https://www.bigtechnology.com/p/openai-chatgpt-search-is-about-20",
+      "published_on": "2026-11-05"
+    },
+    "searches": 5,
+    "input_tokens": 44671,
+    "answer": "{\"links\":[{\"url\":\"https://www.cmswire.com/digital-experience/chatgpt-search-volume-gains-on-google-openais-consumer-lead-says/\",\"title\":\"ChatGPT Search Volume Gains on Google, OpenAI's Consumer Lead Says\",\"site\":\"CMSWire\"},{\"url\":\"https://searchengineland.com/chatgpt-1-trillion-searches-500589\",\"title\":\"Is ChatGPT really handling 1 trillion searches a year?\",\"site\":\"Search Engine Land\"}]}",
+    "reads": [
+      {
+        "url": "https://www.cmswire.com/digital-experience/chatgpt-search-volume-gains-on-google-openais-consumer-lead-says/",
+        "words": 3353
+      },
+      {
+        "url": "https://searchengineland.com/chatgpt-1-trillion-searches-500589",
+        "words": 30
+      }
+    ]
+  },
+  {
+    "story": {
+      "id": 11216,
+      "headline": "OpenAI Closes $11 Billion First Tranche at $1.25 Trillion Valuation",
+      "summary": "OpenAI closed an $11 billion first tranche of its funding round at a $1.25 trillion valuation, below its original target of around $30 billion or more at $1.4 trillion. The round may reach $20 billion in the coming weeks.",
+      "url": "https://techcrunch.com/2026/11/06/openai-reportedly-raises-an-additional-11-billion-at-a-1-25-trillion-valuation/",
+      "published_on": "2026-11-09"
+    },
+    "searches": 9,
+    "input_tokens": 71170,
+    "answer": "{\"links\":[{\"url\":\"https://www.latimes.com/business/story/2026-11-09/openai-closes-latest-funding-round-at-1-25-trillion-valuation\",\"title\":\"OpenAI closes latest funding round at $1.25-trillion valuation\",\"site\":\"Los Angeles Times\"},{\"url\":\"https://finance.yahoo.com/technology/ai/articles/openai-just-raised-11-billion-133842228.html\",\"title\":\"OpenAI Just Raised $11 Billion at a $1.25 Trillion Valuation, Below the $1.4 Trillion It First Sought\",\"site\":\"Yahoo Finance (24/7 Wall St.)\"}]}",
+    "reads": [
+      {
+        "url": "https://www.latimes.com/business/story/2026-11-09/openai-closes-latest-funding-round-at-1-25-trillion-valuation",
+        "words": 1596
+      },
+      {
+        "url": "https://finance.yahoo.com/technology/ai/articles/openai-just-raised-11-billion-133842228.html",
+        "words": 3188
+      }
+    ]
+  }
+]
