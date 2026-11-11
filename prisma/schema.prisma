@@ -76,6 +76,10 @@ model Story {
   note                     String?
   paywallDetected          String?   @map("paywall_detected")
   error                    String?
+  /// When the repeat check (#90) went through the story. Null means not checked yet.
+  matchedAt                DateTime? @map("matched_at") @db.Timestamptz(6)
+  /// The board date of the commit that excluded the story. Null for stories excluded before #90.
+  excludedOn               DateTime? @map("excluded_on") @db.Date
 
   @@index([queuedForPublicationDate], map: "queued_for_publication_date_idx")
   @@index([day], map: "stories_day_idx")
@@ -344,5 +348,35 @@ model StorySource {
 
   @@id([storyId, source])
   @@map("story_sources")
+  @@schema("newsletter")
+}
+
+/// One embedding for each story (#90): 512 numbers from text-embedding-3-small of headline, newline, summary,
+/// with length 1. Made once, by the repeat check. No foreign key, like the other pipeline tables.
+model StoryEmbedding {
+  storyId   Int      @id @map("story_id")
+  model     String
+  vector    Float[]  @db.Real
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("story_embeddings")
+  @@schema("newsletter")
+}
+
+/// A story match (#90): one judged pair of stories. newer_story_id is the story with the later day (same day: the
+/// higher id). similarity is the cosine similarity of their embeddings; same and news are the judge's two answers
+/// (probabilities). repeat-rules.ts (src/pipeline/repeats/) turns these rows into repeats, duplicates and labels.
+model StoryMatch {
+  id           BigInt   @id @default(autoincrement())
+  newerStoryId Int      @map("newer_story_id")
+  olderStoryId Int      @map("older_story_id")
+  similarity   Float    @db.Real
+  same         Float    @db.Real
+  news         Float    @db.Real
+  judgedAt     DateTime @default(now()) @map("judged_at") @db.Timestamptz(6)
+
+  @@unique([newerStoryId, olderStoryId])
+  @@index([olderStoryId])
+  @@map("story_matches")
   @@schema("newsletter")
 }

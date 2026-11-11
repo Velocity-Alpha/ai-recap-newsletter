@@ -5,6 +5,9 @@ import { createPrismaIngestStore } from "@/src/pipeline/ingest/ingest-store";
 import { buildReadyMessage, sendToReviewGroup, type ReviewGroupStatus } from "@/src/pipeline/review-group";
 import { createGmailReader, readGmailCredentials } from "@/src/pipeline/publish/gmail-client";
 import { finishRun, logEvent, startRun, type EventLevel, type RunTrigger } from "@/src/pipeline/runs";
+import { shiftDay } from "@/src/pipeline/repeats/match-stories";
+import { createRepeatCheck, type RepeatCheckResult } from "@/src/pipeline/repeats/repeat-check";
+import { findUnmatchedStoryIds } from "@/src/pipeline/repeats/repeats-store";
 import { readSetting } from "@/src/pipeline/settings";
 
 /**
@@ -29,6 +32,39 @@ export interface RunIngestOptions {
   /** Replaces the real ingestion (tests). */
   ingest?: (now: Date) => Promise<IngestResult>;
   sendTelegram?: (text: string) => Promise<void>;
+  /** Replaces the repeat check of the stories with `day` on or after `since` (tests). */
+  checkRepeats?: (since: string) => Promise<RepeatCheckResult>;
+}
+
+/** The repeat check looks at unchecked stories of the target day and the 3 days before it. */
+const REPEAT_CHECK_DAYS_BACK = 3;
+
+function defaultCheckRepeats(apiKey: string) {
+  const check = createRepeatCheck({ apiKey });
+  return async (since: string) => check(await findUnmatchedStoryIds(since));
+}
+
+/** Never fails the run: a story left unchecked is tried again by the next run. */
+async function runRepeatCheck(
+  runId: bigint,
+  targetDate: string,
+  check: (since: string) => Promise<RepeatCheckResult>,
+): Promise<RepeatCheckResult | { error: string }> {
+  try {
+    const counts = await check(shiftDay(targetDate, -REPEAT_CHECK_DAYS_BACK));
+    const failed = counts.failed ? ` ${counts.failed.count} request(s) failed and will be tried again: ${counts.failed.firstError}` : "";
+    await logEvent(runId, {
+      level: counts.failed ? "warn" : "info",
+      step: "repeats",
+      message: `Checked ${counts.checked} stories: ${counts.pairs} pairs judged, ${counts.refused} refused.${failed}`,
+      data: counts as unknown as Prisma.InputJsonValue,
+    });
+    return counts;
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    await logEvent(runId, { level: "error", step: "repeats", message: `Repeat check failed: ${reason}` }).catch(() => undefined);
+    return { error: reason };
+  }
 }
 
 function defaultIngest(env: Record<string, string | undefined>) {
@@ -79,6 +115,7 @@ export async function runIngest(runner: PipelineRunner, options: RunIngestOption
     const { level, message } = sourceEvent(source);
     await logEvent(runId, { level, step: "source", message, data: source as unknown as Prisma.InputJsonValue });
   }
+  const repeats = await runRepeatCheck(runId, result.targetDate, options.checkRepeats ?? defaultCheckRepeats(env.OPENAI_API_KEY));
   const telegram = await sendToReviewGroup(buildReadyMessage(result), {
     env,
     send: options.sendTelegram,
@@ -90,6 +127,7 @@ export async function runIngest(runner: PipelineRunner, options: RunIngestOption
     runner,
     targetDate: result.targetDate,
     storiesSaved: result.storiesSaved,
+    repeats: repeats as unknown as Prisma.InputJsonValue,
     telegram,
     sources: result.sources.map(({ source, status, documents, stories, skippedNoLink }) => ({ source, status, documents, stories, skippedNoLink })),
   };

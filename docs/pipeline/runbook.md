@@ -185,6 +185,15 @@ Some ingest errors are not incidents. They show on the source's line in the `ing
   its stories matter, they usually arrive through another source. If the error does not clear, tell the
   developer.
 
+### `repeats` event: `Repeat check failed: …` or `… request(s) failed and will be tried again`
+
+- **Raised by:** `ingest-stories`, at the end of the run (the repeat check, ADR 0006).
+- **Severity:** none. The run and the Telegram message are not affected.
+- **Meaning:** The embeddings or the OpenAI Decisions API failed for some or all stories. Those stories keep
+  `matched_at` null. The next ingest run tries them again (it looks back 3 days).
+- **Do (wait, then tell the developer if it stays):** Nothing, unless it repeats. If it repeats, look at the
+  OpenAI status page.
+
 ## A run that fails to report
 
 `run-checks` has one more alert that is not an incident. If the check job itself throws, it posts

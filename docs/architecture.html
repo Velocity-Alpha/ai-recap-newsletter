@@ -54,6 +54,11 @@
            stories linking to the newsletter's own site dropped, bookmark held if any page fails
          -> follow tracking links, strip tracking params -> gpt-6-luna extraction (strict schema)
          -> paywall check -> INSERT newsletter.stories (+ story_sources: which newsletter sent it) -> update scraper_bookmarks
+         -> repeat check (src/pipeline/repeats/, ADR 0006) for unchecked stories of the last 3 days:
+            embed each story once (text-embedding-3-small, 512 numbers) -> its 5 nearest stories within
+            repeats.window_days (similarity >= 0.55, arithmetic in the app) -> each new pair judged by the
+            OpenAI Decisions API (gpt-6-luna, two yes/no questions) -> story_matches rows, stories.matched_at.
+            A failure is logged (step "repeats") and never fails the run or stops the message
          -> pipeline_runs / pipeline_events rows -> Telegram "board ready" to the review group
 
 ~10:00 Owner opens /approval (defaults to today's New York date; shared password login, rate limited)
@@ -136,7 +141,7 @@ If the issue is missing after a send: /approval/issues -> "Mark as published"
   <tr><th>Service</th><th>Used for</th><th>Called by</th></tr>
   <tr><td>Netlify</td><td>Site hosting, functions, env vars, deploy previews</td><td>all</td></tr>
   <tr><td>Neon</td><td>Postgres: production branch and <code>dev</code> branch</td><td>app, jobs</td></tr>
-  <tr><td>OpenAI</td><td>Extraction, dedup, lead pick, drafting and image prompt</td><td>app, jobs</td></tr>
+  <tr><td>OpenAI</td><td>Extraction, dedup, lead pick, drafting and image prompt; story embeddings and the Decisions API (<code>POST /v1/decisions</code> by <code>fetch</code>) for the repeat check</td><td>app, jobs</td></tr>
   <tr><td>Gmail API (read-only)</td><td>Newsletter emails for ingestion; sent-campaign copies for publish detection</td><td>ingest and publish jobs</td></tr>
   <tr><td>Telegram</td><td>Review bot: "board ready" and "draft is ready for review" messages to the review group; ops alerts and the daily summary to the "AI Recap Ops" chat (<code>TELEGRAM_OPS_CHAT_ID</code>)</td><td>ingest, <code>run-checks</code>, draft job (production only)</td></tr>
   <tr><td>GoHighLevel (GHL)</td><td>Subscriber list, campaign emails, email templates; subscribe and unsubscribe webhooks</td><td>app (subscribe, unsubscribe webhook), "Stage for sending" (templates, <code>src/pipeline/distribution/</code>), owner (send). GHL cannot schedule a campaign through its API, so sending stays manual</td></tr>
@@ -153,12 +158,14 @@ If the issue is missing after a send: /approval/issues -> "Mark as published"
 <h2 id="data">6. Data (Postgres schema <code>newsletter</code>)</h2>
 <table>
   <tr><th>Table</th><th>Holds</th><th>Written by</th></tr>
-  <tr><td><code>stories</code></td><td>Extracted stories per day and source (snake_case columns, but <code>"createdAt"</code> is camelCase)</td><td>ingest job</td></tr>
+  <tr><td><code>stories</code></td><td>Extracted stories per day and source (snake_case columns, but <code>"createdAt"</code> is camelCase). <code>matched_at</code>: when the repeat check went through the story. <code>excluded_on</code>: the board date of the commit that excluded it (not written yet; null for older exclusions)</td><td>ingest job</td></tr>
   <tr><td><code>story_sources</code></td><td>Which newsletters covered each story, one row per story and source key. <code>stories.source</code> keeps only the last writer, so the board reads coverage here. If the table is missing, ingestion and the board log and fall back to <code>stories.source</code>.</td><td>ingest job</td></tr>
+  <tr><td><code>story_embeddings</code></td><td>One embedding for each story (512 numbers, <code>real[]</code>, length 1), made once by the repeat check</td><td>ingest job</td></tr>
+  <tr><td><code>story_matches</code></td><td>Story matches: one row for each judged pair (<code>newer_story_id</code>, <code>older_story_id</code>, <code>similarity</code>, and the judge's <code>same</code> and <code>news</code>). <code>stories.matched_at</code> is set when a story went through the check; null means not checked yet</td><td>ingest job</td></tr>
   <tr><td><code>scraper_bookmarks</code></td><td>Last-read time per source (keys such as <code>the_signal</code>; <code>tldr_ai</code> and <code>aloa_ai</code> are unused)</td><td>ingest job</td></tr>
   <tr><td><code>issues</code></td><td>One row per date (<code>issue_date</code> is unique): <code>html</code>, <code>content_json</code>, <code>published_at</code>, <code>slug</code> (generated), and <code>status</code> (<code>draft</code> or <code>published</code>). The database computes <code>status</code> from <code>published_at</code>: read it to ask "is it published?", never write it</td><td>draft job (insert, update), title and image changes (update), publish job (update; the sent staged version is copied over), owner ("Mark as published", from the newest staged version)</td></tr>
   <tr><td><code>subscribers</code>, <code>auth_codes</code></td><td>Site subscriber records and one-time codes</td><td>app</td></tr>
-  <tr><td><code>pipeline_settings</code></td><td>Thresholds and the job runner (<code>pipeline.runner</code>). A job uses its default when a row is missing</td><td>owner, by SQL; shown on <code>/admin/settings</code></td></tr>
+  <tr><td><code>pipeline_settings</code></td><td>Thresholds and the job runner (<code>pipeline.runner</code>), and <code>repeats.window_days</code> (the repeat check's window, default 14). A job uses its default when a row is missing</td><td>owner, by SQL; shown on <code>/admin/settings</code></td></tr>
   <tr><td><code>pipeline_runs</code>, <code>pipeline_events</code></td><td>Job runs and their step logs</td><td>jobs</td></tr>
   <tr><td><code>publish_events</code></td><td>Each seed email seen by publish detection and the decision, and which staged version and draft was sent (<code>staged_version_id</code>, <code>draft_id</code>)</td><td>publish job</td></tr>
   <tr><td><code>approval_outlines</code></td><td>Each board commit: the normalised outline and its hash</td><td>commit route</td></tr>
@@ -192,6 +199,8 @@ src/features/admin/          admin page data
 src/pipeline/                runner-neutral job logic
   ingest/                    sources.ts, feeds, beehiiv-site, email-text, redirects, url, extract (gpt-6-luna), paywall,
                              ingest-store, schedule, start-ingest, run-ingest
+  repeats/                   the repeat check: embed, nearest, decisions (Decisions API), match-stories, repeats-store,
+                             repeat-rules (pair levels and board rules, pure); __fixtures__/ is the measured test set
   publish/                   gmail-client, sent-email-parser, publish-decision, publish-store, content-diff,
                              site-refresh, manual-publish, publish-schedule, detect-publish, run-detect-publish
   checks/                    schedule, day-facts (its DB reads; staged facts through distribution/issue-state-store),
