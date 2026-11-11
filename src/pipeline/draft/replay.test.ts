@@ -161,13 +161,13 @@ describe("replayDraft", () => {
 describe("replayArticleReader", () => {
   const [planner, laundry] = SAMPLE_APPROVED.headlines;
 
-  it("reads every feature story from the web, with no saved copies, and keeps each outcome without the text", async () => {
+  it("reads every feature story from the web, as production does with no Jina key, and keeps each outcome without the text", async () => {
     const web = fakeWeb({
       [planner.url]: htmlPage(prose("planner")),
       [laundry.url]: htmlPage("Forbidden", 403),
       [jinaUrl(laundry.url)]: jinaError(451, "Unavailable for legal reasons"),
     });
-    const reader = replayArticleReader({ read: true, env: { JINA_API_KEY: "jina-test-key" }, readOptions: { fetch: web.fetch } });
+    const reader = replayArticleReader({ read: true, env: {}, readOptions: { fetch: web.fetch } });
 
     const articles = await reader.readArticles([planner, laundry]);
 
@@ -181,7 +181,7 @@ describe("replayArticleReader", () => {
     ]);
     expect(JSON.stringify(reader.reads())).not.toContain("planner pretend lab");
     const jinaCall = web.fetch.mock.calls.find(([url]) => url === jinaUrl(laundry.url)) as [string, { headers: Record<string, string> }];
-    expect(jinaCall[1].headers.Authorization).toBe("Bearer jina-test-key");
+    expect(jinaCall[1].headers).not.toHaveProperty("Authorization");
   });
 
   it("reads nothing with --no-read", async () => {

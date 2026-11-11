@@ -79,6 +79,28 @@ describe("readArticle", () => {
     await expect(readArticle(STORY, { fetch: web.fetch })).resolves.toMatchObject({ status: "blocked", error: "fetch: HTTP 403. jina: A bot check or block page." });
   });
 
+  it("asks Jina with no Authorization header when there is no Jina key", async () => {
+    const web = fakeWeb({ [STORY]: htmlPage("Forbidden", 403), [jinaUrl(STORY)]: jinaAnswer(STORY, prose("anonymous")) });
+
+    const read = await readArticle(STORY, { fetch: web.fetch });
+
+    expect(read).toMatchObject({ status: "read", method: "jina" });
+    const [, init] = web.fetch.mock.calls.find(([url]) => url === jinaUrl(STORY))!;
+    expect(Object.keys(init.headers ?? {}).map((name) => name.toLowerCase())).not.toContain("authorization");
+  });
+
+  it.each([
+    [402, "Insufficient balance."],
+    [429, "Per IP rate limit exceeded."],
+  ])("leaves the article failed, with Jina's reason, when Jina answers HTTP %i", async (status, reason) => {
+    const web = fakeWeb({ [STORY]: htmlPage("Not found", 404), [jinaUrl(STORY)]: jinaError(status, reason) });
+
+    const read = await readArticle(STORY, { fetch: web.fetch });
+
+    expect(read).toMatchObject({ status: "failed", method: null, text: null });
+    expect(read.error).toBe(`fetch: HTTP 404. jina: Jina returned HTTP ${status}: ${reason}`);
+  });
+
   it("cuts a method off at its network limit, even if it ignores the abort, and moves on", async () => {
     const web = fakeWeb({ [STORY]: hang, [jinaUrl(STORY)]: jinaAnswer(STORY, prose("rescued")) });
 

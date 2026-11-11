@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { fakeWeb, htmlPage, jinaAnswer, jinaUrl, prose } from "@/src/pipeline/draft/articles/fake-web.fixture";
 import answers from "@/src/pipeline/free-links/__fixtures__/search-answers.json";
 import { checkLinks, countWords, type LinkRead } from "@/src/pipeline/free-links/check-links";
 import { parseSearchAnswer } from "@/src/pipeline/free-links/search";
@@ -39,6 +40,17 @@ describe("checkLinks", () => {
     const links = await checkLinks(STORY, [{ url: "https://www.free.example/a", title: "A" }], deps);
 
     expect(links).toEqual([{ url: "https://www.free.example/a", site: "free.example", title: "A", words: 300 }]);
+  });
+
+  it("reads with the draft's article reader, Jina last and with no key", async () => {
+    const link = "https://www.free.example/a";
+    const web = fakeWeb({ [link]: htmlPage("Forbidden", 403), [jinaUrl(link)]: jinaAnswer(link, prose("free", 3_000)) });
+
+    const links = await checkLinks(STORY, [{ url: link, title: "A" }], { readOptions: { fetch: web.fetch }, recordPaywalledSite: vi.fn(async () => {}) });
+
+    expect(links).toEqual([expect.objectContaining({ url: link, site: "free.example" })]);
+    const [, init] = web.fetch.mock.calls.find(([url]) => url === jinaUrl(link))!;
+    expect(Object.keys(init.headers ?? {}).map((name) => name.toLowerCase())).not.toContain("authorization");
   });
 
   it("drops a link on the site of the original link, without a read", async () => {

@@ -184,7 +184,8 @@ Optional:
 - `NEON_PROJECT_ID` for `npm run db:reset-dev`
 - `TELEGRAM_REVIEW_CHAT_ID` to send the review group's messages ("stories are ready", "draft is ready for review") to another chat
 - `NEWSLETTER_RUNTIME_DB_ROLE` to override the runtime role name used by the bootstrap scripts. Defaults to `newsletter_web`.
-- `JINA_API_KEY` and `GITHUB_TOKEN` for the draft job's article reader (`src/pipeline/draft/articles`). Both work without a key: Jina Reader is the last fallback and is sent the key as a Bearer header only if set (higher rate limit); the GitHub token only raises the README API's rate limit.
+- `GITHUB_TOKEN` for the article reader (`src/pipeline/draft/articles`, used by the draft job and the free link check): it only raises the GitHub README API's rate limit.
+- `JINA_API_KEY` — optional and not set on the Netlify site; do not add it back. With no key the reader asks Jina Reader, its last method, anonymously (free, 20 requests a minute); a refused call leaves that one article unread. If a key is set, it is sent as a Bearer token. How the reader works (methods including `pdf`, limits, text workers, timings): [architecture, the article reader](./docs/architecture.html#article-reader).
 
 Google Analytics IDs (`NEXT_PUBLIC_GA_MEASUREMENT_ID`) and `APP_ENV` are set per deploy context in `netlify.toml`. `APP_ENV` is also a Netlify env var with the same values, because functions cannot read `netlify.toml` at runtime.
 
