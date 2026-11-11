@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { ResultsFile } from "@/evals/lib/results";
 import { evalSettings } from "@/evals/lib/settings";
-import { countGraded, countHits, runSweep, withSpread } from "@/evals/lib/sweep";
+import { countGraded, countHits, runSweep, withSpread, type SweepSpec } from "@/evals/lib/sweep";
 import { outcomeOf } from "@/evals/lib/testing";
 
 type Item = { id: number; answer: string };
@@ -14,148 +14,182 @@ const ITEMS: Item[] = [
 
 const noWrite = () => "x";
 
+/** A sweep over ITEMS that returns each item's answer, writes nothing and scores nothing, unless changed. */
+function toySweep<Grade = never>(changes: Partial<SweepSpec<Item, string, Grade>>) {
+  return runSweep<Item, string, Grade>({
+    task: "toy",
+    title: "Toy",
+    notes: [],
+    settings: evalSettings({ model: "gpt-6-luna", efforts: ["low"] }, {}),
+    items: ITEMS,
+    id: (item) => String(item.id),
+    run: async (item) => item.answer,
+    score: () => [],
+    write: noWrite,
+    ...changes,
+  });
+}
+
 describe("runSweep", () => {
-  it("runs every item for each effort and repeat, scores each config, and writes one row per config", async () => {
+  it("runs every item for each effort and repeat, capped by EVAL_LIMIT", async () => {
+    const seen: string[] = [];
+    await toySweep({
+      settings: evalSettings({ model: "gpt-6-luna", efforts: ["low", "high"], repeats: 2 }, { EVAL_LIMIT: "2" }),
+      async run(item, context) {
+        seen.push(`${context.config.effort}:${item.id}:${context.repeat}`);
+        return item.answer;
+      },
+    });
+    expect(seen.sort()).toEqual(["high:1:0", "high:1:1", "high:2:0", "high:2:1", "low:1:0", "low:1:1", "low:2:0", "low:2:1"]);
+  });
+
+  it("gives one row per config, in sweep order", async () => {
+    const result = await toySweep({ settings: evalSettings({ model: "gpt-6-luna", efforts: ["high", "low"] }, {}) });
+    expect(result.rows.map((row) => [row.model, row.effort])).toEqual([
+      ["gpt-6-luna", "high"],
+      ["gpt-6-luna", "low"],
+    ]);
+  });
+
+  it("counts a run that throws as an error and scores it as a miss", async () => {
+    const result = await toySweep({
+      async run(item) {
+        if (item.id === 2) throw new Error("boom");
+        return item.answer;
+      },
+      score: (outcomes) => [countHits("Right answer", outcomes, (outcome) => outcome.output === outcome.item.answer)],
+    });
+    expect(result.rows[0]).toMatchObject({ n: 3, errors: 1, metrics: [{ name: "Right answer", hits: 2, n: 3 }] });
+  });
+
+  it("adds each count's spread over the repeats", async () => {
+    const result = await toySweep({
+      settings: evalSettings({ model: "gpt-6-luna", efforts: ["low"], repeats: 2 }, {}),
+      run: async (item, context) => (context.repeat === 0 ? item.answer : "wrong"),
+      score: (outcomes) => [countHits("Right answer", outcomes, (outcome) => outcome.output === outcome.item.answer)],
+    });
+    expect(result.rows[0].metrics[0]).toEqual({ name: "Right answer", hits: 3, n: 6, spread: { min: 0, max: 1 } });
+  });
+
+  it("costs nothing and has no judge cost, grade count or shared cost when no call was made", async () => {
+    const [row] = (await toySweep({})).rows;
+    expect(row).toMatchObject({ costPerCallUsd: 0, judgeCostPerCallUsd: null });
+    expect(row.graded).toBeUndefined();
+    expect(row.sharedCostUsd).toBeUndefined();
+  });
+
+  it("writes the results file with the task, title, notes and columns", async () => {
+    const write = vi.fn((file: ResultsFile) => `evals/results/${file.task}.md`);
+    await toySweep({ notes: ["A toy eval."], columns: ["Right answer"], write });
+    expect(write.mock.calls[0][0]).toMatchObject({ task: "toy", title: "Toy", notes: ["A toy eval."], columns: ["Right answer"] });
+  });
+
+  it("writes the raw JSON with the settings and each outcome's raw fields and error", async () => {
     const write = vi.fn((file: ResultsFile, raw: unknown) => {
       void raw;
       return `evals/results/${file.task}.md`;
     });
-    const seen: string[] = [];
-    const settings = evalSettings({ model: "gpt-6-luna", efforts: ["low", "high"], repeats: 2 }, { EVAL_LIMIT: "2" });
-
-    const result = await runSweep({
-      task: "toy",
-      title: "Toy",
-      notes: ["A toy eval."],
-      settings,
-      items: ITEMS,
-      id: (item) => String(item.id),
-      async run(item, context) {
-        seen.push(`${context.config.effort}:${item.id}:${context.repeat}`);
-        if (context.config.effort === "high" && item.id === 2) throw new Error("boom");
+    await toySweep({
+      settings: evalSettings({ model: "gpt-6-luna", efforts: ["low"] }, { EVAL_LIMIT: "2" }),
+      async run(item) {
+        if (item.id === 2) throw new Error("boom");
         return item.answer;
       },
-      score: (outcomes) => [countHits("Right answer", outcomes, (outcome) => outcome.output === outcome.item.answer)],
-      columns: ["Right answer"],
       raw: (outcome) => ({ answer: outcome.output }),
       write,
     });
-
-    expect(seen.sort()).toEqual(["high:1:0", "high:1:1", "high:2:0", "high:2:1", "low:1:0", "low:1:1", "low:2:0", "low:2:1"]);
-    expect(result.rows.map((row) => [row.effort, row.n, row.errors, row.metrics])).toEqual([
-      ["low", 4, 0, [{ name: "Right answer", hits: 4, n: 4, spread: { min: 1, max: 1 } }]],
-      ["high", 4, 2, [{ name: "Right answer", hits: 2, n: 4, spread: { min: 0.5, max: 0.5 } }]],
-    ]);
-    // No calls were recorded, so the cost is zero, there was no judge and no grade step.
-    expect(result.rows[0]).toMatchObject({ costPerCallUsd: 0, judgeCostPerCallUsd: null, model: "gpt-6-luna" });
-    expect(result.rows[0].graded).toBeUndefined();
-    expect(result.rows[0].sharedCostUsd).toBeUndefined();
-    expect(result.rows[0].latencyMs.p50).not.toBeNull();
-
-    const [file, raw] = write.mock.calls[0];
-    expect(file).toMatchObject({ task: "toy", title: "Toy", notes: ["A toy eval."], columns: ["Right answer"] });
+    const raw = write.mock.calls[0][1];
     expect(raw).toMatchObject({
       task: "toy",
-      settings: { repeats: 2, limit: 2 },
-      configs: [
-        { effort: "low", outcomes: expect.arrayContaining([expect.objectContaining({ id: "1", answer: "a", gradeStatus: "none" })]) },
-        {},
-      ],
+      settings: { limit: 2 },
+      configs: [{ effort: "low", outcomes: expect.arrayContaining([expect.objectContaining({ id: "1", answer: "a", gradeStatus: "none" })]) }],
     });
     expect(JSON.stringify(raw)).toContain("boom");
   });
 
-  it("times only the run, grades the first EVAL_JUDGE_REPEATS repeats, and counts failed grades", async () => {
-    const settings = evalSettings({ model: "gpt-6-luna", efforts: ["low"], repeats: 3 }, { EVAL_JUDGE_REPEATS: "2" });
-    const graded: string[] = [];
-    const result = await runSweep({
-      task: "toy",
-      title: "Toy",
-      notes: [],
-      settings,
-      items: ITEMS.slice(0, 2),
-      id: (item) => String(item.id),
-      run: async (item) => item.answer,
-      async grade(item, output, context) {
-        graded.push(`${item.id}:${context.repeat}`);
-        if (item.id === 2 && context.repeat === 1) throw new Error("judge down");
+  it("leaves grading out of the latency", async () => {
+    const result = await toySweep<{ good: boolean }>({
+      async grade() {
         await new Promise((resolve) => setTimeout(resolve, 30));
-        return { good: output === "a" };
+        return { good: true };
       },
-      score: (outcomes) => [
-        countGraded("Good", outcomes, (outcome) => outcome.grade.good),
-        { name: "Skipped", value: outcomes.filter((outcome) => outcome.gradeStatus === "skipped").length },
-      ],
-      write: noWrite,
     });
-    expect(graded.sort()).toEqual(["1:0", "1:1", "2:0", "2:1"]);
-    const [row] = result.rows;
-    expect(row.graded).toEqual({ hits: 3, n: 4 });
-    expect(row.metrics[0]).toEqual({ name: "Good", hits: 2, n: 3, spread: { min: 0.5, max: 1 } });
-    expect(row.metrics[1]).toMatchObject({ name: "Skipped", value: 2 });
-    // The 30 ms of grading are not in the latency.
-    expect(row.latencyMs.p95).toBeLessThan(25);
+    expect(result.rows[0].latencyMs.p95).toBeLessThan(25);
   });
 
-  it("runs afterSweep with every config's outcomes, adds its metrics, and does shared work once", async () => {
-    const settings = evalSettings({ model: "gpt-6-luna", efforts: ["high", "low"] }, {});
-    const work = vi.fn(async () => "read");
-    const result = await runSweep({
-      task: "toy",
-      title: "Toy",
-      notes: [],
-      settings,
-      items: ITEMS,
-      id: (item) => String(item.id),
+  it("grades only the first EVAL_JUDGE_REPEATS repeats and marks the rest skipped", async () => {
+    const graded: string[] = [];
+    const result = await toySweep<{ good: boolean }>({
+      settings: evalSettings({ model: "gpt-6-luna", efforts: ["low"], repeats: 3 }, { EVAL_JUDGE_REPEATS: "2" }),
+      items: ITEMS.slice(0, 2),
+      async grade(item, _output, context) {
+        graded.push(`${item.id}:${context.repeat}`);
+        return { good: true };
+      },
+      score: (outcomes) => [{ name: "Skipped", value: outcomes.filter((outcome) => outcome.gradeStatus === "skipped").length }],
+    });
+    expect(graded.sort()).toEqual(["1:0", "1:1", "2:0", "2:1"]);
+    expect(result.rows[0].metrics[0]).toMatchObject({ name: "Skipped", value: 2 });
+  });
+
+  it("counts a grade that throws as failed, and leaves it out of graded counts", async () => {
+    const result = await toySweep<{ good: boolean }>({
+      async grade(item, output) {
+        if (item.id === 2) throw new Error("judge down");
+        return { good: output === "a" };
+      },
+      score: (outcomes) => [countGraded("Good", outcomes, (outcome) => outcome.grade.good)],
+    });
+    expect(result.rows[0].graded).toEqual({ hits: 2, n: 3 });
+    expect(result.rows[0].metrics[0]).toEqual({ name: "Good", hits: 1, n: 2 });
+  });
+
+  it("runs afterSweep with every config's outcomes and adds its metrics to each row", async () => {
+    const result = await toySweep({
+      settings: evalSettings({ model: "gpt-6-luna", efforts: ["high", "low"] }, {}),
       run: async (item, context) => `${item.answer}:${context.config.effort}`,
-      grade: async (item, _output, context) => context.shared(`read:${item.id}`, work),
       async afterSweep(configs) {
         const low = configs.find((entry) => entry.config.effort === "low")!;
         return configs.map(({ outcomes }) => ({
           metrics: [{ name: "Same as low", hits: outcomes.filter((o, i) => o.output === low.outcomes[i].output).length, n: outcomes.length }],
         }));
       },
-      score: () => [],
-      write: noWrite,
     });
-    expect(work).toHaveBeenCalledTimes(3);
     expect(result.rows.map((row) => row.metrics)).toEqual([[{ name: "Same as low", hits: 0, n: 3 }], [{ name: "Same as low", hits: 3, n: 3 }]]);
   });
 
-  it("shows the effort as n/a for a call that takes no effort", async () => {
-    const settings = evalSettings({ model: "gpt-6-luna", efforts: null }, {});
-    const result = await runSweep({
-      task: "toy",
-      title: "Toy",
-      notes: [],
-      settings,
-      items: ITEMS,
-      id: (item) => String(item.id),
-      run: async (item) => item.answer,
-      score: () => [],
-      write: noWrite,
+  it("does each piece of shared work once across configs", async () => {
+    const work = vi.fn(async () => "read");
+    await toySweep({
+      settings: evalSettings({ model: "gpt-6-luna", efforts: ["high", "low"] }, {}),
+      grade: async (item, _output, context) => context.shared(`read:${item.id}`, work),
     });
+    expect(work).toHaveBeenCalledTimes(3);
+  });
+
+  it("shows the effort as n/a for a call that takes no effort", async () => {
+    const result = await toySweep({ settings: evalSettings({ model: "gpt-6-luna", efforts: null }, {}) });
     expect(result.rows.map((row) => row.effort)).toEqual(["n/a"]);
   });
 });
 
 describe("withSpread", () => {
-  it("adds the lowest and highest repeat, skips empty counts, and takes numbers only from the given repeats", () => {
-    const total = [
-      { name: "Hit", hits: 3, n: 6 },
-      { name: "Mean", value: 2 },
-      { name: "Once", value: 1 },
-    ];
-    const perRepeat = [
-      [{ name: "Hit", hits: 1, n: 3 }, { name: "Mean", value: 1 }, { name: "Once", value: 1 }],
-      [{ name: "Hit", hits: 2, n: 3 }, { name: "Mean", value: 3 }],
-      [{ name: "Hit", hits: 0, n: 0 }, { name: "Mean", value: 99 }],
-    ];
-    expect(withSpread(total, perRepeat, 2)).toEqual([
-      { name: "Hit", hits: 3, n: 6, spread: { min: 1 / 3, max: 2 / 3 } },
-      { name: "Mean", value: 2, spread: { min: 1, max: 3 } },
-      { name: "Once", value: 1 },
-    ]);
+  const perRepeat = [
+    [{ name: "Hit", hits: 1, n: 3 }, { name: "Mean", value: 1 }, { name: "Once", value: 1 }],
+    [{ name: "Hit", hits: 2, n: 3 }, { name: "Mean", value: 3 }],
+    [{ name: "Hit", hits: 0, n: 0 }, { name: "Mean", value: 99 }],
+  ];
+
+  it("adds the lowest and highest repeat of a count, skipping a repeat with nothing counted", () => {
+    expect(withSpread([{ name: "Hit", hits: 3, n: 6 }], perRepeat, 3)).toEqual([{ name: "Hit", hits: 3, n: 6, spread: { min: 1 / 3, max: 2 / 3 } }]);
+  });
+
+  it("takes a number's spread only from the first given repeats", () => {
+    expect(withSpread([{ name: "Mean", value: 2 }], perRepeat, 2)).toEqual([{ name: "Mean", value: 2, spread: { min: 1, max: 3 } }]);
+  });
+
+  it("adds no spread to a number found in only one repeat", () => {
+    expect(withSpread([{ name: "Once", value: 1 }], perRepeat, 2)).toEqual([{ name: "Once", value: 1 }]);
   });
 });
 

@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 
-import { effortOrDefault, reasoningField, type EffortSetting } from "@/src/lib/reasoning-effort";
+import { modelFields, type ModelOverrides, type ReasoningEffort } from "@/src/lib/reasoning-effort";
 import {
   buildSceneContext,
   SCENE_PROMPT_MODEL,
@@ -16,9 +16,12 @@ import {
  */
 
 export const SCENE_IDEAS_COUNT = 3;
-/** The model is SCENE_PROMPT_MODEL. Medium, from evals/results/scene-ideas.md (2026-11-10): high follows the
- * composition rules a little better, but its p95 reaches the 45 s timeout. */
-export const SCENE_IDEAS_EFFORT: EffortSetting = "medium";
+/**
+ * The model is SCENE_PROMPT_MODEL. Medium, from evals/results/scene-ideas.md (2 runs of 10 issues each). High
+ * keeps more ideas to one supporting element (50 of 60 against 43 of 60), but the call runs in a web request with
+ * a 45 s timeout: high's call p95 is 44.5 s and 1 of its 20 calls failed, while medium's call p95 is 20 s with none.
+ */
+export const SCENE_IDEAS_EFFORT: ReasoningEffort = "medium";
 /** The board waits for this call, and a route must finish inside Netlify's 60 s. */
 export const SCENE_IDEAS_TIMEOUT_MS = 45_000;
 
@@ -92,12 +95,10 @@ export function parseSceneIdeas(outputText: string): SceneIdea[] {
   return ideas;
 }
 
-export interface SuggestSceneIdeasOptions {
+/** `model` and `effort` are for evals: production uses SCENE_PROMPT_MODEL and SCENE_IDEAS_EFFORT. */
+export interface SuggestSceneIdeasOptions extends ModelOverrides {
   client?: ScenePromptClient;
   apiKey?: string;
-  /** For evals. Production uses SCENE_PROMPT_MODEL and SCENE_IDEAS_EFFORT. */
-  model?: string;
-  effort?: EffortSetting;
 }
 
 /** One call, no retries: the owner can ask again, or write a scene. */
@@ -112,8 +113,7 @@ export async function suggestSceneIdeas(
     options.client ??
     (new OpenAI({ apiKey: options.apiKey ?? process.env.OPENAI_API_KEY }) as unknown as ScenePromptClient);
   const request = {
-    model: options.model ?? SCENE_PROMPT_MODEL,
-    ...reasoningField(effortOrDefault(options, SCENE_IDEAS_EFFORT)),
+    ...modelFields(options, { model: SCENE_PROMPT_MODEL, effort: SCENE_IDEAS_EFFORT }),
     instructions: INSTRUCTIONS,
     input: `${SCENE_REQUIREMENTS.replace("image_prompt", "each scene")}\n\n${buildSceneContext(context)}`,
     store: false,

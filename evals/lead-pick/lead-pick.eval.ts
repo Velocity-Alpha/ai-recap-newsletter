@@ -6,7 +6,7 @@ vi.mock("@/src/server/observability", () => ({ logServerInfo: vi.fn(), logServer
 
 import { boardStoryIds, headlineById, leadPickCases, type LeadPickCase } from "@/evals/lead-pick/boards";
 import { scoreLeadPick, type LeadPickOutput } from "@/evals/lead-pick/score";
-import { readOnlyQuery } from "@/evals/lib/dev-db";
+import { BOARD_SUMMARIES_PATH, readBoardSummaries } from "@/evals/lead-pick/summaries";
 import { evalSettings } from "@/evals/lib/settings";
 import { runSweep, type RunContext } from "@/evals/lib/sweep";
 import { applyLeadPick } from "@/src/features/newsletter/lead-story";
@@ -14,18 +14,6 @@ import { checkLeadPickStatus, LEAD_PICK_MODEL, submitLeadPick } from "@/src/feat
 
 const POLL_MS = 1_000;
 const MAX_WAIT_MS = 10 * 60 * 1000;
-
-/** Summaries from the Neon dev branch (read-only), when DATABASE_URL is set. The fixture has headlines only. */
-async function loadSummaries(): Promise<{ summaries: Map<number, string>; source: string }> {
-  const ids = boardStoryIds();
-  const rows = await readOnlyQuery<{ id: number; summary: string | null }>(
-    "SELECT id, summary FROM newsletter.stories WHERE id = ANY($1::int[])",
-    [ids]
-  );
-  if (rows === null) return { summaries: new Map(), source: "headlines only (DATABASE_URL not set)" };
-  const summaries = new Map(rows.filter((row) => row.summary?.trim()).map((row) => [row.id, row.summary!.trim()]));
-  return { summaries, source: `headlines and summaries: ${summaries.size} of ${ids.length} board stories have a summary on the Neon dev branch` };
-}
 
 async function pick(item: LeadPickCase, context: RunContext): Promise<LeadPickOutput> {
   const options = { client: context.client, model: context.config.model, effort: context.config.effort };
@@ -46,7 +34,7 @@ async function pick(item: LeadPickCase, context: RunContext): Promise<LeadPickOu
 
 it("lead pick: AI lead against the owner's lead", async () => {
   const settings = evalSettings({ model: LEAD_PICK_MODEL, efforts: ["none", "low", "medium", "high"], repeats: 3 });
-  const { summaries, source } = await loadSummaries();
+  const summaries = readBoardSummaries();
   const headlines = headlineById();
 
   const { rows, path } = await runSweep({
@@ -57,7 +45,8 @@ it("lead pick: AI lead against the owner's lead", async () => {
         "(`src/features/newsletter/__fixtures__/archived-boards.json`). Ground truth: the lead the owner committed.",
       "AI lead = owner lead: the board's lead after the AI pick (a failed pick leaves the scored lead). " +
         "The shortlist and score-only rows do not depend on the model.",
-      `Story text: ${source}.`,
+      `Story text: headlines, and summaries for ${summaries.size} of the ${boardStoryIds().length} board stories ` +
+        `(\`${BOARD_SUMMARIES_PATH}\`, built from the Neon dev branch).`,
       "Latency includes background-mode polling once a second.",
     ],
     settings,

@@ -1,0 +1,213 @@
+{
+  "note": "The published issues of the scene evals, read from the Neon dev branch by evals/scenes/build-issues.ts: each issue's subject line and Top Stories (headline and story detail), as imageContextFor builds them. Our own text only.",
+  "from": "2026-10-26",
+  "to": "2026-11-06",
+  "issues": [
+    {
+      "issueId": 262,
+      "date": "2026-10-26",
+      "context": {
+        "subjectLine": "Kimi's Million-Token Open Model",
+        "topStories": [
+          {
+            "headline": "Kimi releases 104B open-weight model with 1M-token context",
+            "detail": "Moonshot AI launched Kimi K3.1 Pro, an open-weight model built for coding, long-context work, 3D creation, and financial research. It supports a 1 million-token context window and uses a mixture-of-experts design with 104 billion active parameters out of 2.8 trillion total parameters per request. The model is live on the Kimi API now, with a faster K3.1 Pro Highspeed variant reported to run 2 to 3 times quicker."
+          },
+          {
+            "headline": "Anthropic launches Claude Duet research preview",
+            "detail": "Anthropic launched Claude Duet, a personal agent that works proactively across connected apps and surfaces tasks before users ask. It is in research preview through a waitlist for Pro and Max users in the US at no extra cost. Anthropic describes it as an always-on assistant that can keep working in the background and come back with what needs attention."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 263,
+      "date": "2026-10-27",
+      "context": {
+        "subjectLine": "Anthropic Opens Its Books",
+        "topStories": [
+          {
+            "headline": "Anthropic Files for IPO",
+            "detail": "Anthropic publicly filed its S-1, setting up a Nasdaq listing under the ticker ANT with Goldman Sachs and Morgan Stanley leading a 22-bank syndicate. The filing lays out massive revenue growth, a headline net loss shaped largely by non-cash accounting charges, and an unusually layered governance structure that keeps control with founders and a long-term trust."
+          },
+          {
+            "headline": "OpenAI Ships GPT-6.1 Terra",
+            "detail": "OpenAI released GPT-6.1 Terra as a faster, lower-cost workhorse model for everyday production tasks. The model is priced at $1 per million input tokens and $5 per million output tokens, with stronger coding results and agentic computer-use abilities for navigating screens, apps, forms, and software workflows."
+          },
+          {
+            "headline": "SpaceX Raises $40B for GPUs",
+            "detail": "Elon Musk said SpaceX closed $40 billion in debt financing to buy GPUs, with much of the debt structured as callable so it can be repaid early. He framed the raise as proof that lenders will back companies with real operating revenue, while warning that GPU-rental neoclouds without broader revenue streams could face consolidation."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 264,
+      "date": "2026-10-28",
+      "context": {
+        "subjectLine": "Genie Opens the Simulation Door",
+        "topStories": [
+          {
+            "headline": "Anthropic Pushes Claude Into Drug Discovery",
+            "detail": "Anthropic shared early results from using Claude inside real drug development workflows across six biotech partnerships. The projects span antibody design, trial planning, preclinical lab work, biotech company operations, and Anthropic's own drug programs targeting rare childhood diseases and cancer."
+          },
+          {
+            "headline": "Google DeepMind Unveils Genie 4",
+            "detail": "Google DeepMind released Genie 4, an interactive world model that generates virtual environments in real time. It adds native audio, text-based steering, physics simulation, and longer coherent sessions, with access beginning through trusted testers before a broader rollout."
+          },
+          {
+            "headline": "Liquid AI Launches LFM3 On-Device Models",
+            "detail": "Liquid AI launched LFM3, an open-weight model family built for on-device AI across text, vision, audio, omni, and decision use cases. The 1.7B text model is positioned as smaller and stronger than its predecessor, with a large context window and a memory footprint aimed at local agents."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 265,
+      "date": "2026-10-29",
+      "context": {
+        "subjectLine": "Gemini Carbon Raises The Stakes",
+        "topStories": [
+          {
+            "headline": "Google introduces Gemini 4 Carbon",
+            "detail": "Google introduced Gemini 4 Carbon, a new model framed around stronger AI performance with improved energy efficiency. The company says the model advances natural language processing while reducing its carbon footprint, positioning it as part of a broader push toward more sustainable AI development."
+          },
+          {
+            "headline": "Meta launches Waddle World AI pet app",
+            "detail": "Meta launched Waddle World, a virtual AI pet app in the Philippines for iOS and Android. The app blends pet interaction, mini-games, and journaling while avoiding the tone of a productivity tool or traditional chatbot."
+          },
+          {
+            "headline": "NVIDIA releases Nemotron 3.5 Transcribe and Granary v2",
+            "detail": "NVIDIA released Nemotron 3.5 Transcribe, an open-weight multilingual model for transcription, translation, speaker attribution, and audio Q&A. Granary v2 adds reusable data pipelines and fine-tuning recipes so teams can adapt the system to specialized vocabularies, accents, and domains."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 266,
+      "date": "2026-10-30",
+      "context": {
+        "subjectLine": "Claude Hits The Road",
+        "topStories": [
+          {
+            "headline": "OpenAI Adds API Credits To ChatGPT Plans",
+            "detail": "OpenAI is giving eligible ChatGPT Pro and Business users monthly API credits they can use to build with OpenAI's API without paying extra each month. The credits are tied to plan type, expire at the end of each billing cycle, and must be claimed by linking an eligible ChatGPT subscription to an API organization."
+          },
+          {
+            "headline": "Claude Mobile Adds CarPlay And Account Switching",
+            "detail": "Claude's mobile apps now support multi-account switching on iOS and Android, making it easier to move between personal and work accounts without signing out. The update also brings CarPlay voice mode on iPhone, better iPad split view behavior, support for 33 languages, broader Android device support, and upcoming pull-down search for chats, projects, and settings."
+          },
+          {
+            "headline": "Nvidia Plans $3B Meta Investment",
+            "detail": "Nvidia plans to invest $3 billion in Meta's equity offering as the two companies expand their AI partnership. Meta intends to build out more Nvidia infrastructure, and the companies are also considering collaboration around monitoring agent behavior."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 267,
+      "date": "2026-11-02",
+      "context": {
+        "subjectLine": "AI Compute Hits The Ballot",
+        "topStories": [
+          {
+            "headline": "Data centers become an election fight",
+            "detail": "U.S. midterms are becoming a referendum on AI infrastructure, with roughly 20 communities voting on data center bans or pauses. OpenAI is reportedly preparing a post-election push to rebrand these facilities as AI compute campuses as it tries to frame them as local economic engines."
+          },
+          {
+            "headline": "OpenAI details its misalignment monitors",
+            "detail": "OpenAI laid out a four-layer system for catching misaligned model behavior across training, evaluation, and internal use. The stack combines activation probes, model-based review, investigative agents, and system telemetry, with critical alerts capable of pausing workloads automatically."
+          },
+          {
+            "headline": "Cursor warns of fake Claude Code malware",
+            "detail": "Cursor warned that malicious versions of a fake Claude Code VS Code extension contained an SSH backdoor and affected roughly 5,000 machines. The incident highlights how AI coding workflows have become a serious software supply-chain target."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 268,
+      "date": "2026-11-03",
+      "context": {
+        "subjectLine": "ChatGPT's Workspace Gets Simpler",
+        "topStories": [
+          {
+            "headline": "Anthropic Opens Paid AI Safety Residency",
+            "detail": "Anthropic has opened applications for a paid, fixed-term AI safety residency aimed at established technical leaders who may not have machine learning experience. The program runs full-time for six weeks to six months, with residents working on scoped safety projects across areas like interpretability, AI control, scalable oversight, and red-teaming."
+          },
+          {
+            "headline": "OpenAI Plans To Merge ChatGPT's Chat And Work Tabs",
+            "detail": "OpenAI plans to merge the Chat and Work tabs inside ChatGPT after testing the change with select users. The shift is meant to let people move from brainstorming to execution in one place, while Codex remains separate in the ChatGPT desktop app."
+          },
+          {
+            "headline": "OpenAI Reportedly Cuts Funding Target By $10 Billion",
+            "detail": "OpenAI reportedly lowered the target for its current funding round from about $30 billion to $20 billion. The reported valuation also moved from $1.4 trillion to $1.25 trillion, though OpenAI has not confirmed the figures."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 269,
+      "date": "2026-11-04",
+      "context": {
+        "subjectLine": "DeepSeek Tests China's AI Silicon",
+        "topStories": [
+          {
+            "headline": "Apple opens Siri AI to all developers",
+            "detail": "Apple is letting any developer integrate apps with Siri AI through the iOS 27.3 beta and related platform betas. The preview gives apps access to Siri's natural language capabilities, personal context understanding, onscreen awareness, and App Intents support, while availability remains limited by region, language, and age rules."
+          },
+          {
+            "headline": "Fireworks adds faster inference and enterprise controls",
+            "detail": "Fireworks introduced a new set of Forge products aimed at helping companies build AI around their own data, tasks, and workflows. The launch includes Ultra-fast inference at up to 1,500 tokens per second, lower-cost background processing, Nexus for model access inside existing tools, plus evaluation, fine-tuning deployment, and infrastructure controls."
+          },
+          {
+            "headline": "DeepSeek plans Huawei-chip training run",
+            "detail": "DeepSeek reportedly plans to pretrain its next-generation DeepSeek V5 model on Huawei Ascend AI chips. The move would push Ascend beyond its more common inference role and test whether Chinese accelerators can handle frontier-scale pretraining, potentially reducing reliance on Nvidia hardware if successful."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 270,
+      "date": "2026-11-05",
+      "context": {
+        "subjectLine": "Astra Learns to Rewrite AI",
+        "topStories": [
+          {
+            "headline": "Voters Push Back on Data Centers",
+            "detail": "Voters backed limits on data centers in nearly every local measure that appeared on U.S. midterm ballots. The results point to growing public resistance around AI infrastructure and signal tougher scrutiny ahead for the industry."
+          },
+          {
+            "headline": "Astra Rewrites AI Models From the Inside",
+            "detail": "MIT researchers published work showing OpenAI's GPT-6 Astra can improve some AI models by directly rewriting their weights instead of retraining them. The result hints at a path toward self-improving models and more automated AI research."
+          },
+          {
+            "headline": "OpenAI Deepens Its Abu Dhabi Push",
+            "detail": "OpenAI signed four agreements in Abu Dhabi spanning government, energy, investment, and enterprise deployments. The deals extend OpenAI's role in public-sector AI and major enterprise workflows across the emirate."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 271,
+      "date": "2026-11-06",
+      "context": {
+        "subjectLine": "Images 2.6 Gets Moving",
+        "topStories": [
+          {
+            "headline": "OpenAI Releases GPT-6 Cyber",
+            "detail": "OpenAI released GPT-6 Cyber, a security-focused model built for offensive and defensive teams rather than general chat. It is positioned as a tool for finding, testing, and fixing vulnerabilities in real software, with access routed through OpenAI's vetted Daybreak program."
+          },
+          {
+            "headline": "Tencent Launches Hy4",
+            "detail": "Tencent launched Hy4, a large language model with visual understanding capabilities. The model supports fine-grained image processing, complex chart analysis, mathematical visual reasoning, and computer-use tasks across command-line interfaces and GUIs."
+          },
+          {
+            "headline": "OpenAI Launches Images 2.6 With GIFs",
+            "detail": "OpenAI is rolling out Images 2.6 globally in ChatGPT and Codex. The model generates images 50% faster than the previous iteration, adds GIF creation, and brings GPT-Image-2.6 Flare and Sunburst to the API."
+          }
+        ]
+      }
+    }
+  ]
+}

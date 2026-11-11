@@ -1,7 +1,6 @@
 import { createHash } from "node:crypto";
 
-import { reasoningField, type EffortSetting } from "@/src/lib/reasoning-effort";
-
+import type { EffortSetting } from "@/evals/lib/settings";
 import type { RecordingClient } from "@/evals/lib/usage";
 
 export interface JudgeRequest {
@@ -29,7 +28,7 @@ export function createJudge(options: { model: string; effort: EffortSetting; cli
   return async <T>(request: JudgeRequest): Promise<T> => {
     const body = {
       model: options.model,
-      ...reasoningField(options.effort),
+      ...(options.effort ? { reasoning: { effort: options.effort } } : {}),
       instructions: request.instructions,
       input: request.input,
       prompt_cache_key: judgeCacheKey(request),

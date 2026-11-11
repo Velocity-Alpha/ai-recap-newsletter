@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import type { Metric } from "@/evals/lib/results";
 import type { Outcome } from "@/evals/lib/sweep";
 import { outcomeOf } from "@/evals/lib/testing";
 import {
@@ -44,40 +45,64 @@ describe("checkIdea", () => {
     expect(passesIdeaRules(checkIdea(GOOD))).toBe(true);
   });
 
-  it("fails a one-word label, a short scene, and a forbidden word", () => {
+  it("fails a one-word label", () => {
     expect(passesIdeaRules(checkIdea({ ...GOOD, label: "Key" }))).toBe(false);
+  });
+
+  it("fails a scene under 120 words", () => {
     expect(passesIdeaRules(checkIdea({ ...GOOD, scene: "Foreground, midground, background, camera close, light." }))).toBe(false);
+  });
+
+  it("finds the interpretive words of the ideas' list", () => {
     expect(checkIdea({ ...GOOD, scene: `${SCENE} It represents trust.` }).interpretiveWords).toEqual(["represents"]);
   });
 });
 
 describe("rawIdeaCount", () => {
-  it("counts the ideas of the raw answer, and 0 for an answer that does not parse", () => {
+  it("counts the ideas of the raw answer", () => {
     expect(rawIdeaCount(JSON.stringify({ ideas: [{}, {}, {}, {}] }))).toBe(4);
+  });
+
+  it("is 0 for an answer that does not parse", () => {
     expect(rawIdeaCount("not json")).toBe(0);
   });
 });
 
 describe("scoreSceneIdeas", () => {
-  it("counts runs and ideas (a timeout is a miss, also for the 45 s limit), and grades over the graded runs", () => {
-    const metrics = scoreSceneIdeas([
-      outcome({ ideas: [GOOD, GOOD, GOOD], rawIdeaCount: 3 }, 10_000, {
-        lead_story: 1,
-        ideas: [IDEA_GRADE, IDEA_GRADE, { ...IDEA_GRADE, depicted_story: 2 }],
-        clearly_different: false,
-        note: "",
-      }),
-      outcome({ ideas: [GOOD, { ...GOOD, label: "Key" }], rawIdeaCount: 2 }, 30_000),
-      outcome(null, 45_000),
-    ]);
-    const byName = new Map(metrics.map((metric) => [metric.name, metric]));
-    expect(byName.get("Exactly 3 ideas")).toEqual({ name: "Exactly 3 ideas", hits: 1, n: 3 });
-    expect(byName.get("All ideas pass hard rules")).toEqual({ name: "All ideas pass hard rules", hits: 1, n: 3 });
-    expect(byName.get("Idea: all hard rules")).toEqual({ name: "Idea: all hard rules", hits: 4, n: 9 });
-    expect(byName.get("J: no extras")).toEqual({ name: "J: no extras", hits: 0, n: 3 });
-    expect(byName.get("J: visible only")).toEqual({ name: "J: visible only", hits: 3, n: 3 });
-    expect(byName.get("J: an idea shows the lead")).toEqual({ name: "J: an idea shows the lead", hits: 1, n: 1 });
-    expect(byName.get("J: clearly different")).toEqual({ name: "J: clearly different", hits: 0, n: 1 });
-    expect(byName.get("Done in 45 s")).toEqual({ name: "Done in 45 s", hits: 2, n: 3 });
+  const metrics = (): Map<string, Metric> =>
+    new Map(
+      scoreSceneIdeas([
+        outcome({ ideas: [GOOD, GOOD, GOOD], rawIdeaCount: 3 }, 10_000, {
+          lead_story: 1,
+          ideas: [IDEA_GRADE, IDEA_GRADE, { ...IDEA_GRADE, depicted_story: 2 }],
+          clearly_different: false,
+          note: "",
+        }),
+        outcome({ ideas: [GOOD, { ...GOOD, label: "Key" }], rawIdeaCount: 2 }, 30_000),
+        outcome(null, 45_000),
+      ]).map((metric) => [metric.name, metric])
+    );
+
+  it("counts run checks over all runs, an error as a miss", () => {
+    expect(metrics().get("Exactly 3 ideas")).toEqual({ name: "Exactly 3 ideas", hits: 1, n: 3 });
+    expect(metrics().get("All ideas pass hard rules")).toEqual({ name: "All ideas pass hard rules", hits: 1, n: 3 });
+  });
+
+  it("counts idea checks over 3 ideas per run, a missing idea as a miss", () => {
+    expect(metrics().get("Idea: all hard rules")).toEqual({ name: "Idea: all hard rules", hits: 4, n: 9 });
+  });
+
+  it("counts judged idea rules over 3 ideas per graded run", () => {
+    expect(metrics().get("J: no extras")).toEqual({ name: "J: no extras", hits: 0, n: 3 });
+    expect(metrics().get("J: visible only")).toEqual({ name: "J: visible only", hits: 3, n: 3 });
+  });
+
+  it("counts judged set rules over the graded runs", () => {
+    expect(metrics().get("J: an idea shows the lead")).toEqual({ name: "J: an idea shows the lead", hits: 1, n: 1 });
+    expect(metrics().get("J: clearly different")).toEqual({ name: "J: clearly different", hits: 0, n: 1 });
+  });
+
+  it("counts a run at the 45 s limit, or a timeout, as not done in time", () => {
+    expect(metrics().get("Done in 45 s")).toEqual({ name: "Done in 45 s", hits: 2, n: 3 });
   });
 });

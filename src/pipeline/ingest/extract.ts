@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 
-import { effortOrDefault, reasoningField, type EffortSetting } from "@/src/lib/reasoning-effort";
+import { modelFields, type ModelOverrides, type ReasoningEffort } from "@/src/lib/reasoning-effort";
 
 /**
  * One model call per newsletter issue: n8n's extraction prompt and output schema
@@ -11,7 +11,14 @@ import { effortOrDefault, reasoningField, type EffortSetting } from "@/src/lib/r
  */
 
 export const EXTRACTION_MODEL = "gpt-6-luna";
-export const EXTRACTION_EFFORT: EffortSetting = "low";
+/**
+ * Low, from evals/results/extraction.md (the low and medium rows of d1da5b8: 2 runs of 12 issues each, judge at
+ * high). Medium puts more stories in the right category (287 of 319, 89–91% per run, against 248 of 315, 77–80%)
+ * and its importance is closer (309 of 319 within 1, against 290 of 315). But it gets more story links wrong:
+ * 322 of 329 right (98% in both runs) against 321 of 323 (99–100%). A wrong link sends readers to the wrong page,
+ * so low stays. Faithful stories are within noise (91% against 92%). Medium costs $0.0025 a call against $0.0016.
+ */
+export const EXTRACTION_EFFORT: ReasoningEffort = "low";
 
 export const STORY_CATEGORIES = [
   "Launches",
@@ -254,12 +261,10 @@ export interface ResponsesClient {
   responses: { create(request: never): Promise<{ output_text?: string }> };
 }
 
-export interface ExtractorOptions {
+/** `model` and `effort` are for evals: production uses EXTRACTION_MODEL and EXTRACTION_EFFORT. */
+export interface ExtractorOptions extends ModelOverrides {
   client?: ResponsesClient;
   apiKey?: string;
-  /** For evals. Production uses EXTRACTION_MODEL and EXTRACTION_EFFORT. */
-  model?: string;
-  effort?: EffortSetting;
 }
 
 export function createOpenAIExtractor(options: ExtractorOptions = {}): Extractor {
@@ -269,8 +274,7 @@ export function createOpenAIExtractor(options: ExtractorOptions = {}): Extractor
 
   async function once(input: ExtractionInput): Promise<ExtractedStory[]> {
     const request = {
-      model: options.model ?? EXTRACTION_MODEL,
-      ...reasoningField(effortOrDefault(options, EXTRACTION_EFFORT)),
+      ...modelFields(options, { model: EXTRACTION_MODEL, effort: EXTRACTION_EFFORT }),
       instructions: SYSTEM_PROMPT,
       input: buildExtractionPrompt(input),
       store: false,

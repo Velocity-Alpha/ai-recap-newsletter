@@ -76,8 +76,8 @@ describe("writeScenePrompt", () => {
     expect(request.input).toBe(buildScenePromptInput(CONTEXT));
     expect(request.store).toBe(false);
     expect(request.tools).toBeUndefined();
-    expect(SCENE_PROMPT_EFFORT).toBe("high");
-    expect(request.reasoning).toEqual({ effort: "high" });
+    expect(SCENE_PROMPT_EFFORT).toBe("medium");
+    expect(request.reasoning).toEqual({ effort: "medium" });
     expect(request.text.format).toMatchObject({ type: "json_schema", name: "image_prompt_output", strict: true });
     expect(request.text.format.schema).toMatchObject({
       required: ["image_prompt", "editorial_rationale"],

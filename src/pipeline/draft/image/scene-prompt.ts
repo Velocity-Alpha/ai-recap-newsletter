@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 
-import { effortOrDefault, reasoningField, type EffortSetting } from "@/src/lib/reasoning-effort";
+import { modelFields, type ModelOverrides, type ReasoningEffort } from "@/src/lib/reasoning-effort";
 import { withRetries } from "@/src/pipeline/draft/image/retry";
 
 /**
@@ -11,9 +11,13 @@ import { withRetries } from "@/src/pipeline/draft/image/retry";
  */
 
 export const SCENE_PROMPT_MODEL = "gpt-6-luna";
-/** High, from evals/results/scene-prompt.md (2026-11-10): it keeps the prompt's hard rules most often. The step
- * runs in the draft job, so its p95 of about 33 s is well inside the 120 s timeout. */
-export const SCENE_PROMPT_EFFORT: EffortSetting = "high";
+/**
+ * Medium, from evals/results/scene-prompt.md (2 runs of 10 issues each). It kept all hard rules in 17 of 20
+ * runs, against 19 of 20 at high and 18 of 20 at the API default, which is medium too: so a gap of this size
+ * is noise. High costs twice as much ($0.0014 against $0.000737 a call) and does worse on the judge's
+ * "visible only" (6 of 20 against 7 of 20). Medium's call p95 is 16.7 s, inside the 120 s timeout.
+ */
+export const SCENE_PROMPT_EFFORT: ReasoningEffort = "medium";
 export const SCENE_PROMPT_TIMEOUT_MS = 120_000;
 export const SCENE_PROMPT_RETRIES = 2;
 
@@ -166,14 +170,12 @@ export interface ScenePromptClient {
   responses: { create(request: never, options?: never): Promise<{ output_text?: string }> };
 }
 
-export interface WriteScenePromptOptions {
+/** `model` and `effort` are for evals: production uses SCENE_PROMPT_MODEL and SCENE_PROMPT_EFFORT. */
+export interface WriteScenePromptOptions extends ModelOverrides {
   client?: ScenePromptClient;
   apiKey?: string;
   /** Wait between attempts. n8n waits 5 s. */
   retryDelayMs?: number;
-  /** For evals. Production uses SCENE_PROMPT_MODEL and SCENE_PROMPT_EFFORT. */
-  model?: string;
-  effort?: EffortSetting;
 }
 
 /** Writes the scene prompt for an issue. Tries 3 times (2 retries), each with a 120 s timeout. */
@@ -188,8 +190,7 @@ export async function writeScenePrompt(
     options.client ??
     (new OpenAI({ apiKey: options.apiKey ?? process.env.OPENAI_API_KEY }) as unknown as ScenePromptClient);
   const request = {
-    model: options.model ?? SCENE_PROMPT_MODEL,
-    ...reasoningField(effortOrDefault(options, SCENE_PROMPT_EFFORT)),
+    ...modelFields(options, { model: SCENE_PROMPT_MODEL, effort: SCENE_PROMPT_EFFORT }),
     instructions: SYSTEM_PROMPT,
     input: buildScenePromptInput(context),
     store: false,

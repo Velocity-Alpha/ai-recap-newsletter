@@ -1,4 +1,10 @@
-import { isReasoningEffort, type EffortSetting } from "@/src/lib/reasoning-effort";
+import { isReasoningEffort, type ReasoningEffort } from "@/src/lib/reasoning-effort";
+
+/**
+ * An effort to run a call with. `undefined` sends no `reasoning` field, so the API's own default applies (the
+ * `default` word in EVAL_EFFORTS). Only evals use it: every production call site sets its effort.
+ */
+export type EffortSetting = ReasoningEffort | undefined;
 
 /** One model and effort to run every item with. */
 export interface EvalConfig {

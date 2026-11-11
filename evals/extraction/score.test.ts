@@ -56,24 +56,42 @@ describe("checkExtraction", () => {
     expect(checks).toEqual({ urlsNotInText: 0, pagesNotInText: 0, badCategories: 0, duplicates: 0 });
   });
 
-  it("counts a link that is not in the text, a bad category and a duplicate by link or headline", () => {
-    const checks = checkExtraction(TEXT, [
-      story("https://acme.example/model"),
-      story("https://acme.example/model", { headline: "Other" }),
-      story("https://made.up/link"),
-      // The right page with its query dropped: not the exact link, but the page is in the text.
-      story("https://beta.example/raise/?share=1", { headline: "Beta" }),
-      story("", { headline: "Same", category: "Gossip" as never }),
-      story("", { headline: "same " }),
-    ]);
-    expect(checks).toEqual({ urlsNotInText: 2, pagesNotInText: 1, badCategories: 1, duplicates: 2 });
+  it("counts a link that is not in the text", () => {
+    expect(checkExtraction(TEXT, [story("https://made.up/link")])).toMatchObject({ urlsNotInText: 1, pagesNotInText: 1 });
+  });
+
+  it("finds the page of a link whose query changed, though not the exact link", () => {
+    expect(checkExtraction(TEXT, [story("https://beta.example/raise/?share=1")])).toMatchObject({ urlsNotInText: 1, pagesNotInText: 0 });
+  });
+
+  it("counts a category the prompt does not allow", () => {
+    expect(checkExtraction(TEXT, [story("", { category: "Gossip" as never })]).badCategories).toBe(1);
+  });
+
+  it("counts a duplicate by link", () => {
+    expect(checkExtraction(TEXT, [story("https://acme.example/model"), story("https://acme.example/model", { headline: "Other" })]).duplicates).toBe(1);
+  });
+
+  it("counts a duplicate by headline, ignoring case and spaces", () => {
+    expect(checkExtraction(TEXT, [story("", { headline: "Same" }), story("", { headline: "same " })]).duplicates).toBe(1);
   });
 });
 
 describe("linkedStoryUrls", () => {
-  it("keeps the cleaned links production would save: not empty, not the newsletter's own site, deduplicated", () => {
-    const urls = linkedStoryUrls([story("https://acme.example/model?utm_source=a"), story("https://acme.example/model"), story(""), story("https://news.example/p/other")], "https://news.example/p/issue");
-    expect(urls).toEqual(["https://acme.example/model"]);
+  const ISSUE_URL = "https://news.example/p/issue";
+
+  it("cleans the links and keeps each once", () => {
+    expect(linkedStoryUrls([story("https://acme.example/model?utm_source=a"), story("https://acme.example/model")], ISSUE_URL)).toEqual([
+      "https://acme.example/model",
+    ]);
+  });
+
+  it("drops an empty link", () => {
+    expect(linkedStoryUrls([story("")], ISSUE_URL)).toEqual([]);
+  });
+
+  it("drops a link to the newsletter's own site", () => {
+    expect(linkedStoryUrls([story("https://news.example/p/other")], ISSUE_URL)).toEqual([]);
   });
 });
 
@@ -87,35 +105,54 @@ describe("scoreExtraction", () => {
   const good: ExtractionOutput = {
     stories: [story("https://acme.example/model"), story("https://made.up/link", { importance_score: 3 })],
   };
+  const metrics = () => Object.fromEntries(scoreExtraction([outcome(good, grade), outcome(null, null, "boom")]).map((metric) => [metric.name, metric]));
 
-  it("scores issue checks, judge counts over stories, and the reference comparison; an error is a miss", () => {
-    const metrics = scoreExtraction([outcome(good, grade), outcome(null, null, "boom")]);
-    const byName = Object.fromEntries(metrics.map((metric) => [metric.name, metric]));
-    expect(byName["Valid output"]).toEqual({ name: "Valid output", hits: 1, n: 2 });
-    expect(byName["Issues: all story URLs in text"]).toEqual({ name: "Issues: all story URLs in text", hits: 0, n: 2 });
-    expect(byName["Issues: all story pages in text"]).toEqual({ name: "Issues: all story pages in text", hits: 0, n: 2 });
-    expect(byName["Issues: categories allowed"]).toEqual({ name: "Issues: categories allowed", hits: 1, n: 2 });
-    expect(byName["Issues: no duplicates"]).toEqual({ name: "Issues: no duplicates", hits: 1, n: 2 });
-    expect(byName["Recall (judge)"]).toEqual({ name: "Recall (judge)", hits: 1, n: 2 });
-    expect(byName["Precision (judge)"]).toEqual({ name: "Precision (judge)", hits: 1, n: 2 });
-    expect(byName["Faithful stories"]).toEqual({ name: "Faithful stories", hits: 1, n: 2 });
-    // Category and importance: over the stories the judge calls real stories.
-    expect(byName["Category right"]).toEqual({ name: "Category right", hits: 1, n: 1 });
-    expect(byName["Headline rules"]).toEqual({ name: "Headline rules", hits: 1, n: 2 });
-    expect(byName["URL right"]).toEqual({ name: "URL right", hits: 1, n: 2 });
-    expect(byName["Importance within 1"]).toEqual({ name: "Importance within 1", hits: 1, n: 1 });
-    expect(byName["Stories per issue"]).toEqual({ name: "Stories per issue", value: 2 });
-    expect(byName["Saved per issue"]).toEqual({ name: "Saved per issue", value: 2 });
-    expect(byName["Dev DB per issue"]).toEqual({ name: "Dev DB per issue", value: 2 });
-    expect(byName["Saved vs dev DB"]).toEqual({ name: "Saved vs dev DB", value: 1 });
-    expect(byName["Dev DB URLs found"]).toEqual({ name: "Dev DB URLs found", hits: 1, n: 4 });
+  it("counts an error as a miss", () => {
+    expect(metrics()["Valid output"]).toEqual({ name: "Valid output", hits: 1, n: 2 });
   });
 
-  it("leaves out judge metrics when no run was graded, and the reference when there is none", () => {
-    const metrics = scoreExtraction([{ ...outcome({ stories: [story("")] }), item: { ...ISSUE, referenceCount: null, referenceUrls: [] } }]);
-    const names = metrics.map((metric) => metric.name);
+  it("counts the issue checks per run", () => {
+    expect(metrics()["Issues: all story URLs in text"]).toEqual({ name: "Issues: all story URLs in text", hits: 0, n: 2 });
+    expect(metrics()["Issues: all story pages in text"]).toEqual({ name: "Issues: all story pages in text", hits: 0, n: 2 });
+    expect(metrics()["Issues: categories allowed"]).toEqual({ name: "Issues: categories allowed", hits: 1, n: 2 });
+    expect(metrics()["Issues: no duplicates"]).toEqual({ name: "Issues: no duplicates", hits: 1, n: 2 });
+  });
+
+  it("counts recall over the qualifying stories the judge found in the text", () => {
+    expect(metrics()["Recall (judge)"]).toEqual({ name: "Recall (judge)", hits: 1, n: 2 });
+  });
+
+  it("counts precision, faithfulness, headline rules and URL right over the extracted stories", () => {
+    expect(metrics()["Precision (judge)"]).toEqual({ name: "Precision (judge)", hits: 1, n: 2 });
+    expect(metrics()["Faithful stories"]).toEqual({ name: "Faithful stories", hits: 1, n: 2 });
+    expect(metrics()["Headline rules"]).toEqual({ name: "Headline rules", hits: 1, n: 2 });
+    expect(metrics()["URL right"]).toEqual({ name: "URL right", hits: 1, n: 2 });
+  });
+
+  it("counts category and importance over the stories the judge calls real stories only", () => {
+    expect(metrics()["Category right"]).toEqual({ name: "Category right", hits: 1, n: 1 });
+    expect(metrics()["Importance within 1"]).toEqual({ name: "Importance within 1", hits: 1, n: 1 });
+  });
+
+  it("averages stories and saved stories per valid run", () => {
+    expect(metrics()["Stories per issue"]).toEqual({ name: "Stories per issue", value: 2 });
+    expect(metrics()["Saved per issue"]).toEqual({ name: "Saved per issue", value: 2 });
+  });
+
+  it("compares the saved stories with the dev DB reference", () => {
+    expect(metrics()["Dev DB per issue"]).toEqual({ name: "Dev DB per issue", value: 2 });
+    expect(metrics()["Saved vs dev DB"]).toEqual({ name: "Saved vs dev DB", value: 1 });
+    expect(metrics()["Dev DB URLs found"]).toEqual({ name: "Dev DB URLs found", hits: 1, n: 4 });
+  });
+
+  it("leaves out the judge's metrics when no run was graded", () => {
+    const names = scoreExtraction([outcome({ stories: [story("")] })]).map((metric) => metric.name);
     expect(names).toContain("Valid output");
     expect(names).not.toContain("Recall (judge)");
-    expect(names).not.toContain("Dev DB per issue");
+  });
+
+  it("leaves out the reference comparison when the issue has no reference", () => {
+    const unreferenced = { ...outcome({ stories: [story("")] }), item: { ...ISSUE, referenceCount: null, referenceUrls: [] } };
+    expect(scoreExtraction([unreferenced]).map((metric) => metric.name)).not.toContain("Dev DB per issue");
   });
 });

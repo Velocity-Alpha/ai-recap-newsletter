@@ -117,10 +117,32 @@ export interface RecordingClient {
 
 const DONE = new Set(["completed", "incomplete", "failed", "cancelled"]);
 
-export function recordingClient(recorder: UsageRecorder, apiKey = process.env.OPENAI_API_KEY): RecordingClient {
+/** The part of the OpenAI client's `responses` that a recording client calls. */
+export interface ResponsesApi {
+  create(request: never, options?: never): Promise<unknown>;
+  retrieve(responseId: string): Promise<OpenAI.Responses.Response>;
+}
+
+export interface RecordingClientOptions {
+  /**
+   * Drop the request's `reasoning` field, so the API's own default effort applies. Every call site sets an effort,
+   * so this is the only way an eval can measure the API default (the `default` word in EVAL_EFFORTS).
+   */
+  sendNoEffort?: boolean;
+  /** For tests. Defaults to the OpenAI client, made on first use so an eval that never calls the API needs no key. */
+  api?: () => ResponsesApi;
+}
+
+export function recordingClient(recorder: UsageRecorder, options: RecordingClientOptions = {}): RecordingClient {
   let openai: OpenAI | null = null;
-  // Made on first use, so an eval that never calls the Responses API needs no key.
-  const api = () => (openai ??= new OpenAI({ apiKey, timeout: 600_000, maxRetries: 2 }));
+  const api =
+    options.api ?? (() => (openai ??= new OpenAI({ apiKey: process.env.OPENAI_API_KEY, timeout: 600_000, maxRetries: 2 })).responses);
+  const prepare = (request: Record<string, unknown>) => {
+    if (!options.sendNoEffort) return request;
+    const rest = { ...request };
+    delete rest.reasoning;
+    return rest;
+  };
 
   async function timed(work: () => Promise<OpenAI.Responses.Response>, recordUsage: (response: OpenAI.Responses.Response) => boolean) {
     const started = performance.now();
@@ -141,14 +163,14 @@ export function recordingClient(recorder: UsageRecorder, apiKey = process.env.OP
 
   return {
     responses: {
-      create: (request, options) =>
+      create: (request, requestOptions) =>
         timed(
-          async () => (await api().responses.create(request, options as never)) as OpenAI.Responses.Response,
+          async () => (await api().create(prepare(request) as never, requestOptions as never)) as OpenAI.Responses.Response,
           (response) => !response.status || DONE.has(response.status)
         ),
       retrieve: (responseId) =>
         timed(
-          () => api().responses.retrieve(responseId),
+          () => api().retrieve(responseId),
           (response) => DONE.has(response.status ?? "")
         ),
     },

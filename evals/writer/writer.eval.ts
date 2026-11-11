@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { expect, it } from "vitest";
 
 import { effortLabel, evalSettings } from "@/evals/lib/settings";
-import { mapLimit } from "@/evals/lib/stats";
+import { mapLimit } from "@/evals/lib/concurrency";
 import { runSweep, type AfterSweepContext, type ConfigOutcomes, type GradeContext, type RunContext } from "@/evals/lib/sweep";
 import { articleCoverage, loadCases, type WriterCase } from "@/evals/writer/dataset";
 import { EVAL_NOTES, withEvalNotes } from "@/evals/writer/notes";
@@ -109,12 +109,13 @@ it("writer: code checks and judge grades of each effort", async () => {
       `No issue had owner notes, so the eval adds ${EVAL_NOTES.length} of its own to each issue (evals/writer/notes.ts), each checked in code.`,
       "Every metric reads the first draft, except \"Checks pass after rewrite\", which runs production's one rewrite. " +
         "Cost per call and p50/p95 include the rewrites; p50/p95 are the writer calls alone (the writer times out at " +
-        "240 s in production). Rows from before 2026-11-11 timed the judge in p50/p95 too.",
+        "240 s in production). Rows with git sha 035179c+changes (before d1da5b8) timed the judge in p50/p95 too, and " +
+        "have the writer calls alone in \"Writer p50 s\" and \"Writer max s\".",
       "Judge: gpt-6-sol (high) grades each first draft against the writer's exact input (evals/writer/rubric.ts): unsupported " +
         "claims counted per story, each bullet, each note, and editorial quality on anchored 1-5; (judge) counts are over " +
         "the graded runs. The pairwise judge sees both drafts in random order without the article text; once all efforts " +
-        `ran, each is compared with ${BASELINE_NAME} (production's effort) on the same issue, first repeat only. Rows from ` +
-        "before 2026-11-11 were compared with low. The table shows chosen columns; all metrics are in the stored rows.",
+        `ran, each is compared with ${BASELINE_NAME} (production's effort) on the same issue, first repeat only. Rows with ` +
+        "git sha 035179c+changes were compared with low. The table shows chosen columns; all metrics are in the stored rows.",
     ],
     settings,
     items: cases,

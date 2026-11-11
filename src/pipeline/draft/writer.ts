@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 
-import { effortOrDefault, reasoningField, type EffortSetting } from "@/src/lib/reasoning-effort";
+import { modelFields, type ModelOverrides, type ReasoningEffort } from "@/src/lib/reasoning-effort";
 
 import { CANDIDATE_SECTION_CONFIGS, type SectionKey } from "@/src/features/newsletter/section-config";
 import {
@@ -24,9 +24,14 @@ import {
  */
 
 export const WRITER_MODEL = "gpt-6-luna";
-/** High, from evals/results/writer.md (2026-11-10): fewer claims the inputs do not support than low, and notes
- * followed more often, for about 2 cents more per issue and well inside the 240 s timeout. */
-export const WRITER_EFFORT: EffortSetting = "high";
+/**
+ * High, from evals/results/writer.md (12 runs over 6 issues). The choice rests on two judge counts: 0.33
+ * unsupported claims per issue against 1.08 at low, and the eval's notes followed in 35 of 36 against 28 of 36. It
+ * does not rest on the pairwise judge, where high against low is a tie (0.5). High costs $0.0043 a call against
+ * $0.0021 at low, about 0.2 cents more per issue, and its slowest call took 59.8 s against the 240 s timeout.
+ * Twelve runs is a small sample.
+ */
+export const WRITER_EFFORT: ReasoningEffort = "high";
 
 /** Article text beyond this is cut, so 8 feature stories stay well inside the model's context. */
 export const MAX_ARTICLE_CHARS = 20_000;
@@ -254,12 +259,10 @@ function refusalOf(response: WriterResponse): string | null {
   return null;
 }
 
-export interface IssueWriterOptions {
+/** `model` and `effort` are for evals: production uses WRITER_MODEL and WRITER_EFFORT. */
+export interface IssueWriterOptions extends ModelOverrides {
   client?: ResponsesClient;
   apiKey?: string;
-  /** For evals. Production uses WRITER_MODEL and WRITER_EFFORT. */
-  model?: string;
-  effort?: EffortSetting;
 }
 
 export function createOpenAIIssueWriter(options: IssueWriterOptions = {}): IssueWriter {
@@ -273,8 +276,7 @@ export function createOpenAIIssueWriter(options: IssueWriterOptions = {}): Issue
 
   return async (input) => {
     const request = {
-      model: options.model ?? WRITER_MODEL,
-      ...reasoningField(effortOrDefault(options, WRITER_EFFORT)),
+      ...modelFields(options, { model: WRITER_MODEL, effort: WRITER_EFFORT }),
       instructions: SYSTEM_PROMPT,
       input: buildWriterPrompt(input),
       store: false,

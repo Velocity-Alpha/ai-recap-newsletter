@@ -3,7 +3,8 @@ import type OpenAI from "openai";
 import { createJudge, type Judge } from "@/evals/lib/judge";
 import { gitSha, writeResults, type Metric, type ResultRow, type ResultsFile } from "@/evals/lib/results";
 import { effortLabel, sweepConfigs, type EvalConfig, type EvalSettings } from "@/evals/lib/settings";
-import { mapLimit, percentile } from "@/evals/lib/stats";
+import { mapLimit } from "@/evals/lib/concurrency";
+import { percentile } from "@/evals/lib/stats";
 import {
   addUsage,
   costUsd,
@@ -211,7 +212,7 @@ export async function runSweep<Item, Output, Grade = never>(spec: SweepSpec<Item
       const context: RunContext = {
         config,
         repeat,
-        client: recordingClient(recorder),
+        client: recordingClient(recorder, { sendNoEffort: config.effort === undefined }),
         fetch: recordingFetch(recorder),
         responses: () => [...recorder.responses],
       };

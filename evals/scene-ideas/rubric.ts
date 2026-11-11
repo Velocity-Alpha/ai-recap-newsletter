@@ -1,4 +1,4 @@
-import { SCENE_GRADE_PROPERTIES, SCENE_RULES_RUBRIC } from "@/evals/scene-prompt/rubric";
+import { SCENE_GRADE_PROPERTIES, SCENE_RULES_RUBRIC } from "@/evals/scenes/rubric";
 import type { SceneIdea } from "@/src/pipeline/draft/image/scene-ideas";
 
 /** The judge's rubric for one answer of the scene ideas: each idea on the scene rules, then the set. */

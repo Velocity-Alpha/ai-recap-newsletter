@@ -2,61 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import type { Metric } from "@/evals/lib/results";
 import { outcomeOf } from "@/evals/lib/testing";
-import { countSentences } from "@/evals/lib/text";
-import type { WriterCase } from "@/evals/writer/dataset";
-import { withEvalNotes } from "@/evals/writer/notes";
 import type { IssueGrade, StoryGrade } from "@/evals/writer/rubric";
-import { gradeInput, pairInput } from "@/evals/writer/rubric";
 import { bulletOverlap, pairMetrics, scoreWriter, stringFields, writerColumns, type WriterOutcome, type WriterRun } from "@/evals/writer/score";
-import type { ApprovedStory, WrittenIssueContent } from "@/src/pipeline/draft/content";
-
-const story = (id: number, note = ""): ApprovedStory => ({
-  id,
-  headline: `Headline ${id}`,
-  summary: `Summary ${id}`,
-  storyDetails: null,
-  url: `https://example.com/${id}`,
-  note,
-});
-
-const CASE: WriterCase = {
-  date: "2026-11-05",
-  issueId: 1,
-  sections: "issue_stories",
-  input: {
-    sections: { headlines: [story(1), story(2)], research: [story(3)], tools: [story(4)], quickHits: [story(5)] },
-    leadStoryId: 1,
-    articles: [{ storyId: 1, text: "Article one." }, { storyId: 2, unread: true }, { storyId: 3, text: "Article three." }],
-  },
-  articleSources: { "1": "saved", "2": "unread:blocked", "3": "read:fetch" },
-};
-
-const bullet = (highlight: string) => ({ before: "The team", highlight, after: "this quarter." });
-const feature = (id: number, headline: string, detail: string) => ({
-  story_id: id,
-  url: `https://example.com/${id}`,
-  headline,
-  story_detail: detail,
-  bullets: [bullet("cut latency by 40%"), bullet("hired 12 researchers"), bullet("opened a Paris office")],
-});
-
-const GOOD: WrittenIssueContent = {
-  title: "Lab ships faster reasoning model",
-  excerpt: "A lab ships a faster model. Rivals respond.",
-  overview: {
-    summary:
-      "Good morning, a lab shipped a faster reasoning model and rivals are scrambling to answer it with their own launches. " +
-      "Researchers also found a cheaper way to train small models, and a new tool makes agents easier to test before release, which could save teams real time this week. " +
-      "Let's dive in.",
-  },
-  headlines: [
-    feature(1, "Lab ships a faster model", "The lab shipped a model. It is faster than before."),
-    feature(2, "Rival answers back", "A rival answered. It priced lower."),
-  ],
-  research_and_analysis: [feature(3, "Can small models learn cheaply?", "Researchers trained small models. Costs fell.")],
-  tools: [{ story_id: 4, url: "https://example.com/4", link_text: "AgentTest", detail: "tests agents before release." }],
-  quick_hits: [{ story_id: 5, url: "https://example.com/5", link_text: "Chip maker", text: "raises a new round." }],
-};
+import { bullet, CASE, GOOD } from "@/evals/writer/testing";
+import type { WrittenIssueContent } from "@/src/pipeline/draft/content";
 
 const GRADE: IssueGrade = {
   stories: [1, 2, 3].map((id): StoryGrade => ({
@@ -95,100 +44,157 @@ const outcome = (output: WriterRun | null, repeat = 0, grade: IssueGrade | null 
 
 const byName = (metrics: Metric[]) => Object.fromEntries(metrics.map((metric) => [metric.name, metric]));
 
-describe("scoreWriter", () => {
-  it("scores the code checks of a good draft and counts an error as a miss", () => {
-    const metrics = byName(scoreWriter([outcome(run()), outcome(null, 1)]));
-    expect(metrics["Valid output"]).toEqual({ name: "Valid output", hits: 1, n: 2 });
-    expect(metrics["Checks pass, first draft"]).toMatchObject({ hits: 1, n: 2 });
-    expect(metrics["Stories in section and order"]).toMatchObject({ hits: 1, n: 2 });
-    expect(metrics["Feature items with 3 bullets"]).toMatchObject({ hits: 3, n: 6 });
-    expect(metrics["Story detail 2-4 sentences"]).toMatchObject({ hits: 3, n: 6 });
-    expect(metrics["Title 4-8 words"]).toMatchObject({ hits: 1, n: 2 });
-    expect(metrics["Excerpt 1-2 sentences"]).toMatchObject({ hits: 1, n: 2 });
-    expect(metrics["Overview 45-80 words"]).toMatchObject({ hits: 1, n: 2 });
-    expect(metrics["Plain text (no markup, URL, emoji)"]).toMatchObject({ hits: 1, n: 2 });
-    expect(metrics["No em dash or ellipsis"]).toMatchObject({ hits: 1, n: 2 });
-    expect(metrics["Bullets not repeating detail"]).toMatchObject({ hits: 9, n: 18 });
-    // The eval's notes land on the 2nd top story, the 1st research story and the 1st quick hit.
-    expect(metrics["Notes followed (code)"]).toMatchObject({ hits: 3, n: 6 });
-    // The failed run has no recorded call, so it counts at its own time, over the 240 s timeout.
-    expect(metrics["Writer calls under 240 s"]).toMatchObject({ hits: 1, n: 2 });
+describe("scoreWriter on a good draft and a failed run", () => {
+  const metrics = () => byName(scoreWriter([outcome(run()), outcome(null, 1)]));
+
+  it("counts a failed run as a miss", () => {
+    expect(metrics()["Valid output"]).toEqual({ name: "Valid output", hits: 1, n: 2 });
   });
 
-  it("finds broken rules: a moved story, markup, an em dash, a long title, a repeated bullet, and checks after rewrite", () => {
-    const bad: WrittenIssueContent = {
-      ...GOOD,
-      title: "A very long subject line that keeps on going past eight words",
-      excerpt: "See https://example.com — now.",
-      headlines: [{ ...GOOD.headlines[0], bullets: [{ before: "The lab shipped", highlight: "a model", after: "faster than before." }, ...GOOD.headlines[0].bullets.slice(1)] }],
-      research_and_analysis: [GOOD.headlines[1], GOOD.research_and_analysis[0]],
-    };
-    const metrics = byName(scoreWriter([outcome(run({ first: bad, firstProblems: ["x"], finalProblems: [] }))]));
+  it("passes every per-issue code check of the good draft", () => {
+    for (const name of [
+      "Checks pass, first draft",
+      "Stories in section and order",
+      "Title 4-8 words",
+      "Excerpt 1-2 sentences",
+      "Overview 45-80 words",
+      "Plain text (no markup, URL, emoji)",
+      "No em dash or ellipsis",
+    ]) {
+      expect(metrics()[name], name).toMatchObject({ hits: 1, n: 2 });
+    }
+  });
+
+  it("counts per-story checks over the feature stories of every run", () => {
+    expect(metrics()["Feature items with 3 bullets"]).toMatchObject({ hits: 3, n: 6 });
+    expect(metrics()["Story detail 2-4 sentences"]).toMatchObject({ hits: 3, n: 6 });
+  });
+
+  it("counts bullets that do not repeat the story detail over every bullet", () => {
+    expect(metrics()["Bullets not repeating detail"]).toMatchObject({ hits: 9, n: 18 });
+  });
+
+  it("checks in code the eval's notes on the 2nd top story, the 1st research story and the 1st quick hit", () => {
+    expect(metrics()["Notes followed (code)"]).toMatchObject({ hits: 3, n: 6 });
+  });
+
+  it("counts a run with no recorded call at its own time, over the 240 s timeout", () => {
+    expect(metrics()["Writer calls under 240 s"]).toMatchObject({ hits: 1, n: 2 });
+  });
+});
+
+describe("scoreWriter on a draft that breaks rules", () => {
+  const scored = (draft: WrittenIssueContent, changes: Partial<WriterRun> = {}) => byName(scoreWriter([outcome(run({ first: draft, ...changes }))]));
+
+  it("fails a draft whose first checks found problems, and passes it after a clean rewrite", () => {
+    const metrics = scored(GOOD, { firstProblems: ["x"], finalProblems: [] });
     expect(metrics["Checks pass, first draft"]).toMatchObject({ hits: 0 });
     expect(metrics["Checks pass after rewrite"]).toMatchObject({ hits: 1 });
-    expect(metrics["Stories in section and order"]).toMatchObject({ hits: 0 });
-    expect(metrics["Title 4-8 words"]).toMatchObject({ hits: 0 });
-    expect(metrics["Plain text (no markup, URL, emoji)"]).toMatchObject({ hits: 0 });
-    expect(metrics["No em dash or ellipsis"]).toMatchObject({ hits: 0 });
-    expect(metrics["Bullets not repeating detail"]).toMatchObject({ hits: 8, n: 9 });
   });
 
-  it("turns the judge's grades into counts and means over the graded runs", () => {
-    const metrics = byName(scoreWriter([outcome(run()), outcome(run(), 1, null)]));
-    expect(metrics["Unsupported claims per issue (judge)"]).toEqual({ name: "Unsupported claims per issue (judge)", value: 1 });
-    expect(metrics["Issues with no unsupported claim (judge)"]).toMatchObject({ hits: 0, n: 1 });
-    expect(metrics["Bullets distinct from detail (judge)"]).toMatchObject({ hits: 6, n: 9 });
+  it("flags a story moved to another section", () => {
+    const moved = { ...GOOD, headlines: [GOOD.headlines[0]], research_and_analysis: [GOOD.headlines[1], GOOD.research_and_analysis[0]] };
+    expect(scored(moved)["Stories in section and order"]).toMatchObject({ hits: 0 });
+  });
+
+  it("flags a title over 8 words", () => {
+    expect(scored({ ...GOOD, title: "A very long subject line that keeps on going past eight words" })["Title 4-8 words"]).toMatchObject({ hits: 0 });
+  });
+
+  it("flags a URL in the text", () => {
+    expect(scored({ ...GOOD, excerpt: "See https://example.com now." })["Plain text (no markup, URL, emoji)"]).toMatchObject({ hits: 0 });
+  });
+
+  it("flags an em dash", () => {
+    expect(scored({ ...GOOD, excerpt: "A lab ships — now." })["No em dash or ellipsis"]).toMatchObject({ hits: 0 });
+  });
+
+  it("flags a bullet that repeats the story detail", () => {
+    const repeated = {
+      ...GOOD,
+      headlines: [
+        { ...GOOD.headlines[0], bullets: [{ before: "The lab shipped", highlight: "a model", after: "faster than before." }, ...GOOD.headlines[0].bullets.slice(1)] },
+        GOOD.headlines[1],
+      ],
+    };
+    expect(scored(repeated)["Bullets not repeating detail"]).toMatchObject({ hits: 8, n: 9 });
+  });
+});
+
+describe("scoreWriter on the judge's grades", () => {
+  const metrics = () => byName(scoreWriter([outcome(run()), outcome(run(), 1, null)]));
+
+  it("averages unsupported claims per issue over the graded runs", () => {
+    expect(metrics()["Unsupported claims per issue (judge)"]).toEqual({ name: "Unsupported claims per issue (judge)", value: 1 });
+  });
+
+  it("counts issues with no unsupported claim over the graded runs", () => {
+    expect(metrics()["Issues with no unsupported claim (judge)"]).toMatchObject({ hits: 0, n: 1 });
+  });
+
+  it("counts judged bullets distinct from the detail over every bullet of a graded run", () => {
+    expect(metrics()["Bullets distinct from detail (judge)"]).toMatchObject({ hits: 6, n: 9 });
+  });
+
+  it("counts bullets from article text only for stories with article text", () => {
     // Only stories 1 and 3 have article text.
-    expect(metrics["Bullets from article text (judge)"]).toMatchObject({ hits: 2, n: 6 });
-    expect(metrics["Notes followed (judge)"]).toMatchObject({ hits: 2, n: 3 });
-    expect(metrics["Editorial quality 1-5 (judge)"]).toEqual({ name: "Editorial quality 1-5 (judge)", value: 4 });
+    expect(metrics()["Bullets from article text (judge)"]).toMatchObject({ hits: 2, n: 6 });
+  });
+
+  it("counts notes followed over the stories with a note", () => {
+    expect(metrics()["Notes followed (judge)"]).toMatchObject({ hits: 2, n: 3 });
+  });
+
+  it("averages the editorial quality", () => {
+    expect(metrics()["Editorial quality 1-5 (judge)"]).toEqual({ name: "Editorial quality 1-5 (judge)", value: 4 });
   });
 });
 
 describe("pairMetrics", () => {
-  it("counts wins and ties against the baseline, and gives nothing when no pair was judged", () => {
+  it("gives nothing when no pair was judged", () => {
     expect(pairMetrics([], "high")).toEqual([]);
+  });
+
+  it("counts wins and ties against the baseline", () => {
     const metrics = byName(pairMetrics(["win", "tie", "loss"], "high"));
     expect(metrics["Wins vs high (pairwise)"]).toMatchObject({ hits: 1, n: 3 });
     expect(metrics["Ties vs high (pairwise)"]).toMatchObject({ hits: 1, n: 3 });
-    expect(metrics["Preference vs high (win + tie/2)"]).toEqual({ name: "Preference vs high (win + tie/2)", value: 0.5 });
   });
 
-  it("names the table's columns for the baseline, keeping the old rows' comparison with low", () => {
-    expect(writerColumns("high")).toEqual(expect.arrayContaining(["Wins vs high (pairwise)", "Preference vs low (win + tie/2)"]));
+  it("scores the preference as a win plus half a tie", () => {
+    expect(byName(pairMetrics(["win", "tie", "loss"], "high"))["Preference vs high (win + tie/2)"]).toEqual({
+      name: "Preference vs high (win + tie/2)",
+      value: 0.5,
+    });
+  });
+});
+
+describe("writerColumns", () => {
+  it("names the pairwise columns for the baseline", () => {
+    expect(writerColumns("high")).toEqual(expect.arrayContaining(["Wins vs high (pairwise)"]));
+  });
+
+  it("keeps the old rows' comparison with low", () => {
+    expect(writerColumns("high")).toEqual(expect.arrayContaining(["Preference vs low (win + tie/2)"]));
+  });
+
+  it("lists the comparison with low once when low is the baseline", () => {
     expect(writerColumns("low").filter((name) => name === "Preference vs low (win + tie/2)")).toHaveLength(1);
   });
 });
 
-describe("helpers", () => {
-  it("counts sentences without splitting decimals", () => {
-    expect(countSentences("It costs $3.50 a month. It ships today!")).toBe(2);
-    expect(countSentences("One sentence only")).toBe(1);
+describe("bulletOverlap", () => {
+  it("is 1 for a bullet whose words are all in the story detail", () => {
+    expect(bulletOverlap({ before: "The lab", highlight: "shipped", after: "a faster model" }, "The lab shipped a model. It is faster.")).toBe(1);
   });
 
-  it("measures a bullet's overlap with its story detail", () => {
-    expect(bulletOverlap({ before: "The lab", highlight: "shipped", after: "a faster model" }, "The lab shipped a model. It is faster.")).toBe(1);
+  it("is 0 for a bullet with none of the detail's words", () => {
     expect(bulletOverlap(bullet("hired 12 researchers"), "The lab shipped a model.")).toBe(0);
   });
+});
 
-  it("lists every string field", () => {
+describe("stringFields", () => {
+  it("lists every string field of a draft", () => {
     expect(stringFields(GOOD)).toHaveLength(3 + 3 * (2 + 9) + 2 + 2);
-  });
-
-  it("adds the eval's notes without changing the input, and keeps an owner's note", () => {
-    const owned = { ...CASE.input, sections: { ...CASE.input.sections, quickHits: [story(5, "Owner note.")] } };
-    const { input, noted } = withEvalNotes(owned);
-    expect(noted.map((entry) => entry.storyId)).toEqual([2, 3]);
-    expect(input.sections.headlines[1].note).toBe("Keep the story detail to two sentences.");
-    expect(input.sections.quickHits[0].note).toBe("Owner note.");
-    expect(owned.sections.headlines[1].note).toBe("");
-  });
-
-  it("puts the source before the draft for the grade, and leaves article text out of the pair", () => {
-    const grade = gradeInput(CASE.input, GOOD);
-    expect(grade.indexOf("Article one.")).toBeLessThan(grade.indexOf("DRAFT:"));
-    const pair = pairInput(CASE.input, GOOD, GOOD);
-    expect(pair).not.toContain("Article one.");
-    expect(pair).toContain("DRAFT B:");
   });
 });

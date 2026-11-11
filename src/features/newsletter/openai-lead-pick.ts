@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 
-import { effortOrDefault, reasoningField, type EffortSetting } from "@/src/lib/reasoning-effort";
+import { modelFields, type ModelOverrides, type ReasoningEffort } from "@/src/lib/reasoning-effort";
 import type { LeadShortlistEntry } from "@/src/features/newsletter/lead-story";
 import { logServerError, logServerInfo } from "@/src/server/observability";
 
@@ -14,7 +14,13 @@ import { logServerError, logServerInfo } from "@/src/server/observability";
  */
 
 export const LEAD_PICK_MODEL = "gpt-6-luna";
-export const LEAD_PICK_EFFORT: EffortSetting = "low";
+/**
+ * Low, from evals/results/lead-pick.md (30 runs over 10 archived boards). Effort does not change the pick: the AI
+ * lead is the owner's lead in 15 of 30 runs at none and high and 16 of 30 at low and medium, against 9 of 30 for
+ * the scored lead alone. Every effort is cheap ($0.000073 a call at none, $0.000116 at low); low was the effort
+ * before the eval, and a one-run gap gives no reason to move.
+ */
+export const LEAD_PICK_EFFORT: ReasoningEffort = "low";
 
 /** The part of the OpenAI client the lead pick uses, so tests and evals can pass their own. */
 export interface LeadPickClient {
@@ -30,11 +36,9 @@ export interface LeadPickClient {
 
 const defaultClient = new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) as unknown as LeadPickClient;
 
-export interface LeadPickOptions {
+/** `model` and `effort` are for evals: production uses LEAD_PICK_MODEL and LEAD_PICK_EFFORT. */
+export interface LeadPickOptions extends ModelOverrides {
   client?: LeadPickClient;
-  /** For evals. Production uses LEAD_PICK_MODEL and LEAD_PICK_EFFORT. */
-  model?: string;
-  effort?: EffortSetting;
 }
 
 export const LEAD_PICK_INSTRUCTIONS = `You are the editor of AI Recap, a daily AI newsletter for people who follow AI closely. You choose the lead story: the one the issue's subject line is about.
@@ -89,8 +93,7 @@ export function leadPickUserMessage(input: LeadPickInput): string {
 export async function submitLeadPick(input: LeadPickInput, date: string, options: LeadPickOptions = {}): Promise<string> {
   const client = options.client ?? defaultClient;
   const request = {
-    model: options.model ?? LEAD_PICK_MODEL,
-    ...reasoningField(effortOrDefault(options, LEAD_PICK_EFFORT)),
+    ...modelFields(options, { model: LEAD_PICK_MODEL, effort: LEAD_PICK_EFFORT }),
     instructions: LEAD_PICK_INSTRUCTIONS,
     input: leadPickUserMessage(input),
     background: true,

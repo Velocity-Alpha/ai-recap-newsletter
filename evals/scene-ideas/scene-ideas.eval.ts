@@ -1,14 +1,12 @@
 // The scene ideas of "New image" (src/pipeline/draft/image/scene-ideas.ts) on 10 past issues. evals/README.md.
-import { expect, it, vi } from "vitest";
-
-vi.mock("@/src/server/prisma", () => ({ prisma: {} }));
+import { expect, it } from "vitest";
 
 import { evalSettings } from "@/evals/lib/settings";
 import { runSweep, type GradeContext, type RunContext } from "@/evals/lib/sweep";
 import { ideasForJudge, SCENE_IDEAS_JUDGE_INSTRUCTIONS, SCENE_IDEAS_JUDGE_SCHEMA } from "@/evals/scene-ideas/rubric";
 import { checkIdea, rawIdeaCount, scoreSceneIdeas, type SceneIdeasGrade, type SceneIdeasOutput } from "@/evals/scene-ideas/score";
-import { loadSceneIssues, SCENE_ISSUE_DATES, type SceneIssue } from "@/evals/scene-prompt/issues";
-import { issueForJudge } from "@/evals/scene-prompt/rubric";
+import { readSceneIssues, SCENE_ISSUES_PATH, type SceneIssue } from "@/evals/scenes/issues";
+import { issueForJudge } from "@/evals/scenes/rubric";
 import { SCENE_IDEAS_TIMEOUT_MS, suggestSceneIdeas } from "@/src/pipeline/draft/image/scene-ideas";
 import { SCENE_PROMPT_MODEL } from "@/src/pipeline/draft/image/scene-prompt";
 
@@ -30,14 +28,14 @@ function grade(item: SceneIssue, output: SceneIdeasOutput, context: GradeContext
 
 it("scene ideas: hard rules, judged rules, and latency against the route's timeout", async () => {
   const settings = evalSettings({ model: SCENE_PROMPT_MODEL, efforts: ["none", "low", "medium", "high", undefined], repeats: 2 });
-  const items = await loadSceneIssues();
+  const { from, to, issues: items } = readSceneIssues();
 
   const { rows, path } = await runSweep({
     task: "scene-ideas",
     title: "Scene ideas eval",
     notes: [
-      `The three scene ideas of "New image" on the ${items.length} published issues of ${SCENE_ISSUE_DATES.from} to ` +
-        `${SCENE_ISSUE_DATES.to}, read from the Neon dev branch (read-only), with the context the board builds ` +
+      `The three scene ideas of "New image" on the ${items.length} published issues of ${from} to ${to} ` +
+        `(\`${SCENE_ISSUES_PATH}\`, built from the Neon dev branch), with the context the board builds ` +
         "(`imageContextFor`). No ground truth: the scores are the prompt's own rules.",
       "Run columns are of n runs; 'Idea:' and judged idea columns are of 3 ideas per run (a missing idea or an error " +
         "is a miss). Hard rules (score.ts): exactly 3 ideas in the answer, 120–200 words, a label of 2–6 words, " +
@@ -45,8 +43,8 @@ it("scene ideas: hard rules, judged rules, and latency against the route's timeo
       "J: columns are the judge's grade (rubric.ts), over the runs it graded (the Graded column; judged idea columns " +
         "are of 3 ideas per graded run). 'An idea shows the lead': one idea shows the top story the subject line is about.",
       `The call runs in a web request with a ${SCENE_IDEAS_TIMEOUT_MS / 1000} s timeout and no retry: a slower call ` +
-        `is an error. 'Done in ${SCENE_IDEAS_TIMEOUT_MS / 1000} s' and p50/p95 time the call alone. Rows from before ` +
-        "2026-11-11 counted ungraded runs as J: misses, timed the judge in p50/p95, and have the call alone in 'Call p50 s' and 'Call p95 s'.",
+        `is an error. 'Done in ${SCENE_IDEAS_TIMEOUT_MS / 1000} s' and p50/p95 time the call alone. Rows with git sha ` +
+        "035179c+changes (before d1da5b8) counted ungraded runs as J: misses, timed the judge in p50/p95, and have the call alone in 'Call p50 s' and 'Call p95 s'.",
     ],
     settings,
     items,

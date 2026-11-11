@@ -2,7 +2,7 @@ import type { Metric } from "@/evals/lib/results";
 import { mean } from "@/evals/lib/stats";
 import { countGraded, countHits, gradedOutcomes, type Outcome } from "@/evals/lib/sweep";
 import { countWords } from "@/evals/lib/text";
-import { checkSceneText, GRADE_RULES, INTERPRETIVE_SCENE_IDEAS, type SceneGrade, type SceneTextChecks } from "@/evals/scene-prompt/score";
+import { checkSceneText, GRADE_RULES, INTERPRETIVE_SCENE_IDEAS, type SceneGrade, type SceneTextChecks } from "@/evals/scenes/rules";
 import { SCENE_IDEAS_COUNT, SCENE_IDEAS_TIMEOUT_MS, type SceneIdea } from "@/src/pipeline/draft/image/scene-ideas";
 
 /** Scoring of the scene ideas (src/pipeline/draft/image/scene-ideas.ts): its prompt's hard rules and the judge. */

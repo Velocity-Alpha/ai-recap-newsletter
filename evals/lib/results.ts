@@ -50,7 +50,7 @@ export interface ResultsFile {
 
 const ROOT = join(__dirname, "..", "..");
 const STORE_START = "<!-- eval-results";
-/** The block of results files written before 2026-11-11: the rows only. */
+/** The block of results files written before d1da5b8: the rows only. */
 const OLD_STORE_START = "<!-- eval-rows";
 const STORE_END = "-->";
 
@@ -177,7 +177,7 @@ export function renderResults(file: ResultsFile): string {
   ].join("\n");
 }
 
-/** What a results file stores. Files from before 2026-11-11 stored only rows: their title and notes are read from the text. */
+/** What a results file stores. Files from before d1da5b8 stored only rows: their title and notes are read from the text. */
 export function readStored(markdown: string): Omit<ResultsFile, "task"> | null {
   const start = markdown.indexOf(STORE_START);
   if (start !== -1) {

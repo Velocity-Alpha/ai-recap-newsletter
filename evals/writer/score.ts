@@ -198,8 +198,8 @@ export function pairMetrics(results: PairResult[], baseline: string): Metric[] {
 
 /**
  * The results table's columns: the writer gives about 27 metrics, all kept in the stored rows. Rows from before
- * 2026-11-11 timed the judge in p50/p95 and compared each effort with low, so their "Writer p50 s", "Writer max s" and preference
- * columns are kept too; a column no row has is left out.
+ * d1da5b8 timed the judge in p50/p95 and compared each effort with low, so their "Writer p50 s", "Writer max s" and
+ * preference columns are kept too; a column no row has is left out.
  */
 export function writerColumns(baseline: string): string[] {
   const pair = pairMetricNames(baseline);

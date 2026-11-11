@@ -48,6 +48,8 @@ it("extraction: stories from past issues, checked and judged", async () => {
       "Saved per issue: stories with a usable link, as ingestion saves them. Dev DB: the Neon dev branch `stories` rows of the " +
         "same source and day, which the production or n8n extractor made from the email (The Signal 2026-10-25 is under n8n's " +
         "`tldr_ai` label; In the World of AI 2026-10-22 has none). Dev DB URLs found: those rows' links that this run also saved.",
+      "p50/p95 time the extraction call alone. Rows with git sha 035179c+changes (before d1da5b8) timed the judge in " +
+        "p50/p95 too, give the graded count as 'Graded runs', and have no 'Issues: all story pages in text'.",
     ],
     settings,
     items,
