@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { paywalledLinks, selectedLinkState, typedLinkOf } from "@/src/components/approval/story-links";
+import { freeLinkPill,
+  linkChoiceOf,
+  linksToAutoSelect,
+  ownerLinkEdits,
+  paywalledLinks, selectedLinkState, typedLinkOf } from "@/src/components/approval/story-links";
 
 const slot = (id: number, status: "selected" | "fill-in" = "selected") => ({ story: { id, headline: `Story ${id}` }, status });
 
@@ -78,5 +82,83 @@ describe("paywalledLinks", () => {
 
   it("lists nothing when no selected link is paywalled", () => {
     expect(paywalledLinks(board({ linkState: { 1: "unknown", 3: "no" } }))).toEqual([]);
+  });
+});
+
+const FREE_LINKS = [
+  { url: "https://free.example/a", site: "free.example", title: "A", words: 812 },
+  { url: "https://other.example/b", site: "other.example", title: null, words: 400 },
+];
+
+describe("linkChoiceOf", () => {
+  it("is the original link when the story has no link edit", () => {
+    expect(linkChoiceOf(undefined, FREE_LINKS, false)).toEqual({ kind: "original" });
+  });
+
+  it("is the free link whose link the story has", () => {
+    expect(linkChoiceOf("https://other.example/b", FREE_LINKS, false)).toEqual({ kind: "free", index: 1 });
+  });
+
+  it("is the other link when the story has a link that is not a free link", () => {
+    expect(linkChoiceOf("https://typed.example/c", FREE_LINKS, false)).toEqual({ kind: "other" });
+  });
+
+  it("is the other link once the owner selected it, also with an empty field", () => {
+    expect(linkChoiceOf(undefined, FREE_LINKS, true)).toEqual({ kind: "other" });
+  });
+});
+
+describe("freeLinkPill", () => {
+  const ORIGINAL = "https://www.wsj.com/story";
+
+  it("is null for a story with no search", () => {
+    expect(freeLinkPill(undefined, ORIGINAL, ORIGINAL)).toBeNull();
+  });
+
+  it("says that the search runs", () => {
+    expect(freeLinkPill({ done: false, links: [] }, ORIGINAL, ORIGINAL)).toBe("finding free links…");
+  });
+
+  it("says that no free link was found", () => {
+    expect(freeLinkPill({ done: true, links: [] }, ORIGINAL, ORIGINAL)).toBe("no free link found");
+  });
+
+  it("names the selected free link, its words and the site of the original link", () => {
+    expect(freeLinkPill({ done: true, links: FREE_LINKS }, "https://free.example/a", ORIGINAL)).toBe(
+      "free link: free.example, 812 words · original: wsj.com",
+    );
+  });
+
+  it("counts the free links when another link is selected", () => {
+    expect(freeLinkPill({ done: true, links: FREE_LINKS }, ORIGINAL, ORIGINAL)).toBe("2 free links found");
+    expect(freeLinkPill({ done: true, links: FREE_LINKS.slice(0, 1) }, "https://typed.example/c", ORIGINAL)).toBe("1 free link found");
+  });
+});
+
+describe("linksToAutoSelect", () => {
+  const UPDATE = { 1: { done: true, links: FREE_LINKS }, 2: { done: true, links: [] }, 3: { done: false, links: FREE_LINKS } };
+
+  it("gives the first free link of each story that is done and has one", () => {
+    expect(linksToAutoSelect(UPDATE, new Set(), {})).toEqual({ 1: "https://free.example/a" });
+  });
+
+  it("leaves out a story whose link the owner changed", () => {
+    expect(linksToAutoSelect(UPDATE, new Set([1]), {})).toEqual({});
+  });
+
+  it("leaves out a story the board selected a link for before", () => {
+    expect(linksToAutoSelect(UPDATE, new Set(), { 1: "https://free.example/a" })).toEqual({});
+  });
+});
+
+describe("ownerLinkEdits", () => {
+  it("leaves out the free links the board selected by itself", () => {
+    const urlOverrides = { 1: "https://free.example/a", 2: "https://typed.example/c" };
+
+    expect(ownerLinkEdits(urlOverrides, { 1: "https://free.example/a" })).toEqual({ 2: "https://typed.example/c" });
+  });
+
+  it("keeps the link of a story where the owner selected another link after the board", () => {
+    expect(ownerLinkEdits({ 1: "https://other.example/b" }, { 1: "https://free.example/a" })).toEqual({ 1: "https://other.example/b" });
   });
 });

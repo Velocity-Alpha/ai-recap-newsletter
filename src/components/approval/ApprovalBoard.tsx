@@ -4,7 +4,15 @@ import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { hasBoardEdits } from "@/components/approval/board-edits";
 import { repeatOfText, restoreRepeat, similarLabel, similarTooltip } from "@/components/approval/repeat-labels";
-import { type LinkState, paywalledLinks, selectedLinkState } from "@/components/approval/story-links";
+import {
+  freeLinkPill,
+  linkChoiceOf,
+  linksToAutoSelect,
+  ownerLinkEdits,
+  type LinkState,
+  paywalledLinks,
+  selectedLinkState,
+} from "@/components/approval/story-links";
 import { createTypedLinks } from "@/components/approval/typed-links";
 import type { AlsoFrom, RestorableRepeat } from "@/src/features/newsletter/board-repeats";
 import type { SimilarStory } from "@/src/pipeline/repeats/repeat-rules";
@@ -37,7 +45,8 @@ import DateState from "@/components/approval/DateState";
 import NoIssueTodayButton from "@/components/approval/NoIssueTodayButton";
 import { Button } from "@/components/ui/button";
 import { nativeCommitTarget, secondCommitNotice } from "@/features/newsletter/draft-links";
-import { checkLink } from "@/features/newsletter/free-links-client";
+import { checkLink, watchFreeLinks, type FreeLinksByStory } from "@/features/newsletter/free-links-client";
+import { siteOf } from "@/src/pipeline/free-links/sites";
 import type { DateDraftsView } from "@/src/pipeline/draft/draft-board";
 
 type StoryOption = {
@@ -200,6 +209,34 @@ function formatLongDate(value: string | null | undefined): string {
   }).format(parsed);
 }
 
+function withoutStory<T>(map: Record<number, T>, id: number): Record<number, T> {
+  return Object.fromEntries(Object.entries(map).filter(([key]) => Number(key) !== id));
+}
+
+function withoutId(ids: Set<number>, id: number): Set<number> {
+  const next = new Set(ids);
+  next.delete(id);
+  return next;
+}
+
+const LINK_ROW =
+  "flex cursor-pointer items-start gap-3 rounded-lg border border-[var(--border-light)] bg-white px-3 py-2.5 transition hover:border-[var(--accent-primary)]";
+
+function renderOpenLink(href: string | null | undefined) {
+  if (!href) return null;
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--border-light)] text-[var(--text-secondary)] hover:border-[var(--accent-primary)] hover:text-[var(--accent-primary)] transition"
+      aria-label="Open link"
+    >
+      <ExternalLink className="h-4 w-4" />
+    </a>
+  );
+}
+
 function renderPaywallIcon(paywallDetected: "yes" | "no" | "unknown" | "error" | null | undefined, errorMessage?: string | null) {
   if (paywallDetected === "yes") {
     return (
@@ -267,7 +304,7 @@ export default function ApprovalBoard({
   const dragStory = useRef<{ storyId: number; fromSectionKey: string } | null>(null);
   const [dragOverSection, setDragOverSection] = useState<string | null>(null);
   const [restoredIds, setRestoredIds] = useState<Set<number>>(new Set());
-  // The paywall state of each link the owner typed (#59). A story with no entry shows its stored state.
+  // The paywall state of each link that was typed or selected (#59). A story with no entry shows its stored state.
   const [linkState, setLinkState] = useState<LinkState>({});
   const [paywallWarningOpen, setPaywallWarningOpen] = useState(false);
   const [isCheckingLinks, setIsCheckingLinks] = useState(false);
@@ -275,9 +312,21 @@ export default function ApprovalBoard({
     createTypedLinks({
       checkLink,
       onStates: setLinkState,
-      onDropped: (id) => setUrlOverrides((prev) => Object.fromEntries(Object.entries(prev).filter(([key]) => Number(key) !== id))),
+      onDropped: (id) => {
+        setUrlOverrides((prev) => withoutStory(prev, id));
+        setOtherLinkIds((prev) => withoutId(prev, id));
+      },
     })
   );
+  // Free links (#59). `freeLinks` has an entry for each story the board asked about; the search runs until `done`.
+  const [freeLinks, setFreeLinks] = useState<FreeLinksByStory>({});
+  /** The free link the board selected by itself, by story id. It is not an edit of the owner. */
+  const [autoLinks, setAutoLinks] = useState<Record<number, string>>({});
+  const latestAutoLinks = useRef<Record<number, string>>({});
+  /** The stories whose link the owner typed or selected. The board never selects a link for them. */
+  const ownerChangedLinks = useRef(new Set<number>());
+  /** The stories whose "Other link" row is selected, also while its field is empty. */
+  const [otherLinkIds, setOtherLinkIds] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     setSections(initSections(candidateSections));
@@ -299,14 +348,65 @@ export default function ApprovalBoard({
     headlineStoryId,
     proposedLeadId,
     excludeState,
-    urlOverrides,
+    urlOverrides: ownerLinkEdits(urlOverrides, autoLinks),
     notesOverrides,
   });
   useEffect(() => {
     if (edited) onEdit?.();
   }, [edited, onEdit]);
 
+  // Ask for free links for each story on the board whose link is paywalled, once for each story.
+  const paywalledStoryIds = useMemo(
+    () =>
+      sections
+        .flatMap((section) => section.stories.map(({ story }) => story.id))
+        .filter((id) => candidateMap[String(id)]?.paywall_detected === "yes"),
+    [candidateMap, sections]
+  );
+  const askedFreeLinks = useRef(new Set<number>());
+  useEffect(() => {
+    const ids = paywalledStoryIds.filter((id) => !askedFreeLinks.current.has(id));
+    if (ids.length === 0) return;
+    for (const id of ids) askedFreeLinks.current.add(id);
+    setFreeLinks((prev) => ({ ...Object.fromEntries(ids.map((id) => [id, { done: false, links: [] }])), ...prev }));
+    void watchFreeLinks(ids, {
+      onUpdate: (update) => {
+        setFreeLinks((prev) => ({ ...prev, ...update }));
+        // Select the first free link of a story, unless the owner already changed the story's link.
+        const selected = linksToAutoSelect(update, ownerChangedLinks.current, latestAutoLinks.current);
+        if (Object.keys(selected).length === 0) return;
+        latestAutoLinks.current = { ...latestAutoLinks.current, ...selected };
+        setAutoLinks(latestAutoLinks.current);
+        setUrlOverrides((prev) => ({ ...prev, ...selected }));
+        for (const id of Object.keys(selected)) typedLinks.select(Number(id), "no");
+      },
+    });
+  }, [paywalledStoryIds, typedLinks]);
+
+  const selectOriginalLink = (id: number) => {
+    ownerChangedLinks.current.add(id);
+    setOtherLinkIds((prev) => withoutId(prev, id));
+    setUrlOverrides((prev) => withoutStory(prev, id));
+    typedLinks.select(id, null);
+  };
+
+  const selectFreeLink = (id: number, url: string) => {
+    ownerChangedLinks.current.add(id);
+    setOtherLinkIds((prev) => withoutId(prev, id));
+    setUrlOverrides((prev) => ({ ...prev, [id]: url }));
+    typedLinks.select(id, "no");
+  };
+
+  /** "Other link" starts with an empty field. Until the owner types a link, the story has its original link. */
+  const selectOtherLink = (id: number) => {
+    ownerChangedLinks.current.add(id);
+    setOtherLinkIds((prev) => new Set(prev).add(id));
+    setUrlOverrides((prev) => withoutStory(prev, id));
+    typedLinks.select(id, null);
+  };
+
   const typeLink = (id: number, value: string) => {
+    ownerChangedLinks.current.add(id);
     setUrlOverrides((prev) => ({ ...prev, [id]: value }));
     // The lock icon describes the selected link. This one is not checked until the owner leaves the field.
     typedLinks.type(id, value);
@@ -482,6 +582,13 @@ export default function ApprovalBoard({
     }
     return null;
   }, [candidateMap, sections, previewStoryId]);
+
+  const previewFreeLinks = previewStory ? (freeLinks[previewStory.id]?.links ?? []) : [];
+  const previewLinkChoice = linkChoiceOf(
+    previewStory ? urlOverrides[previewStory.id] : undefined,
+    previewFreeLinks,
+    previewStory !== null && otherLinkIds.has(previewStory.id)
+  );
 
   const validationErrors = useMemo(() => {
     const errors: string[] = [];
@@ -1018,6 +1125,7 @@ export default function ApprovalBoard({
                         const hasHeadlineValidationError = isHeadline && (isExcluded || status === "fill-in");
                         const sourceCount = full ? storySources(full).length : 0;
                         const alsoFrom = full?.also_from ?? [];
+                        const freePill = freeLinkPill(freeLinks[story.id], urlOverrides[story.id] ?? full?.url ?? null, full?.url ?? null);
                         const similar = full?.similar_to ?? [];
 
                         return (
@@ -1092,6 +1200,11 @@ export default function ApprovalBoard({
                                       className="max-w-[16rem] shrink truncate rounded-full border border-[rgba(184,133,110,0.28)] bg-[rgba(255,244,236,0.92)] px-1.5 text-[10px] font-medium text-[var(--accent-warm)]"
                                     >
                                       {similarLabel(similar[0])}
+                                    </span>
+                                  ) : null}
+                                  {freePill ? (
+                                    <span className="max-w-[22rem] shrink truncate rounded-full border border-[rgba(107,155,184,0.24)] bg-[rgba(232,242,248,0.8)] px-1.5 text-[10px] font-medium text-[var(--watercolor-ink)]">
+                                      {freePill}
                                     </span>
                                   ) : null}
                                 </p>
@@ -1468,6 +1581,75 @@ export default function ApprovalBoard({
                 <p className="mt-3 text-base leading-7 text-[var(--text-secondary)]">{previewStory.summary}</p>
               ) : null}
               {/* Editable link */}
+              {previewFreeLinks.length > 0 ? (
+              <fieldset className="mt-5">
+                <legend className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--accent-primary)]">Story Link</legend>
+                <div className="mt-2 space-y-2">
+                  <label className={LINK_ROW}>
+                    <input
+                      type="radio"
+                      name={`story-link-${previewStory.id}`}
+                      checked={previewLinkChoice.kind === "original"}
+                      onChange={() => selectOriginalLink(previewStory.id)}
+                      className="mt-1 accent-[var(--accent-primary)]"
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-center gap-1.5 text-sm font-medium text-[var(--text-primary)]">
+                        {renderPaywallIcon(previewStory.paywall_detected, previewStory.error)}
+                        Original link · {siteOf(previewStory.url ?? "") ?? "no link"}
+                      </span>
+                      <span className="block truncate text-xs text-[var(--text-secondary)]">{previewStory.url ?? "No link"}</span>
+                    </span>
+                    {renderOpenLink(previewStory.url)}
+                  </label>
+                  {previewFreeLinks.map((link, index) => (
+                    <label key={link.url} className={LINK_ROW}>
+                      <input
+                        type="radio"
+                        name={`story-link-${previewStory.id}`}
+                        checked={previewLinkChoice.kind === "free" && previewLinkChoice.index === index}
+                        onChange={() => selectFreeLink(previewStory.id, link.url)}
+                        className="mt-1 accent-[var(--accent-primary)]"
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="flex items-center gap-1.5 text-sm font-medium text-[var(--text-primary)]">
+                          {renderPaywallIcon("no")}
+                          {link.site} · {link.words} words
+                        </span>
+                        <span className="block truncate text-xs text-[var(--text-secondary)]">{link.title ?? link.url}</span>
+                      </span>
+                      {renderOpenLink(link.url)}
+                    </label>
+                  ))}
+                  <label className={LINK_ROW}>
+                    <input
+                      type="radio"
+                      name={`story-link-${previewStory.id}`}
+                      checked={previewLinkChoice.kind === "other"}
+                      onChange={() => selectOtherLink(previewStory.id)}
+                      className="mt-1 accent-[var(--accent-primary)]"
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-center gap-1.5 text-sm font-medium text-[var(--text-primary)]">
+                        {previewLinkChoice.kind === "other" ? renderLinkIcon(previewStory.id) : null}
+                        Other link
+                      </span>
+                      {previewLinkChoice.kind === "other" ? (
+                        <input
+                          type="url"
+                          autoFocus
+                          value={urlOverrides[previewStory.id] ?? ""}
+                          onChange={(e) => typeLink(previewStory.id, e.target.value)}
+                          onBlur={() => void finishTypedLink(previewStory.id)}
+                          placeholder="https://…"
+                          className="mt-2 w-full rounded-lg border border-[var(--border-light)] bg-white px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)]"
+                        />
+                      ) : null}
+                    </span>
+                  </label>
+                </div>
+              </fieldset>
+              ) : (
               <div className="mt-5">
                 <div className="flex items-center justify-between gap-3">
                   <label className="block text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--accent-primary)]">
@@ -1499,19 +1681,10 @@ export default function ApprovalBoard({
                       {urlOverrides[previewStory.id] ?? previewStory.url ?? "No link"}
                     </span>
                   )}
-                  {(urlOverrides[previewStory.id] ?? previewStory.url) ? (
-                    <a
-                      href={urlOverrides[previewStory.id] ?? previewStory.url ?? ""}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--border-light)] text-[var(--text-secondary)] hover:border-[var(--accent-primary)] hover:text-[var(--accent-primary)] transition"
-                      aria-label="Open link"
-                    >
-                      <ExternalLink className="h-4 w-4" />
-                    </a>
-                  ) : null}
+                  {renderOpenLink(urlOverrides[previewStory.id] ?? previewStory.url)}
                 </div>
               </div>
+              )}
 
               <div className="mt-5 rounded-xl border border-[var(--border-light)] bg-[var(--bg-warm)] p-5">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--accent-primary)]">Notes</p>

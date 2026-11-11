@@ -198,6 +198,17 @@ Some ingest errors are not incidents. They show on the source's line in the `ing
   "Check again" on that line (it builds the board again and drops unsaved board edits). Until then, some
   repeats can still be on the board.
 
+## A board card that stays on "finding free links…"
+
+- **Raised by:** the board. It asks for free links for each story with a paywalled link, and polls for 2 minutes.
+- **Severity:** none. The owner can always select "Other link" and type a link, or commit the original link.
+- **Meaning:** The search did not finish for the story. After 2 minutes the card says "no free link found".
+  The search can still finish later (15 minutes at most); load the board again to see its links.
+- **Do:** Look at the log of the `find-free-links-background` function on Netlify. One line for each run says
+  how many stories it worked on and how many failed. A line `[free-links] Story <id>: …` gives the error of one
+  story; that story stays not searched, and the next board load tries it again. For an OpenAI error, look at
+  the OpenAI status page.
+
 ## A run that fails to report
 
 `run-checks` has one more alert that is not an incident. If the check job itself throws, it posts
