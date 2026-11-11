@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { hashOutline, normalizeOutline, outlineLeadStoryId, type ApprovalOutline } from "@/src/pipeline/draft/outline";
+import {
+  hashOutline,
+  normalizeFeedback,
+  normalizeOutline,
+  normalizeProposed,
+  outlineLeadStoryId,
+  type ApprovalOutline,
+} from "@/src/pipeline/draft/outline";
 
 /** A board commit body like ApprovalBoard sends, with made-up stories. */
 function boardBody() {
@@ -42,8 +49,13 @@ describe("normalizeOutline", () => {
         { id: 21, section: "tools", url: "https://example.com/c", note: "" },
         { id: 31, section: "tools", url: "https://example.com/d", note: "" },
       ],
-      excluded: [{ id: 31, section: "tools", reason: "duplicate" }],
+      excluded: [{ id: 31, section: "tools", reason: "duplicate", reasonCode: "" }],
     });
+  });
+
+  it("keeps the reason code of an excluded story next to its reason", () => {
+    const body = { ...boardBody(), excluded_stories: [{ id: 31, reason: "old news", reason_code: "repeat", newsletter_category: "tools" }] };
+    expect(normalizeOutline(body, "2026-11-09").excluded).toEqual([{ id: 31, section: "tools", reason: "old news", reasonCode: "repeat" }]);
   });
 
   it("falls back to the approved-ids key order when candidate sections are missing", () => {
@@ -115,6 +127,87 @@ describe("hashOutline", () => {
     expect(hashOutline(normalizeOutline(reordered, "2026-11-09"))).not.toBe(
       hashOutline(normalizeOutline(body, "2026-11-09")),
     );
+  });
+});
+
+describe("normalizeProposed", () => {
+  const proposed = {
+    sections: [
+      { key: "top_stories", story_ids: [11, 12, 13] },
+      { key: "tools", story_ids: [21] },
+    ],
+    lead_story_id: 11,
+    repeats_removed: [41, 42],
+  };
+
+  it("reads the proposed board the board sent", () => {
+    expect(normalizeProposed({ proposed })).toEqual({
+      sections: [
+        { key: "top_stories", storyIds: [11, 12, 13] },
+        { key: "tools", storyIds: [21] },
+      ],
+      leadStoryId: 11,
+      repeatsRemoved: [41, 42],
+    });
+  });
+
+  it("gives null when the body has no proposed board", () => {
+    for (const value of [undefined, null, "board", [], 5]) expect(normalizeProposed({ proposed: value })).toBeNull();
+  });
+
+  it("skips bad sections and bad ids, and gives null or an empty list for a missing field", () => {
+    const body = {
+      proposed: {
+        sections: [{ key: "top_stories", story_ids: [11, "abc", -1, "12"] }, { story_ids: [1] }, "tools", { key: "tools" }],
+        lead_story_id: "lead",
+        repeats_removed: [41, null, 0],
+      },
+    };
+    expect(normalizeProposed(body)).toEqual({
+      sections: [
+        { key: "top_stories", storyIds: [11, 12] },
+        { key: "tools", storyIds: [] },
+      ],
+      leadStoryId: null,
+      repeatsRemoved: [41],
+    });
+    expect(normalizeProposed({ proposed: {} })).toEqual({ sections: [], leadStoryId: null, repeatsRemoved: [] });
+  });
+});
+
+describe("normalizeFeedback", () => {
+  it("reads the reasons for a lead and a move", () => {
+    const body = {
+      feedback: [
+        { story_id: 12, action: "lead", code: "bigger story", text: "" },
+        { story_id: 21, action: "move", code: "", text: "fits tools better" },
+      ],
+    };
+    expect(normalizeFeedback(body)).toEqual([
+      { storyId: 12, action: "lead", code: "bigger story", text: "" },
+      { storyId: 21, action: "move", code: "", text: "fits tools better" },
+    ]);
+  });
+
+  it("keeps a lead reason with no story id: the owner cleared the lead", () => {
+    expect(normalizeFeedback({ feedback: [{ story_id: null, action: "lead", code: "less doom", text: "" }] })).toEqual([
+      { storyId: null, action: "lead", code: "less doom", text: "" },
+    ]);
+  });
+
+  it("skips bad entries and never throws", () => {
+    const body = {
+      feedback: [
+        null,
+        "lead",
+        { story_id: 12, action: "exclude", code: "promo" },
+        { story_id: "abc", action: "move", code: "wrong section" },
+        { action: "move", code: "wrong section" },
+        { story_id: 12, action: "lead", code: 5, text: ["x"] },
+      ],
+    };
+    expect(normalizeFeedback(body)).toEqual([{ storyId: 12, action: "lead", code: "", text: "" }]);
+    for (const value of [undefined, null, {}, "x"]) expect(normalizeFeedback({ feedback: value })).toEqual([]);
   });
 });
 

@@ -22,6 +22,7 @@ import {
   toggleReuseDraftDate,
 } from "@/features/newsletter/reuse-drafts-param";
 import type { DateDraftsView } from "@/src/pipeline/draft/draft-board";
+import type { ReasonCodes } from "@/src/pipeline/feedback/default-reason-codes";
 import { awaitLeadPick } from "@/features/newsletter/lead-pick-client";
 import { applyLeadPick } from "@/features/newsletter/lead-story";
 
@@ -227,14 +228,16 @@ function ApprovalPageForDate({ dateKey, reuseKey }: { dateKey: string; reuseKey:
           status: "ready";
           outline: ApprovalOutlineData;
           lead_response_id?: string | null;
+          reason_codes?: ReasonCodes;
         }>;
       })
       .then((outlinePayload) => {
         if (!active) return;
-        writeApprovalOutlineCache(cacheId, outlinePayload.outline);
-        setOutlineData(normalizeApprovalOutlineData(outlinePayload.outline));
+        const outline = { ...outlinePayload.outline, reason_codes: outlinePayload.reason_codes };
+        writeApprovalOutlineCache(cacheId, outline);
+        setOutlineData(normalizeApprovalOutlineData(outline));
         if (outlinePayload.lead_response_id) {
-          applyLeadPickWhenReady(outlinePayload.lead_response_id, outlinePayload.outline);
+          applyLeadPickWhenReady(outlinePayload.lead_response_id, outline);
         }
       })
       .catch((err: unknown) => {
@@ -287,6 +290,7 @@ function ApprovalPageForDate({ dateKey, reuseKey }: { dateKey: string; reuseKey:
       publishStatus={publishStatus}
       repeatsRemoved={outlineData.repeats_removed}
       repeatCheckIncomplete={outlineData.repeat_check_incomplete ?? false}
+      reasonCodes={outlineData.reason_codes}
       onRebuild={rebuildBoard}
       drafting={drafting}
     />

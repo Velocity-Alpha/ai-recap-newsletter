@@ -5,6 +5,7 @@ import { LEAD_SHORTLIST_SIZE, leadShortlist } from "@/src/features/newsletter/le
 import { submitLeadPick } from "@/src/features/newsletter/openai-lead-pick";
 import { approvalDateKey } from "@/src/features/newsletter/approval-date";
 import { parseReuseDraftDates } from "@/src/features/newsletter/reuse-drafts-param";
+import { readReasonCodes } from "@/src/pipeline/feedback/reason-codes";
 import { hasValidApprovalSession } from "@/src/server/approval-auth";
 import { logServerError, logServerInfo } from "@/src/server/observability";
 
@@ -38,6 +39,7 @@ async function startLeadPick(outline: ApprovalOutlineData, date: Date): Promise<
 /**
  * The board for a date, in one request: repeats are removed from the story matches ingestion stored (#90), so
  * there is no wait. The AI lead pick starts here; the board polls `/api/approval/outline/lead` for it.
+ * `reason_codes` are the board's reason chips (#150), read from the `feedback.reason_codes` setting on each load.
  */
 export async function GET(request: Request) {
   if (!(await hasValidApprovalSession(request))) {
@@ -51,7 +53,10 @@ export async function GET(request: Request) {
   logServerInfo("approval.outline.api.request", { date: date.toISOString(), reuseDraftDates });
 
   try {
-    const { outline, rankedCandidates } = await createOutlineCandidateStories(date, { reuseDraftDates });
+    const [{ outline, rankedCandidates }, reasonCodes] = await Promise.all([
+      createOutlineCandidateStories(date, { reuseDraftDates }),
+      readReasonCodes(),
+    ]);
     const leadResponseId = await startLeadPick(outline, date);
 
     logServerInfo("approval.outline.api.outline_ready", {
@@ -61,7 +66,7 @@ export async function GET(request: Request) {
       leadResponseId,
     });
 
-    return NextResponse.json({ status: "ready", outline, lead_response_id: leadResponseId });
+    return NextResponse.json({ status: "ready", outline, lead_response_id: leadResponseId, reason_codes: reasonCodes });
   } catch (error) {
     logServerError("approval.outline.api.error", error, { date: date.toISOString() });
 

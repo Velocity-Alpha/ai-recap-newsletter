@@ -8,7 +8,15 @@ import {
 } from "@/src/server/observability";
 import { hasValidApprovalSession } from "@/src/server/approval-auth";
 import { fetchLastPublishedIssueDateOnOrBefore } from "@/src/features/newsletter/repository";
-import { normalizeOutline, parseCommitDate, type ApprovalOutline } from "@/src/pipeline/draft/outline";
+import {
+  normalizeFeedback,
+  normalizeOutline,
+  normalizeProposed,
+  parseCommitDate,
+  type ApprovalOutline,
+  type BoardFeedback,
+  type ProposedBoard,
+} from "@/src/pipeline/draft/outline";
 import { IssuePublishedError } from "@/src/pipeline/draft/draft-store";
 import { commitNativeDraft } from "@/src/pipeline/draft/native-commit";
 
@@ -94,7 +102,9 @@ export async function POST(request: Request) {
       );
     }
 
-    return await commitDraft(context, outline, new URL(request.url).origin);
+    // The proposed board and the reasons are lenient: a bad entry is skipped, and they never reject a commit.
+    const board = { proposed: normalizeProposed(normalizedPayload), feedback: normalizeFeedback(normalizedPayload) };
+    return await commitDraft(context, outline, board, new URL(request.url).origin);
   } catch (error) {
     logRequestError(context, "Outline commit workflow failed", error);
 
@@ -116,11 +126,12 @@ export async function POST(request: Request) {
 async function commitDraft(
   context: RequestLogContext,
   outline: ApprovalOutline,
+  board: { proposed: ProposedBoard | null; feedback: BoardFeedback[] },
   siteUrl: string,
 ) {
   let result: Awaited<ReturnType<typeof commitNativeDraft>>;
   try {
-    result = await commitNativeDraft(outline, { siteUrl });
+    result = await commitNativeDraft(outline, { siteUrl }, board);
   } catch (error) {
     if (!(error instanceof IssuePublishedError)) throw error;
     return jsonWithRequestId(

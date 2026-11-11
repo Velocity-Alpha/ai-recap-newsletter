@@ -136,6 +136,7 @@ export function createFakeDb() {
     settings: { rows: [], updates: [] } as FakeTable,
     freeLinks: { rows: [], updates: [] } as FakeTable,
     paywallSites: { rows: [], updates: [] } as FakeTable,
+    boardActions: { rows: [], updates: [] } as FakeTable,
     locks: [] as unknown[][],
     /** Makes the next issue update fail with this error (then clears). */
     issueUpdateError: null as Error | null,
@@ -191,6 +192,7 @@ export function createFakeDb() {
     pipelineSetting: table(state.settings, { nextId: id, defaults: () => ({}) }),
     paywallSite: table(state.paywallSites, { nextId: id, unique: ["site"], defaults: () => ({ storyIds: [], ignored: false, createdAt: now(), updatedAt: now() }) }),
     storyFreeLink: table(state.freeLinks, { nextId: id, unique: ["storyId", "url"], defaults: () => ({ title: null, originStoryId: null, createdAt: now() }) }),
+    boardAction: table(state.boardActions, { nextId: id, defaults: () => ({ createdAt: now() }) }),
     $executeRaw: async (strings: TemplateStringsArray, ...values: unknown[]) => {
       state.locks.push([strings.join("?"), ...values]);
       return 1;
@@ -224,7 +226,7 @@ export function createFakeDb() {
     state,
     client,
     reset() {
-      for (const key of ["issues", "drafts", "outlines", "stories", "publishEvents", "stagedVersions", "issueStories", "settings", "freeLinks", "paywallSites"] as const) {
+      for (const key of ["issues", "drafts", "outlines", "stories", "publishEvents", "stagedVersions", "issueStories", "settings", "freeLinks", "paywallSites", "boardActions"] as const) {
         state[key].rows = [];
         state[key].updates = [];
       }

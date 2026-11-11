@@ -97,6 +97,22 @@ _Avoid_: selection, payload
 The owner's approval of an outline, which starts drafting.
 _Avoid_: submit, approve
 
+**Proposed board**:
+What the board showed before the owner's first change: the selected stories of each section, the proposed lead,
+and the repeats removed. It is saved with each commit, so the commit can be compared with it.
+_Avoid_: original board, default outline
+
+**Board action**:
+One difference between the proposed board and the committed outline: a story excluded, added, restored from the
+repeats, moved to another section, a section reordered, the lead changed, or a link changed. Worked out at commit,
+so a change the owner took back is not one.
+_Avoid_: edit, click, event
+
+**Reason code**:
+A short reason the owner can tap on the board for an exclude, a lead change, or a move. The codes come from the
+`feedback.reason_codes` setting. A reason is always optional.
+_Avoid_: tag, label, category
+
 **Issue**:
 The newsletter for one date. There is at most one issue per date.
 _Avoid_: edition, campaign. Say "GitHub issue" for a ticket.

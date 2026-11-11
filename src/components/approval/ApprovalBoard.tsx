@@ -3,6 +3,15 @@
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { hasBoardEdits } from "@/components/approval/board-edits";
+import {
+  feedbackBody,
+  type GivenReason,
+  isMoved,
+  proposedBody,
+  proposedSectionsOf,
+} from "@/components/approval/board-feedback";
+import { ReasonChips, ReasonLine } from "@/components/approval/ReasonChips";
+import { DEFAULT_REASON_CODES, type ReasonCodes } from "@/src/pipeline/feedback/default-reason-codes";
 import { repeatOfText, restoreRepeat, similarLabel, similarTooltip } from "@/components/approval/repeat-labels";
 import {
   freeLinkPill,
@@ -126,6 +135,8 @@ type ApprovalBoardProps = {
   repeatCheckIncomplete?: boolean;
   /** Builds the board again, so the repeat check runs again. */
   onRebuild?: () => void;
+  /** The reason chips for an exclude, a lead change, and a move (#150). From the `feedback.reason_codes` setting. */
+  reasonCodes?: ReasonCodes;
   publishStatus: {
     target_date: string;
     has_exact_match: boolean;
@@ -158,6 +169,8 @@ type SectionState = {
 type ExcludeState = {
   excluded: boolean;
   reason: string;
+  /** The reason chip the owner tapped, or "". */
+  reasonCode: string;
 };
 
 const SECTION_ICONS: Record<string, typeof Star> = {
@@ -285,6 +298,7 @@ export default function ApprovalBoard({
   repeatsRemoved = [],
   repeatCheckIncomplete = false,
   onRebuild,
+  reasonCodes = DEFAULT_REASON_CODES,
   publishStatus,
   drafting = null,
 }: ApprovalBoardProps) {
@@ -343,10 +357,21 @@ export default function ApprovalBoard({
   /** The stories whose "Other link" row is selected, also while its field is empty. */
   const [otherLinkIds, setOtherLinkIds] = useState<Set<number>>(new Set());
 
+  // The proposed board (#150): what the board showed before the owner's first change. The sections are the ones the
+  // board was built with, again for each loaded board. The lead is the proposed lead at the first change; the AI lead
+  // pick can still replace it until then.
+  const proposedSections = useMemo(() => proposedSectionsOf(candidateSections), [candidateSections]);
+  const [leadAtFirstEdit, setLeadAtFirstEdit] = useState<number | null | undefined>(undefined);
+  const proposedLead = leadAtFirstEdit === undefined ? proposedLeadId : leadAtFirstEdit;
+  // The owner's optional reasons for a lead change and for a move, by story id.
+  const [leadReasons, setLeadReasons] = useState<Record<number, GivenReason>>({});
+  const [moveReasons, setMoveReasons] = useState<Record<number, GivenReason>>({});
+
   useEffect(() => {
     setSections(initSections(candidateSections));
     setHeadlineStoryId(proposedLeadId);
     setRestoredIds(new Set());
+    setLeadAtFirstEdit(undefined);
   }, [candidateSections, proposedLeadId]);
 
   const shownRepeats = repeatsRemoved.filter((entry) => !restoredIds.has(entry.story.id));
@@ -369,6 +394,9 @@ export default function ApprovalBoard({
   useEffect(() => {
     if (edited) onEdit?.();
   }, [edited, onEdit]);
+  useEffect(() => {
+    if (edited) setLeadAtFirstEdit((lead) => (lead === undefined ? proposedLeadId : lead));
+  }, [edited, proposedLeadId]);
 
   // Ask for free links for each story on the board whose link is paywalled and that the owner did not change,
   // once for each story.
@@ -480,7 +508,7 @@ export default function ApprovalBoard({
 
     setExcludeState((prev) => ({
       ...prev,
-      [id]: { excluded: nextExcluded, reason: prev[id]?.reason ?? "" },
+      [id]: { excluded: nextExcluded, reason: prev[id]?.reason ?? "", reasonCode: prev[id]?.reasonCode ?? "" },
     }));
 
     if (nextExcluded) {
@@ -489,7 +517,13 @@ export default function ApprovalBoard({
   };
 
   const setExcludeReason = (id: number, reason: string) => {
-    setExcludeState((prev) => ({ ...prev, [id]: { ...prev[id], excluded: true, reason } }));
+    setExcludeState((prev) => ({ ...prev, [id]: { excluded: true, reason, reasonCode: prev[id]?.reasonCode ?? "" } }));
+    demoteStoryToFillIn(id);
+  };
+
+  /** A reason chip: "" clears it. */
+  const setExcludeReasonCode = (id: number, reasonCode: string) => {
+    setExcludeState((prev) => ({ ...prev, [id]: { excluded: true, reason: prev[id]?.reason ?? "", reasonCode } }));
     demoteStoryToFillIn(id);
   };
 
@@ -505,6 +539,7 @@ export default function ApprovalBoard({
           [storyId]: {
             excluded: false,
             reason: prev[storyId]?.reason ?? "",
+            reasonCode: prev[storyId]?.reasonCode ?? "",
           },
         };
       });
@@ -705,6 +740,7 @@ export default function ApprovalBoard({
         summary: slot.story.summary,
         note: notesOverrides[slot.story.id] ?? "",
         reason: exclude?.reason ?? "",
+        reason_code: exclude?.reasonCode ?? "",
         newsletter_category: section.key,
       }));
 
@@ -772,8 +808,35 @@ export default function ApprovalBoard({
       selected_story_ids: selectedStoryIds,
       stories,
       queue_update_count: selectedStoryIds.length,
+      // How the owner changed the proposed board (#150). The server works out the board actions.
+      proposed: proposedBody(
+        proposedSections,
+        proposedLead,
+        repeatsRemoved.map((entry) => entry.story.id)
+      ),
+      feedback: feedbackBody({
+        proposed: proposedSections,
+        sections,
+        headlineStoryId,
+        proposedLeadId: proposedLead,
+        leadReasons,
+        moveReasons,
+      }),
     };
-  }, [candidateMap, dateKey, excludeState, headlineStoryId, notesOverrides, sections, urlOverrides]);
+  }, [
+    candidateMap,
+    dateKey,
+    excludeState,
+    headlineStoryId,
+    leadReasons,
+    moveReasons,
+    notesOverrides,
+    proposedLead,
+    proposedSections,
+    repeatsRemoved,
+    sections,
+    urlOverrides,
+  ]);
 
   const paywalled = useMemo(
     () => paywalledLinks({ sections, excludeState, urlOverrides, linkState, candidateMap }),
@@ -1243,6 +1306,25 @@ export default function ApprovalBoard({
                                     Use &ldquo;Set as headline&rdquo; on another story to change it.
                                   </p>
                                 ) : null}
+                                {/* Optional reasons (#150), only while the difference exists. */}
+                                {isHeadline && !hasHeadlineValidationError && story.id !== proposedLead ? (
+                                  <ReasonLine
+                                    question="Why this lead?"
+                                    placeholder="Why this lead…"
+                                    codes={reasonCodes.lead}
+                                    reason={leadReasons[story.id]}
+                                    onChange={(reason) => setLeadReasons((prev) => ({ ...prev, [story.id]: reason }))}
+                                  />
+                                ) : null}
+                                {isMoved(proposedSections, story.id, section.key) ? (
+                                  <ReasonLine
+                                    question="Why moved?"
+                                    placeholder="Why moved…"
+                                    codes={reasonCodes.move}
+                                    reason={moveReasons[story.id]}
+                                    onChange={(reason) => setMoveReasons((prev) => ({ ...prev, [story.id]: reason }))}
+                                  />
+                                ) : null}
                                 {!isExpanded && story.summary ? (
                                   <p className={`truncate text-xs ${status === "fill-in" ? "text-[var(--text-muted)]" : "text-[var(--text-secondary)]"}`}>
                                     {story.summary}
@@ -1403,7 +1485,14 @@ export default function ApprovalBoard({
                                   </div>
                                 )}
 
-                                {/* Reason input — only when excluded */}
+                                {/* Reason chips and input — only when excluded. Both optional (#150). */}
+                                {isExcluded && (
+                                  <ReasonChips
+                                    codes={reasonCodes.exclude}
+                                    selected={excl?.reasonCode ?? ""}
+                                    onSelect={(code) => setExcludeReasonCode(story.id, code)}
+                                  />
+                                )}
                                 {isExcluded && (
                                   <input
                                     type="text"

@@ -1,5 +1,6 @@
 import type { AlsoFrom, RestorableRepeat } from "@/src/features/newsletter/board-repeats";
 import { CANDIDATE_SECTION_CONFIGS } from "@/src/features/newsletter/section-config";
+import type { ReasonCodes } from "@/src/pipeline/feedback/default-reason-codes";
 import type { SimilarStory } from "@/src/pipeline/repeats/repeat-rules";
 
 export const APPROVAL_OUTLINE_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -62,6 +63,8 @@ export type ApprovalOutlineData = {
   unsent_drafts?: UnsentDraftNotice[];
   // Highest candidate story id the server saw when it built the board. Missing on older cached boards.
   candidate_marker?: number | null;
+  // The board's reason chips (#150), from the setting when the board was built. Missing on older cached boards.
+  reason_codes?: ReasonCodes;
 };
 
 export type UnsentDraftNotice = {
