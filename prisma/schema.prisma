@@ -170,6 +170,8 @@ model PublishEvent {
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   /// The native draft the sent email was made from (its data-draft-id). NULL for n8n's emails.
   draftId        BigInt?  @map("draft_id")
+  /// The staged version the sent email was made from (its data-version-id). NULL for emails staged before #149.
+  stagedVersionId BigInt? @map("staged_version_id")
 
   @@unique([mode, gmailMessageId])
   @@index([issueId])
@@ -267,9 +269,40 @@ model IssueDraft {
   finishedAt       DateTime? @map("finished_at") @db.Timestamptz(6)
   /// A "New image" draft (#116): the ready draft whose written content it re-uses. Null for a commit's draft.
   sourceDraftId    BigInt?   @map("source_draft_id")
+  /// When the owner last changed the draft's title or image in the app (#149). NULL for a draft nobody changed.
+  editedAt         DateTime? @map("edited_at") @db.Timestamptz(6)
 
   @@unique([issueId, version])
   @@map("issue_drafts")
+  @@schema("newsletter")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// One row per staged version of an issue (#149, ADR 0005): the exact title, image, content, and HTML the owner
+/// staged for sending, numbered from 1 per issue. status is staging (the call to the distribution service is
+/// running) or staged (CHECK constraint in the migration). A staged row never changes. id is the hidden
+/// data-version-id in the staged email. service is the distribution service's key; service_ref is the id that
+/// service returned. No foreign keys, like the other pipeline tables.
+model StagedVersion {
+  id               BigInt    @id @default(autoincrement())
+  issueId          BigInt    @map("issue_id")
+  version          Int
+  draftId          BigInt    @map("draft_id")
+  status           String
+  title            String
+  featuredImageUrl String?   @map("featured_image_url")
+  scenePrompt      String?   @map("scene_prompt")
+  content          Json
+  html             String
+  service          String
+  serviceRef       String?   @map("service_ref")
+  serviceUrl       String?   @map("service_url")
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  stagedAt         DateTime? @map("staged_at") @db.Timestamptz(6)
+
+  @@unique([issueId, version])
+  @@index([draftId])
+  @@map("staged_versions")
   @@schema("newsletter")
 }
 

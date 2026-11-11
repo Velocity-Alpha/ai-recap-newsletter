@@ -2,22 +2,26 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createApprovalSessionToken } from "@/src/server/approval-auth";
 
-const board = vi.hoisted(() => ({ listDraftsForBoard: vi.fn() }));
+const board = vi.hoisted(() => ({ readDateForBoard: vi.fn() }));
 vi.mock("@/src/pipeline/draft/draft-board", () => board);
 
 import { GET } from "@/app/api/approval/drafts/route";
 
-const ENTRY = {
-  id: 41,
-  version: 2,
-  status: "running",
-  subject: null,
-  failedStepLabel: null,
-  ghlTemplateId: null,
-  ghlPreviewUrl: null,
-  sent: false,
-  current: false,
-  createdAt: "2026-05-21T14:00:00.000Z",
+const VIEW = {
+  state: { kind: "staged", version: 2, changedSinceStaged: false },
+  currentDraft: { id: 41, edited: true },
+  stagedVersions: [
+    {
+      id: 9,
+      version: 2,
+      title: "Pretend Lab Plans A Week",
+      stagedAt: "2026-05-21T14:00:00.000Z",
+      serviceName: "Pretend Mail",
+      serviceUrl: null,
+      latest: true,
+      sent: false,
+    },
+  ],
 };
 
 async function get(query: string, signedIn = true) {
@@ -35,14 +39,14 @@ describe("GET /api/approval/drafts", () => {
     vi.clearAllMocks();
     process.env.APPROVAL_PASSWORD = "approval-secret";
     process.env.SESSION_SECRET = "test-session-secret";
-    board.listDraftsForBoard.mockResolvedValue([ENTRY, { ...ENTRY, id: 40, version: 1 }]);
+    board.readDateForBoard.mockResolvedValue(VIEW);
   });
 
   it("needs the approval login", async () => {
     const { response } = await get("?date=2026-05-21", false);
 
     expect(response.status).toBe(401);
-    expect(board.listDraftsForBoard).not.toHaveBeenCalled();
+    expect(board.readDateForBoard).not.toHaveBeenCalled();
   });
 
   it("needs a YYYY-MM-DD date", async () => {
@@ -52,19 +56,21 @@ describe("GET /api/approval/drafts", () => {
     expect(json.error).toContain("date");
   });
 
-  it("lists the date's drafts and the version the next commit makes", async () => {
+  it("gives the date's state, current draft, and staged versions", async () => {
     const { response, json } = await get("?date=2026-05-21");
 
     expect(response.status).toBe(200);
-    expect(board.listDraftsForBoard).toHaveBeenCalledWith("2026-05-21");
-    expect(json).toEqual({ drafts: [ENTRY, { ...ENTRY, id: 40, version: 1 }], nextVersion: 3 });
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
+    expect(board.readDateForBoard).toHaveBeenCalledWith("2026-05-21");
+    expect(json).toEqual(VIEW);
   });
 
-  it("says the next commit makes v1 when the date has no drafts", async () => {
-    board.listDraftsForBoard.mockResolvedValue([]);
+  it("says so when the read fails, without the cause", async () => {
+    board.readDateForBoard.mockRejectedValue(new Error("connection string leaked here"));
 
-    const { json } = await get("?date=2026-05-21");
+    const { response, json } = await get("?date=2026-05-21");
 
-    expect(json).toEqual({ drafts: [], nextVersion: 1 });
+    expect(response.status).toBe(500);
+    expect(json).toEqual({ error: "Could not read the drafts." });
   });
 });

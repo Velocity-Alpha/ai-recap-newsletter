@@ -91,7 +91,7 @@ describe("commitOutline and readN8nIssue", () => {
 describe("replayDraft", () => {
   const issue = readN8nIssue(N8N_ISSUE);
 
-  it("drafts with n8n's image and a GHL dry run, and reports content, problems, and timings", async () => {
+  it("drafts with n8n's image, and reports content, problems, and timings", async () => {
     const writer: IssueWriter = vi.fn(async () => structuredClone(SAMPLE_CONTENT));
 
     const result = await replayDraft({ outline: SAMPLE_OUTLINE, stories: SAMPLE_APPROVED, n8nIssue: issue }, { writer });
@@ -106,9 +106,36 @@ describe("replayDraft", () => {
       problems: [],
       unreadStoryIds: [501, 502, 503, 504],
       scenePrompt: "A pretend lab at dawn.",
-      ghlTemplate: `dry-run-2027-01-04-v1`,
     });
-    expect(Object.keys(result.report.timings)).toEqual(["read_articles", "write", "validate", "image", "html", "ghl"]);
+    expect(Object.keys(result.report.timings)).toEqual(["read_articles", "write", "validate", "image", "html"]);
+  });
+
+  it("makes no email in the distribution service: no draft row, no network, and no service template in the report", async () => {
+    const writer: IssueWriter = vi.fn(async () => structuredClone(SAMPLE_CONTENT));
+    const network = vi.fn(async () => new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", network);
+
+    try {
+      const result = await replayDraft({ outline: SAMPLE_OUTLINE, stories: SAMPLE_APPROVED, n8nIssue: issue }, { writer });
+
+      expect(result.report.status).toBe("ready");
+      expect(result.report).not.toHaveProperty("ghlTemplate");
+      // The replay has no draft row, so its email carries draft id 0, which the parser reads as no draft.
+      expect(result.nativeHtml).toContain('data-draft-id="0"');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+    expect(network).not.toHaveBeenCalled();
+  });
+
+  it("reports no service template for a failed replay either", async () => {
+    const writer: IssueWriter = vi.fn(async () => Promise.reject(new Error("The writer refused: no.")));
+
+    const result = await replayDraft({ outline: SAMPLE_OUTLINE, stories: SAMPLE_APPROVED, n8nIssue: issue }, { writer });
+
+    expect(result.report.status).toBe("failed");
+    expect(result.report).not.toHaveProperty("ghlTemplate");
+    expect(Object.keys(result.report.timings)).toEqual(["read_articles", "write"]);
   });
 
   it("still renders the email when the checks fail, and lists the problems", async () => {
@@ -175,5 +202,12 @@ describe("renderReplayIndex", () => {
     expect(html).toContain('<iframe src="2027-01-04.n8n.html"');
     expect(html).toContain("A &amp; B");
     expect(html).toContain("Bad &lt;b&gt;");
+  });
+
+  it("names the steps it timed and whose images they are, with no distribution service step", () => {
+    const html = renderReplayIndex([]);
+
+    expect(html).toContain("<p>Steps timed: read_articles, write, validate, image, html. Images are n8n's.</p>");
+    expect(html).not.toMatch(/ghl/i);
   });
 });

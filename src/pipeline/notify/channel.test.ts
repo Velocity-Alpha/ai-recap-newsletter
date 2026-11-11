@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { REVIEW_CHAT_ID } from "@/src/pipeline/ingest/telegram";
+import { REVIEW_CHAT_ID } from "@/src/pipeline/review-group";
 import { createTelegramOpsChannel, opsChannelFromEnv } from "@/src/pipeline/notify/channel";
 
 const OPS_CHAT_ID = "-4000000001";

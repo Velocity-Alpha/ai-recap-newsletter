@@ -2,11 +2,10 @@ import type { Prisma } from "@/src/generated/prisma";
 import { createOpenAIExtractor } from "@/src/pipeline/ingest/extract";
 import { ingestStories, type IngestResult, type SourceResult } from "@/src/pipeline/ingest/ingest";
 import { createPrismaIngestStore } from "@/src/pipeline/ingest/ingest-store";
-import { buildReadyMessage, createTelegramSender } from "@/src/pipeline/ingest/telegram";
+import { buildReadyMessage, sendToReviewGroup, type ReviewGroupStatus } from "@/src/pipeline/review-group";
 import { createGmailReader, readGmailCredentials } from "@/src/pipeline/publish/gmail-client";
 import { finishRun, logEvent, startRun, type EventLevel, type RunTrigger } from "@/src/pipeline/runs";
 import { readSetting } from "@/src/pipeline/settings";
-import { createSideEffects } from "@/src/pipeline/side-effects";
 
 /**
  * Story ingestion with its run log and Telegram message, independent of the job runner. The
@@ -18,12 +17,10 @@ type PipelineRunner = "netlify" | "trigger";
 
 const JOB = "ingest-stories";
 
-export type TelegramStatus = "sent" | "recorded" | "failed" | "not_configured";
-
 export type RunIngestResult =
   | { status: "other_runner"; runner: PipelineRunner }
   | { status: "not_configured"; reason: string }
-  | { status: "ran"; runId: string; result: IngestResult; telegram: TelegramStatus };
+  | { status: "ran"; runId: string; result: IngestResult; telegram: ReviewGroupStatus };
 
 export interface RunIngestOptions {
   env?: Record<string, string | undefined>;
@@ -43,52 +40,13 @@ function defaultIngest(env: Record<string, string | undefined>) {
 
 function sourceEvent(source: SourceResult): { level: EventLevel; message: string } {
   if (source.status === "failed") return { level: "error", message: `${source.name}: failed. ${source.errors.join(" ")}` };
-  const counts = `${source.emails} email(s), ${source.stories} stories, ${source.skippedNoLink} without a link.`;
+  const counts = `${source.documents} document(s), ${source.stories} stories, ${source.skippedNoLink} without a link.`;
   if (source.status === "partial") {
     return { level: "warn", message: `${source.name}: partial, ${counts} Errors: ${source.errors.join(" ")}` };
   }
   return { level: "info", message: `${source.name}: ${source.status}, ${counts}` };
 }
 
-async function notify(
-  runId: bigint,
-  result: IngestResult,
-  env: Record<string, string | undefined>,
-  sendTelegram: ((text: string) => Promise<void>) | undefined,
-): Promise<TelegramStatus> {
-  const text = buildReadyMessage(result);
-  const effects = createSideEffects({
-    appEnv: env.APP_ENV,
-    record: (entry) =>
-      logEvent(runId, {
-        level: "info",
-        step: "telegram",
-        message: "Not sent outside production. Recorded the text.",
-        data: entry.payload as Prisma.InputJsonValue,
-      }).then(() => undefined),
-  });
-  const token = env.TELEGRAM_REVIEW_BOT_TOKEN?.trim();
-  const send = sendTelegram ?? (token ? createTelegramSender({ token, chatId: env.TELEGRAM_REVIEW_CHAT_ID?.trim() || undefined }) : undefined);
-  if (effects.live && !send) {
-    await logEvent(runId, { level: "warn", step: "telegram", message: "Missing setting: TELEGRAM_REVIEW_BOT_TOKEN. Not sent." });
-    return "not_configured";
-  }
-  try {
-    const outcome = await effects.run({
-      target: "review_group",
-      action: "sendMessage",
-      payload: { text },
-      send: () => send!(text),
-      dryRun: () => undefined,
-    });
-    if (outcome.mode === "recorded") return "recorded";
-    await logEvent(runId, { level: "info", step: "telegram", message: "Sent the ready message." });
-    return "sent";
-  } catch (error) {
-    await logEvent(runId, { level: "warn", step: "telegram", message: error instanceof Error ? error.message : String(error) });
-    return "failed";
-  }
-}
 
 export async function runIngest(runner: PipelineRunner, options: RunIngestOptions = {}): Promise<RunIngestResult> {
   const env = options.env ?? process.env;
@@ -121,7 +79,11 @@ export async function runIngest(runner: PipelineRunner, options: RunIngestOption
     const { level, message } = sourceEvent(source);
     await logEvent(runId, { level, step: "source", message, data: source as unknown as Prisma.InputJsonValue });
   }
-  const telegram = await notify(runId, result, env, options.sendTelegram);
+  const telegram = await sendToReviewGroup(buildReadyMessage(result), {
+    env,
+    send: options.sendTelegram,
+    log: (event) => logEvent(runId, event),
+  });
 
   const withErrors = result.sources.filter((source) => source.status === "failed" || source.status === "partial");
   const stats = {
@@ -129,7 +91,7 @@ export async function runIngest(runner: PipelineRunner, options: RunIngestOption
     targetDate: result.targetDate,
     storiesSaved: result.storiesSaved,
     telegram,
-    sources: result.sources.map(({ source, status, emails, stories, skippedNoLink }) => ({ source, status, emails, stories, skippedNoLink })),
+    sources: result.sources.map(({ source, status, documents, stories, skippedNoLink }) => ({ source, status, documents, stories, skippedNoLink })),
   };
   await finishRun(
     runId,

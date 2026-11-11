@@ -5,7 +5,8 @@ import { HTMLElement, NodeType, parse, type Node } from "node-html-parser";
  * `content_json` v2 object the website renders. No AI: it reads the IDs and structure that n8n's
  * "Build Clean HTML Email" node writes. `data-issue-id` names the issue; each story wrapper carries
  * `data-story-id` and `data-src-url`, which survive Mailgun's link tracking. Native drafts also put
- * `data-draft-id` next to `data-issue-id` (src/pipeline/draft/email-html.ts).
+ * `data-draft-id` next to `data-issue-id`, and a staged email (#149) also carries `data-version-id`
+ * (src/pipeline/draft/email-html.ts).
  */
 
 export interface PublishedBullet {
@@ -56,6 +57,8 @@ export interface SentEmailParseResult {
   storyIds: number[];
   /** Anything the parser could not read cleanly. Empty means the email matched the template. */
   problems: string[];
+  /** The staged version this email was made from (`data-version-id`); null for emails staged before #149. */
+  versionId: number | null;
   /** The native draft this email was made from; null for n8n's emails, which carry no draft id. */
   draftId: number | null;
 }
@@ -245,5 +248,11 @@ export function parseSentEmail(html: string): SentEmailParseResult | null {
     new Set(issueElement.querySelectorAll("[data-story-id]").map(storyId).filter(Number.isSafeInteger))
   );
 
-  return { content, storyIds, problems, draftId: positiveId(issueElement.getAttribute("data-draft-id")) };
+  return {
+    content,
+    storyIds,
+    problems,
+    versionId: positiveId(issueElement.getAttribute("data-version-id")),
+    draftId: positiveId(issueElement.getAttribute("data-draft-id")),
+  };
 }

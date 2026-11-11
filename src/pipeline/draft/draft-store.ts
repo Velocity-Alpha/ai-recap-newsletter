@@ -1,15 +1,15 @@
 import { Prisma } from "@/src/generated/prisma";
 import { ISSUE_DRAFT, ISSUE_PUBLISHED } from "@/src/features/newsletter/issue-status";
 import { toIssueContentJson, type WrittenIssueContent } from "@/src/pipeline/draft/content";
-import { emailImageUrl } from "@/src/pipeline/draft/email-html";
+import { emailImageUrl, renderIssueEmailHtml } from "@/src/pipeline/draft/email-html";
 import type { ApprovalOutline } from "@/src/pipeline/draft/outline";
 import type { PartialDraft, ProducedDraft } from "@/src/pipeline/draft/produce-draft";
-import { finishRun, logEvent, startRun } from "@/src/pipeline/runs";
 import { prisma } from "@/src/server/prisma";
 
 /**
- * Issues and their drafts (ADR 0002): one issue per date, and each commit makes the next draft of it.
- * The draft job (run-draft.ts) and the board (#79) read and write drafts only through here.
+ * Issues and their drafts (ADR 0005): one issue per date, and each commit makes the next draft of it. A title or
+ * image change edits the newest draft in place. The draft job (run-draft.ts) and the board (#79) read and write
+ * drafts only through here.
  */
 
 export type DraftStatus = "running" | "ready" | "failed";
@@ -27,7 +27,7 @@ export class IssuePublishedError extends Error {
     readonly issueId: number,
     readonly issueDate: string,
   ) {
-    super(`The issue for ${issueDate} (id ${issueId}) is already published. Drafting stopped.`);
+    super(`The issue for ${issueDate} (id ${issueId}) is already published.`);
     this.name = "IssuePublishedError";
   }
 }
@@ -40,17 +40,22 @@ export class DraftNotRetryableError extends Error {
 }
 
 /**
- * "New image" (#116) asked of a draft that does not exist (`missing`), is not ready (`not_ready`), or is not the
- * newest (`not_current`: a newer draft is running or ready, and the new draft would put this one's older text back).
+ * A title or image change (#149) asked of a draft that does not exist (`missing`), is not the issue's newest draft
+ * (`not_current`), or is not ready (`not_ready`), or a new title that another issue already has (`title_taken`).
  */
-export class NewImageError extends Error {
+export class DraftEditError extends Error {
   constructor(
     message: string,
-    readonly reason: "missing" | "not_ready" | "not_current",
+    readonly reason: "missing" | "not_ready" | "not_current" | "title_taken",
   ) {
     super(message);
-    this.name = "NewImageError";
+    this.name = "DraftEditError";
   }
+}
+
+/** `issues.slug` comes from the title and is unique, so two issues cannot have one title. */
+export function titleTakenMessage(title: string, next: string): string {
+  return `Another issue already uses the title "${title}", and titles must be unique. ${next}`;
 }
 
 export interface CreatedDraft {
@@ -65,7 +70,7 @@ function day(date: string): Date {
   return new Date(`${date}T00:00:00.000Z`);
 }
 
-function dateKey(value: Date | null): string | null {
+export function dateKey(value: Date | null): string | null {
   return value ? value.toISOString().slice(0, 10) : null;
 }
 
@@ -88,12 +93,12 @@ export function isStuckDraft(draft: { status: string; startedAt: Date | null; qu
  * Serialises everything that picks or writes the issue for a date: creating a draft, and copying a ready draft to
  * the issue. The unique index on `issues.issue_date` (#82) backs it up.
  */
-async function lockIssueDate(tx: Client, date: string): Promise<void> {
+export async function lockIssueDate(tx: Client, date: string): Promise<void> {
   await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`issue-date:${date}`}))`;
 }
 
 /** The date's issue, if it is published. */
-async function publishedIssueFor(client: Client, date: string): Promise<{ id: bigint } | null> {
+export async function publishedIssueFor(client: Client, date: string): Promise<{ id: bigint } | null> {
   return client.issue.findFirst({ where: { issueDate: day(date), status: ISSUE_PUBLISHED }, select: { id: true } });
 }
 
@@ -137,8 +142,8 @@ export async function createDraft(outlineId: Id, options: { now?: () => Date } =
   });
 }
 
-/** A ready draft that "New image" (#116) starts from. */
-export interface ImageSource {
+/** The issue's current draft: its newest draft, when that draft is ready. Only it can be changed or staged. */
+export interface CurrentDraft {
   draftId: number;
   issueId: number;
   version: number;
@@ -149,104 +154,97 @@ export interface ImageSource {
   scenePrompt: string | null;
 }
 
-/**
- * The ready draft "New image" starts from. Throws `NewImageError` when it is missing or not ready, and
- * `IssuePublishedError` when any issue for its date is published.
- */
-export async function readImageSource(draftId: Id): Promise<ImageSource> {
-  const { source } = await readSourceDraft(draftId);
-  await assertNewestDraft(prisma, source);
-  return source;
-}
-
-/** A draft that is running or ready wins over older drafts when it saves. */
-const LIVE_DRAFT_STATUSES: DraftStatus[] = ["running", "ready"];
-
-function newerLiveDraft(client: Client, issueId: bigint, version: number) {
-  return client.issueDraft.findFirst({
-    where: { issueId, version: { gt: version }, status: { in: LIVE_DRAFT_STATUSES } },
-    orderBy: { version: "desc" },
-    select: { version: true, status: true },
-  });
-}
-
-/** "New image" starts only from the newest ready draft, with nothing newer running. */
-async function assertNewestDraft(client: Client, source: Pick<ImageSource, "issueId" | "version">): Promise<void> {
-  const newer = await newerLiveDraft(client, BigInt(source.issueId), source.version);
-  if (newer) {
-    throw new NewImageError(
-      `Draft v${source.version} is not the newest draft: v${newer.version} is ${newer.status}. Use "New image" on the newest ready draft.`,
-      "not_current",
-    );
-  }
-}
-
-async function readSourceDraft(draftId: Id): Promise<{ source: ImageSource; outlineId: bigint }> {
-  const draft = await prisma.issueDraft.findUnique({
-    where: { id: BigInt(draftId) },
-    select: { id: true, issueId: true, version: true, outlineId: true, status: true, content: true, featuredImageUrl: true, scenePrompt: true },
-  });
-  if (!draft) throw new NewImageError(`Draft ${draftId} does not exist.`, "missing");
-  if (draft.status !== "ready" || !draft.content) {
-    throw new NewImageError(`Draft ${draftId} is ${draft.status}. Only a ready draft can get a new image.`, "not_ready");
-  }
+async function findDraftWithDate(draftId: Id): Promise<{ id: bigint; issueId: bigint; version: number; issueDate: string }> {
+  const draft = await prisma.issueDraft.findUnique({ where: { id: BigInt(draftId) }, select: { id: true, issueId: true, version: true } });
+  if (!draft) throw new DraftEditError(`Draft ${draftId} does not exist.`, "missing");
   const issue = await prisma.issue.findUnique({ where: { id: draft.issueId }, select: { issueDate: true } });
   const issueDate = dateKey(issue?.issueDate ?? null);
-  if (!issueDate) throw new NewImageError(`Draft ${draftId} has no issue date.`, "missing");
-  const published = await publishedIssueFor(prisma, issueDate);
-  if (published) throw new IssuePublishedError(Number(published.id), issueDate);
+  if (!issueDate) throw new DraftEditError(`Draft ${draftId} has no issue date.`, "missing");
+  return { ...draft, issueDate };
+}
+
+/**
+ * The draft as the issue's current draft. Throws `IssuePublishedError` when any issue for the date is published,
+ * and `DraftEditError` when a newer draft exists (`not_current`) or the draft is not ready (`not_ready`).
+ */
+async function currentDraftOf(client: Client, draft: { id: bigint; issueId: bigint; version: number; issueDate: string }): Promise<CurrentDraft> {
+  const published = await publishedIssueFor(client, draft.issueDate);
+  if (published) throw new IssuePublishedError(Number(published.id), draft.issueDate);
+
+  const newest = await client.issueDraft.findFirst({
+    where: { issueId: draft.issueId },
+    orderBy: { version: "desc" },
+    select: { id: true, status: true, content: true, featuredImageUrl: true, scenePrompt: true },
+  });
+  // The messages name no draft number: the owner sees only staged version numbers (#149).
+  if (!newest || newest.id !== draft.id) {
+    throw new DraftEditError(`This is not the newest draft for ${draft.issueDate}. Reload the page.`, "not_current");
+  }
+  if (newest.status !== "ready" || !newest.content) {
+    throw new DraftEditError(`The draft for ${draft.issueDate} is ${newest.status}. Only a ready draft can be changed.`, "not_ready");
+  }
   return {
-    outlineId: draft.outlineId,
-    source: {
-      draftId: Number(draft.id),
-      issueId: Number(draft.issueId),
-      version: draft.version,
-      issueDate,
-      content: draft.content as unknown as WrittenIssueContent,
-      featuredImageUrl: draft.featuredImageUrl,
-      scenePrompt: draft.scenePrompt,
-    },
+    draftId: Number(draft.id),
+    issueId: Number(draft.issueId),
+    version: draft.version,
+    issueDate: draft.issueDate,
+    content: newest.content as unknown as WrittenIssueContent,
+    featuredImageUrl: newest.featuredImageUrl,
+    scenePrompt: newest.scenePrompt,
   };
 }
 
+/** The current draft, for "New image" ideas and "Generate". Throws as `editCurrentDraft` does. */
+export async function readCurrentDraft(draftId: Id): Promise<CurrentDraft> {
+  return currentDraftOf(prisma, await findDraftWithDate(draftId));
+}
+
+export type DraftEdit = { title: string } | { image: { imageUrl: string; scenePrompt: string } };
+
 /**
- * "Use this image" (#116, ADR 0002): the issue's next draft, with the source draft's written content and the
- * owner's chosen image. The draft job copies the content, so it does not write again, and makes new HTML and a
- * new GHL template. The source draft is not changed. Same published and per-date lock rules as a commit.
+ * Changes the current draft's title or image in place (#149, ADR 0005): the same draft row, with its email HTML
+ * built again, and the issue row updated in the same transaction. It makes no new draft and calls no outside
+ * service. A staged version keeps its own copy, so it does not change. Same published and per-date lock rules
+ * as a commit. The caller gives a clean title (draft-edit.ts) or an image it has checked (new-image.ts).
  */
-export async function createImageDraft(
-  sourceDraftId: Id,
-  image: { imageUrl: string; scenePrompt: string },
-  options: { now?: () => Date } = {},
-): Promise<CreatedDraft> {
+export async function editCurrentDraft(draftId: Id, edit: DraftEdit, options: { now?: () => Date } = {}): Promise<CurrentDraft> {
   const now = (options.now ?? (() => new Date()))();
-  const { source, outlineId } = await readSourceDraft(sourceDraftId);
+  const draft = await findDraftWithDate(draftId);
 
-  return prisma.$transaction(async (tx) => {
-    await lockIssueDate(tx, source.issueDate);
-    const published = await publishedIssueFor(tx, source.issueDate);
-    if (published) throw new IssuePublishedError(Number(published.id), source.issueDate);
-    // Under the lock, so a commit cannot start a newer draft between this check and the insert.
-    await assertNewestDraft(tx, source);
+  try {
+    return await prisma.$transaction(async (tx) => {
+      // Under the lock, so a commit or a staging cannot slip in between the checks and the write.
+      await lockIssueDate(tx, draft.issueDate);
+      const current = await currentDraftOf(tx, draft);
 
-    const issueId = BigInt(source.issueId);
-    const last = await tx.issueDraft.findFirst({ where: { issueId }, orderBy: { version: "desc" }, select: { version: true } });
-    const version = (last?.version ?? 0) + 1;
-    const draft = await tx.issueDraft.create({
-      data: {
-        issueId,
-        version,
-        outlineId,
-        sourceDraftId: BigInt(source.draftId),
-        status: "running",
-        queuedAt: now,
-        featuredImageUrl: image.imageUrl,
-        scenePrompt: image.scenePrompt,
-      },
-      select: { id: true },
+      const content: WrittenIssueContent = "title" in edit ? { ...current.content, title: edit.title } : current.content;
+      // A draft with no image or scene prompt keeps null: a title change does not write "" in its place.
+      const featuredImageUrl = "image" in edit ? edit.image.imageUrl : current.featuredImageUrl;
+      const scenePrompt = "image" in edit ? edit.image.scenePrompt : current.scenePrompt;
+      const html = renderIssueEmailHtml(
+        content,
+        { id: current.issueId, issueDate: current.issueDate },
+        { id: current.draftId, featuredImageUrl: featuredImageUrl ?? "" },
+      );
+
+      await tx.issueDraft.update({
+        where: { id: draft.id },
+        data: { content: content as unknown as Prisma.InputJsonValue, html, featuredImageUrl, scenePrompt, editedAt: now },
+      });
+      const updated = await tx.issue.updateMany({
+        where: { id: draft.issueId, status: ISSUE_DRAFT },
+        data: issueFields({ content, html, featuredImageUrl, scenePrompt }, { issueId: current.issueId, issueDate: current.issueDate }),
+      });
+      if (updated.count !== 1) throw new IssuePublishedError(current.issueId, current.issueDate);
+      return { ...current, content, featuredImageUrl, scenePrompt };
     });
-    return { draftId: Number(draft.id), issueId: source.issueId, version, issueDate: source.issueDate };
-  });
+  } catch (error) {
+    // The failed write undid the whole transaction, so the draft still has its old title.
+    if ((error as { code?: unknown } | null)?.code === "P2002" && "title" in edit) {
+      throw new DraftEditError(titleTakenMessage(edit.title, "Use a different title."), "title_taken");
+    }
+    throw error;
+  }
 }
 
 /**
@@ -257,17 +255,7 @@ export async function retryDraft(draftId: Id, options: { now?: () => Date } = {}
   const now = (options.now ?? (() => new Date()))();
   const draft = await prisma.issueDraft.findUnique({
     where: { id: BigInt(draftId) },
-    select: {
-      id: true,
-      issueId: true,
-      version: true,
-      status: true,
-      queuedAt: true,
-      startedAt: true,
-      ghlTemplateId: true,
-      ghlPreviewUrl: true,
-      sourceDraftId: true,
-    },
+    select: { id: true, issueId: true, version: true, status: true, queuedAt: true, startedAt: true },
   });
   if (!draft) throw new DraftNotRetryableError(`Draft ${draftId} does not exist.`);
   const issue = await prisma.issue.findUnique({ where: { id: draft.issueId }, select: { issueDate: true, status: true } });
@@ -282,11 +270,6 @@ export async function retryDraft(draftId: Id, options: { now?: () => Date } = {}
     throw new DraftNotRetryableError(`Draft ${draftId} is ${draft.status}. Only a failed draft can be retried.`);
   }
 
-  // The retry makes a new GHL template. The old one stays in GHL, so keep its id in the run log.
-  if (draft.ghlTemplateId) {
-    await logRetriedTemplate({ ...draft, issueDate, ghlTemplateId: draft.ghlTemplateId }, now);
-  }
-
   // Matching on the status and times makes two clicks on "Retry" reset it once.
   const reset = await prisma.issueDraft.updateMany({
     where: { id: draft.id, status: draft.status, queuedAt: draft.queuedAt, startedAt: draft.startedAt },
@@ -297,11 +280,10 @@ export async function retryDraft(draftId: Id, options: { now?: () => Date } = {}
       error: null,
       content: Prisma.DbNull,
       html: null,
-      // A "New image" draft keeps its chosen image: it is the draft's input, not something the job made.
-      ...(draft.sourceDraftId === null ? { featuredImageUrl: null, scenePrompt: null } : {}),
-      ghlTemplateId: null,
-      ghlPreviewUrl: null,
+      featuredImageUrl: null,
+      scenePrompt: null,
       unreadStoryIds: [],
+      editedAt: null,
       queuedAt: now,
       startedAt: null,
       finishedAt: null,
@@ -327,30 +309,6 @@ export async function markDraftStartFailed(draftId: Id, error: string, now: Date
   return updated.count === 1;
 }
 
-/** The job name for a retry's run log entry. Not `draft-issue`: a retry does no drafting. */
-export const DRAFT_RETRY_JOB = "draft-retry";
-
-async function logRetriedTemplate(
-  draft: { id: bigint; version: number; issueDate: string; ghlTemplateId: string; ghlPreviewUrl: string | null },
-  now: Date,
-): Promise<void> {
-  const runId = await startRun({ job: DRAFT_RETRY_JOB, trigger: "manual" }, now);
-  const data = {
-    draftId: Number(draft.id),
-    version: draft.version,
-    issueDate: draft.issueDate,
-    ghlTemplateId: draft.ghlTemplateId,
-    ghlPreviewUrl: draft.ghlPreviewUrl,
-  };
-  await logEvent(runId, {
-    level: "info",
-    step: "retry",
-    message: `Retrying draft ${draft.id} (v${draft.version} for ${draft.issueDate}). Its old GHL template ${draft.ghlTemplateId} stays in GHL.`,
-    data,
-  });
-  await finishRun(runId, { status: "succeeded", stats: data }, now);
-}
-
 // ---- The draft job's reads and writes (run-draft.ts) ----
 
 export interface DraftToRun {
@@ -361,14 +319,12 @@ export interface DraftToRun {
   status: string;
   startedAt: Date | null;
   issueDate: string | null;
-  /** Set on a "New image" draft (#116): the job copies this draft's content instead of writing. */
-  sourceDraftId: bigint | null;
 }
 
 export async function findDraftToRun(draftId: Id): Promise<DraftToRun | null> {
   const draft = await prisma.issueDraft.findUnique({
     where: { id: BigInt(draftId) },
-    select: { id: true, issueId: true, version: true, outlineId: true, status: true, startedAt: true, sourceDraftId: true },
+    select: { id: true, issueId: true, version: true, outlineId: true, status: true, startedAt: true },
   });
   if (!draft) return null;
   const issue = await prisma.issue.findUnique({ where: { id: draft.issueId }, select: { issueDate: true } });
@@ -404,43 +360,26 @@ export async function loadDraftInputs(draft: DraftToRun): Promise<{ outline: App
   return { outline: outline.payload as unknown as ApprovalOutline, issue: { id: Number(draft.issueId), date } };
 }
 
-/**
- * What a "New image" draft re-uses: its source draft's written content, and the image the owner chose (stored on
- * this draft when it was made). A missing image is left for the job's image step to report.
- */
-export async function loadNewImageInputs(
-  draft: Pick<DraftToRun, "id" | "issueId" | "sourceDraftId">,
-): Promise<{ source: { content: WrittenIssueContent; unreadStoryIds: number[] }; image: { imageUrl: string; scenePrompt: string } }> {
-  if (draft.sourceDraftId === null) throw new Error(`Draft ${draft.id} is not a new image draft.`);
-  const source = await prisma.issueDraft.findUnique({
-    where: { id: draft.sourceDraftId },
-    select: { issueId: true, status: true, content: true, unreadStoryIds: true },
-  });
-  if (!source || source.issueId !== draft.issueId) {
-    throw new Error(`Draft ${draft.sourceDraftId}, which this new image draft copies, is not a draft of the same issue.`);
-  }
-  if (source.status !== "ready" || !source.content) {
-    throw new Error(`Draft ${draft.sourceDraftId}, which this new image draft copies, is ${source.status}, not ready.`);
-  }
-  const own = await prisma.issueDraft.findUnique({ where: { id: draft.id }, select: { featuredImageUrl: true, scenePrompt: true } });
-  return {
-    source: { content: source.content as unknown as WrittenIssueContent, unreadStoryIds: source.unreadStoryIds },
-    image: { imageUrl: own?.featuredImageUrl ?? "", scenePrompt: own?.scenePrompt ?? "" },
-  };
-}
-
 export type IssueUpdate = "updated" | "newer_draft" | "published";
+
+export interface ReadyDraftSave {
+  /** What happened to the issue row. */
+  issue: IssueUpdate;
+  /** No newer draft of any status exists for the issue, so this is the draft to review. */
+  newest: boolean;
+}
 
 /**
  * Marks the draft ready and, in the same transaction, copies it to the issue row, so the site and publish
  * detection read it as before. The issue keeps a newer ready draft, and nothing changes once any issue for the
- * date is published.
+ * date is published. A newer draft that is running or failed does not stop the copy, but then this draft is not
+ * the `newest`.
  */
 export async function saveReadyDraft(
   draft: DraftToRun & { issueDate: string },
   produced: ProducedDraft,
   now: Date,
-): Promise<IssueUpdate> {
+): Promise<ReadyDraftSave> {
   return prisma.$transaction(async (tx) => {
     // Two drafts finishing together: the second waits here, so it sees the first one's ready row below.
     await lockIssueDate(tx, draft.issueDate);
@@ -454,26 +393,32 @@ export async function saveReadyDraft(
         html: produced.html,
         featuredImageUrl: produced.featuredImageUrl,
         scenePrompt: produced.scenePrompt,
-        ghlTemplateId: produced.ghlTemplateId,
-        ghlPreviewUrl: produced.ghlPreviewUrl,
         unreadStoryIds: produced.unreadStoryIds,
       },
     });
 
-    const newer = await tx.issueDraft.count({ where: { issueId: draft.issueId, version: { gt: draft.version }, status: "ready" } });
-    if (newer > 0) return "newer_draft";
-    if (await publishedIssueFor(tx, draft.issueDate)) return "published";
+    // createDraft takes the same lock, so no newer draft can appear between this read and the commit.
+    const newerDrafts = await tx.issueDraft.findMany({
+      where: { issueId: draft.issueId, version: { gt: draft.version } },
+      select: { status: true },
+    });
+    const newest = newerDrafts.length === 0;
+    if (newerDrafts.some((newer) => newer.status === "ready")) return { issue: "newer_draft", newest };
+    if (await publishedIssueFor(tx, draft.issueDate)) return { issue: "published", newest };
 
     const updated = await tx.issue.updateMany({
       where: { id: draft.issueId, status: ISSUE_DRAFT },
       data: issueFields(produced, { issueId: Number(draft.issueId), issueDate: draft.issueDate }),
     });
-    return updated.count === 1 ? "updated" : "published";
+    return { issue: updated.count === 1 ? "updated" : "published", newest };
   });
 }
 
+/** What a draft gives the issue row. The image and its scene prompt are null on a draft that has none. */
+type IssueSource = Pick<ProducedDraft, "content" | "html"> & { featuredImageUrl: string | null; scenePrompt: string | null };
+
 /** The issue columns a ready draft sets. `slug` is generated from the title. */
-export function issueFields(produced: Pick<ProducedDraft, "content" | "html" | "featuredImageUrl" | "scenePrompt">, meta: { issueId: number; issueDate: string }) {
+export function issueFields(produced: IssueSource, meta: { issueId: number; issueDate: string }) {
   const content: WrittenIssueContent = produced.content;
   return {
     title: content.title,
@@ -484,28 +429,9 @@ export function issueFields(produced: Pick<ProducedDraft, "content" | "html" | "
     contentJson: toIssueContentJson(content, {
       issueId: meta.issueId,
       issueDate: meta.issueDate,
-      featuredImageUrl: emailImageUrl(produced.featuredImageUrl),
+      featuredImageUrl: emailImageUrl(produced.featuredImageUrl ?? ""),
     }) as unknown as Prisma.InputJsonValue,
   };
-}
-
-/**
- * The issue columns for the draft a sent email carried, so the archive shows the version that was sent, not the
- * newest one. Null when the draft is not this issue's or has no email yet: publishing then works as before.
- */
-export async function sentDraftIssueFields(client: Client, issueId: number, draftId: number) {
-  const draft = await client.issueDraft.findUnique({
-    where: { id: BigInt(draftId) },
-    select: { issueId: true, content: true, html: true, featuredImageUrl: true, scenePrompt: true },
-  });
-  if (!draft || draft.issueId !== BigInt(issueId) || !draft.content || !draft.html || !draft.featuredImageUrl || !draft.scenePrompt) {
-    return null;
-  }
-  const issue = await client.issue.findUnique({ where: { id: BigInt(issueId) }, select: { issueDate: true } });
-  const issueDate = dateKey(issue?.issueDate ?? null);
-  if (!issueDate) return null;
-  const { html, featuredImageUrl, scenePrompt } = draft;
-  return issueFields({ content: draft.content as unknown as WrittenIssueContent, html, featuredImageUrl, scenePrompt }, { issueId, issueDate });
 }
 
 /** Marks the draft failed at a step, keeping what it made before the step, so the owner can see it. */
@@ -528,8 +454,6 @@ export async function saveFailedDraft(
       ...(partial.featuredImageUrl ? { featuredImageUrl: partial.featuredImageUrl } : {}),
       ...(partial.scenePrompt ? { scenePrompt: partial.scenePrompt } : {}),
       ...(partial.unreadStoryIds ? { unreadStoryIds: partial.unreadStoryIds } : {}),
-      ...(partial.ghlTemplateId ? { ghlTemplateId: partial.ghlTemplateId } : {}),
-      ...(partial.ghlPreviewUrl ? { ghlPreviewUrl: partial.ghlPreviewUrl } : {}),
     },
   });
 }
@@ -543,7 +467,7 @@ export interface DraftView {
   issueDate: string | null;
   version: number;
   status: DraftStatus;
-  /** The step running now (load, read_articles, write, validate, image, html, ghl, save), else null. */
+  /** The step running now (load, read_articles, write, validate, image, html, save), else null. */
   currentStep: string | null;
   failedStep: string | null;
   /** Plain words, for the board. */
@@ -551,8 +475,6 @@ export interface DraftView {
   /** The written title, once the writer has run. */
   subject: string | null;
   hasHtml: boolean;
-  ghlTemplateId: string | null;
-  ghlPreviewUrl: string | null;
   /** Feature-section stories whose article was not read ("source not read"). */
   unreadStoryIds: number[];
   createdAt: Date;
@@ -562,20 +484,12 @@ export interface DraftView {
   finishedAt: Date | null;
   featuredImageUrl: string | null;
   scenePrompt: string | null;
-  /** A "New image" draft (#116): the draft whose content it re-uses, and that draft's version. */
-  sourceDraftId: number | null;
-  sourceVersion: number | null;
+  /** When the owner last changed the title or the image. Null when the draft is as the job made it. */
+  editedAt: Date | null;
   /** Any issue row for the date is published, so nothing more can be drafted. */
   issuePublished: boolean;
-  /** A newer draft of the issue is running or ready, so "New image" cannot start from this one. */
+  /** The issue has a newer draft, so this one can no longer be changed or staged. */
   hasNewerDraft: boolean;
-}
-
-export interface DraftListItem extends DraftView {
-  /** A sent email carried this draft's id (publish_events.draft_id). */
-  sent: boolean;
-  /** The newest ready draft: the one the issue row holds. */
-  current: boolean;
 }
 
 const VIEW_SELECT = {
@@ -588,8 +502,6 @@ const VIEW_SELECT = {
   error: true,
   content: true,
   html: true,
-  ghlTemplateId: true,
-  ghlPreviewUrl: true,
   unreadStoryIds: true,
   createdAt: true,
   queuedAt: true,
@@ -597,7 +509,7 @@ const VIEW_SELECT = {
   finishedAt: true,
   featuredImageUrl: true,
   scenePrompt: true,
-  sourceDraftId: true,
+  editedAt: true,
 } as const;
 
 type ViewRow = Prisma.IssueDraftGetPayload<{ select: typeof VIEW_SELECT }>;
@@ -610,7 +522,7 @@ function subjectOf(content: unknown): string | null {
 function toView(
   row: ViewRow,
   issueDate: string | null,
-  extra: Pick<DraftView, "issuePublished" | "sourceVersion" | "hasNewerDraft">,
+  extra: Pick<DraftView, "issuePublished" | "hasNewerDraft">,
 ): DraftView {
   return {
     id: Number(row.id),
@@ -623,8 +535,6 @@ function toView(
     error: row.error,
     subject: subjectOf(row.content),
     hasHtml: Boolean(row.html),
-    ghlTemplateId: row.ghlTemplateId,
-    ghlPreviewUrl: row.ghlPreviewUrl,
     unreadStoryIds: row.unreadStoryIds,
     createdAt: row.createdAt,
     queuedAt: row.queuedAt,
@@ -632,43 +542,10 @@ function toView(
     finishedAt: row.finishedAt,
     featuredImageUrl: row.featuredImageUrl,
     scenePrompt: row.scenePrompt,
-    sourceDraftId: row.sourceDraftId === null ? null : Number(row.sourceDraftId),
-    sourceVersion: extra.sourceVersion,
+    editedAt: row.editedAt,
     issuePublished: extra.issuePublished,
     hasNewerDraft: extra.hasNewerDraft,
   };
-}
-
-/** Every draft for a date (YYYY-MM-DD), newest first. */
-export async function listDraftsForDate(date: string): Promise<DraftListItem[]> {
-  const issues = await prisma.issue.findMany({ where: { issueDate: day(date) }, select: { id: true, status: true } });
-  if (issues.length === 0) return [];
-  const issuePublished = issues.some((issue) => issue.status === ISSUE_PUBLISHED);
-  const rows = await prisma.issueDraft.findMany({
-    where: { issueId: { in: issues.map((issue) => issue.id) } },
-    orderBy: [{ version: "desc" }, { id: "desc" }],
-    select: VIEW_SELECT,
-  });
-  if (rows.length === 0) return [];
-
-  const sentRows = await prisma.publishEvent.findMany({
-    where: { draftId: { in: rows.map((row) => row.id) } },
-    select: { draftId: true },
-  });
-  const sent = new Set(sentRows.map((row) => String(row.draftId)));
-  const current = rows.find((row) => row.status === "ready")?.id;
-  const versions = new Map(rows.map((row) => [String(row.id), row.version]));
-  return rows.map((row) => ({
-    ...toView(row, date, {
-      issuePublished,
-      sourceVersion: row.sourceDraftId === null ? null : (versions.get(String(row.sourceDraftId)) ?? null),
-      hasNewerDraft: rows.some(
-        (other) => other.issueId === row.issueId && other.version > row.version && LIVE_DRAFT_STATUSES.includes(other.status as DraftStatus),
-      ),
-    }),
-    sent: sent.has(String(row.id)),
-    current: row.id === current,
-  }));
 }
 
 /** One draft's status, for the board's live progress. Null when there is no such draft. */
@@ -678,10 +555,8 @@ export async function getDraftStatus(draftId: Id): Promise<DraftView | null> {
   const issue = await prisma.issue.findUnique({ where: { id: row.issueId }, select: { issueDate: true } });
   const issueDate = dateKey(issue?.issueDate ?? null);
   const published = issueDate ? await publishedIssueFor(prisma, issueDate) : null;
-  const source =
-    row.sourceDraftId === null ? null : await prisma.issueDraft.findUnique({ where: { id: row.sourceDraftId }, select: { version: true } });
-  const newer = await newerLiveDraft(prisma, row.issueId, row.version);
-  return toView(row, issueDate, { issuePublished: Boolean(published), sourceVersion: source?.version ?? null, hasNewerDraft: Boolean(newer) });
+  const newer = await prisma.issueDraft.count({ where: { issueId: row.issueId, version: { gt: row.version } } });
+  return toView(row, issueDate, { issuePublished: Boolean(published), hasNewerDraft: newer > 0 });
 }
 
 /** The draft's email HTML, for the board's preview frame. */

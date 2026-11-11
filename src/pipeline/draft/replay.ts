@@ -6,7 +6,6 @@ import {
 } from "@/src/pipeline/draft/articles";
 import type { ApprovedSections, WrittenIssueContent } from "@/src/pipeline/draft/content";
 import { renderIssueEmailHtml } from "@/src/pipeline/draft/email-html";
-import { createDraftTemplate } from "@/src/pipeline/draft/ghl-template";
 import { normalizeOutline, parseCommitDate, type ApprovalOutline } from "@/src/pipeline/draft/outline";
 import { DRAFT_STEPS, DraftStepError, produceDraft, readNoArticles, type DraftStep, type ReadArticles } from "@/src/pipeline/draft/produce-draft";
 import { findContentProblems } from "@/src/pipeline/draft/validate";
@@ -14,7 +13,7 @@ import { createOpenAIIssueWriter, type IssueWriter } from "@/src/pipeline/draft/
 
 /**
  * The pieces of scripts/replay-drafts.mts that need no database or network: replay one past commit through
- * produceDraft with n8n's image and a GHL dry run, and lay the two emails side by side (#76 testing box).
+ * produceDraft with n8n's image, and lay the two emails side by side (#76 testing box).
  */
 
 export const REPLAY_USAGE = `Usage: npx vite-node --config vitest.config.ts scripts/replay-drafts.mts -- \\
@@ -118,7 +117,6 @@ export interface ReplayReport {
   /** Each feature story's read outcome, without the text. The script adds it; empty with --no-read. */
   articles?: ArticleReadLog[];
   scenePrompt: string;
-  ghlTemplate: string | null;
   /** Milliseconds per step. */
   timings: Partial<Record<DraftStep, number>>;
   totalMs: number;
@@ -168,8 +166,8 @@ function errorPage(step: string, error: string): string {
 }
 
 /**
- * produceDraft for a past date, with no issue or draft row: the image step returns n8n's image and scene prompt,
- * and the GHL step is a dry run. A draft that fails its checks is still rendered, so the owner can compare it.
+ * produceDraft for a past date, with no issue or draft row: the image step returns n8n's image and scene prompt.
+ * A draft that fails its checks is still rendered, so the owner can compare it.
  */
 export async function replayDraft(
   input: { outline: ApprovalOutline; stories: ApprovedSections; n8nIssue: N8nIssue },
@@ -180,7 +178,7 @@ export async function replayDraft(
     throw new Error(`The n8n issue is for ${n8nIssue.date}, but the commit is for ${outline.date}.`);
   }
   const issue = { id: n8nIssue.id, date: outline.date };
-  const draft = { id: 0, version: 1 };
+  const draft = { id: 0 };
   const started = Date.now();
   const base = { date: outline.date, n8nIssueId: n8nIssue.id, scenePrompt: n8nIssue.scenePrompt };
 
@@ -191,8 +189,6 @@ export async function replayDraft(
         readArticles: deps.readArticles ?? readNoArticles,
         writer: deps.writer ?? createOpenAIIssueWriter({ apiKey: deps.openAIKey }),
         makeImage: async () => ({ imageUrl: n8nIssue.featuredImageUrl, scenePrompt: n8nIssue.scenePrompt }),
-        // APP_ENV is fixed here, so this never reaches GHL whatever the shell says.
-        createTemplate: (template) => createDraftTemplate(template, { env: { APP_ENV: "development" }, record: () => undefined }),
       },
     );
     return {
@@ -204,7 +200,6 @@ export async function replayDraft(
         title: { native: produced.content.title, n8n: n8nIssue.title },
         problems: findContentProblems(produced.content, stories),
         unreadStoryIds: produced.unreadStoryIds,
-        ghlTemplate: produced.ghlTemplateId,
         timings: produced.stepMs,
         totalMs: Date.now() - started,
         content: produced.content,
@@ -229,7 +224,6 @@ export async function replayDraft(
         title: { native: content?.title ?? null, n8n: n8nIssue.title },
         problems: content ? findContentProblems(content, stories) : [],
         unreadStoryIds: error.partial.unreadStoryIds ?? [],
-        ghlTemplate: error.partial.ghlTemplateId ?? null,
         timings: error.stepMs,
         totalMs: Date.now() - started,
         content,
@@ -272,7 +266,7 @@ export function renderReplayIndex(reports: ReplayReport[]): string {
 </head>
 <body>
 <h1>Native drafts vs n8n</h1>
-<p>Steps timed: ${DRAFT_STEPS.join(", ")}. Images are n8n's; GHL was a dry run.</p>
+<p>Steps timed: ${DRAFT_STEPS.join(", ")}. Images are n8n's.</p>
 ${sections.join("\n")}
 </body>
 </html>

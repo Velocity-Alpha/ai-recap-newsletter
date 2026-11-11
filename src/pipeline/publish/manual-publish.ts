@@ -3,11 +3,12 @@ import { createPrismaPublishStore, type PrismaPublishStore } from "@/src/pipelin
 import { parseSentEmail, type SentEmailParseResult } from "@/src/pipeline/publish/sent-email-parser";
 
 /**
- * The "Mark as published" fallback (#64). Publishes a draft from the email HTML stored on the issue, the same
- * way native detection publishes from Gmail. No AI, no Gmail, no runner.
+ * The "Mark as published" fallback (#64). Publishes an issue from the email HTML of its newest staged version
+ * (what the owner sends), or from the HTML stored on the issue when nothing is staged, the same way native
+ * detection publishes from Gmail. No AI, no Gmail, no runner.
  */
 
-export type ManualPublishStore = Pick<PrismaPublishStore, "findDraft" | "publish">;
+export type ManualPublishStore = Pick<PrismaPublishStore, "findDraft" | "newestStagedHtml" | "publish">;
 
 export type ManualPublishStatus = "ready" | "already_published" | "not_found" | "no_email" | "wrong_issue";
 
@@ -22,7 +23,8 @@ export interface ManualPublishPreview {
 
 async function load(issueId: number, store: ManualPublishStore) {
   const draft = await store.findDraft(issueId);
-  const parsed = draft ? parseSentEmail(draft.html ?? "") : null;
+  const html = draft ? ((await store.newestStagedHtml(issueId)) ?? draft.html ?? "") : null;
+  const parsed = html === null ? null : parseSentEmail(html);
   const preview: ManualPublishPreview = {
     issueId,
     status: "ready",
@@ -81,5 +83,6 @@ function manualEvent(issueId: number, parsed: SentEmailParseResult) {
     contentJson: parsed.content,
     problems: parsed.problems,
     draftId: parsed.draftId,
+    versionId: parsed.versionId,
   };
 }

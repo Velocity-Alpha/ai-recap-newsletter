@@ -54,6 +54,7 @@ describe.skipIf(!enabled)("publish store on a real database", () => {
       contentJson: null,
       problems: [],
       draftId: 41,
+      versionId: null,
     };
   }
 

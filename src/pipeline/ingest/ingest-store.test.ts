@@ -5,10 +5,8 @@ const prismaMock = vi.hoisted(() => ({
   storySource: { createMany: vi.fn() },
   $transaction: vi.fn(),
 }));
-const logServerErrorMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/src/server/prisma", () => ({ prisma: prismaMock }));
-vi.mock("@/src/server/observability", () => ({ logServerError: logServerErrorMock, logServerInfo: vi.fn() }));
 
 import type { StoryRow } from "@/src/pipeline/ingest/ingest";
 import { createPrismaIngestStore } from "@/src/pipeline/ingest/ingest-store";
@@ -57,13 +55,15 @@ describe("ingest store: coverage across sources (#58)", () => {
 
   it("still saves the stories when the sources cannot be recorded", async () => {
     prismaMock.storySource.createMany.mockRejectedValue(new Error('relation "story_sources" does not exist'));
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
     const store = createPrismaIngestStore();
 
     await expect(store.upsertStories([row("g11", "rundown_ai")])).resolves.toBe(1);
-    expect(logServerErrorMock).toHaveBeenCalledWith(
-      "ingest.story_sources.failed",
-      expect.any(Error),
-      expect.objectContaining({ storyCount: 1 }),
-    );
+    expect(JSON.parse(String(consoleError.mock.calls[0][0]))).toEqual({
+      event: "ingest.story_sources.failed",
+      error: 'relation "story_sources" does not exist',
+      storyCount: 1,
+    });
+    consoleError.mockRestore();
   });
 });

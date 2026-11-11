@@ -4,34 +4,37 @@ import { articleReadLogData, describeArticleRead, summarizeArticleReads, type Ar
 import {
   claimDraft,
   findDraftToRun,
+  IssuePublishedError,
   loadDraftInputs,
-  loadNewImageInputs,
   saveFailedDraft,
   saveReadyDraft,
   setDraftStep,
+  titleTakenMessage,
   type IssueUpdate,
+  type ReadyDraftSave,
 } from "@/src/pipeline/draft/draft-store";
+import { draftsLink } from "@/src/pipeline/draft/drafts-link";
 import {
   createDraftDeps,
   DraftStepError,
   produceDraft,
   untilAborted,
   type DraftStep,
-  type NewImageDraftInput,
   type PartialDraft,
   type ProduceDraftDeps,
   type ProduceDraftInput,
   type ProducedDraft,
 } from "@/src/pipeline/draft/produce-draft";
+import { sendToReviewGroup, type ReviewGroupStatus } from "@/src/pipeline/review-group";
 import { raiseIncident, resolveIncident } from "@/src/pipeline/notify";
 import { finishRun, logEvent, startRun, type RunTrigger } from "@/src/pipeline/runs";
-import type { SideEffectRecord } from "@/src/pipeline/side-effects";
 
 /**
  * The `draft-issue` job (#76): runs one draft that `createDraft` (or `retryDraft`) left in `running`. It writes
  * each step to the draft row for the board, logs the run to pipeline_runs and pipeline_events, and on success
- * copies the draft to the issue row. A failure marks the draft failed at its step and raises
- * `draft.failed:<date>`; the next ready draft for that date resolves it.
+ * copies the draft to the issue row and tells the review group that the draft is ready (#149). It never calls
+ * the distribution service: only "Stage for sending" does (ADR 0005). A failure marks the draft failed at its
+ * step and raises `draft.failed:<date>`; the next ready draft for that date resolves it.
  */
 
 export const DRAFT_JOB = "draft-issue";
@@ -47,12 +50,10 @@ export const DRAFT_STEP_LABELS: Record<DraftJobStep, string> = {
   validate: "checking the writing",
   image: "making the image",
   html: "building the email",
-  ghl: "creating the GHL template",
   save: "saving the draft",
 };
 
 const MAX_ERROR_CHARS = 2_000;
-const SITE_URL = "https://airecap.news";
 
 /**
  * Netlify stops a background function at 15 minutes, without warning. The job gives up at 13, so it still has
@@ -75,56 +76,35 @@ export interface RunDraftJobOptions {
   deps?: Partial<Omit<ProduceDraftDeps, "onStep" | "onRewrite" | "signal">>;
   /** Defaults to `DRAFT_DEADLINE_MS`. */
   deadlineMs?: number;
-  /** For the job's own checks, such as the chosen image's HEAD request to S3. Defaults to the global fetch (tests replace it). */
-  fetch?: typeof fetch;
+  /** Replaces the real Telegram sender (tests). */
+  sendTelegram?: (text: string) => Promise<void>;
 }
 
-/** This deploy's site: Netlify's `URL` in production, the deploy's own address on previews, else production. */
-export function siteUrl(env: Record<string, string | undefined>): string {
-  const candidates = env.APP_ENV === "production" ? [env.URL] : [env.DEPLOY_PRIME_URL, env.URL];
-  const url = candidates.map((value) => value?.trim()).find(Boolean);
-  return (url ?? SITE_URL).replace(/\/+$/, "");
-}
-
-/** The drafts page for a date (#79), where the owner sees the failed step and can retry. */
-export function draftsLink(date: string, env: Record<string, string | undefined> = {}): string {
-  return `${siteUrl(env)}/approval/drafts?date=${encodeURIComponent(date)}`;
+/** The review group's message once the issue's newest draft is ready and the issue holds it. */
+export function buildDraftReadyMessage(date: string, link: string): string {
+  return `Draft for ${date} is ready for review: ${link}`;
 }
 
 export function draftIncidentKey(date: string): string {
   return `draft.failed:${date}`;
 }
 
-function plainError(error: unknown, step: DraftJobStep, produced: ProducedDraft | null, newImage = false): string {
+function plainError(error: unknown, step: DraftJobStep, produced: ProducedDraft | null): string {
   const code = (error as { code?: unknown } | null)?.code;
   if (step === "save" && code === "P2002" && produced) {
-    // A "New image" draft copies its title, so its retry would clash again; only a commit writes a new one.
-    const next = newImage ? "Commit again for a new title." : "Retry to write a new title.";
-    return `Another issue already uses the title "${produced.content.title}", and titles must be unique. ${next}`;
+    return titleTakenMessage(produced.content.title, "Retry to write a new title.");
   }
+  // The error states only the fact, since a title or image change shows it too. Here it did stop the drafting.
+  if (error instanceof IssuePublishedError) return `${error.message} Drafting stopped.`;
   const message = error instanceof Error ? error.message : String(error);
   return message.length > MAX_ERROR_CHARS ? `${message.slice(0, MAX_ERROR_CHARS)}...` : message;
-}
-
-/** GHL calls recorded outside production go into the run log, without the email HTML. */
-function withoutHtml(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(withoutHtml);
-  if (value && typeof value === "object") {
-    return Object.fromEntries(
-      Object.entries(value).map(([key, item]) => [
-        key,
-        key === "html" && typeof item === "string" ? `[${item.length} characters of HTML]` : withoutHtml(item),
-      ]),
-    );
-  }
-  return value;
 }
 
 function partialFrom(error: unknown, produced: ProducedDraft | null): PartialDraft {
   if (error instanceof DraftStepError) return error.partial;
   if (!produced) return {};
-  const { content, html, featuredImageUrl, scenePrompt, unreadStoryIds, ghlTemplateId, ghlPreviewUrl } = produced;
-  return { content, html, featuredImageUrl, scenePrompt, unreadStoryIds, ghlTemplateId, ghlPreviewUrl: ghlPreviewUrl ?? undefined };
+  const { content, html, featuredImageUrl, scenePrompt, unreadStoryIds } = produced;
+  return { content, html, featuredImageUrl, scenePrompt, unreadStoryIds };
 }
 
 function minutes(ms: number): string {
@@ -143,7 +123,6 @@ export async function runDraftJob(draftId: bigint | number | string, options: Ru
   if (!(await claimDraft(draft.id, now()))) return { status: "skipped", draftId: id, reason: `Draft ${draftId} is running already.` };
 
   const date = draft.issueDate ?? `issue-${draft.issueId}`;
-  const newImageOf = draft.sourceDraftId === null ? {} : { sourceDraftId: Number(draft.sourceDraftId) };
   const incidentKey = draftIncidentKey(date);
   const stepMs: Partial<Record<DraftJobStep, number>> = {};
   let runId: bigint | null = null;
@@ -165,14 +144,6 @@ export async function runDraftJob(draftId: bigint | number | string, options: Ru
       step: "write",
       message: `The written issue failed ${problemCount} ${problemCount === 1 ? "check" : "checks"}. Writing it once more with the problems listed.`,
       data: { problems: problemCount },
-    });
-  };
-  const record = async (entry: SideEffectRecord) => {
-    await log({
-      level: "info",
-      step: "ghl",
-      message: "Not sent outside production. Recorded the call.",
-      data: { target: entry.target, action: entry.action, payload: withoutHtml(entry.payload) } as Prisma.InputJsonValue,
     });
   };
   // One event per feature story (#120): how its article was read, or why not. The article text stays out.
@@ -214,7 +185,7 @@ export async function runDraftJob(draftId: bigint | number | string, options: Ru
   const failDraft = async (error: unknown): Promise<RunDraftJobResult> => {
     const failedStep: DraftJobStep = error instanceof DraftStepError ? error.step : step;
     if (error instanceof DraftStepError) Object.assign(stepMs, error.stepMs);
-    const message = plainError(error, failedStep, produced, draft.sourceDraftId !== null);
+    const message = plainError(error, failedStep, produced);
 
     const problems = [
       await bestEffort("save", "mark the draft failed", () =>
@@ -225,7 +196,7 @@ export async function runDraftJob(draftId: bigint | number | string, options: Ru
         if (runId === null) throw new Error("The run log was never started.");
         await finishRun(
           runId,
-          { status: "failed", error: message, stats: { draftId: id, version: draft.version, issueDate: date, ...newImageOf, failedStep, stepMs } },
+          { status: "failed", error: message, stats: { draftId: id, version: draft.version, issueDate: date, failedStep, stepMs } },
           now(),
         );
       }),
@@ -235,9 +206,8 @@ export async function runDraftJob(draftId: bigint | number | string, options: Ru
       raiseIncident(
         {
           incidentKey,
-          // A failed "New image" draft leaves its ready source draft in place, so the issue still has a draft.
-          severity: draft.sourceDraftId === null ? "critical" : "warning",
-          what: `Draft v${draft.version} for ${date} failed at ${DRAFT_STEP_LABELS[failedStep]}.`,
+          severity: "critical",
+          what: `The draft for ${date} failed at ${DRAFT_STEP_LABELS[failedStep]}.`,
           evidence: message,
           link: draftsLink(date, env),
           details: {
@@ -260,18 +230,15 @@ export async function runDraftJob(draftId: bigint | number | string, options: Ru
     deadlineMs,
   );
 
-  let saved: { issue: { id: number; date: string }; issueUpdate: IssueUpdate; produced: ProducedDraft };
+  let saved: { issue: { id: number; date: string }; save: ReadyDraftSave; produced: ProducedDraft };
   try {
     runId = await startRun({ job: DRAFT_JOB, trigger: options.trigger ?? "event" }, now());
     await enter("load");
     const loadStarted = Date.now();
-    const target = { draft: { id, version: draft.version } };
-    const input: ProduceDraftInput | NewImageDraftInput = await untilAborted(
+    const input: ProduceDraftInput = await untilAborted(
       (async () => {
         const inputs = await loadDraftInputs(draft);
-        // A "New image" draft (#116) copies its source draft's content, so it needs no stories.
-        if (draft.sourceDraftId !== null) return { ...target, issue: inputs.issue, ...(await loadNewImageInputs(draft)) };
-        return { ...target, ...inputs, stories: await loadApprovedSections(inputs.outline) };
+        return { draft: { id }, ...inputs, stories: await loadApprovedSections(inputs.outline) };
       })(),
       deadline.signal,
     );
@@ -279,7 +246,7 @@ export async function runDraftJob(draftId: bigint | number | string, options: Ru
     stepMs.load = Date.now() - loadStarted;
 
     produced = await produceDraft(input, {
-      ...createDraftDeps(env, { record, fetch: options.fetch, onArticleReads, onArticleWarning, onArticleInfo }),
+      ...createDraftDeps(env, { onArticleReads, onArticleWarning, onArticleInfo }),
       ...options.deps,
       onStep: enter,
       onRewrite,
@@ -289,7 +256,7 @@ export async function runDraftJob(draftId: bigint | number | string, options: Ru
 
     // Not cut short by the deadline: a save that commits after the draft was marked failed would contradict it.
     await enter("save");
-    saved = { issue, produced, issueUpdate: await saveReadyDraft({ ...draft, issueDate: issue.date }, produced, now()) };
+    saved = { issue, produced, save: await saveReadyDraft({ ...draft, issueDate: issue.date }, produced, now()) };
   } catch (error) {
     return failDraft(error);
   } finally {
@@ -297,22 +264,32 @@ export async function runDraftJob(draftId: bigint | number | string, options: Ru
   }
 
   // The draft is saved. Problems with the run log or the incident from here on do not undo that.
-  const { issue, issueUpdate } = saved;
+  const { issue } = saved;
+  const issueUpdate = saved.save.issue;
+  const readyRunId: bigint = runId!;
+  // Only for the draft the issue now holds, and only when it is the issue's newest draft. A draft that finished
+  // after the issue was published, or that has a newer draft (ready, running, or failed), is not the one to review.
+  let telegram: ReviewGroupStatus | "skipped" = "skipped";
+  if (issueUpdate === "updated" && saved.save.newest) {
+    telegram = await sendToReviewGroup(buildDraftReadyMessage(issue.date, draftsLink(issue.date, env)), {
+      env,
+      send: options.sendTelegram,
+      log: (event) => logEvent(readyRunId, event),
+    });
+  }
   const stats = {
     draftId: id,
-    ...newImageOf,
     issueId: issue.id,
     version: draft.version,
     issueDate: issue.date,
     issue: issueUpdate,
-    ghlMode: saved.produced.ghlMode,
+    telegram,
     unreadStoryIds: saved.produced.unreadStoryIds,
     stepMs,
   };
-  const readyRunId: bigint = runId!;
   await bestEffort("run", "finish the run", () => finishRun(readyRunId, { status: "succeeded", stats }, now()));
   await bestEffort("alert", `resolve ${incidentKey}`, () =>
-    resolveIncident(incidentKey, { runId: readyRunId, env, now: now(), link: draftsLink(issue.date, env), note: `Draft v${draft.version} is ready.` }),
+    resolveIncident(incidentKey, { runId: readyRunId, env, now: now(), link: draftsLink(issue.date, env), note: "The draft is ready." }),
   );
   return { status: "ready", draftId: id, runId: readyRunId.toString(), issue: issueUpdate };
 }

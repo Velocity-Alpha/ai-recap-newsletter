@@ -14,7 +14,7 @@ describe("createSideEffects", () => {
     const effects = createSideEffects({ appEnv: "production", record });
 
     const outcome = await effects.run({
-      target: "ghl",
+      target: "distribution",
       action: "createTemplate",
       payload: { name: "2026-11-09 v1: Subject" },
       send,
@@ -35,7 +35,7 @@ describe("createSideEffects", () => {
       const effects = createSideEffects({ appEnv, record: (entry) => void records.push(entry) });
 
       const outcome = await effects.run({
-        target: "ghl",
+        target: "distribution",
         action: "createTemplate",
         payload: { name: "2026-11-09 v1: Subject" },
         send,
@@ -45,7 +45,7 @@ describe("createSideEffects", () => {
       expect(effects.live).toBe(false);
       expect(send).not.toHaveBeenCalled();
       expect(records).toEqual([
-        { target: "ghl", action: "createTemplate", payload: { name: "2026-11-09 v1: Subject" } },
+        { target: "distribution", action: "createTemplate", payload: { name: "2026-11-09 v1: Subject" } },
       ]);
       expect(outcome).toEqual({ mode: "recorded", value: { id: "dry-run" } });
     },

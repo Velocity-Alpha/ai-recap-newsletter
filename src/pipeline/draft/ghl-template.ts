@@ -1,7 +1,7 @@
 import { createSideEffects, type SideEffectRecord } from "@/src/pipeline/side-effects";
 
 /**
- * Each draft gets its own new GHL email template (ADR 0002). Same two calls as n8n's `2. Create Issue Draft`
+ * A new GHL email template for each staged version (ADR 0005). Same two calls as n8n's `2. Create Issue Draft`
  * (docs/n8n-backend/20-drafting-and-images.md §1.8): create the template, then set its HTML.
  *
  * It never edits or deletes an existing template: the input has no template id, and the second call only
@@ -21,16 +21,7 @@ const SETTING = {
   userId: "GHL_USER_ID",
 } as const;
 
-export interface DraftTemplateInput {
-  /** The issue date, `YYYY-MM-DD`. */
-  issueDate: string;
-  /** The draft's version for that date: 1, 2, ... */
-  version: number;
-  subject: string;
-  html: string;
-}
-
-export interface DraftTemplateResult {
+export interface EmailTemplateResult {
   templateId: string;
   /** GHL's preview link, when it returns one. */
   previewUrl?: string;
@@ -38,12 +29,14 @@ export interface DraftTemplateResult {
   mode: "sent" | "recorded";
 }
 
-export interface DraftTemplateDeps {
+export interface EmailTemplateDeps {
   /** `APP_ENV` and the `GHL_*` settings. */
   env: Record<string, string | undefined>;
   fetch?: typeof fetch;
   /** Where non-production calls are recorded (see side-effects). */
   record?: (entry: SideEffectRecord) => void | Promise<void>;
+  /** Stops a running call to GHL, in addition to each call's own 15 s limit. */
+  signal?: AbortSignal;
 }
 
 export type GhlStep = "createTemplate" | "setTemplateHtml";
@@ -64,19 +57,6 @@ export class GhlTemplateError extends Error {
     super(message);
     this.name = "GhlTemplateError";
   }
-}
-
-/** `<YYYY-MM-DD> v<version>: <subject>`, the name the owner sees in GHL. */
-export function draftTemplateName(input: Pick<DraftTemplateInput, "issueDate" | "version" | "subject">): string {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.issueDate)) {
-    throw new Error(`Issue date "${input.issueDate}" must be YYYY-MM-DD.`);
-  }
-  if (!Number.isInteger(input.version) || input.version < 1) {
-    throw new Error(`Draft version ${input.version} must be a whole number from 1.`);
-  }
-  const subject = input.subject.replace(/\s+/g, " ").trim();
-  if (!subject) throw new Error("The draft subject is empty.");
-  return `${input.issueDate} v${input.version}: ${subject}`;
 }
 
 interface GhlSettings {
@@ -112,7 +92,7 @@ async function post(
   step: GhlStep,
   path: string,
   body: Record<string, unknown>,
-  context: { token: string; fetch: typeof fetch; templateId?: string },
+  context: { token: string; fetch: typeof fetch; templateId?: string; signal?: AbortSignal },
 ): Promise<Record<string, unknown>> {
   const label = STEP_LABEL[step];
   const created = context.templateId ? ` Template ${context.templateId} was created.` : "";
@@ -127,7 +107,7 @@ async function post(
         Version: GHL_API_VERSION,
       },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(TIMEOUT_MS),
+      signal: context.signal ? AbortSignal.any([AbortSignal.timeout(TIMEOUT_MS), context.signal]) : AbortSignal.timeout(TIMEOUT_MS),
     });
   } catch (error) {
     const detail = error instanceof Error ? scrub(error.message, context.token) : "unknown error";
@@ -145,12 +125,17 @@ async function post(
   return (await response.json().catch(() => ({}))) as Record<string, unknown>;
 }
 
+/** The stand-in template id outside production: the name's `<date> v<version>` part, e.g. `dry-run-2026-11-09-v2`. */
+function dryRunTemplateId(name: string): string {
+  return `dry-run-${name.split(":")[0].trim().replace(/\s+/g, "-")}`;
+}
+
 /**
- * Creates a new GHL template for one draft and sets its HTML. Outside production both calls are recorded,
+ * Creates a new GHL template with this name and sets its HTML. Outside production both calls are recorded,
  * nothing is sent, and the template id is a stand-in.
  */
-export async function createDraftTemplate(input: DraftTemplateInput, deps: DraftTemplateDeps): Promise<DraftTemplateResult> {
-  const name = draftTemplateName(input);
+export async function createEmailTemplate(input: { name: string; html: string }, deps: EmailTemplateDeps): Promise<EmailTemplateResult> {
+  const { name } = input;
   const effects = createSideEffects({ appEnv: deps.env.APP_ENV, record: deps.record });
   const settings = readSettings(deps.env, effects.live);
   const fetcher = deps.fetch ?? fetch;
@@ -159,27 +144,27 @@ export async function createDraftTemplate(input: DraftTemplateInput, deps: Draft
 
   const createBody = { locationId: settings.locationId, title: name, type: "html", builderVersion: "2", html: input.html };
   const created = await effects.run({
-    target: "ghl",
+    target: "distribution",
     action: "createTemplate",
     payload: { method: "POST", url: `${GHL_API_BASE}${CREATE_PATH}`, body: createBody },
     send: async () => {
-      const response = await post("createTemplate", CREATE_PATH, createBody, { token, fetch: fetcher });
+      const response = await post("createTemplate", CREATE_PATH, createBody, { token, fetch: fetcher, signal: deps.signal });
       if (typeof response.id !== "string" || !response.id) {
         throw new GhlTemplateError(`GHL ${STEP_LABEL.createTemplate} returned no template id.`, "createTemplate");
       }
       return response.id;
     },
-    dryRun: () => `dry-run-${input.issueDate}-v${input.version}`,
+    dryRun: () => dryRunTemplateId(name),
   });
   const templateId = created.value;
 
   const setHtmlBody = { locationId: settings.locationId, templateId, updatedBy: settings.userId, editorType: "html", html: input.html };
   const filled = await effects.run({
-    target: "ghl",
+    target: "distribution",
     action: "setTemplateHtml",
     payload: { method: "POST", url: `${GHL_API_BASE}${SET_HTML_PATH}`, body: setHtmlBody },
     send: async () => {
-      const response = await post("setTemplateHtml", SET_HTML_PATH, setHtmlBody, { token, fetch: fetcher, templateId });
+      const response = await post("setTemplateHtml", SET_HTML_PATH, setHtmlBody, { token, fetch: fetcher, templateId, signal: deps.signal });
       return typeof response.previewUrl === "string" && response.previewUrl ? response.previewUrl : undefined;
     },
     dryRun: () => undefined,

@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 
+import { currentDistributionServiceName } from "@/src/pipeline/distribution/service";
 import {
-  checkIncidentDate,
+  dayIncidentDate,
   evaluateChecks,
   needsSiteCheck,
   type CheckOutcome,
@@ -53,7 +54,7 @@ function notes(outcome: CheckOutcome): string[] {
 
 const RUNNING = { id: "41", status: "running", startedAt: new Date("2026-11-10T14:55:00Z") };
 
-const SOURCE_KEYS = ["rundown_ai", "ai_breakfast", "the_signal", "tldr", "alphasignal", "product_hunt_ai", "huggingface"];
+const SOURCE_KEYS = ["rundown_ai", "ai_breakfast", "the_signal", "tldr", "alphasignal", "product_hunt_ai", "huggingface", "world_of_ai"];
 
 describe("10:05 stories check", () => {
   it("passes on a normal day, and checks only the stories", () => {
@@ -182,6 +183,8 @@ describe("12:00 commit check", () => {
 });
 
 describe("18:00 draft and publish checks", () => {
+  const SERVICE = currentDistributionServiceName();
+
   it("raises a critical when committed but no draft is ready", () => {
     const found = failures(run("18:00", committedNoDraft()));
     expect(Object.keys(found)).toEqual(["draft-missing:2026-11-10"]);
@@ -189,10 +192,30 @@ describe("18:00 draft and publish checks", () => {
     expect(found["draft-missing:2026-11-10"].evidence).toContain("23 stories");
   });
 
-  it("warns as a reminder when the draft is ready but not published", () => {
-    const found = failures(run("18:00", draftNotPublished()));
+  it("warns as a reminder when the draft is ready but nothing is staged", () => {
+    const found = failures(run("18:00", draftNotPublished({ stagedVersion: null })));
     expect(Object.keys(found)).toEqual(["publish-pending:2026-11-10"]);
-    expect(found["publish-pending:2026-11-10"]).toMatchObject({ severity: "warning", link: `${SITE}/approval/issues` });
+    expect(found["publish-pending:2026-11-10"]).toMatchObject({
+      severity: "warning",
+      link: `${SITE}/approval/issues`,
+      what: "The draft for 2026-11-10 is ready but not staged.",
+    });
+    expect(found["publish-pending:2026-11-10"].evidence).toContain(`Stage it for sending, then send it from ${SERVICE}.`);
+  });
+
+  it("warns under the same incident key when a version is staged but not published", () => {
+    const found = failures(run("18:00", draftNotPublished({ stagedVersion: 2 })));
+    expect(Object.keys(found)).toEqual(["publish-pending:2026-11-10"]);
+    expect(found["publish-pending:2026-11-10"]).toMatchObject({ severity: "warning", what: "v2 for 2026-11-10 is staged but not published." });
+    expect(found["publish-pending:2026-11-10"].evidence).toContain(`Send it from ${SERVICE}, or mark it published.`);
+  });
+
+  it("adds that the draft changed after it was staged", () => {
+    const found = failures(run("18:00", draftNotPublished({ stagedVersion: 2, changedSinceStaged: true })));
+    expect(found["publish-pending:2026-11-10"]).toMatchObject({
+      what: "v2 for 2026-11-10 is staged but not published. The draft changed after v2 was staged.",
+    });
+    expect(found["publish-pending:2026-11-10"].evidence).toContain(`Send it from ${SERVICE}, or mark it published.`);
   });
 
   it("passes when the issue is published and on the site", () => {
@@ -238,11 +261,19 @@ describe("18:00 draft and publish checks", () => {
   });
 });
 
-describe("checkIncidentDate", () => {
+describe("dayIncidentDate", () => {
+  it("reads the date of a failed staging, which nothing can resolve after its day", () => {
+    expect(dayIncidentDate("stage.failed:2026-11-09")).toBe("2026-11-09");
+  });
+
+  it("ignores a failed draft, which stays open until a draft works", () => {
+    expect(dayIncidentDate("draft.failed:2026-11-09")).toBeNull();
+  });
+
   it("reads the date of a check incident key, and ignores other keys", () => {
-    expect(checkIncidentDate("source-empty:tldr:2026-11-10")).toBe("2026-11-10");
-    expect(checkIncidentDate("stories-thin:2026-11-09")).toBe("2026-11-09");
-    expect(checkIncidentDate("ingest-failed:2026-11-09")).toBeNull();
-    expect(checkIncidentDate("stories-thin")).toBeNull();
+    expect(dayIncidentDate("source-empty:tldr:2026-11-10")).toBe("2026-11-10");
+    expect(dayIncidentDate("stories-thin:2026-11-09")).toBe("2026-11-09");
+    expect(dayIncidentDate("ingest-failed:2026-11-09")).toBeNull();
+    expect(dayIncidentDate("stories-thin")).toBeNull();
   });
 });

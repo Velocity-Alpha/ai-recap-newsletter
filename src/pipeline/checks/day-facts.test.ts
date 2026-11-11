@@ -8,7 +8,10 @@ const db = vi.hoisted(() => ({
 }));
 const settings = vi.hoisted(() => new Map<string, unknown>());
 
+const staged = vi.hoisted(() => ({ readDateIssueFacts: vi.fn() }));
+
 vi.mock("@/src/server/prisma", () => ({ prisma: db }));
+vi.mock("@/src/pipeline/distribution/issue-state-store", () => staged);
 vi.mock("@/src/pipeline/settings", () => ({ readSetting: vi.fn(async (key: string) => settings.get(key) ?? null) }));
 
 import { readDayFacts } from "@/src/pipeline/checks/day-facts";
@@ -37,6 +40,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   settings.clear();
   db.skippedDate.findUnique.mockResolvedValue(null);
+  staged.readDateIssueFacts.mockResolvedValue({ published: false, newestDraft: null, newestStaged: null });
   db.pipelineRun.findFirst.mockResolvedValue({ id: 41n, status: "succeeded", startedAt: new Date("2026-11-10T14:55:00Z") });
   db.story.groupBy.mockImplementation(groupBySource({ [TODAY_START]: TODAY_BY_SOURCE, ...HISTORY }));
   db.story.aggregate.mockResolvedValue({ _count: { _all: 23 }, _min: { updatedAt: new Date("2026-11-10T16:52:00Z") } });
@@ -65,7 +69,38 @@ describe("readDayFacts", () => {
       draftReady: true,
       // The published draft wins over a later unpublished one.
       issue: { id: "270", slug: "first-draft", title: "First draft", status: "published", publishedAt: new Date("2026-11-10T17:31:00Z") },
+      stagedVersion: null,
+      changedSinceStaged: false,
       warnings: [],
+    });
+  });
+
+  it("gives the newest staged version and whether the draft changed after it", async () => {
+    const draft = { id: 41, status: "ready", title: "Pretend Lab Plans A Week", featuredImageUrl: null };
+    staged.readDateIssueFacts.mockResolvedValue({
+      published: false,
+      newestDraft: draft,
+      newestStaged: { version: 2, draftId: 41, title: draft.title, featuredImageUrl: null },
+    });
+    await expect(readDayFacts("2026-11-10")).resolves.toMatchObject({ stagedVersion: 2, changedSinceStaged: false });
+    expect(staged.readDateIssueFacts).toHaveBeenCalledWith("2026-11-10");
+
+    staged.readDateIssueFacts.mockResolvedValue({
+      published: false,
+      newestDraft: { ...draft, title: "Pretend Lab Plans A Month" },
+      newestStaged: { version: 2, draftId: 41, title: draft.title, featuredImageUrl: null },
+    });
+    await expect(readDayFacts("2026-11-10")).resolves.toMatchObject({ stagedVersion: 2, changedSinceStaged: true });
+  });
+
+  it("counts the date as not staged when the staged versions cannot be read, and says why", async () => {
+    staged.readDateIssueFacts.mockRejectedValue(new Error('relation "newsletter.staged_versions" does not exist'));
+
+    await expect(readDayFacts("2026-11-10")).resolves.toMatchObject({
+      stagedVersion: null,
+      changedSinceStaged: false,
+      draftReady: true,
+      warnings: ['Could not read the staged versions, so 2026-11-10 counts as not staged: relation "newsletter.staged_versions" does not exist'],
     });
   });
 

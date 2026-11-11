@@ -1,11 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
-import {
-  createDraftTemplate,
-  draftTemplateName,
-  GHL_API_VERSION,
-  type DraftTemplateInput,
-} from "@/src/pipeline/draft/ghl-template";
+import { stagedEmailName } from "@/src/pipeline/distribution/staged-version";
+import { createEmailTemplate, GHL_API_VERSION, GhlTemplateError } from "@/src/pipeline/draft/ghl-template";
 import type { SideEffectRecord } from "@/src/pipeline/side-effects";
 
 const TOKEN = "pit-test-token-0000";
@@ -17,11 +13,10 @@ const PRODUCTION_ENV = {
   GHL_USER_ID: "user_test",
 };
 
-const INPUT: DraftTemplateInput = {
-  issueDate: "2026-11-09",
-  version: 2,
-  subject: "Synthetic subject line",
-  html: "<html><body><p>Synthetic draft</p></body></html>",
+/** A staged version's email: the distribution service names it `<date> v<version>: <title>`. */
+const INPUT = {
+  name: stagedEmailName({ issueDate: "2026-11-09", version: 2, title: "Synthetic subject line" }),
+  html: "<html><body><p>Synthetic staged version</p></body></html>",
 };
 
 type Call = { url: string; init: RequestInit };
@@ -58,28 +53,11 @@ function headers(call: Call): Record<string, string> {
   return Object.fromEntries(new Headers(call.init.headers).entries());
 }
 
-describe("draftTemplateName", () => {
-  it("is the date, the version and the subject", () => {
-    expect(draftTemplateName(INPUT)).toBe("2026-11-09 v2: Synthetic subject line");
-  });
-
-  it("trims the subject and folds line breaks", () => {
-    expect(draftTemplateName({ ...INPUT, version: 1, subject: "  A long\n subject  " })).toBe("2026-11-09 v1: A long subject");
-  });
-
-  it("refuses a bad date, version or empty subject", () => {
-    expect(() => draftTemplateName({ ...INPUT, issueDate: "2026-11-9" })).toThrow(/YYYY-MM-DD/);
-    expect(() => draftTemplateName({ ...INPUT, version: 0 })).toThrow(/version/);
-    expect(() => draftTemplateName({ ...INPUT, version: 1.5 })).toThrow(/version/);
-    expect(() => draftTemplateName({ ...INPUT, subject: "   " })).toThrow(/subject/);
-  });
-});
-
-describe("createDraftTemplate in production", () => {
+describe("createEmailTemplate in production", () => {
   it("creates the template, then sets its HTML, with GHL's headers and n8n's bodies", async () => {
     const ghl = fakeGhl();
 
-    const result = await createDraftTemplate(INPUT, { env: PRODUCTION_ENV, fetch: ghl.fetch });
+    const result = await createEmailTemplate(INPUT, { env: PRODUCTION_ENV, fetch: ghl.fetch });
 
     expect(result).toEqual({
       templateId: "tpl_new",
@@ -123,7 +101,7 @@ describe("createDraftTemplate in production", () => {
   it("never edits or deletes another template: two POSTs, the second only for the new id", async () => {
     const ghl = fakeGhl({ create: () => json({ id: "tpl_fresh", status: "ok" }) });
 
-    await createDraftTemplate(INPUT, { env: PRODUCTION_ENV, fetch: ghl.fetch });
+    await createEmailTemplate(INPUT, { env: PRODUCTION_ENV, fetch: ghl.fetch });
 
     expect(ghl.calls.map((call) => [call.init.method, new URL(call.url).pathname])).toEqual([
       ["POST", "/emails/builder"],
@@ -135,7 +113,7 @@ describe("createDraftTemplate in production", () => {
   it("leaves the preview URL out when GHL does not return one", async () => {
     const ghl = fakeGhl({ setHtml: () => json({ ok: true, id: "tpl_new" }) });
 
-    const result = await createDraftTemplate(INPUT, { env: PRODUCTION_ENV, fetch: ghl.fetch });
+    const result = await createEmailTemplate(INPUT, { env: PRODUCTION_ENV, fetch: ghl.fetch });
 
     expect(result).toEqual({ templateId: "tpl_new", mode: "sent" });
   });
@@ -146,7 +124,7 @@ describe("createDraftTemplate in production", () => {
       const ghl = fakeGhl();
       const env = { ...PRODUCTION_ENV, [name]: " " };
 
-      await expect(createDraftTemplate(INPUT, { env, fetch: ghl.fetch })).rejects.toThrow(`Missing setting: ${name}.`);
+      await expect(createEmailTemplate(INPUT, { env, fetch: ghl.fetch })).rejects.toThrow(`Missing setting: ${name}.`);
       expect(ghl.calls).toHaveLength(0);
     },
   );
@@ -154,7 +132,7 @@ describe("createDraftTemplate in production", () => {
   it("names the step and the status when creating fails, without the token", async () => {
     const ghl = fakeGhl({ create: () => json({ statusCode: 401, message: `Invalid token ${TOKEN}` }, 401) });
 
-    const failure = createDraftTemplate(INPUT, { env: PRODUCTION_ENV, fetch: ghl.fetch });
+    const failure = createEmailTemplate(INPUT, { env: PRODUCTION_ENV, fetch: ghl.fetch });
 
     await expect(failure).rejects.toThrow(/create template \(POST \/emails\/builder\) failed with HTTP 401/);
     await expect(failure).rejects.not.toThrow(TOKEN);
@@ -164,7 +142,7 @@ describe("createDraftTemplate in production", () => {
   it("names the step, the status and the new template id when setting the HTML fails", async () => {
     const ghl = fakeGhl({ setHtml: () => json({ message: "Bad request" }, 422) });
 
-    const error = await createDraftTemplate(INPUT, { env: PRODUCTION_ENV, fetch: ghl.fetch }).catch((e: unknown) => e);
+    const error = await createEmailTemplate(INPUT, { env: PRODUCTION_ENV, fetch: ghl.fetch }).catch((e: unknown) => e);
 
     expect(error).toBeInstanceOf(Error);
     expect((error as Error).message).toMatch(/set template HTML \(POST \/emails\/builder\/data\) failed with HTTP 422/);
@@ -176,7 +154,7 @@ describe("createDraftTemplate in production", () => {
   it("fails when GHL answers without a template id", async () => {
     const ghl = fakeGhl({ create: () => json({ status: "ok" }) });
 
-    await expect(createDraftTemplate(INPUT, { env: PRODUCTION_ENV, fetch: ghl.fetch })).rejects.toThrow(
+    await expect(createEmailTemplate(INPUT, { env: PRODUCTION_ENV, fetch: ghl.fetch })).rejects.toThrow(
       /create template .* returned no template id/,
     );
     expect(ghl.calls).toHaveLength(1);
@@ -187,19 +165,70 @@ describe("createDraftTemplate in production", () => {
       throw new TypeError("fetch failed");
     }) as unknown as typeof globalThis.fetch;
 
-    const failure = createDraftTemplate(INPUT, { env: PRODUCTION_ENV, fetch });
+    const failure = createEmailTemplate(INPUT, { env: PRODUCTION_ENV, fetch });
 
     await expect(failure).rejects.toThrow(/create template \(POST \/emails\/builder\) failed: fetch failed/);
     await expect(failure).rejects.not.toThrow(TOKEN);
   });
+
+  it("removes the token from a network error that echoes it", async () => {
+    const fetch = vi.fn(async () => {
+      throw new TypeError(`request with Bearer ${TOKEN} was refused`);
+    }) as unknown as typeof globalThis.fetch;
+
+    const error = await createEmailTemplate(INPUT, { env: PRODUCTION_ENV, fetch }).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(GhlTemplateError);
+    expect((error as Error).message).toContain("request with Bearer [redacted] was refused");
+    expect((error as Error).message).not.toContain(TOKEN);
+  });
+
+  it("gives each call a signal that the caller's signal stops", async () => {
+    const ghl = fakeGhl();
+    const caller = new AbortController();
+
+    await createEmailTemplate(INPUT, { env: PRODUCTION_ENV, fetch: ghl.fetch, signal: caller.signal });
+
+    const signals = ghl.calls.map((call) => call.init.signal as AbortSignal);
+    expect(signals).toHaveLength(2);
+    expect(signals.every((signal) => signal instanceof AbortSignal && !signal.aborted)).toBe(true);
+    caller.abort(new Error("Staging took too long."));
+    expect(signals.every((signal) => signal.aborted)).toBe(true);
+  });
+
+  it("gives each call its own time limit when the caller passes no signal", async () => {
+    const ghl = fakeGhl();
+
+    await createEmailTemplate(INPUT, { env: PRODUCTION_ENV, fetch: ghl.fetch });
+
+    expect(ghl.calls.every((call) => call.init.signal instanceof AbortSignal)).toBe(true);
+  });
+
+  it("stops at the first call, and names the step, when the caller's signal has already stopped it", async () => {
+    const calls: string[] = [];
+    const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      calls.push(String(input));
+      init?.signal?.throwIfAborted();
+      return json({ id: "tpl_new" });
+    }) as unknown as typeof globalThis.fetch;
+    const caller = new AbortController();
+    caller.abort(new Error("Staging took too long."));
+
+    const error = await createEmailTemplate(INPUT, { env: PRODUCTION_ENV, fetch, signal: caller.signal }).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(GhlTemplateError);
+    expect(error).toMatchObject({ step: "createTemplate", templateId: undefined });
+    expect((error as Error).message).toContain("GHL create template (POST /emails/builder) failed: Staging took too long.");
+    expect(calls).toEqual(["https://services.leadconnectorhq.com/emails/builder"]);
+  });
 });
 
-describe("createDraftTemplate outside production", () => {
+describe("createEmailTemplate outside production", () => {
   it.each(["preview", "development", undefined])("records both calls and sends nothing when APP_ENV is %j", async (appEnv) => {
     const ghl = fakeGhl();
     const records: SideEffectRecord[] = [];
 
-    const result = await createDraftTemplate(INPUT, {
+    const result = await createEmailTemplate(INPUT, {
       env: { ...PRODUCTION_ENV, APP_ENV: appEnv },
       fetch: ghl.fetch,
       record: (entry) => void records.push(entry),
@@ -209,7 +238,7 @@ describe("createDraftTemplate outside production", () => {
     expect(result).toEqual({ templateId: "dry-run-2026-11-09-v2", mode: "recorded" });
     expect(records).toEqual([
       {
-        target: "ghl",
+        target: "distribution",
         action: "createTemplate",
         payload: {
           method: "POST",
@@ -224,7 +253,7 @@ describe("createDraftTemplate outside production", () => {
         },
       },
       {
-        target: "ghl",
+        target: "distribution",
         action: "setTemplateHtml",
         payload: {
           method: "POST",
@@ -245,7 +274,7 @@ describe("createDraftTemplate outside production", () => {
   it("does not need the GHL settings", async () => {
     const records: SideEffectRecord[] = [];
 
-    const result = await createDraftTemplate(INPUT, {
+    const result = await createEmailTemplate(INPUT, {
       env: { APP_ENV: "preview" },
       record: (entry) => void records.push(entry),
     });
