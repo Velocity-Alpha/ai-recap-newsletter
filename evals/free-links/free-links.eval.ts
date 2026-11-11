@@ -6,7 +6,7 @@ import { expect, it, vi } from "vitest";
 vi.mock("@/src/server/prisma", () => ({ prisma: {} }));
 
 import { readOnlyQuery } from "@/evals/lib/dev-db";
-import { evalSettings } from "@/evals/lib/settings";
+import { API_DEFAULT, evalSettings } from "@/evals/lib/settings";
 import { runSweep, type GradeContext, type RunContext } from "@/evals/lib/sweep";
 import { WEB_SEARCH_USD_PER_CALL } from "@/evals/lib/usage";
 import { ARTICLE_WORDS_FOR_JUDGE, sameNewsInput, SAME_NEWS_INSTRUCTIONS, SAME_NEWS_SCHEMA } from "@/evals/free-links/rubric";
@@ -108,7 +108,7 @@ function makeGrade(learnedSites: string[]) {
 }
 
 it("free links: usable links found by the web search, at each effort", async () => {
-  const settings = evalSettings({ model: SEARCH_MODEL, efforts: ["none", "low", "medium", "high", undefined], repeats: 1 });
+  const settings = evalSettings({ model: SEARCH_MODEL, efforts: ["none", "low", "medium", "high", API_DEFAULT], repeats: 1 });
   const learned = await loadLearnedSites();
 
   const { rows, path } = await runSweep({

@@ -28,6 +28,8 @@ export interface ResultRow {
   costPerCallUsd: number | null;
   /** Cost of the judge for one item run, or null when the eval uses no judge. */
   judgeCostPerCallUsd: number | null;
+  /** The judge's model and effort ("gpt-6-sol / high"), when the judge graded this row's runs. */
+  judge?: string;
   /** Web search calls per item run, when the call searched. */
   webSearchesPerCall?: number;
   /** Runs the judge graded, of the runs it tried (EVAL_JUDGE_REPEATS can leave runs out). Evals with a grade step. */
@@ -133,6 +135,7 @@ function tableColumns(file: ResultsFile): Column[] {
     { header: "p95", cell: (row) => (row.latencyMs.p95 === null ? null : formatSeconds(row.latencyMs.p95)) },
     { header: "Searches per call", cell: (row) => (row.webSearchesPerCall === undefined ? null : roundValue(row.webSearchesPerCall)) },
     { header: "Cost per call", cell: (row) => formatUsd(row.costPerCallUsd) },
+    { header: "Judge", cell: (row) => row.judge ?? null },
     { header: "Judge cost per call", cell: (row) => (row.judgeCostPerCallUsd === null ? null : formatUsd(row.judgeCostPerCallUsd)) },
     { header: "n", cell: (row) => String(row.n) },
     { header: "Date", cell: (row) => row.date },

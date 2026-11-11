@@ -1,7 +1,7 @@
 // The scene ideas of "New image" (src/pipeline/draft/image/scene-ideas.ts) on 10 past issues. evals/README.md.
 import { expect, it } from "vitest";
 
-import { evalSettings } from "@/evals/lib/settings";
+import { API_DEFAULT, evalSettings } from "@/evals/lib/settings";
 import { runSweep, type GradeContext, type RunContext } from "@/evals/lib/sweep";
 import { ideasForJudge, SCENE_IDEAS_JUDGE_INSTRUCTIONS, SCENE_IDEAS_JUDGE_SCHEMA } from "@/evals/scene-ideas/rubric";
 import { checkIdea, rawIdeaCount, scoreSceneIdeas, type SceneIdeasGrade, type SceneIdeasOutput } from "@/evals/scene-ideas/score";
@@ -27,7 +27,7 @@ function grade(item: SceneIssue, output: SceneIdeasOutput, context: GradeContext
 }
 
 it("scene ideas: hard rules, judged rules, and latency against the route's timeout", async () => {
-  const settings = evalSettings({ model: SCENE_PROMPT_MODEL, efforts: ["none", "low", "medium", "high", undefined], repeats: 2 });
+  const settings = evalSettings({ model: SCENE_PROMPT_MODEL, efforts: ["none", "low", "medium", "high", API_DEFAULT], repeats: 2 });
   const { from, to, issues: items } = readSceneIssues();
 
   const { rows, path } = await runSweep({

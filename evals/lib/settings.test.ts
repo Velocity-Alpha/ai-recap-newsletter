@@ -28,25 +28,39 @@ describe("evalSettings", () => {
     expect(evalSettings(DEFAULTS, { EVAL_EFFORTS: " none, default ,max" }).efforts).toEqual(["none", undefined, "max"]);
   });
 
-  it("reads EVAL_REPEATS, EVAL_LIMIT and EVAL_CONCURRENCY", () => {
-    expect(evalSettings(DEFAULTS, { EVAL_REPEATS: "2", EVAL_LIMIT: "5", EVAL_CONCURRENCY: "8" })).toMatchObject({
-      repeats: 2,
-      limit: 5,
-      concurrency: 8,
-    });
+  it("reads EVAL_REPEATS", () => {
+    expect(evalSettings(DEFAULTS, { EVAL_REPEATS: "2" }).repeats).toBe(2);
   });
 
-  it("reads the judge's model, effort and repeats", () => {
-    const env = { EVAL_JUDGE_MODEL: "gpt-6-luna", EVAL_JUDGE_EFFORT: "medium", EVAL_JUDGE_REPEATS: "1" };
-    expect(evalSettings(DEFAULTS, env)).toMatchObject({ judgeModel: "gpt-6-luna", judgeEffort: "medium", judgeRepeats: 1 });
+  it("reads EVAL_LIMIT", () => {
+    expect(evalSettings(DEFAULTS, { EVAL_LIMIT: "5" }).limit).toBe(5);
+  });
+
+  it("reads EVAL_CONCURRENCY", () => {
+    expect(evalSettings(DEFAULTS, { EVAL_CONCURRENCY: "8" }).concurrency).toBe(8);
+  });
+
+  it("reads the judge's model", () => {
+    expect(evalSettings(DEFAULTS, { EVAL_JUDGE_MODEL: "gpt-6-luna" }).judgeModel).toBe("gpt-6-luna");
+  });
+
+  it("reads the judge's effort", () => {
+    expect(evalSettings(DEFAULTS, { EVAL_JUDGE_EFFORT: "medium" }).judgeEffort).toBe("medium");
+  });
+
+  it("reads the judge's repeats", () => {
+    expect(evalSettings(DEFAULTS, { EVAL_JUDGE_REPEATS: "1" }).judgeRepeats).toBe(1);
   });
 
   it("rejects an effort the API does not take", () => {
     expect(() => evalSettings(DEFAULTS, { EVAL_EFFORTS: "low,minimal" })).toThrow(/minimal/);
   });
 
-  it("rejects a number below 1 or not a number", () => {
+  it("rejects a number below 1", () => {
     expect(() => evalSettings(DEFAULTS, { EVAL_REPEATS: "0" })).toThrow(/EVAL_REPEATS/);
+  });
+
+  it("rejects a value that is not a number", () => {
     expect(() => evalSettings(DEFAULTS, { EVAL_LIMIT: "x" })).toThrow(/EVAL_LIMIT/);
   });
 

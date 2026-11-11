@@ -52,32 +52,38 @@ describe("renderResults", () => {
     expect(readStored(renderResults({ task: "t", ...file }))).toEqual(file);
   });
 
-  it("shows only the chosen metric columns, and leaves out a column with no value in any row", () => {
-    expect(render([row("low", 1)], { columns: ["Mean shortlist size", "Gone"] })).toContain(
-      "| Model | Effort | Mean shortlist size | Errors | p50 | p95 | Cost per call | n | Date | Git sha |"
-    );
+  it("shows only the chosen metric columns", () => {
+    expect(render([row("low", 1)], { columns: ["Mean shortlist size"] })).toContain("| Model | Effort | Mean shortlist size | Errors |");
   });
 
-  it("shows the lowest and highest repeat of a count or a number, rounded", () => {
-    const markdown = render([
-      row("low", 21, {
-        metrics: [
-          { name: "Hit", hits: 21, n: 30, spread: { min: 0.6, max: 0.8 } },
-          { name: "Words", value: 123.456, spread: { min: 101.2, max: 140.9 } },
-        ],
-      }),
-    ]);
-    expect(markdown).toContain("| 21/30 (70%; 60–80%) | 123 (101–141) |");
+  it("leaves out a column with no value in any row", () => {
+    expect(render([row("low", 1)], { columns: ["Mean shortlist size", "Gone"] })).not.toContain("| Gone |");
+  });
+
+  it("shows the lowest and highest repeat of a count as shares", () => {
+    const markdown = render([row("low", 21, { metrics: [{ name: "Hit", hits: 21, n: 30, spread: { min: 0.6, max: 0.8 } }] })]);
+    expect(markdown).toContain("| 21/30 (70%; 60–80%) |");
+  });
+
+  it("shows the lowest and highest repeat of a number, rounded", () => {
+    const markdown = render([row("low", 21, { metrics: [{ name: "Words", value: 123.456, spread: { min: 101.2, max: 140.9 } }] })]);
+    expect(markdown).toContain("| 123 (101–141) |");
   });
 
   it("shows no spread when every repeat is the same", () => {
     expect(render([row("low", 3, { metrics: [{ name: "Same", hits: 3, n: 3, spread: { min: 1, max: 1 } }] })])).toContain("| 3/3 (100%) |");
   });
 
-  it("adds the graded runs and the web searches per call", () => {
-    const markdown = render([row("low", 21, { graded: { hits: 9, n: 10 }, webSearchesPerCall: 7.4 })]);
-    expect(markdown).toContain("| Errors | Graded | p50 | p95 | Searches per call | Cost per call |");
-    expect(markdown).toContain("| 0 | 9/10 | 1.2 s | 5.7 s | 7.4 | $0.000123 |");
+  it("adds the graded runs after the errors", () => {
+    const markdown = render([row("low", 21, { graded: { hits: 9, n: 10 } })]);
+    expect(markdown).toContain("| Errors | Graded | p50 |");
+    expect(markdown).toContain("| 0 | 9/10 | 1.2 s |");
+  });
+
+  it("adds the web searches per call before the cost", () => {
+    const markdown = render([row("low", 21, { webSearchesPerCall: 7.4 })]);
+    expect(markdown).toContain("| p95 | Searches per call | Cost per call |");
+    expect(markdown).toContain("| 5.7 s | 7.4 | $0.000123 |");
   });
 
   it("gives the cost of shared work in a line under the table", () => {
@@ -86,9 +92,23 @@ describe("renderResults", () => {
     );
   });
 
-  it("adds a judge cost column only when a judge was used", () => {
-    expect(render([row("low", 1)])).not.toContain("Judge cost per call");
+  it("adds a judge cost column when a judge was used", () => {
     expect(render([row("low", 1, { judgeCostPerCallUsd: 0.01 })])).toContain("| Cost per call | Judge cost per call |");
+  });
+
+  it("leaves out the judge cost column when no judge was used", () => {
+    expect(render([row("low", 1)])).not.toContain("Judge cost per call");
+  });
+
+  it("shows the judge's model and effort of each row that used one", () => {
+    const markdown = render([row("low", 1, { judge: "gpt-6-sol / high" }), row("high", 1, { judge: "gpt-6-sol / medium" })]);
+    expect(markdown).toContain("| Judge |");
+    expect(markdown).toContain("| gpt-6-sol / high |");
+    expect(markdown).toContain("| gpt-6-sol / medium |");
+  });
+
+  it("leaves out the judge column when no row used a judge", () => {
+    expect(render([row("low", 1)])).not.toContain("| Judge |");
   });
 
   it("shows an unknown cost", () => {
@@ -141,9 +161,13 @@ describe("mergeRows", () => {
   const old = [row("high", 1), row("low", 2), row("low", 3, { model: "gpt-6-sol" })];
   const merged = () => mergeRows(old, [row("low", 9), row("none", 8)]).map((r) => [r.model, r.effort, "hits" in r.metrics[0] ? r.metrics[0].hits : null]);
 
-  it("replaces the rows of the configs that ran and keeps the others", () => {
-    expect(merged()).toEqual(expect.arrayContaining([["gpt-6-luna", "low", 9], ["gpt-6-luna", "high", 1], ["gpt-6-sol", "low", 3]]));
+  it("replaces the rows of the configs that ran", () => {
+    expect(merged()).toContainEqual(["gpt-6-luna", "low", 9]);
     expect(merged()).not.toContainEqual(["gpt-6-luna", "low", 2]);
+  });
+
+  it("keeps the rows of the configs that did not run", () => {
+    expect(merged()).toEqual(expect.arrayContaining([["gpt-6-luna", "high", 1], ["gpt-6-sol", "low", 3]]));
   });
 
   it("orders the rows by model, then effort from lowest", () => {

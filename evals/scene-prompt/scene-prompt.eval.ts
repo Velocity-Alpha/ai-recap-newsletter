@@ -1,7 +1,7 @@
 // The scene prompt (src/pipeline/draft/image/scene-prompt.ts) on 10 past issues. evals/README.md.
 import { expect, it } from "vitest";
 
-import { evalSettings } from "@/evals/lib/settings";
+import { API_DEFAULT, evalSettings } from "@/evals/lib/settings";
 import { runSweep, type GradeContext, type RunContext } from "@/evals/lib/sweep";
 import { SCENE_PROMPT_JUDGE_INSTRUCTIONS, SCENE_PROMPT_JUDGE_SCHEMA } from "@/evals/scene-prompt/rubric";
 import { checkScenePrompt, scoreScenePrompt, type ScenePromptGrade, type ScenePromptOutput } from "@/evals/scene-prompt/score";
@@ -24,7 +24,7 @@ function grade(item: SceneIssue, output: ScenePromptOutput, context: GradeContex
 }
 
 it("scene prompt: hard rules and judged rules", async () => {
-  const settings = evalSettings({ model: SCENE_PROMPT_MODEL, efforts: ["none", "low", "medium", "high", undefined], repeats: 2 });
+  const settings = evalSettings({ model: SCENE_PROMPT_MODEL, efforts: ["none", "low", "medium", "high", API_DEFAULT], repeats: 2 });
   const { from, to, issues: items } = readSceneIssues();
 
   const { rows, path } = await runSweep({

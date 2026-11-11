@@ -12,13 +12,15 @@ import { modelFields, type ModelOverrides, type ReasoningEffort } from "@/src/li
 
 export const EXTRACTION_MODEL = "gpt-6-luna";
 /**
- * Low, from evals/results/extraction.md (the low and medium rows of d1da5b8: 2 runs of 12 issues each, judge at
- * high). Medium puts more stories in the right category (287 of 319, 89–91% per run, against 248 of 315, 77–80%)
- * and its importance is closer (309 of 319 within 1, against 290 of 315). But it gets more story links wrong:
- * 322 of 329 right (98% in both runs) against 321 of 323 (99–100%). A wrong link sends readers to the wrong page,
- * so low stays. Faithful stories are within noise (91% against 92%). Medium costs $0.0025 a call against $0.0016.
+ * Medium, from evals/results/extraction.md (the low and medium rows of d1da5b8: 2 runs of 12 issues each, judge at
+ * high). Medium covers more of the stories in the text (recall 339 of 358, 93–96% per run, against 329 of 364,
+ * 90–91%) and misses fewer per issue (0.79 against 1.46). It puts more stories in the right category (287 of 319,
+ * 89–91%, against 248 of 315, 77–80%) and rates importance closer (309 of 319 within 1, against 290 of 315).
+ * Against it: URL right is 322 of 329 (98%) against 321 of 323 (99–100%); most of those links only drop a query
+ * string or a trailing slash and still open the page. Faithful stories are within noise (91% against 92%). It costs
+ * $0.0025 a call against $0.0016, and its p95 of 63.4 s is inside the 120 s timeout.
  */
-export const EXTRACTION_EFFORT: ReasoningEffort = "low";
+export const EXTRACTION_EFFORT: ReasoningEffort = "medium";
 
 export const STORY_CATEGORIES = [
   "Launches",

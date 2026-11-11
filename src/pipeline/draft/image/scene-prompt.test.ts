@@ -57,35 +57,62 @@ describe("buildScenePromptInput", () => {
 });
 
 describe("writeScenePrompt", () => {
-  it("asks gpt-6-luna for 2.2.1's strict JSON with a 120 s timeout and returns the trimmed scene", async () => {
+  async function sentCall() {
     const { client, create } = fakeClient(OUTPUT);
-
-    await expect(writeScenePrompt(CONTEXT, { client, retryDelayMs: 0 })).resolves.toEqual({
-      scenePrompt: SCENE,
-      rationale: "The robot is easy to draw.",
-    });
-
+    await writeScenePrompt(CONTEXT, { client, retryDelayMs: 0 });
     expect(create).toHaveBeenCalledOnce();
     const [request, requestOptions] = create.mock.calls[0] as [
       Record<string, unknown> & { text: { format: Record<string, unknown> & { schema: Record<string, unknown> } } },
       Record<string, unknown>,
     ];
+    return { request, requestOptions };
+  }
+
+  it("returns the trimmed scene and rationale", async () => {
+    const { client } = fakeClient(OUTPUT);
+    await expect(writeScenePrompt(CONTEXT, { client, retryDelayMs: 0 })).resolves.toEqual({
+      scenePrompt: SCENE,
+      rationale: "The robot is easy to draw.",
+    });
+  });
+
+  it("calls gpt-6-luna", async () => {
     expect(SCENE_PROMPT_MODEL).toBe("gpt-6-luna");
-    expect(request.model).toBe("gpt-6-luna");
+    expect((await sentCall()).request.model).toBe("gpt-6-luna");
+  });
+
+  it("calls at medium effort", async () => {
+    expect(SCENE_PROMPT_EFFORT).toBe("medium");
+    expect((await sentCall()).request.reasoning).toEqual({ effort: "medium" });
+  });
+
+  it("sends 2.2.1's instructions and the context as input", async () => {
+    const { request } = await sentCall();
     expect(request.instructions).toMatch(/^You are an editorial image creative director/);
     expect(request.input).toBe(buildScenePromptInput(CONTEXT));
-    expect(request.store).toBe(false);
-    expect(request.tools).toBeUndefined();
-    expect(SCENE_PROMPT_EFFORT).toBe("medium");
-    expect(request.reasoning).toEqual({ effort: "medium" });
+  });
+
+  it("uses no web search", async () => {
+    expect((await sentCall()).request.tools).toBeUndefined();
+  });
+
+  it("stores nothing", async () => {
+    expect((await sentCall()).request.store).toBe(false);
+  });
+
+  it("asks for 2.2.1's strict JSON", async () => {
+    const { request } = await sentCall();
     expect(request.text.format).toMatchObject({ type: "json_schema", name: "image_prompt_output", strict: true });
     expect(request.text.format.schema).toMatchObject({
       required: ["image_prompt", "editorial_rationale"],
       additionalProperties: false,
     });
+  });
+
+  it("gives the call a 120 s timeout and no SDK retry", async () => {
     expect(SCENE_PROMPT_TIMEOUT_MS).toBe(120_000);
     // Our loop does the retries, so the SDK must not retry on top of it.
-    expect(requestOptions).toEqual({ timeout: 120_000, maxRetries: 0 });
+    expect((await sentCall()).requestOptions).toEqual({ timeout: 120_000, maxRetries: 0 });
   });
 
   it("uses the model and effort it is given (for evals)", async () => {

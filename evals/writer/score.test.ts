@@ -86,10 +86,12 @@ describe("scoreWriter on a good draft and a failed run", () => {
 describe("scoreWriter on a draft that breaks rules", () => {
   const scored = (draft: WrittenIssueContent, changes: Partial<WriterRun> = {}) => byName(scoreWriter([outcome(run({ first: draft, ...changes }))]));
 
-  it("fails a draft whose first checks found problems, and passes it after a clean rewrite", () => {
-    const metrics = scored(GOOD, { firstProblems: ["x"], finalProblems: [] });
-    expect(metrics["Checks pass, first draft"]).toMatchObject({ hits: 0 });
-    expect(metrics["Checks pass after rewrite"]).toMatchObject({ hits: 1 });
+  it("fails a draft whose first checks found problems", () => {
+    expect(scored(GOOD, { firstProblems: ["x"], finalProblems: [] })["Checks pass, first draft"]).toMatchObject({ hits: 0 });
+  });
+
+  it("passes a draft after a clean rewrite", () => {
+    expect(scored(GOOD, { firstProblems: ["x"], finalProblems: [] })["Checks pass after rewrite"]).toMatchObject({ hits: 1 });
   });
 
   it("flags a story moved to another section", () => {
@@ -155,10 +157,12 @@ describe("pairMetrics", () => {
     expect(pairMetrics([], "high")).toEqual([]);
   });
 
-  it("counts wins and ties against the baseline", () => {
-    const metrics = byName(pairMetrics(["win", "tie", "loss"], "high"));
-    expect(metrics["Wins vs high (pairwise)"]).toMatchObject({ hits: 1, n: 3 });
-    expect(metrics["Ties vs high (pairwise)"]).toMatchObject({ hits: 1, n: 3 });
+  it("counts wins against the baseline", () => {
+    expect(byName(pairMetrics(["win", "tie", "loss"], "high"))["Wins vs high (pairwise)"]).toMatchObject({ hits: 1, n: 3 });
+  });
+
+  it("counts ties against the baseline", () => {
+    expect(byName(pairMetrics(["win", "tie", "loss"], "high"))["Ties vs high (pairwise)"]).toMatchObject({ hits: 1, n: 3 });
   });
 
   it("scores the preference as a win plus half a tie", () => {

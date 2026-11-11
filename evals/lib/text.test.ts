@@ -7,9 +7,12 @@ describe("countSentences", () => {
     expect(countSentences('One. Two! 3 is next? "Four."')).toBe(4);
   });
 
-  it("does not split a decimal or an abbreviation", () => {
-    expect(countSentences("It costs $2.5 and e.g. more. Then stop.")).toBe(2);
+  it("does not split a decimal", () => {
     expect(countSentences("It costs $3.50 a month. It ships today!")).toBe(2);
+  });
+
+  it("does not split an abbreviation", () => {
+    expect(countSentences("It costs more, e.g. tax. Then stop.")).toBe(2);
   });
 
   it("counts text with no end mark as one sentence", () => {

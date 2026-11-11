@@ -14,8 +14,8 @@ export const SCENE_PROMPT_MODEL = "gpt-6-luna";
 /**
  * Medium, from evals/results/scene-prompt.md (2 runs of 10 issues each). It kept all hard rules in 17 of 20
  * runs, against 19 of 20 at high and 18 of 20 at the API default, which is medium too: so a gap of this size
- * is noise. High costs twice as much ($0.0014 against $0.000737 a call) and does worse on the judge's
- * "visible only" (6 of 20 against 7 of 20). Medium's call p95 is 16.7 s, inside the 120 s timeout.
+ * is noise, and high costs about twice as much ($0.0014 against $0.000737 a call). Medium's call p95 is 16.7 s,
+ * inside the 120 s timeout.
  */
 export const SCENE_PROMPT_EFFORT: ReasoningEffort = "medium";
 export const SCENE_PROMPT_TIMEOUT_MS = 120_000;

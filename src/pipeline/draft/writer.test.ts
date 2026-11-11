@@ -43,19 +43,38 @@ function payloadOf(prompt: string): Record<string, Array<Record<string, unknown>
 }
 
 describe("createOpenAIIssueWriter", () => {
-  it("makes one strict-schema GPT-6 Luna call with high effort and no web search", async () => {
+  async function sentRequest() {
     const { client, create } = fakeClient({ status: "completed", output_text: JSON.stringify(SAMPLE_CONTENT) });
-
-    await expect(createOpenAIIssueWriter({ client })(INPUT)).resolves.toEqual(SAMPLE_CONTENT);
-
+    await createOpenAIIssueWriter({ client })(INPUT);
     expect(create).toHaveBeenCalledTimes(1);
-    const request = create.mock.calls[0][0];
+    return create.mock.calls[0][0];
+  }
+
+  it("returns the written issue of one call", async () => {
+    const { client } = fakeClient({ status: "completed", output_text: JSON.stringify(SAMPLE_CONTENT) });
+    await expect(createOpenAIIssueWriter({ client })(INPUT)).resolves.toEqual(SAMPLE_CONTENT);
+  });
+
+  it("calls GPT-6 Luna", async () => {
     expect(WRITER_MODEL).toBe("gpt-6-luna");
-    expect(request.model).toBe("gpt-6-luna");
+    expect((await sentRequest()).model).toBe("gpt-6-luna");
+  });
+
+  it("calls at high effort", async () => {
     expect(WRITER_EFFORT).toBe("high");
-    expect(request.reasoning).toEqual({ effort: "high" });
-    expect(request.tools).toBeUndefined();
-    expect(request.text.format).toMatchObject({ type: "json_schema", strict: true, schema: WRITTEN_ISSUE_SCHEMA });
+    expect((await sentRequest()).reasoning).toEqual({ effort: "high" });
+  });
+
+  it("uses no web search", async () => {
+    expect((await sentRequest()).tools).toBeUndefined();
+  });
+
+  it("asks for the strict written-issue schema", async () => {
+    expect((await sentRequest()).text.format).toMatchObject({ type: "json_schema", strict: true, schema: WRITTEN_ISSUE_SCHEMA });
+  });
+
+  it("sends the writer prompt under the editorial instructions", async () => {
+    const request = await sentRequest();
     expect(request.input).toBe(buildWriterPrompt(INPUT));
     expect(request.instructions).toContain("You are the editorial structuring engine for an AI newsletter.");
   });

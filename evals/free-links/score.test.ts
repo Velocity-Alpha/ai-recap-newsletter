@@ -41,8 +41,11 @@ describe("scoreFreeLinks", () => {
       ]).map((metric) => [metric.name, metric])
     );
 
-  it("counts a story with a kept link the judge calls the same news as usable, and a failed search as a miss", () => {
+  it("counts a story with a kept link the judge calls the same news as usable, a failed search as a miss", () => {
     expect(metrics().get("Stories with a usable link")).toEqual({ name: "Stories with a usable link", hits: 1, n: 3 });
+  });
+
+  it("counts the stories with a kept link, a failed search as a miss", () => {
     expect(metrics().get("Stories with a kept link")).toEqual({ name: "Stories with a kept link", hits: 1, n: 3 });
   });
 
@@ -54,8 +57,11 @@ describe("scoreFreeLinks", () => {
     expect(metrics().get("Kept, judged not same news")).toEqual({ name: "Kept, judged not same news", hits: 1, n: 2 });
   });
 
-  it("counts failed and short reads over the links that were read", () => {
+  it("counts failed reads over the links that were read", () => {
     expect(metrics().get("Links that fail to read")).toEqual({ name: "Links that fail to read", hits: 1, n: 4 });
+  });
+
+  it("counts short reads over the links that were read", () => {
     expect(metrics().get("Read but too short")).toEqual({ name: "Read but too short", hits: 1, n: 4 });
   });
 

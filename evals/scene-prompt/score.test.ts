@@ -34,21 +34,24 @@ describe("checkScenePrompt", () => {
     expect(passesScenePromptRules(checkScenePrompt({ scenePrompt: GOOD, rationale: "It shows the key." }))).toBe(true);
   });
 
-  it("counts '16:9', and fails a prompt that has it twice", () => {
-    const checks = checkScenePrompt({ scenePrompt: `${GOOD} Again 16:9.`, rationale: "" });
-    expect(checks.ratioCount).toBe(2);
-    expect(passesScenePromptRules(checks)).toBe(false);
+  it("counts each '16:9'", () => {
+    expect(checkScenePrompt({ scenePrompt: `${GOOD} Again 16:9.`, rationale: "" }).ratioCount).toBe(2);
+  });
+
+  it("fails a prompt that has '16:9' twice", () => {
+    expect(passesScenePromptRules(checkScenePrompt({ scenePrompt: `${GOOD} Again 16:9.`, rationale: "" }))).toBe(false);
   });
 
   it("fails a prompt under 200 words", () => {
     expect(passesScenePromptRules(checkScenePrompt({ scenePrompt: "A 16:9 frame. Foreground, midground, background.", rationale: "" }))).toBe(false);
   });
 
-  it("counts the rationale's words and sentences", () => {
-    expect(checkScenePrompt({ scenePrompt: GOOD, rationale: "It shows the key. It is simple." })).toMatchObject({
-      rationaleWords: 7,
-      rationaleSentences: 2,
-    });
+  it("counts the rationale's words", () => {
+    expect(checkScenePrompt({ scenePrompt: GOOD, rationale: "It shows the key. It is simple." }).rationaleWords).toBe(7);
+  });
+
+  it("counts the rationale's sentences", () => {
+    expect(checkScenePrompt({ scenePrompt: GOOD, rationale: "It shows the key. It is simple." }).rationaleSentences).toBe(2);
   });
 });
 
@@ -63,8 +66,11 @@ describe("scoreScenePrompt", () => {
       ]).map((metric) => [metric.name, metric])
     );
 
-  it("counts each check over all runs, an error as a miss", () => {
+  it("counts all hard rules over all runs, an error as a miss", () => {
     expect(metrics().get("All hard rules")).toEqual({ name: "All hard rules", hits: 1, n: 4 });
+  });
+
+  it("counts each single check over all runs, an error as a miss", () => {
     expect(metrics().get("16:9 once")).toEqual({ name: "16:9 once", hits: 3, n: 4 });
   });
 

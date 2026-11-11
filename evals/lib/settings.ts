@@ -6,6 +6,9 @@ import { isReasoningEffort, type ReasoningEffort } from "@/src/lib/reasoning-eff
  */
 export type EffortSetting = ReasoningEffort | undefined;
 
+/** "Send no effort": a sweep entry that drops the call's `reasoning` field, so the API's own default applies. */
+export const API_DEFAULT: EffortSetting = undefined;
+
 /** One model and effort to run every item with. */
 export interface EvalConfig {
   model: string;
@@ -49,7 +52,7 @@ export function effortLabel(effort: EffortSetting): string {
 }
 
 function parseEffort(word: string, name: string): EffortSetting {
-  if (word === API_DEFAULT_WORD) return undefined;
+  if (word === API_DEFAULT_WORD) return API_DEFAULT;
   if (isReasoningEffort(word)) return word;
   throw new Error(`${name}: "${word}" is not an effort. Use none, low, medium, high, xhigh, max or ${API_DEFAULT_WORD}.`);
 }
@@ -68,7 +71,7 @@ export function evalSettings(defaults: EvalDefaults, env: Env = process.env): Ev
   let efforts: EffortSetting[];
   if (defaults.efforts === null) {
     if (effortsRaw) throw new Error("This eval's model call takes no effort. Unset EVAL_EFFORTS; sweep EVAL_MODEL instead.");
-    efforts = [undefined];
+    efforts = [API_DEFAULT];
   } else {
     efforts = effortsRaw
       ? effortsRaw.split(",").map((word) => parseEffort(word.trim(), "EVAL_EFFORTS"))

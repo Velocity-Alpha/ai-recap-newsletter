@@ -38,12 +38,16 @@ describe("createJudge", () => {
     expect(await sentBody("high")).toMatchObject({ instructions: "Grade it.", input: "the text" });
   });
 
-  it("asks for strict JSON under the rubric's cache key, and stores nothing", async () => {
-    expect(await sentBody("high")).toMatchObject({
-      prompt_cache_key: judgeCacheKey(REQUEST),
-      store: false,
-      text: { format: { type: "json_schema", name: "grade", strict: true } },
-    });
+  it("asks for strict JSON", async () => {
+    expect(await sentBody("high")).toMatchObject({ text: { format: { type: "json_schema", name: "grade", strict: true } } });
+  });
+
+  it("sends the rubric's cache key", async () => {
+    expect(await sentBody("high")).toMatchObject({ prompt_cache_key: judgeCacheKey(REQUEST) });
+  });
+
+  it("stores nothing", async () => {
+    expect(await sentBody("high")).toMatchObject({ store: false });
   });
 
   it("tries twice, then throws", async () => {

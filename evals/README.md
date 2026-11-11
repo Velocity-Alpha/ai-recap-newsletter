@@ -8,11 +8,11 @@ money, so `npm test` never runs them.
 
 | Call | Effort | Why | Results |
 |---|---|---|---|
-| Story extraction (`src/pipeline/ingest/extract.ts`) | low | Medium puts more stories in the right category (287 of 319 against 248 of 315; the repeat ranges do not overlap) and rates importance closer (309 of 319 within 1, against 290 of 315). But it gets more story links wrong (322 of 329 right, against 321 of 323), and a wrong link sends readers to the wrong page. Faithful stories are within noise. $0.0016 a call against $0.0025. | [extraction.md](results/extraction.md) |
+| Story extraction (`src/pipeline/ingest/extract.ts`) | medium | Medium covers more of the stories in the text (recall 339 of 358 against 329 of 364; the repeat ranges do not overlap), misses fewer per issue (0.79 against 1.46), puts more stories in the right category (287 of 319 against 248 of 315) and rates importance closer (309 of 319 within 1, against 290 of 315). Against it: URL right is 322 of 329 against 321 of 323, mostly links that drop a query string or a trailing slash and still open the page. Faithful stories are within noise. $0.0025 a call against $0.0016; p95 63.4 s of the 120 s timeout. | [extraction.md](results/extraction.md) |
 | Lead pick (`src/features/newsletter/openai-lead-pick.ts`) | low | Effort does not change the pick: the AI lead is the owner's lead in 15 or 16 of 30 runs over 10 boards at every effort from none to high (9 of 30 for the scored lead alone). Low was its setting before the evals. | [lead-pick.md](results/lead-pick.md) |
 | Repeat check (`src/pipeline/repeats/`, Decisions API) | n/a | The Decisions API takes no effort. | [repeats.md](results/repeats.md) |
 | Issue writer (`src/pipeline/draft/writer.ts`) | high | Two judge counts over 12 runs of 6 issues: 0.33 unsupported claims per issue against 1.08 at low, and notes followed in 35 of 36 against 28 of 36. Not the pairwise judge, where high against low is a tie (0.5). $0.0043 a call against $0.0021, about 0.2 cents more per issue; the slowest call took 59.8 s of the 240 s timeout. | [writer.md](results/writer.md) |
-| Scene prompt (`src/pipeline/draft/image/scene-prompt.ts`) | medium | All hard rules in 17 of 20 runs, against 19 of 20 at high and 18 of 20 at the API default, which is medium too: a gap of this size is noise. High costs about twice as much ($0.0014 a call against $0.000737) and does worse on "visible only" (6 of 20 against 7 of 20). | [scene-prompt.md](results/scene-prompt.md) |
+| Scene prompt (`src/pipeline/draft/image/scene-prompt.ts`) | medium | All hard rules in 17 of 20 runs, against 19 of 20 at high and 18 of 20 at the API default, which is medium too: a gap of this size is noise. High costs about twice as much ($0.0014 a call against $0.000737). | [scene-prompt.md](results/scene-prompt.md) |
 | Scene ideas (`src/pipeline/draft/image/scene-ideas.ts`) | medium | High keeps more ideas to one supporting element (50 of 60 against 43 of 60), but its call p95 is 44.5 s against the 45 s timeout of the web request, and 1 of its 20 calls failed. | [scene-ideas.md](results/scene-ideas.md) |
 | Free-link search (`src/pipeline/free-links/search.ts`) | medium | A usable link for 22 of 30 stories over 3 runs (70–80% per run), against 24 of 30 (70–90%) at none: the ranges overlap. None costs 2.3 times as much ($0.0832 a request against $0.0368), its p95 is 101.1 s against the 120 s limit, and 1 of its 30 requests failed. | [free-links.md](results/free-links.md) |
 
@@ -64,6 +64,7 @@ The columns, after the eval's metrics:
 - `Searches per call`: web search calls per run, for calls with the web search tool.
 - `Cost per call`: tokens at the prices in `evals/lib/usage.ts`, plus $0.01 per web search call. A model with no
   price there shows `unknown`: add it first.
+- `Judge`: the judge's model and effort for that row, so rows judged at different efforts say so.
 - `Judge cost per call`: the judge's cost spread over the runs.
 - A line under the table gives the cost of shared work (see below), which is in neither cost column.
 

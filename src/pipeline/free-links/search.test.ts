@@ -28,17 +28,33 @@ describe("buildSearchPrompt", () => {
 });
 
 describe("searchFreeLinks", () => {
-  it("sends one web search request to gpt-6-luna at medium effort, with a 120 s limit and one retry", async () => {
+  async function sentCall() {
     const { client, create } = clientAnswering('{"links":[]}');
-
     await searchFreeLinks(STORY, { client });
-
     expect(create).toHaveBeenCalledTimes(1);
-    expect(create).toHaveBeenCalledWith(
-      { model: "gpt-6-luna", reasoning: { effort: "medium" }, tools: [{ type: "web_search" }], input: buildSearchPrompt(STORY) },
-      { timeout: 120_000, maxRetries: 1 },
-    );
+    const [request, options] = create.mock.calls[0] as unknown as [Record<string, unknown>, Record<string, unknown>];
+    return { request, options };
+  }
+
+  it("sends one web search request with the search prompt", async () => {
+    expect((await sentCall()).request).toMatchObject({ tools: [{ type: "web_search" }], input: buildSearchPrompt(STORY) });
+  });
+
+  it("calls gpt-6-luna", async () => {
+    expect((await sentCall()).request.model).toBe("gpt-6-luna");
+  });
+
+  it("calls at medium effort", async () => {
     expect(SEARCH_EFFORT).toBe("medium");
+    expect((await sentCall()).request.reasoning).toEqual({ effort: "medium" });
+  });
+
+  it("gives the call a 120 s limit", async () => {
+    expect((await sentCall()).options.timeout).toBe(120_000);
+  });
+
+  it("retries the call once", async () => {
+    expect((await sentCall()).options.maxRetries).toBe(1);
   });
 
   it("uses the model and effort it is given (for evals)", async () => {

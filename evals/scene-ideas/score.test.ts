@@ -83,8 +83,11 @@ describe("scoreSceneIdeas", () => {
       ]).map((metric) => [metric.name, metric])
     );
 
-  it("counts run checks over all runs, an error as a miss", () => {
+  it("counts runs with exactly 3 ideas over all runs, an error as a miss", () => {
     expect(metrics().get("Exactly 3 ideas")).toEqual({ name: "Exactly 3 ideas", hits: 1, n: 3 });
+  });
+
+  it("counts runs whose ideas all pass the hard rules over all runs, an error as a miss", () => {
     expect(metrics().get("All ideas pass hard rules")).toEqual({ name: "All ideas pass hard rules", hits: 1, n: 3 });
   });
 
@@ -92,13 +95,19 @@ describe("scoreSceneIdeas", () => {
     expect(metrics().get("Idea: all hard rules")).toEqual({ name: "Idea: all hard rules", hits: 4, n: 9 });
   });
 
-  it("counts judged idea rules over 3 ideas per graded run", () => {
+  it("counts the judged 'no extras' over 3 ideas per graded run", () => {
     expect(metrics().get("J: no extras")).toEqual({ name: "J: no extras", hits: 0, n: 3 });
+  });
+
+  it("counts the judged 'visible only' over 3 ideas per graded run", () => {
     expect(metrics().get("J: visible only")).toEqual({ name: "J: visible only", hits: 3, n: 3 });
   });
 
-  it("counts judged set rules over the graded runs", () => {
+  it("counts the judged 'an idea shows the lead' over the graded runs", () => {
     expect(metrics().get("J: an idea shows the lead")).toEqual({ name: "J: an idea shows the lead", hits: 1, n: 1 });
+  });
+
+  it("counts the judged 'clearly different' over the graded runs", () => {
     expect(metrics().get("J: clearly different")).toEqual({ name: "J: clearly different", hits: 0, n: 1 });
   });
 

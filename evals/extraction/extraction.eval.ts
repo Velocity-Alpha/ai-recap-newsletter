@@ -40,7 +40,7 @@ it("extraction: stories from past issues, checked and judged", async () => {
         "AlphaSignal has no public issue archive and is not in the set.",
       "Issues: per issue run. Valid output: the call returned stories matching the schema (two tries, as in production). " +
         "All story URLs in text: every non-empty url is a link in the text (compared cleaned). No duplicates: by cleaned url or headline.",
-      `Judge (${settings.judgeModel}, ${settings.judgeEffort ?? "api default"} effort, rubric in \`evals/extraction/judge.ts\`) counts per run: ` +
+      "Judge (the Judge column gives each row's model and effort; rubric in `evals/extraction/judge.ts`) counts per run: " +
         "Recall = qualifying stories in the text the " +
         "extraction covers. Precision = extracted stories that are one real story (not sponsored, filtered, merged or a fragment). " +
         "Faithful = no fact the text does not state. Headline rules and URL right follow the prompt. Category right and " +

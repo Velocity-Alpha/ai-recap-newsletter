@@ -63,19 +63,37 @@ describe("createOpenAIExtractor", () => {
     return { client: { responses: { create } }, create };
   }
 
-  it("calls gpt-6-luna with low effort and the strict schema, without web search or storage", async () => {
+  async function sentRequest() {
     const { client, create } = fakeClient(JSON.stringify({ stories: [STORY] }));
-    const extract = createOpenAIExtractor({ client });
+    await createOpenAIExtractor({ client })({ sourceDate: "2026-11-09", text: "Issue body" });
+    return create.mock.calls[0][0] as Record<string, unknown> & { text: { format: Record<string, unknown> } };
+  }
 
-    await expect(extract({ sourceDate: "2026-11-09", text: "Issue body" })).resolves.toEqual([STORY]);
-    const request = create.mock.calls[0][0] as Record<string, unknown> & { text: { format: Record<string, unknown> } };
-    expect(request.model).toBe(EXTRACTION_MODEL);
+  it("returns the stories of the answer", async () => {
+    const { client } = fakeClient(JSON.stringify({ stories: [STORY] }));
+    await expect(createOpenAIExtractor({ client })({ sourceDate: "2026-11-09", text: "Issue body" })).resolves.toEqual([STORY]);
+  });
+
+  it("calls gpt-6-luna", async () => {
     expect(EXTRACTION_MODEL).toBe("gpt-6-luna");
-    expect(EXTRACTION_EFFORT).toBe("low");
-    expect(request.reasoning).toEqual({ effort: "low" });
-    expect(request.store).toBe(false);
-    expect(request.tools).toBeUndefined();
-    expect(request.text.format).toMatchObject({ type: "json_schema", name: "news_stories", strict: true });
+    expect((await sentRequest()).model).toBe("gpt-6-luna");
+  });
+
+  it("calls at medium effort", async () => {
+    expect(EXTRACTION_EFFORT).toBe("medium");
+    expect((await sentRequest()).reasoning).toEqual({ effort: "medium" });
+  });
+
+  it("asks for the strict news_stories schema", async () => {
+    expect((await sentRequest()).text.format).toMatchObject({ type: "json_schema", name: "news_stories", strict: true });
+  });
+
+  it("uses no web search", async () => {
+    expect((await sentRequest()).tools).toBeUndefined();
+  });
+
+  it("stores nothing", async () => {
+    expect((await sentRequest()).store).toBe(false);
   });
 
   it("uses the model and effort it is given (for evals)", async () => {

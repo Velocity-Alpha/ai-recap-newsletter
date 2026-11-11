@@ -15,6 +15,7 @@ import {
   UsageRecorder,
   type Price,
   type RecordingClient,
+  type ResponsesApi,
   type Usage,
 } from "@/evals/lib/usage";
 
@@ -109,6 +110,8 @@ export interface SweepSpec<Item, Output, Grade = never> {
   raw?: (outcome: Outcome<Item, Output, Grade>) => Record<string, unknown>;
   /** The price of a model. Default: PRICES in usage.ts. */
   price?: (model: string) => Price | null;
+  /** For tests: the Responses API of the run and judge clients. Default: the OpenAI client. */
+  api?: () => ResponsesApi;
   /** For tests. Default: writeResults. */
   write?: (file: ResultsFile, raw: unknown) => string;
 }
@@ -189,7 +192,7 @@ export async function runSweep<Item, Output, Grade = never>(spec: SweepSpec<Item
   const sha = gitSha();
   const judgeRepeats = Math.min(settings.repeats, settings.judgeRepeats ?? settings.repeats);
   const makeJudge = (recorder: UsageRecorder) =>
-    createJudge({ model: settings.judgeModel, effort: settings.judgeEffort, client: recordingClient(recorder) });
+    createJudge({ model: settings.judgeModel, effort: settings.judgeEffort, client: recordingClient(recorder, { api: spec.api }) });
 
   const sharedRecorder = new UsageRecorder();
   const sharedJudge = makeJudge(sharedRecorder);
@@ -212,7 +215,7 @@ export async function runSweep<Item, Output, Grade = never>(spec: SweepSpec<Item
       const context: RunContext = {
         config,
         repeat,
-        client: recordingClient(recorder, { sendNoEffort: config.effort === undefined }),
+        client: recordingClient(recorder, { sendNoEffort: config.effort === undefined, api: spec.api }),
         fetch: recordingFetch(recorder),
         responses: () => [...recorder.responses],
       };
@@ -284,6 +287,7 @@ export async function runSweep<Item, Output, Grade = never>(spec: SweepSpec<Item
       latencyMs: { p50: roundMs(percentile(latencies, 50)), p95: roundMs(percentile(latencies, 95)) },
       costPerCallUsd: perCall(usage, price(config.model), outcomes.length),
       judgeCostPerCallUsd: judgeUsage.calls === 0 ? null : perCall(judgeUsage, price(settings.judgeModel), outcomes.length),
+      ...(judgeUsage.calls === 0 ? {} : { judge: `${settings.judgeModel} / ${effortLabel(settings.judgeEffort)}` }),
       ...(usage.webSearches > 0 ? { webSearchesPerCall: usage.webSearches / outcomes.length } : {}),
       ...(spec.grade ? { graded: { hits: tried.filter((outcome) => outcome.gradeStatus === "graded").length, n: tried.length } } : {}),
       ...(sharedCostUsd === undefined ? {} : { sharedCostUsd }),

@@ -122,20 +122,35 @@ describe("scoreExtraction", () => {
     expect(metrics()["Recall (judge)"]).toEqual({ name: "Recall (judge)", hits: 1, n: 2 });
   });
 
-  it("counts precision, faithfulness, headline rules and URL right over the extracted stories", () => {
+  it("counts precision over the extracted stories", () => {
     expect(metrics()["Precision (judge)"]).toEqual({ name: "Precision (judge)", hits: 1, n: 2 });
+  });
+
+  it("counts faithful stories over the extracted stories", () => {
     expect(metrics()["Faithful stories"]).toEqual({ name: "Faithful stories", hits: 1, n: 2 });
+  });
+
+  it("counts headline rules over the extracted stories", () => {
     expect(metrics()["Headline rules"]).toEqual({ name: "Headline rules", hits: 1, n: 2 });
+  });
+
+  it("counts URL right over the extracted stories", () => {
     expect(metrics()["URL right"]).toEqual({ name: "URL right", hits: 1, n: 2 });
   });
 
-  it("counts category and importance over the stories the judge calls real stories only", () => {
+  it("counts category right over the stories the judge calls real stories only", () => {
     expect(metrics()["Category right"]).toEqual({ name: "Category right", hits: 1, n: 1 });
+  });
+
+  it("counts importance within 1 over the stories the judge calls real stories only", () => {
     expect(metrics()["Importance within 1"]).toEqual({ name: "Importance within 1", hits: 1, n: 1 });
   });
 
-  it("averages stories and saved stories per valid run", () => {
+  it("averages the stories per valid run", () => {
     expect(metrics()["Stories per issue"]).toEqual({ name: "Stories per issue", value: 2 });
+  });
+
+  it("averages the saved stories per valid run", () => {
     expect(metrics()["Saved per issue"]).toEqual({ name: "Saved per issue", value: 2 });
   });
 

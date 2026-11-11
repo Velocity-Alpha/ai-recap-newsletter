@@ -4,6 +4,7 @@ import type { ResultsFile } from "@/evals/lib/results";
 import { evalSettings } from "@/evals/lib/settings";
 import { countGraded, countHits, runSweep, withSpread, type SweepSpec } from "@/evals/lib/sweep";
 import { outcomeOf } from "@/evals/lib/testing";
+import type { ResponsesApi } from "@/evals/lib/usage";
 
 type Item = { id: number; answer: string };
 const ITEMS: Item[] = [
@@ -51,15 +52,21 @@ describe("runSweep", () => {
     ]);
   });
 
-  it("counts a run that throws as an error and scores it as a miss", async () => {
-    const result = await toySweep({
+  const sweepWithAThrow = () =>
+    toySweep({
       async run(item) {
         if (item.id === 2) throw new Error("boom");
         return item.answer;
       },
       score: (outcomes) => [countHits("Right answer", outcomes, (outcome) => outcome.output === outcome.item.answer)],
     });
-    expect(result.rows[0]).toMatchObject({ n: 3, errors: 1, metrics: [{ name: "Right answer", hits: 2, n: 3 }] });
+
+  it("counts a run that throws as an error", async () => {
+    expect((await sweepWithAThrow()).rows[0]).toMatchObject({ n: 3, errors: 1 });
+  });
+
+  it("scores a run that throws as a miss", async () => {
+    expect((await sweepWithAThrow()).rows[0].metrics).toEqual([{ name: "Right answer", hits: 2, n: 3 }]);
   });
 
   it("adds each count's spread over the repeats", async () => {
@@ -71,11 +78,34 @@ describe("runSweep", () => {
     expect(result.rows[0].metrics[0]).toEqual({ name: "Right answer", hits: 3, n: 6, spread: { min: 0, max: 1 } });
   });
 
-  it("costs nothing and has no judge cost, grade count or shared cost when no call was made", async () => {
-    const [row] = (await toySweep({})).rows;
-    expect(row).toMatchObject({ costPerCallUsd: 0, judgeCostPerCallUsd: null });
-    expect(row.graded).toBeUndefined();
-    expect(row.sharedCostUsd).toBeUndefined();
+  it("costs nothing when no call was made", async () => {
+    expect((await toySweep({})).rows[0].costPerCallUsd).toBe(0);
+  });
+
+  it("has no judge cost when no judge call was made", async () => {
+    expect((await toySweep({})).rows[0].judgeCostPerCallUsd).toBeNull();
+  });
+
+  it("has no grade count when the eval does not grade", async () => {
+    expect((await toySweep({})).rows[0].graded).toBeUndefined();
+  });
+
+  it("has no shared cost when no shared work ran", async () => {
+    expect((await toySweep({})).rows[0].sharedCostUsd).toBeUndefined();
+  });
+
+  it("records the judge's model and effort on the row of a config the judge graded", async () => {
+    const answer = { id: "resp_1", status: "completed", output: [], output_text: '{"good":true}', usage: { input_tokens: 7, output_tokens: 3 } };
+    const api = { create: vi.fn(async () => answer), retrieve: vi.fn(async () => answer) } as unknown as ResponsesApi;
+    const result = await toySweep<{ good: boolean }>({
+      api: () => api,
+      grade: (_item, _output, context) => context.judge<{ good: boolean }>({ name: "g", instructions: "i", input: "x", schema: {} }),
+    });
+    expect(result.rows[0].judge).toBe("gpt-6-sol / high");
+  });
+
+  it("records no judge when no judge call was made", async () => {
+    expect((await toySweep({})).rows[0].judge).toBeUndefined();
   });
 
   it("writes the results file with the task, title, notes and columns", async () => {
@@ -117,7 +147,7 @@ describe("runSweep", () => {
     expect(result.rows[0].latencyMs.p95).toBeLessThan(25);
   });
 
-  it("grades only the first EVAL_JUDGE_REPEATS repeats and marks the rest skipped", async () => {
+  async function sweepWithJudgeRepeats() {
     const graded: string[] = [];
     const result = await toySweep<{ good: boolean }>({
       settings: evalSettings({ model: "gpt-6-luna", efforts: ["low"], repeats: 3 }, { EVAL_JUDGE_REPEATS: "2" }),
@@ -128,20 +158,32 @@ describe("runSweep", () => {
       },
       score: (outcomes) => [{ name: "Skipped", value: outcomes.filter((outcome) => outcome.gradeStatus === "skipped").length }],
     });
-    expect(graded.sort()).toEqual(["1:0", "1:1", "2:0", "2:1"]);
-    expect(result.rows[0].metrics[0]).toMatchObject({ name: "Skipped", value: 2 });
+    return { graded, result };
+  }
+
+  it("grades only the first EVAL_JUDGE_REPEATS repeats", async () => {
+    expect((await sweepWithJudgeRepeats()).graded.sort()).toEqual(["1:0", "1:1", "2:0", "2:1"]);
   });
 
-  it("counts a grade that throws as failed, and leaves it out of graded counts", async () => {
-    const result = await toySweep<{ good: boolean }>({
+  it("marks the repeats after EVAL_JUDGE_REPEATS skipped", async () => {
+    expect((await sweepWithJudgeRepeats()).result.rows[0].metrics[0]).toMatchObject({ name: "Skipped", value: 2 });
+  });
+
+  const sweepWithAFailedGrade = () =>
+    toySweep<{ good: boolean }>({
       async grade(item, output) {
         if (item.id === 2) throw new Error("judge down");
         return { good: output === "a" };
       },
       score: (outcomes) => [countGraded("Good", outcomes, (outcome) => outcome.grade.good)],
     });
-    expect(result.rows[0].graded).toEqual({ hits: 2, n: 3 });
-    expect(result.rows[0].metrics[0]).toEqual({ name: "Good", hits: 1, n: 2 });
+
+  it("counts a grade that throws as failed", async () => {
+    expect((await sweepWithAFailedGrade()).rows[0].graded).toEqual({ hits: 2, n: 3 });
+  });
+
+  it("leaves a failed grade out of graded counts", async () => {
+    expect((await sweepWithAFailedGrade()).rows[0].metrics[0]).toEqual({ name: "Good", hits: 1, n: 2 });
   });
 
   it("runs afterSweep with every config's outcomes and adds its metrics to each row", async () => {
