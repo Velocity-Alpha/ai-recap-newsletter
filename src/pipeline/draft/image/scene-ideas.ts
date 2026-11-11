@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 
-import { API_DEFAULT_EFFORT, effortOrDefault, reasoningField, type EffortSetting } from "@/src/lib/reasoning-effort";
+import { effortOrDefault, reasoningField, type EffortSetting } from "@/src/lib/reasoning-effort";
 import {
   buildSceneContext,
   SCENE_PROMPT_MODEL,
@@ -16,8 +16,9 @@ import {
  */
 
 export const SCENE_IDEAS_COUNT = 3;
-/** The model is SCENE_PROMPT_MODEL. No effort is sent: the API default. */
-export const SCENE_IDEAS_EFFORT: EffortSetting = API_DEFAULT_EFFORT;
+/** The model is SCENE_PROMPT_MODEL. Medium, from evals/results/scene-ideas.md (2026-11-10): high follows the
+ * composition rules a little better, but its p95 reaches the 45 s timeout. */
+export const SCENE_IDEAS_EFFORT: EffortSetting = "medium";
 /** The board waits for this call, and a route must finish inside Netlify's 60 s. */
 export const SCENE_IDEAS_TIMEOUT_MS = 45_000;
 

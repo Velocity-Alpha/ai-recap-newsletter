@@ -43,7 +43,7 @@ function payloadOf(prompt: string): Record<string, Array<Record<string, unknown>
 }
 
 describe("createOpenAIIssueWriter", () => {
-  it("makes one strict-schema GPT-6 Luna call with low effort and no web search", async () => {
+  it("makes one strict-schema GPT-6 Luna call with high effort and no web search", async () => {
     const { client, create } = fakeClient({ status: "completed", output_text: JSON.stringify(SAMPLE_CONTENT) });
 
     await expect(createOpenAIIssueWriter({ client })(INPUT)).resolves.toEqual(SAMPLE_CONTENT);
@@ -52,8 +52,8 @@ describe("createOpenAIIssueWriter", () => {
     const request = create.mock.calls[0][0];
     expect(WRITER_MODEL).toBe("gpt-6-luna");
     expect(request.model).toBe("gpt-6-luna");
-    expect(WRITER_EFFORT).toBe("low");
-    expect(request.reasoning).toEqual({ effort: "low" });
+    expect(WRITER_EFFORT).toBe("high");
+    expect(request.reasoning).toEqual({ effort: "high" });
     expect(request.tools).toBeUndefined();
     expect(request.text.format).toMatchObject({ type: "json_schema", strict: true, schema: WRITTEN_ISSUE_SCHEMA });
     expect(request.input).toBe(buildWriterPrompt(INPUT));

@@ -40,9 +40,8 @@ describe("suggestSceneIdeas", () => {
       store: false,
       text: { format: { type: "json_schema", strict: true } },
     });
-    // No effort is set, so the API default applies.
-    expect(SCENE_IDEAS_EFFORT).toBeUndefined();
-    expect(request).not.toHaveProperty("reasoning");
+    expect(SCENE_IDEAS_EFFORT).toBe("medium");
+    expect(request.reasoning).toEqual({ effort: "medium" });
     expect(String(request.input)).toContain(buildSceneContext(CONTEXT));
     expect(String(request.instructions)).toContain("three");
     // The board waits for this, so there are no retries, and it ends inside Netlify's 60 s.

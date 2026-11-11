@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 
-import { API_DEFAULT_EFFORT, effortOrDefault, reasoningField, type EffortSetting } from "@/src/lib/reasoning-effort";
+import { effortOrDefault, reasoningField, type EffortSetting } from "@/src/lib/reasoning-effort";
 import { withRetries } from "@/src/pipeline/draft/image/retry";
 
 /**
@@ -11,8 +11,9 @@ import { withRetries } from "@/src/pipeline/draft/image/retry";
  */
 
 export const SCENE_PROMPT_MODEL = "gpt-6-luna";
-/** No effort is sent: the API default. */
-export const SCENE_PROMPT_EFFORT: EffortSetting = API_DEFAULT_EFFORT;
+/** High, from evals/results/scene-prompt.md (2026-11-10): it keeps the prompt's hard rules most often. The step
+ * runs in the draft job, so its p95 of about 33 s is well inside the 120 s timeout. */
+export const SCENE_PROMPT_EFFORT: EffortSetting = "high";
 export const SCENE_PROMPT_TIMEOUT_MS = 120_000;
 export const SCENE_PROMPT_RETRIES = 2;
 

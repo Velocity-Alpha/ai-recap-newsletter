@@ -76,9 +76,8 @@ describe("writeScenePrompt", () => {
     expect(request.input).toBe(buildScenePromptInput(CONTEXT));
     expect(request.store).toBe(false);
     expect(request.tools).toBeUndefined();
-    // No effort is set, so the API default applies.
-    expect(SCENE_PROMPT_EFFORT).toBeUndefined();
-    expect(request).not.toHaveProperty("reasoning");
+    expect(SCENE_PROMPT_EFFORT).toBe("high");
+    expect(request.reasoning).toEqual({ effort: "high" });
     expect(request.text.format).toMatchObject({ type: "json_schema", name: "image_prompt_output", strict: true });
     expect(request.text.format.schema).toMatchObject({
       required: ["image_prompt", "editorial_rationale"],

@@ -24,7 +24,9 @@ import {
  */
 
 export const WRITER_MODEL = "gpt-6-luna";
-export const WRITER_EFFORT: EffortSetting = "low";
+/** High, from evals/results/writer.md (2026-11-10): fewer claims the inputs do not support than low, and notes
+ * followed more often, for about 2 cents more per issue and well inside the 240 s timeout. */
+export const WRITER_EFFORT: EffortSetting = "high";
 
 /** Article text beyond this is cut, so 8 feature stories stay well inside the model's context. */
 export const MAX_ARTICLE_CHARS = 20_000;
