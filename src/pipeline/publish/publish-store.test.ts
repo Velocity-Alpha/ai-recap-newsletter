@@ -252,6 +252,81 @@ describe("publish store", () => {
   });
 });
 
+describe("publish store: the stories of a published issue", () => {
+  const SENT = {
+    headlines: [{ story_id: 501, url: "https://example.test/501" }, { story_id: 502, url: "https://example.test/502" }],
+    research_and_analysis: [],
+    tools: [{ story_id: 503, url: "" }],
+    quick_hits: [{ story_id: 504, url: "https://example.test/504" }],
+  };
+  const sentContent = (issueId: number) => ({ ...emailContent(issueId), ...SENT }) as unknown as PublishedIssueContent;
+
+  async function outlineRow(leadStoryId: number | null): Promise<bigint> {
+    const row = await fakeDb.client.approvalOutline.create({ data: { issueDate: new Date(`${DATE}T00:00:00.000Z`), payload: { leadStoryId }, payloadHash: "hash" } });
+    return (row as { id: bigint }).id;
+  }
+
+  const storyRows = () =>
+    fakeDb.state.issueStories.rows.map(({ issueId, storyId, section, position, url, isLead }) => ({ issueId, storyId, section, position, url, isLead }));
+
+  it("writes one row for each story of the sent email, and marks the lead story of the sent draft's outline", async () => {
+    const issueId = await issueRow();
+    const draftId = await draftRow(issueId, { outlineId: await outlineRow(502) });
+
+    await store().publish({ issueId, content: sentContent(issueId), storyIds: [501, 502, 503, 504], publishedAt: SENT_AT, event: { ...EVENT, issueId, draftId } });
+
+    const id = BigInt(issueId);
+    expect(storyRows()).toEqual([
+      { issueId: id, storyId: 501, section: "headlines", position: 1, url: "https://example.test/501", isLead: false },
+      { issueId: id, storyId: 502, section: "headlines", position: 2, url: "https://example.test/502", isLead: true },
+      { issueId: id, storyId: 503, section: "tools", position: 1, url: null, isLead: false },
+      { issueId: id, storyId: 504, section: "quick_hits", position: 1, url: "https://example.test/504", isLead: false },
+    ]);
+  });
+
+  it("marks no lead story when the outline of the sent draft has none", async () => {
+    const issueId = await issueRow();
+    const draftId = await draftRow(issueId, { outlineId: await outlineRow(null) });
+
+    await store().publish({ issueId, content: sentContent(issueId), storyIds: [], publishedAt: SENT_AT, event: { ...EVENT, issueId, draftId } });
+
+    expect(storyRows().map((row) => row.isLead)).toEqual([false, false, false, false]);
+  });
+
+  it("leaves the lead unknown when the email names no draft", async () => {
+    const issueId = await issueRow();
+    await draftRow(issueId, { outlineId: await outlineRow(502) });
+
+    await store().publish({ issueId, content: sentContent(issueId), storyIds: [], publishedAt: SENT_AT, event: { ...EVENT, issueId } });
+
+    expect(storyRows().map((row) => [row.storyId, row.isLead])).toEqual([[501, null], [502, null], [503, null], [504, null]]);
+  });
+
+  it("leaves the lead unknown when the draft the email names is another issue's, or its outline is gone", async () => {
+    const issueId = await issueRow();
+    const otherIssue = await issueRow();
+    const othersDraft = await draftRow(otherIssue, { outlineId: await outlineRow(502) });
+    const noOutline = await draftRow(otherIssue, { version: 3, outlineId: 999999n });
+
+    await store().publish({ issueId, content: sentContent(issueId), storyIds: [], publishedAt: SENT_AT, event: { ...EVENT, issueId, draftId: othersDraft } });
+    await store().publish({ issueId: otherIssue, content: sentContent(otherIssue), storyIds: [], publishedAt: SENT_AT, event: { ...EVENT, gmailMessageId: "m2", issueId: otherIssue, draftId: noOutline } });
+
+    expect(storyRows().map((row) => row.isLead)).toEqual(Array(8).fill(null));
+  });
+
+  it("writes nothing for an issue that is already published", async () => {
+    const issueId = await issueRow();
+    await store().publish({ issueId, content: sentContent(issueId), storyIds: [], publishedAt: SENT_AT, event: { ...EVENT, issueId } });
+    const before = structuredClone(fakeDb.state.issueStories.rows);
+
+    const resent = { ...sentContent(issueId), quick_hits: [{ story_id: 777, url: "https://example.test/777" }] } as unknown as PublishedIssueContent;
+    const outcome = await store().publish({ issueId, content: resent, storyIds: [], publishedAt: SENT_AT, event: { ...EVENT, gmailMessageId: "m2", issueId } });
+
+    expect(outcome).toBe("already_published");
+    expect(fakeDb.state.issueStories.rows).toEqual(before);
+  });
+});
+
 describe("publish store: newestStagedHtml", () => {
   it("gives the email HTML of the issue's newest staged version", async () => {
     const issueId = await issueRow();

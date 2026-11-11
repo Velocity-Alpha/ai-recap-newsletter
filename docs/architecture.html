@@ -107,6 +107,7 @@ GHL      Emails all subscribers, plus the seed inbox
 every 5 min, 09:00-21:00 weekdays
          detect-publish reads the seed inbox (Gmail API, PUBLISH_SEED_RECIPIENTS only)
          -> parses the sent email -> matches the issue -> sets published_at + content_json (status: published)
+         -> stories.used_in_publication_date + issue_stories rows: one for each story of the sent email (ADR 0007)
          -> publish_events row -> POST /api/revalidate (cache tag published-issues) -> issue is live
 03:00 UTC daily: detect-publish-catch-up does the same over the last 3 days
 If the issue is missing after a send: /approval/issues -> "Mark as published"
@@ -169,6 +170,7 @@ If the issue is missing after a send: /approval/issues -> "Mark as published"
   <tr><td><code>story_sources</code></td><td>Which newsletters covered each story, one row per story and source key. <code>stories.source</code> keeps only the last writer, so the board reads coverage here. If the table is missing, ingestion and the board log and fall back to <code>stories.source</code>.</td><td>ingest job</td></tr>
   <tr><td><code>story_embeddings</code></td><td>One embedding for each story (512 numbers, <code>real[]</code>, length 1), made once by the repeat check</td><td>ingest job; the board for candidates ingestion did not check</td></tr>
   <tr><td><code>story_matches</code></td><td>Story matches: one row for each judged pair (<code>newer_story_id</code>, <code>older_story_id</code>, <code>similarity</code>, and the judge's <code>same</code> and <code>news</code>). <code>stories.matched_at</code> is set when a story went through the check; null means not checked yet</td><td>ingest job; the board for candidates ingestion did not check</td></tr>
+  <tr><td><code>issue_stories</code></td><td>Which stories ran in which published issue: one row for each story of the sent email (<code>issue_id</code>, <code>story_id</code>), with its <code>section</code>, its <code>position</code> in the section (from 1), the link that was sent (<code>url</code>), and <code>is_lead</code> (null when the sent draft is not known: an email that names no draft, and the rows the migration made for past issues). A second copy of the email writes nothing. Nothing reads it yet: the board, held stories, and the checks still read <code>stories.used_in_publication_date</code> and <code>queued_for_publication_date</code></td><td>publish job, owner ("Mark as published")</td></tr>
   <tr><td><code>scraper_bookmarks</code></td><td>Last-read time per source (keys such as <code>the_signal</code>; <code>tldr_ai</code> and <code>aloa_ai</code> are unused)</td><td>ingest job</td></tr>
   <tr><td><code>issues</code></td><td>One row per date (<code>issue_date</code> is unique): <code>html</code>, <code>content_json</code>, <code>published_at</code>, <code>slug</code> (generated), and <code>status</code> (<code>draft</code> or <code>published</code>). The database computes <code>status</code> from <code>published_at</code>: read it to ask "is it published?", never write it</td><td>draft job (insert, update), title and image changes (update), publish job (update; the sent staged version is copied over), owner ("Mark as published", from the newest staged version)</td></tr>
   <tr><td><code>subscribers</code>, <code>auth_codes</code></td><td>Site subscriber records and one-time codes</td><td>app</td></tr>
@@ -184,7 +186,7 @@ If the issue is missing after a send: /approval/issues -> "Mark as published"
   <tr><td><code>rate_limits</code></td><td>Fixed-window counters for login, sign-up, and New image (Generate, ideas) per-session limits; keys hold a hash, never an address. Rows are deleted a day after their window starts</td><td>app (approval login and New image, subscriber sign-up and sign-in codes)</td></tr>
   <tr><td><code>public.schema_migrations</code></td><td>Legacy migration record</td><td>none</td></tr>
 </table>
-<p>The runtime DB role is <code>newsletter_web</code> (<code>prisma/bootstrap/001_grant_newsletter_web.sql</code>). The pipeline tables have no foreign keys. A story has no link to the issues it ran in yet (#118).</p>
+<p>The runtime DB role is <code>newsletter_web</code> (<code>prisma/bootstrap/001_grant_newsletter_web.sql</code>). The pipeline tables have no foreign keys. <code>stories.id</code> is the stable key of a story: it never changes, and other records name a story by it. <code>stories.guid</code> is only the key that stops ingestion from inserting the same link twice on one day (<a href="./adr/0007-story-id-is-the-stable-key.md">ADR 0007</a>).</p>
 
 <h2 id="code">7. Code map</h2>
 <pre>
@@ -208,7 +210,7 @@ src/pipeline/                runner-neutral job logic
                              ingest-store, schedule, start-ingest, run-ingest
   repeats/                   the repeat check: embed, nearest, decisions (Decisions API), match-stories, repeats-store,
                              repeat-rules (pair levels and board rules, pure); __fixtures__/ is the measured test set
-  publish/                   gmail-client, sent-email-parser, publish-decision, publish-store, content-diff,
+  publish/                   gmail-client, sent-email-parser, publish-decision, publish-store, issue-stories,
                              site-refresh, manual-publish, publish-schedule, detect-publish, run-detect-publish
   checks/                    schedule, day-facts (its DB reads; staged facts through distribution/issue-state-store),
                              checks (pure), site, summary, heartbeat,
@@ -264,7 +266,7 @@ scripts/                     reset-dev-branch.mjs, run-prisma-prod.mjs, import-s
   <li><a href="../GLOSSARY.md">Glossary</a>: the words to use for issues, drafts, commits, checks, and incidents.</li>
   <li><a href="../README.md">README</a>: setup, env vars, migrations, deploy, API routes. <a href="../prisma/schema.prisma">Prisma schema</a>.</li>
   <li><a href="./pipeline/runbook.md">Pipeline runbook</a>: what each incident key means and what to do. <a href="./pipeline/adding-a-source.md">Adding a source</a>.</li>
-  <li>Decisions: <a href="./adr/0001-job-runner.md">ADR 0001: job runner</a>, <a href="./adr/0003-n8n-retired-kept-as-record.md">ADR 0003: n8n retired</a>, <a href="./adr/0004-beehiiv-site-source.md">ADR 0004: beehiiv site source</a>, <a href="./adr/0005-draft-staged-for-sending-by-the-owner.md">ADR 0005: a draft is staged for sending by the owner</a> (replaces <a href="./adr/0002-new-draft-per-commit.md">ADR 0002</a>).</li>
+  <li>Decisions: <a href="./adr/0001-job-runner.md">ADR 0001: job runner</a>, <a href="./adr/0003-n8n-retired-kept-as-record.md">ADR 0003: n8n retired</a>, <a href="./adr/0004-beehiiv-site-source.md">ADR 0004: beehiiv site source</a>, <a href="./adr/0005-draft-staged-for-sending-by-the-owner.md">ADR 0005: a draft is staged for sending by the owner</a> (replaces <a href="./adr/0002-new-draft-per-commit.md">ADR 0002</a>), <a href="./adr/0006-repeats-by-embeddings-and-pair-judging.md">ADR 0006: repeats by embeddings and pair judging</a>, <a href="./adr/0007-story-id-is-the-stable-key.md">ADR 0007: the story id is the stable key</a>.</li>
   <li>History, not the current system: <a href="./n8n-backend/README.md">the old n8n backend and the migration plan</a>, and <a href="./research/">research</a> on job runners, news search, and article reading.</li>
 </ul>
 
