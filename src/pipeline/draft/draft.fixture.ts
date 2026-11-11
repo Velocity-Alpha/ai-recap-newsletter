@@ -157,5 +157,5 @@ export const SAMPLE_OUTLINE: ApprovalOutline = {
     { id: 502, section: "headlines", url: null, note: "Keep this one light." },
     { id: 509, section: "quickHits", url: null, note: "" },
   ],
-  excluded: [{ id: 510, section: "tools", reason: "Duplicate" }],
+  excluded: [{ id: 510, section: "tools", reason: "Duplicate", reasonCode: "" }],
 };

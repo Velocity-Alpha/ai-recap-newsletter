@@ -44,7 +44,7 @@ const OUTLINE: ApprovalOutline = {
     { id: 3, section: "tools", url: null, note: "" },
     { id: 4, section: "tools", url: "https://example.test/4", note: "" },
   ],
-  excluded: [{ id: 4, section: "tools", reason: "off topic" }],
+  excluded: [{ id: 4, section: "tools", reason: "off topic", reasonCode: "" }],
 };
 
 /** One story with a new link, as the board sends it. */

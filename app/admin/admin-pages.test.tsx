@@ -24,12 +24,15 @@ const prismaMock = vi.hoisted(() => ({
   pipelineSetting: { findMany: vi.fn() },
   paywallSite: { findMany: vi.fn() },
   alert: { findMany: vi.fn() },
+  approvalOutline: { findMany: vi.fn() },
+  boardAction: { findMany: vi.fn() },
 }));
 
 vi.mock("@/src/server/prisma", () => ({ prisma: prismaMock }));
 
 import AdminErrorPage from "@/app/admin/error";
 import AdminOverviewPage from "@/app/admin/page";
+import AdminFeedbackPage from "@/app/admin/feedback/page";
 import AdminIncidentsPage from "@/app/admin/incidents/page";
 import AdminRunPage from "@/app/admin/runs/[id]/page";
 import AdminRunsPage from "@/app/admin/runs/page";
@@ -204,6 +207,38 @@ describe("admin pages render", () => {
 
     expect(html).toContain("No site was found paywalled yet.");
     expect(html).not.toContain("<button");
+  });
+
+  it("/admin/feedback shows the kept proposals by day and by section, and the reason codes", async () => {
+    prismaMock.approvalOutline.findMany.mockResolvedValue([
+      {
+        id: 11n,
+        issueDate: new Date("2099-01-05T00:00:00Z"),
+        proposed: { sections: [{ key: "headlines", storyIds: [1, 2] }], leadStoryId: 1, repeatsRemoved: [] },
+        payload: { sections: [{ key: "headlines", storyIds: [1] }], leadStoryId: 1 },
+      },
+    ]);
+    prismaMock.boardAction.findMany.mockResolvedValue([{ outlineId: 11n, action: "exclude", reasonCode: "promo" }]);
+
+    const html = await render(AdminFeedbackPage());
+
+    expect(html).toContain("By day");
+    expect(html).toContain("2099-01-05");
+    expect(html).toContain("By section");
+    expect(html).toContain("Top Stories");
+    expect(html).toContain("50%");
+    expect(html).toContain("Reason codes");
+    expect(html).toContain("promo");
+    expect(html).not.toContain("No commits with a proposed board yet.");
+  });
+
+  it("/admin/feedback says so when no commit has a proposed board", async () => {
+    prismaMock.approvalOutline.findMany.mockResolvedValue([]);
+
+    const html = await render(AdminFeedbackPage());
+
+    expect(html).toContain("No commits with a proposed board yet.");
+    expect(html).not.toContain("<table");
   });
 
   it("/admin shows open incidents and the latest runs, and no stage owners", async () => {
