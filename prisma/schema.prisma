@@ -80,6 +80,10 @@ model Story {
   matchedAt                DateTime? @map("matched_at") @db.Timestamptz(6)
   /// The board date of the commit that excluded the story. Null for stories excluded before #90.
   excludedOn               DateTime? @map("excluded_on") @db.Date
+  /// When the search for free links (#59) finished for the story, also with no result. Null means not searched.
+  freeLinksCheckedAt       DateTime? @map("free_links_checked_at") @db.Timestamptz(6)
+  /// The original link (#59): the link the story had before a commit first changed it. Null means never changed.
+  originalUrl              String?   @map("original_url")
 
   @@index([queuedForPublicationDate], map: "queued_for_publication_date_idx")
   @@index([day], map: "stories_day_idx")
@@ -378,6 +382,40 @@ model StoryMatch {
   @@unique([newerStoryId, olderStoryId])
   @@index([olderStoryId])
   @@map("story_matches")
+  @@schema("newsletter")
+}
+
+/// A free link (#59) for a story with a paywalled link: an article that reports the same news, that the app could
+/// read, and that has 300 words or more. position 0 is the one the board selects. origin is where it came from:
+/// `story` (one of our own stories, origin_story_id) or `search` (the web search).
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model StoryFreeLink {
+  id            BigInt   @id @default(autoincrement())
+  storyId       Int      @map("story_id")
+  position      Int
+  url           String
+  site          String
+  title         String?
+  words         Int
+  origin        String
+  originStoryId Int?     @map("origin_story_id")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([storyId, url])
+  @@map("story_free_links")
+  @@schema("newsletter")
+}
+
+/// A site the article reader found paywalled (#59). story_ids are the distinct stories whose suggested link was
+/// paywalled there. The site is a learned paywalled site when it has 2 or more story ids and is not ignored.
+model PaywallSite {
+  site      String   @id
+  storyIds  Int[]    @default([]) @map("story_ids")
+  ignored   Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("paywall_sites")
   @@schema("newsletter")
 }
 

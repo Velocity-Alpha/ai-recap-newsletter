@@ -4,6 +4,8 @@ import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { hasBoardEdits } from "@/components/approval/board-edits";
 import { repeatOfText, restoreRepeat, similarLabel, similarTooltip } from "@/components/approval/repeat-labels";
+import { type LinkState, paywalledLinks, selectedLinkState } from "@/components/approval/story-links";
+import { createTypedLinks } from "@/components/approval/typed-links";
 import type { AlsoFrom, RestorableRepeat } from "@/src/features/newsletter/board-repeats";
 import type { SimilarStory } from "@/src/pipeline/repeats/repeat-rules";
 import { storySources } from "@/src/features/newsletter/lead-story";
@@ -35,6 +37,7 @@ import DateState from "@/components/approval/DateState";
 import NoIssueTodayButton from "@/components/approval/NoIssueTodayButton";
 import { Button } from "@/components/ui/button";
 import { nativeCommitTarget, secondCommitNotice } from "@/features/newsletter/draft-links";
+import { checkLink } from "@/features/newsletter/free-links-client";
 import type { DateDraftsView } from "@/src/pipeline/draft/draft-board";
 
 type StoryOption = {
@@ -264,6 +267,17 @@ export default function ApprovalBoard({
   const dragStory = useRef<{ storyId: number; fromSectionKey: string } | null>(null);
   const [dragOverSection, setDragOverSection] = useState<string | null>(null);
   const [restoredIds, setRestoredIds] = useState<Set<number>>(new Set());
+  // The paywall state of each link the owner typed (#59). A story with no entry shows its stored state.
+  const [linkState, setLinkState] = useState<LinkState>({});
+  const [paywallWarningOpen, setPaywallWarningOpen] = useState(false);
+  const [isCheckingLinks, setIsCheckingLinks] = useState(false);
+  const [typedLinks] = useState(() =>
+    createTypedLinks({
+      checkLink,
+      onStates: setLinkState,
+      onDropped: (id) => setUrlOverrides((prev) => Object.fromEntries(Object.entries(prev).filter(([key]) => Number(key) !== id))),
+    })
+  );
 
   useEffect(() => {
     setSections(initSections(candidateSections));
@@ -291,6 +305,30 @@ export default function ApprovalBoard({
   useEffect(() => {
     if (edited) onEdit?.();
   }, [edited, onEdit]);
+
+  const typeLink = (id: number, value: string) => {
+    setUrlOverrides((prev) => ({ ...prev, [id]: value }));
+    // The lock icon describes the selected link. This one is not checked until the owner leaves the field.
+    typedLinks.type(id, value);
+  };
+
+  /** The owner left the link field or pressed "Done": check the typed link, or drop an edit that changed nothing. */
+  const finishTypedLink = (id: number) => typedLinks.finish(id, candidateMap[String(id)]?.url);
+
+  const closePreview = () => {
+    if (previewStoryId !== null) void finishTypedLink(previewStoryId);
+    setEditingPreviewId(null);
+    setPreviewStoryId(null);
+  };
+
+  /** The lock icon of the link that is selected now. A stored fetch error describes the original link only. */
+  const renderLinkIcon = (id: number) => {
+    const candidate = candidateMap[String(id)];
+    return renderPaywallIcon(
+      selectedLinkState(id, linkState, candidate?.paywall_detected),
+      id in linkState ? null : candidate?.error
+    );
+  };
 
   const toggleExpand = (id: number) =>
     setExpandedIds((prev) => {
@@ -607,13 +645,36 @@ export default function ApprovalBoard({
     };
   }, [candidateMap, dateKey, excludeState, headlineStoryId, notesOverrides, sections, urlOverrides]);
 
+  const paywalled = useMemo(
+    () => paywalledLinks({ sections, excludeState, urlOverrides, linkState, candidateMap }),
+    [candidateMap, excludeState, linkState, sections, urlOverrides]
+  );
+
   const handleCommitOutline = () => {
     setCommitResponseMessage(null);
     setCommitErrorMessage(null);
+    setPaywallWarningOpen(false);
     setCommitModalOpen(true);
   };
 
-  const handleCommitContinue = async () => {
+  const closeCommitModal = () => {
+    setPaywallWarningOpen(false);
+    setCommitModalOpen(false);
+  };
+
+  /** No issue goes out with a paywalled link unless the owner says so (#59). */
+  const handleCommitContinue = async (options: { withPaywalledLinks?: boolean } = {}) => {
+    if (!options.withPaywalledLinks) {
+      // A typed link can still be at the paywall check. Its answer decides, so wait for it.
+      setIsCheckingLinks(true);
+      await typedLinks.settle();
+      setIsCheckingLinks(false);
+      if (paywalledLinks({ sections, excludeState, urlOverrides, linkState: typedLinks.states(), candidateMap }).length > 0) {
+        setPaywallWarningOpen(true);
+        return;
+      }
+    }
+    setPaywallWarningOpen(false);
     setIsCommitting(true);
     setCommitErrorMessage(null);
     setCommitResponseMessage(null);
@@ -1012,7 +1073,7 @@ export default function ApprovalBoard({
                                     ? "text-[var(--text-secondary)]"
                                     : "text-[var(--text-primary)]"
                                 }`}>
-                                  {renderPaywallIcon(candidateMap[String(story.id)]?.paywall_detected, candidateMap[String(story.id)]?.error)}
+                                  {renderLinkIcon(story.id)}
                                   <span className="truncate">{story.headline}</span>
                                   {sourceCount > 1 || alsoFrom.length > 0 ? (
                                     <span
@@ -1249,19 +1310,32 @@ export default function ApprovalBoard({
             <div className="flex items-center justify-between border-b border-[var(--border-light)] px-5 py-4 sm:px-6">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--accent-primary)]">
-                  {validationErrors.length > 0 ? "Commit Blocked" : "Commit Summary"}
+                  {validationErrors.length > 0 ? "Commit Blocked" : paywallWarningOpen ? "Paywalled Links" : "Commit Summary"}
                 </p>
                 <p className="mt-1 text-sm text-[var(--text-secondary)]">
                   {validationErrors.length > 0
                     ? "Resolve these issues before continuing."
+                    : paywallWarningOpen
+                    ? "These stories still have a paywalled link:"
                     : "Everything looks ready. Review the outline summary before committing it to generation."}
                 </p>
               </div>
-              <Button variant="ghost" onClick={() => setCommitModalOpen(false)}>Close</Button>
+              <Button variant="ghost" onClick={closeCommitModal}>Close</Button>
             </div>
 
             <div className="max-h-[70vh] overflow-y-auto px-5 py-5 sm:px-6">
-              {validationErrors.length > 0 ? (
+              {validationErrors.length === 0 && paywallWarningOpen ? (
+                <ul className="space-y-2 rounded-xl border border-[rgba(184,133,110,0.28)] bg-[rgba(255,244,236,0.92)] px-4 py-3">
+                  {paywalled.map((link) => (
+                    <li key={link.id} className="flex items-start gap-2 text-sm text-[var(--text-primary)]">
+                      <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-red-500" />
+                      <span>
+                        {link.headline} <span className="text-[var(--text-secondary)]">({link.site})</span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : validationErrors.length > 0 ? (
                 <div className="space-y-4">
                   <div className="rounded-xl border border-[rgba(184,133,110,0.28)] bg-[rgba(255,244,236,0.92)] px-4 py-3">
                     <div className="flex items-start gap-3">
@@ -1326,14 +1400,21 @@ export default function ApprovalBoard({
             </div>
 
             <div className="flex items-center justify-end gap-3 border-t border-[var(--border-light)] px-5 py-4 sm:px-6">
-              <Button variant="outline" onClick={() => setCommitModalOpen(false)} disabled={isCommitting}>
-                Cancel
+              <Button variant="outline" onClick={closeCommitModal} disabled={isCommitting}>
+                {paywallWarningOpen ? "Go back" : "Cancel"}
               </Button>
-              {validationErrors.length === 0 ? (
-                <Button className="bg-[var(--text-primary)] text-white hover:bg-[var(--watercolor-ink)]" onClick={handleCommitContinue} disabled={isCommitting}>
-                  {isCommitting ? "Committing..." : "Commit outline"}
+              {validationErrors.length > 0 ? null : paywallWarningOpen ? (
+                <Button
+                  className="bg-[var(--text-primary)] text-white hover:bg-[var(--watercolor-ink)]"
+                  onClick={() => handleCommitContinue({ withPaywalledLinks: true })}
+                >
+                  Commit anyway
                 </Button>
-              ) : null}
+              ) : (
+                <Button className="bg-[var(--text-primary)] text-white hover:bg-[var(--watercolor-ink)]" onClick={() => handleCommitContinue()} disabled={isCommitting || isCheckingLinks}>
+                  {isCommitting ? "Committing..." : isCheckingLinks ? "Checking links..." : "Commit outline"}
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -1352,7 +1433,7 @@ export default function ApprovalBoard({
                   {previewStory.sectionLabel} · {previewStory.status === "selected" ? "Selected" : "Fill-in"}
                 </p>
               </div>
-              <Button variant="ghost" onClick={() => setPreviewStoryId(null)}>Close</Button>
+              <Button variant="ghost" onClick={closePreview}>Close</Button>
             </div>
             <div className="max-h-[calc(92vh-72px)] overflow-y-auto px-5 py-6 sm:px-6">
               <div className="flex flex-wrap items-center gap-2">
@@ -1379,7 +1460,7 @@ export default function ApprovalBoard({
               </div>
               <h3 className="mt-4 font-serif text-[clamp(22px,3.5vw,32px)] leading-[1.22] text-[var(--text-primary)]">
                 <span className="mr-2 inline-flex align-middle">
-                  {renderPaywallIcon(previewStory.paywall_detected, previewStory.error)}
+                  {renderLinkIcon(previewStory.id)}
                 </span>
                 {previewStory.headline || "Untitled story"}
               </h3>
@@ -1393,7 +1474,11 @@ export default function ApprovalBoard({
                     Story Link
                   </label>
                   <button
-                    onClick={() => setEditingPreviewId(editingPreviewId === previewStory.id ? null : previewStory.id)}
+                    onClick={() => {
+                      if (editingPreviewId !== previewStory.id) return setEditingPreviewId(previewStory.id);
+                      void finishTypedLink(previewStory.id);
+                      setEditingPreviewId(null);
+                    }}
                     className="rounded-full border border-[var(--border-light)] px-2.5 py-1 text-[11px] font-medium text-[var(--text-secondary)] hover:border-[var(--accent-primary)] hover:text-[var(--accent-primary)] transition"
                   >
                     {editingPreviewId === previewStory.id ? "Done" : "Edit"}
@@ -1404,9 +1489,8 @@ export default function ApprovalBoard({
                     <input
                       type="url"
                       value={urlOverrides[previewStory.id] ?? previewStory.url ?? ""}
-                      onChange={(e) =>
-                        setUrlOverrides((prev) => ({ ...prev, [previewStory.id]: e.target.value }))
-                      }
+                      onChange={(e) => typeLink(previewStory.id, e.target.value)}
+                      onBlur={() => void finishTypedLink(previewStory.id)}
                       placeholder="https://…"
                       className="min-w-0 flex-1 rounded-lg border border-[var(--border-light)] bg-white px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)]"
                     />

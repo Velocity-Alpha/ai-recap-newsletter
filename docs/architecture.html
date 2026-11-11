@@ -53,7 +53,8 @@
          + beehiiv websites: sitemap.xml + post pages up to the page cap (In the World of AI; ADR 0004),
            stories linking to the newsletter's own site dropped, bookmark held if any page fails
          -> follow tracking links, strip tracking params -> gpt-6-luna extraction (strict schema)
-         -> paywall check -> INSERT newsletter.stories (+ story_sources: which newsletter sent it) -> update scraper_bookmarks
+         -> paywall check (site lists and learned paywalled sites, then one page check; no AI call)
+         -> INSERT newsletter.stories (+ story_sources: which newsletter sent it) -> update scraper_bookmarks
          -> repeat check (src/pipeline/repeats/, ADR 0006) for unchecked stories of the last 3 days:
             embed each story once (text-embedding-3-small, 512 numbers) -> its 5 nearest stories within
             repeats.window_days (similarity >= 0.55, arithmetic in the app) -> each new pair judged by the
@@ -76,8 +77,12 @@
              the model picks one with the owner's rubric and a one-line reason (never a recently published
              story). GET /api/approval/outline/lead polls it; the board swaps it in only if not yet edited.
              Best-effort: off with APPROVAL_LEAD_PICK=off, and on any failure the scored lead stays
+           + links (#59): a story with a paywalled link can lead. A link the owner types is checked by
+             POST /api/approval/check-link (the same paywall check) and the story's lock icon shows the answer.
+             A commit with a paywalled link asks first: "Go back" or "Commit anyway"
          owner edits, then commits -> POST /api/newsletters/commit  ("No issue today" marks a skipped date)
-         -> approval_outlines row -> story changes (queued, excluded, edits) in one transaction
+         -> approval_outlines row -> story changes (queued, excluded, edits) in one transaction; a changed
+            link keeps the old one in stories.original_url (the first time only) and gets its own paywall state
          -> new issue_drafts row (version n+1) -> starts draft-issue-background (job token)
 
 draft-issue-background (15 min limit)
@@ -166,10 +171,12 @@ If the issue is missing after a send: /approval/issues -> "Mark as published"
 <h2 id="data">6. Data (Postgres schema <code>newsletter</code>)</h2>
 <table>
   <tr><th>Table</th><th>Holds</th><th>Written by</th></tr>
-  <tr><td><code>stories</code></td><td>Extracted stories per day and source (snake_case columns, but <code>"createdAt"</code> is camelCase). <code>matched_at</code>: when the repeat check went through the story. <code>excluded_on</code>: the board date of the commit that excluded it (null for older exclusions)</td><td>ingest job; the commit (exclusions, queue date, edits)</td></tr>
+  <tr><td><code>stories</code></td><td>Extracted stories per day and source (snake_case columns, but <code>"createdAt"</code> is camelCase). <code>matched_at</code>: when the repeat check went through the story. <code>excluded_on</code>: the board date of the commit that excluded it (null for older exclusions). <code>original_url</code>: the original link, kept when a commit first changes a story's link. <code>free_links_checked_at</code>: when the search for free links finished for the story (nothing sets it yet)</td><td>ingest job; the commit (exclusions, queue date, edits)</td></tr>
   <tr><td><code>story_sources</code></td><td>Which newsletters covered each story, one row per story and source key. <code>stories.source</code> keeps only the last writer, so the board reads coverage here. If the table is missing, ingestion and the board log and fall back to <code>stories.source</code>.</td><td>ingest job</td></tr>
   <tr><td><code>story_embeddings</code></td><td>One embedding for each story (512 numbers, <code>real[]</code>, length 1), made once by the repeat check</td><td>ingest job; the board for candidates ingestion did not check</td></tr>
   <tr><td><code>story_matches</code></td><td>Story matches: one row for each judged pair (<code>newer_story_id</code>, <code>older_story_id</code>, <code>similarity</code>, and the judge's <code>same</code> and <code>news</code>). <code>stories.matched_at</code> is set when a story went through the check; null means not checked yet</td><td>ingest job; the board for candidates ingestion did not check</td></tr>
+  <tr><td><code>paywall_sites</code></td><td>Sites where the article reader found a suggested link paywalled, with the distinct stories (<code>story_ids</code>). A site with 2 or more stories and <code>ignored = false</code> is a learned paywalled site: the paywall check treats it like its own list. Shown on <code>/admin/settings</code></td><td>nothing yet (the free link job is not built); the owner sets <code>ignored</code> with "Ignore" on <code>/admin/settings</code></td></tr>
+  <tr><td><code>story_free_links</code></td><td>The free links of a story with a paywalled link, in <code>position</code> order: <code>url</code>, <code>site</code>, <code>title</code>, <code>words</code>, and <code>origin</code> (<code>story</code> or <code>search</code>). A commit that changes a story's link to one of its rows marks the story as not paywalled</td><td>nothing yet (the free link job is not built)</td></tr>
   <tr><td><code>issue_stories</code></td><td>Which stories ran in which published issue: one row for each story of the sent email (<code>issue_id</code>, <code>story_id</code>), with its <code>section</code>, its <code>position</code> in the section (from 1), the link that was sent (<code>url</code>), and <code>is_lead</code> (null when the sent draft is not known: an email that names no draft, and the rows the migration made for past issues). A second copy of the email writes nothing. Nothing reads it yet: the board, held stories, and the checks still read <code>stories.used_in_publication_date</code> and <code>queued_for_publication_date</code></td><td>publish job, owner ("Mark as published")</td></tr>
   <tr><td><code>scraper_bookmarks</code></td><td>Last-read time per source (keys such as <code>the_signal</code>; <code>tldr_ai</code> and <code>aloa_ai</code> are unused)</td><td>ingest job</td></tr>
   <tr><td><code>issues</code></td><td>One row per date (<code>issue_date</code> is unique): <code>html</code>, <code>content_json</code>, <code>published_at</code>, <code>slug</code> (generated), and <code>status</code> (<code>draft</code> or <code>published</code>). The database computes <code>status</code> from <code>published_at</code>: read it to ask "is it published?", never write it</td><td>draft job (insert, update), title and image changes (update), publish job (update; the sent staged version is copied over), owner ("Mark as published", from the newest staged version)</td></tr>
@@ -195,10 +202,12 @@ app/                         Next.js routes
   approval/                  board (page.tsx), login/, issues/ ("Mark as published"), submitted/,
                              drafts/ (drafts for a date: live steps, Retry, email preview, the title field, "New image",
                              "Stage for sending")
-  admin/                     overview, runs/ (+ [id]), incidents/, settings/ (read only); guard: src/server/admin-auth.ts
+  admin/                     overview, runs/ (+ [id]), incidents/, settings/ (pipeline settings, read only; learned paywalled
+                             sites with "Ignore"); guard: src/server/admin-auth.ts
   api/newsletters/           list, [id], outline, commit (starts the draft job), publish-status
-  api/approval/              login, outline (+ lead, marker), issues/[id]/publish, skipped-dates,
+  api/approval/              login, outline (+ lead, marker), check-link, issues/[id]/publish, skipped-dates,
                              drafts (+ [id], html, retry, image, image/ideas, image/generate)
+  api/admin/                 paywall-sites/ignore (the "Ignore" button of /admin/settings)
   api/subscriber/            subscribe, request-code, verify-code, sign-out, unsubscribe (+ webhook from GHL)
   api/issues/[slug], api/ticker, api/for-brands, api/revalidate (job token)
 src/features/newsletter/     site and board logic: repository, cache, curation.service, board-repeats, lead-story,
@@ -208,6 +217,8 @@ src/features/admin/          admin page data
 src/pipeline/                runner-neutral job logic
   ingest/                    sources.ts, feeds, beehiiv-site, email-text, redirects, url, extract (gpt-6-luna), paywall,
                              ingest-store, schedule, start-ingest, run-ingest
+  free-links/                sites (a link's site, skipped sites, limits; pure), paywall-sites (the learned
+                             paywalled sites); __fixtures__/ is the recorded web search test set
   repeats/                   the repeat check: embed, nearest, decisions (Decisions API), match-stories, repeats-store,
                              repeat-rules (pair levels and board rules, pure); __fixtures__/ is the measured test set
   publish/                   gmail-client, sent-email-parser, publish-decision, publish-store, issue-stories,

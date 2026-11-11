@@ -22,6 +22,7 @@ vi.mock("next/link", () => ({
 const prismaMock = vi.hoisted(() => ({
   pipelineRun: { findMany: vi.fn(), findUnique: vi.fn() },
   pipelineSetting: { findMany: vi.fn() },
+  paywallSite: { findMany: vi.fn() },
   alert: { findMany: vi.fn() },
 }));
 
@@ -87,6 +88,11 @@ describe("admin pages render", () => {
     prismaMock.pipelineSetting.findMany.mockResolvedValue([
       { key: "pipeline.runner", value: "netlify", updatedAt: T },
       { key: "threshold:stories:min-ratio", value: { ratio: 0.5 }, updatedAt: T },
+    ]);
+    prismaMock.paywallSite.findMany.mockResolvedValue([
+      { site: "ignored.example", storyIds: [1, 2, 3], ignored: true, updatedAt: T },
+      { site: "learned.example", storyIds: [4, 5], ignored: false, updatedAt: T },
+      { site: "once.example", storyIds: [6], ignored: false, updatedAt: T },
     ]);
     prismaMock.alert.findMany.mockImplementation(async (args: { where: { status: string } }) =>
       args.where.status === "open" ? [OPEN_ALERT] : [],
@@ -176,6 +182,27 @@ describe("admin pages render", () => {
     expect(html).toContain("&quot;netlify&quot;");
     expect(html).not.toContain("n8n");
     expect(html).not.toContain("Stage owners");
+  });
+
+  it("/admin/settings lists the paywalled sites found, with an Ignore button on each site that is not ignored", async () => {
+    const html = await render(AdminSettingsPage());
+
+    for (const site of ["ignored.example", "learned.example", "once.example"]) expect(html).toContain(site);
+    expect(html).toContain("Paywalled sites found");
+    expect(html).toContain("1 learned");
+    expect(html).toContain("not learned yet");
+    expect(html).toContain('aria-label="Ignore learned.example"');
+    expect(html).toContain('aria-label="Ignore once.example"');
+    expect(html).not.toContain('aria-label="Ignore ignored.example"');
+    expect(html.match(/<button/g)).toHaveLength(2);
+  });
+
+  it("/admin/settings says so when no site was found paywalled", async () => {
+    prismaMock.paywallSite.findMany.mockResolvedValue([]);
+
+    const html = await render(AdminSettingsPage());
+
+    expect(html).toContain("No site was found paywalled yet.");
     expect(html).not.toContain("<button");
   });
 

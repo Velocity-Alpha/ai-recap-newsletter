@@ -101,6 +101,7 @@ Read routes:
 
 Mutation routes:
 
+- `POST /api/approval/check-link` with `{ url }` says if a link the owner typed on the board is paywalled: `{ paywall: "yes" | "no" | "unknown" | "error" }`, from the site lists and one page check (approval session)
 - `POST /api/for-brands`
 - `POST /api/subscriber/subscribe`
 - `POST /api/subscriber/request-code`
@@ -118,7 +119,7 @@ Mutation routes:
 - `POST /api/approval/drafts/[id]/stage` "Stage for sending": copies the issue's newest ready draft into the distribution service (GHL) as the next staged version, named `<YYYY-MM-DD> v<n>: <title>`. Body `{ confirmRepeat?: boolean }`: an unchanged draft answers 409 with code `already_staged` until `confirmRepeat` is true. It runs in the request and starts no job. Outside production the call is recorded and nothing reaches GHL (approval session)
 - `POST /api/approval/skipped-dates` with `{ date, note? }` marks a skipped date, and `DELETE /api/approval/skipped-dates?date=` undoes it, until that day is over (approval session). Used by "No issue today" on `/approval`.
 - `POST /api/approval/issues/[id]/publish` publishes an unpublished issue from the HTML of its newest staged version, or from the issue's own HTML when nothing is staged (approval session). Used by the "Mark as published" button on `/approval/issues`. It sends no email.
-- `proxy.ts` refuses writes (any method but GET, HEAD, OPTIONS) to `/approval/*`, `/api/approval/*`, `/api/newsletters/commit`, and `/api/admin/*` (no routes today) unless they come from this site's own origin (`403`), and refuses API writes that are not `Content-Type: application/json` (`415`). See `src/server/same-origin.ts`.
+- `proxy.ts` refuses writes (any method but GET, HEAD, OPTIONS) to `/approval/*`, `/api/approval/*`, `/api/newsletters/commit`, and `/api/admin/*` unless they come from this site's own origin (`403`), and refuses API writes that are not `Content-Type: application/json` (`415`). See `src/server/same-origin.ts`.
 - `POST /api/revalidate` refreshes the cached issue lists, issue pages, and sitemap. It needs `Authorization: Bearer <token>`, a 5-minute token signed with a key derived from `SESSION_SECRET` (`src/server/cache-refresh-auth.ts`). The publish job calls it after it publishes an issue.
 
 Public unsubscribe page:
@@ -127,7 +128,8 @@ Public unsubscribe page:
 
 Admin pages (approval login; `proxy.ts` and `requireAdminPage()` in `src/server/admin-auth.ts` both check it):
 
-- `/admin` overview, `/admin/runs` and `/admin/runs/[id]`, `/admin/incidents`, `/admin/settings` (every `pipeline_settings` row)
+- `/admin` overview, `/admin/runs` and `/admin/runs/[id]`, `/admin/incidents`, `/admin/settings` (every `pipeline_settings` row, and the learned paywalled sites with an "Ignore" button)
+- `POST /api/admin/paywall-sites/ignore` with `{ site }` marks a learned paywalled site as ignored, so the paywall check stops treating it as paywalled (approval session)
 
 ## Architecture
 

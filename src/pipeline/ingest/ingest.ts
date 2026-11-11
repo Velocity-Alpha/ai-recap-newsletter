@@ -54,6 +54,8 @@ export interface IngestDeps {
   store: IngestStore;
   now: Date;
   sources?: StorySource[];
+  /** The learned paywalled sites (#59), loaded once for the run. A story on one is paywalled with no page check. */
+  learnedSites?: readonly string[];
 }
 
 export type SourceStatus = "ok" | "no_new" | "partial" | "failed";
@@ -133,7 +135,7 @@ interface RowContext {
 /** Cleaned, deduplicated rows. Stories without a usable link are dropped (the board cannot show them). */
 async function toRows(
   stories: ExtractedStory[],
-  context: RowContext & { fetch: typeof fetch },
+  context: RowContext & Pick<IngestDeps, "fetch" | "learnedSites">,
 ): Promise<{ rows: StoryRow[]; skippedNoLink: number }> {
   const byGuid = new Map<string, Omit<StoryRow, "paywallDetected" | "error">>();
   let skippedNoLink = 0;
@@ -158,7 +160,7 @@ async function toRows(
     });
   }
   const rows = await mapInBatches([...byGuid.values()], PAYWALL_CONCURRENCY, async (row) => {
-    const paywall = await checkPaywall(row.url, { fetch: context.fetch });
+    const paywall = await checkPaywall(row.url, { fetch: context.fetch, learnedSites: context.learnedSites });
     return { ...row, paywallDetected: paywall.status, error: paywall.error };
   });
   return { rows, skippedNoLink };
@@ -168,7 +170,7 @@ async function toRows(
 async function extractAndSave(options: { input: ExtractionInput; context: RowContext; deps: IngestDeps; result: SourceResult }): Promise<void> {
   const { input, context, deps, result } = options;
   const stories = await deps.extract(input);
-  const { rows, skippedNoLink } = await toRows(stories, { ...context, fetch: deps.fetch });
+  const { rows, skippedNoLink } = await toRows(stories, { ...context, fetch: deps.fetch, learnedSites: deps.learnedSites });
   result.stories += await deps.store.upsertStories(rows);
   result.skippedNoLink += skippedNoLink;
 }

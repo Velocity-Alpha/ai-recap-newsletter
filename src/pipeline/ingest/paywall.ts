@@ -1,3 +1,5 @@
+import { createNodeFetch } from "@/src/pipeline/draft/articles/http";
+import { siteOf } from "@/src/pipeline/free-links/sites";
 import { BROWSER_USER_AGENT } from "@/src/pipeline/ingest/redirects";
 
 /**
@@ -5,6 +7,11 @@ import { BROWSER_USER_AGENT } from "@/src/pipeline/ingest/redirects";
  * of stories `unknown` or `error`. Changes: known free sites skip the fetch (Product Hunt always blocked
  * it), the publisher's own structured data decides first, and weak wording such as a footer
  * "Already a subscriber?" no longer counts.
+ *
+ * The check is staged (#59) and stops at the first step that answers. No AI call decides it.
+ * 1. Site list (`checkSiteList`): the lists below plus the learned paywalled sites. No network.
+ * 2. Page check: one fetch of the page, then its markup and wording.
+ * `checkPaywall` is steps 1 and 2.
  */
 
 export type PaywallStatus = "yes" | "no" | "unknown" | "error";
@@ -49,28 +56,55 @@ const LOCKED_WORDING = [
 ];
 
 const TIMEOUT_MS = 10_000;
+/** The page check's limit when the owner waits for the answer (a typed link on the board, a commit). */
+export const OWNER_CHECK_TIMEOUT_MS = 5_000;
 const MAX_BODY_CHARS = 1_500_000;
 
-function onList(hostname: string, domains: string[]): boolean {
-  return domains.some((domain) => hostname === domain || hostname.endsWith(`.${domain}`));
+/** True when the host is a site on the list or one of its subdomains. */
+export function isOnSiteList(hostname: string, sites: readonly string[]): boolean {
+  return sites.some((site) => hostname === site || hostname.endsWith(`.${site}`));
 }
 
-export async function checkPaywall(url: string, options: { fetch?: typeof fetch } = {}): Promise<PaywallResult> {
-  let hostname: string;
-  try {
-    hostname = new URL(url).hostname.toLowerCase();
-  } catch {
-    return { status: "unknown", error: "" };
-  }
-  if (onList(hostname, PAYWALLED)) return { status: "yes", error: "" };
-  if (onList(hostname, FREE)) return { status: "no", error: "" };
+/** Step 1, no network: "yes" or "no" when a site list knows the link's site, null when none does. */
+export function checkSiteList(url: string, learnedSites: readonly string[] = []): "yes" | "no" | null {
+  const site = siteOf(url);
+  return site ? siteListState(site, learnedSites) : null;
+}
+
+function siteListState(site: string, learnedSites: readonly string[]): "yes" | "no" | null {
+  if (isOnSiteList(site, PAYWALLED) || isOnSiteList(site, learnedSites)) return "yes";
+  if (isOnSiteList(site, FREE)) return "no";
+  return null;
+}
+
+/**
+ * A fetch for a link a person typed: it connects to public addresses only, like the article reader. The links
+ * of ingestion come from the news sources and use the plain fetch.
+ */
+export function guardedFetch(): typeof fetch {
+  return createNodeFetch() as unknown as typeof fetch;
+}
+
+export interface CheckPaywallOptions {
+  fetch?: typeof fetch;
+  /** The learned paywalled sites (src/pipeline/free-links/paywall-sites.ts). They count like the `PAYWALLED` list. */
+  learnedSites?: readonly string[];
+  /** The limit for the page fetch. Defaults to 10 seconds. */
+  timeoutMs?: number;
+}
+
+export async function checkPaywall(url: string, options: CheckPaywallOptions = {}): Promise<PaywallResult> {
+  const site = siteOf(url);
+  if (!site) return { status: "unknown", error: "" };
+  const listed = siteListState(site, options.learnedSites ?? []);
+  if (listed) return { status: listed, error: "" };
 
   const send = options.fetch ?? fetch;
   let body: string;
   try {
     const response = await send(url, {
       headers: { "user-agent": BROWSER_USER_AGENT, accept: "text/html" },
-      signal: AbortSignal.timeout(TIMEOUT_MS),
+      signal: AbortSignal.timeout(options.timeoutMs ?? TIMEOUT_MS),
     });
     if (!response.ok) {
       await response.body?.cancel().catch(() => undefined);

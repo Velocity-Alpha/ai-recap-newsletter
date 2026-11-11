@@ -238,7 +238,7 @@ describe("POST /api/newsletters/commit", () => {
       draft: { draftId: 41, issueId: 3, version: 2, issueDate: "2026-05-21" },
     });
     expect(outlineStore.saveOutline).toHaveBeenCalledWith(OUTLINE);
-    expect(storyChanges.applyStoryChanges).toHaveBeenCalledWith(OUTLINE);
+    expect(storyChanges.applyStoryChanges).toHaveBeenCalledWith(OUTLINE, expect.anything());
     expect(draftStore.createDraft).toHaveBeenCalledWith(BigInt(5), expect.anything());
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0];
