@@ -1,36 +1,37 @@
 import type { Metric } from "@/evals/lib/results";
-import { percentile } from "@/evals/lib/stats";
-import { countHits, type Outcome } from "@/evals/lib/sweep";
+import { mean } from "@/evals/lib/stats";
+import { countGraded, countHits, gradedOutcomes, type Outcome } from "@/evals/lib/sweep";
+import { countSentences, countWords } from "@/evals/lib/text";
 import type { WriterCase } from "@/evals/writer/dataset";
-import { countSentences, withEvalNotes } from "@/evals/writer/notes";
+import { withEvalNotes } from "@/evals/writer/notes";
 import type { IssueGrade } from "@/evals/writer/rubric";
 import { CANDIDATE_SECTION_CONFIGS } from "@/src/features/newsletter/section-config";
 import { CONTENT_SECTION_KEYS, FEATURE_BULLET_COUNT, type FeatureStory, type WrittenIssueContent } from "@/src/pipeline/draft/content";
-import { countWords } from "@/src/pipeline/draft/validate";
+import { MARKUP } from "@/src/pipeline/draft/validate";
 
 /** The writer's timeout in production (writer.ts). */
 export const WRITER_TIMEOUT_MS = 240_000;
 
-/** What one writer run gives. Every metric reads the first draft, except "Checks pass after rewrite". */
+/**
+ * What one writer run gives. Every metric reads the first draft, except "Checks pass after rewrite". The judge's
+ * grade of the first draft is the outcome's `grade`; the times of the writer calls are its `callMs`.
+ */
 export interface WriterRun {
   first: WrittenIssueContent;
   /** findContentProblems on the first draft. */
   firstProblems: string[];
   /** After production's one rewrite (none when the first draft passed). A failed rewrite is a problem. */
   finalProblems: string[];
-  /** Milliseconds of each writer call: the first, and the rewrite if there was one. */
-  writerMs: number[];
-  /** The judge's grade of the first draft, or null when the judge failed. */
-  grade: IssueGrade | null;
-  /** This effort's first draft against the `low` first draft of the same issue and repeat. Null when not run. */
-  pair: { result: "win" | "tie" | "loss"; thisFirst: boolean } | null;
 }
 
-type WriterOutcome = Outcome<WriterCase, WriterRun>;
+export type WriterOutcome = Outcome<WriterCase, WriterRun, IssueGrade>;
 type Ok = WriterOutcome & { output: WriterRun };
 
-// Links, HTML tags, markdown links, bold, code (validate.ts), and markdown list or heading marks.
-const MARKUP = /https?:\/\/|\bwww\.|<\/?[a-z][^>]*>|\]\(|\*\*|`|^\s*(?:[-*•]|#{1,6})\s/im;
+/** The pairwise judge's verdict on one issue: this effort's first draft against the baseline's. */
+export type PairResult = "win" | "tie" | "loss";
+
+/** Markdown list or heading marks, which the draft checks' MARKUP (links, tags, bold, code) does not cover. */
+const LIST_OR_HEADING = /^\s*(?:[-*•]|#{1,6})\s/m;
 const EMOJI = /\p{Extended_Pictographic}/u;
 const DASH_OR_ELLIPSIS = /—|…|\.\.\./;
 
@@ -74,10 +75,6 @@ function countParts(name: string, outcomes: WriterOutcome[], parts: (outcome: Wr
   return { name, hits: all.filter(Boolean).length, n: all.length };
 }
 
-function mean(values: number[]): number {
-  return values.length ? values.reduce((a, b) => a + b, 0) / values.length : 0;
-}
-
 function storiesInPlace(item: WriterCase, content: WrittenIssueContent): boolean {
   return CANDIDATE_SECTION_CONFIGS.every((config) => {
     const want = item.input.sections[config.key].map((story) => story.id);
@@ -96,8 +93,8 @@ function hasArticleText(item: WriterCase, storyId: number): boolean {
 
 function codeMetrics(outcomes: WriterOutcome[]): Metric[] {
   const ok = (outcome: WriterOutcome): outcome is Ok => outcome.error === null && outcome.output !== null;
-  const writerMs = outcomes.flatMap((outcome) => (ok(outcome) ? outcome.output.writerMs : [outcome.latencyMs]));
-  const firstMs = outcomes.filter(ok).map((outcome) => outcome.output.writerMs[0]);
+  // Every writer call, failed ones too; a run with no recorded call counts at its own time.
+  const writerMs = outcomes.flatMap((outcome) => (outcome.callMs.length ? outcome.callMs : [outcome.latencyMs]));
   return [
     countHits("Valid output", outcomes, () => true),
     countHits("Checks pass, first draft", outcomes, (outcome) => outcome.output.firstProblems.length === 0),
@@ -129,7 +126,7 @@ function codeMetrics(outcomes: WriterOutcome[]): Metric[] {
       return words >= 45 && words <= 80;
     }),
     countHits("Plain text (no markup, URL, emoji)", outcomes, (outcome) =>
-      stringFields(outcome.output.first).every((field) => !MARKUP.test(field) && !EMOJI.test(field))
+      stringFields(outcome.output.first).every((field) => !MARKUP.test(field) && !LIST_OR_HEADING.test(field) && !EMOJI.test(field))
     ),
     countHits("No em dash or ellipsis", outcomes, (outcome) => stringFields(outcome.output.first).every((field) => !DASH_OR_ELLIPSIS.test(field))),
     countParts("Bullets not repeating detail", outcomes, (outcome) =>
@@ -146,14 +143,12 @@ function codeMetrics(outcomes: WriterOutcome[]): Metric[] {
     countParts("Notes followed (code)", outcomes, (outcome) =>
       withEvalNotes(outcome.item.input).noted.map(({ storyId, note }) => ok(outcome) && note.followed(outcome.output.first, storyId))
     ),
-    { name: `Writer calls under ${WRITER_TIMEOUT_MS / 1000} s`, hits: writerMs.filter((ms) => ms < WRITER_TIMEOUT_MS).length, n: writerMs.length },
-    { name: "Writer p50 s", value: (percentile(firstMs, 50) ?? 0) / 1000 },
-    { name: "Writer max s", value: Math.max(0, ...writerMs) / 1000 },
+    { name: WRITER_CALLS_IN_TIME, hits: writerMs.filter((ms) => ms < WRITER_TIMEOUT_MS).length, n: writerMs.length },
   ];
 }
 
 function judgeMetrics(outcomes: WriterOutcome[]): Metric[] {
-  const graded = outcomes.flatMap((outcome) => (outcome.error === null && outcome.output?.grade ? [{ outcome, grade: outcome.output.grade }] : []));
+  const graded = gradedOutcomes(outcomes).map((outcome) => ({ outcome, grade: outcome.grade }));
   const claims = (grade: IssueGrade) =>
     Math.max(0, grade.intro_unsupported_claims) + grade.stories.reduce((sum, story) => sum + Math.max(0, story.unsupported_claims), 0);
   const bullets = graded.flatMap(({ outcome, grade }) =>
@@ -165,27 +160,69 @@ function judgeMetrics(outcomes: WriterOutcome[]): Metric[] {
   const readBullets = bullets.filter((entry) => entry.read);
   return [
     { name: "Unsupported claims per issue (judge)", value: mean(graded.map(({ grade }) => claims(grade))) },
-    { name: "Issues with no unsupported claim (judge)", hits: graded.filter(({ grade }) => claims(grade) === 0).length, n: outcomes.length },
+    countGraded("Issues with no unsupported claim (judge)", outcomes, (outcome) => claims(outcome.grade) === 0),
     { name: "Bullets distinct from detail (judge)", hits: bullets.filter((entry) => entry.bullet.distinct_from_detail).length, n: bullets.length },
     { name: "Bullets from article text (judge)", hits: readBullets.filter((entry) => entry.bullet.from_article_text).length, n: readBullets.length },
     { name: "Notes followed (judge)", hits: notes.filter(Boolean).length, n: notes.length },
     { name: "Editorial quality 1-5 (judge)", value: mean(graded.map(({ grade }) => Math.min(5, Math.max(1, grade.editorial_quality)))) },
-    { name: "Judge failures", value: outcomes.filter((outcome) => outcome.error === null && outcome.output !== null && !outcome.output.grade).length },
-  ];
-}
-
-function pairMetrics(outcomes: WriterOutcome[]): Metric[] {
-  const pairs = outcomes.flatMap((outcome) => (outcome.error === null && outcome.output?.pair ? [outcome.output.pair.result] : []));
-  if (pairs.length === 0) return [];
-  const wins = pairs.filter((result) => result === "win").length;
-  const ties = pairs.filter((result) => result === "tie").length;
-  return [
-    { name: "Wins vs low (pairwise)", hits: wins, n: pairs.length },
-    { name: "Ties vs low (pairwise)", hits: ties, n: pairs.length },
-    { name: "Preference vs low (win + tie/2)", value: (wins + ties / 2) / pairs.length },
   ];
 }
 
 export function scoreWriter(outcomes: WriterOutcome[]): Metric[] {
-  return [...codeMetrics(outcomes), ...judgeMetrics(outcomes), ...pairMetrics(outcomes)];
+  return [...codeMetrics(outcomes), ...judgeMetrics(outcomes)];
+}
+
+const WRITER_CALLS_IN_TIME = `Writer calls under ${WRITER_TIMEOUT_MS / 1000} s`;
+
+/** The names of the pairwise metrics against `baseline`. */
+export function pairMetricNames(baseline: string) {
+  return {
+    wins: `Wins vs ${baseline} (pairwise)`,
+    ties: `Ties vs ${baseline} (pairwise)`,
+    preference: `Preference vs ${baseline} (win + tie/2)`,
+  };
+}
+
+/** The pairwise metrics of one effort against `baseline`; none when no pair was judged. */
+export function pairMetrics(results: PairResult[], baseline: string): Metric[] {
+  if (results.length === 0) return [];
+  const names = pairMetricNames(baseline);
+  const wins = results.filter((result) => result === "win").length;
+  const ties = results.filter((result) => result === "tie").length;
+  return [
+    { name: names.wins, hits: wins, n: results.length },
+    { name: names.ties, hits: ties, n: results.length },
+    { name: names.preference, value: (wins + ties / 2) / results.length },
+  ];
+}
+
+/**
+ * The results table's columns: the writer gives about 27 metrics, all kept in the stored rows. Rows from before
+ * 2026-11-11 timed the judge in p50/p95 and compared each effort with low, so their "Writer p50 s", "Writer max s" and preference
+ * columns are kept too; a column no row has is left out.
+ */
+export function writerColumns(baseline: string): string[] {
+  const pair = pairMetricNames(baseline);
+  return [
+    "Valid output",
+    "Checks pass, first draft",
+    "Checks pass after rewrite",
+    "Stories in section and order",
+    "Story detail 2-4 sentences",
+    "Overview 45-80 words",
+    "Plain text (no markup, URL, emoji)",
+    "Bullets not repeating detail",
+    "Notes followed (code)",
+    WRITER_CALLS_IN_TIME,
+    "Unsupported claims per issue (judge)",
+    "Issues with no unsupported claim (judge)",
+    "Bullets from article text (judge)",
+    "Notes followed (judge)",
+    "Editorial quality 1-5 (judge)",
+    pair.wins,
+    pair.preference,
+    ...(baseline === "low" ? [] : [pairMetricNames("low").preference]),
+    "Writer p50 s",
+    "Writer max s",
+  ];
 }

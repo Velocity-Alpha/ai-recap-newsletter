@@ -19,6 +19,8 @@ export interface EvalSettings {
   concurrency: number;
   judgeModel: string;
   judgeEffort: EffortSetting;
+  /** Grade only the first N repeats of each item (EVAL_JUDGE_REPEATS). Null grades every repeat. */
+  judgeRepeats: number | null;
 }
 
 export interface EvalDefaults {
@@ -27,6 +29,8 @@ export interface EvalDefaults {
   efforts: EffortSetting[] | null;
   repeats?: number;
   concurrency?: number;
+  /** The eval's default for EVAL_JUDGE_REPEATS. */
+  judgeRepeats?: number;
 }
 
 type Env = Record<string, string | undefined>;
@@ -74,6 +78,7 @@ export function evalSettings(defaults: EvalDefaults, env: Env = process.env): Ev
     concurrency: positiveInteger(env, "EVAL_CONCURRENCY") ?? defaults.concurrency ?? 4,
     judgeModel: env.EVAL_JUDGE_MODEL?.trim() || "gpt-6-sol",
     judgeEffort: judgeEffortRaw ? parseEffort(judgeEffortRaw, "EVAL_JUDGE_EFFORT") : "high",
+    judgeRepeats: positiveInteger(env, "EVAL_JUDGE_REPEATS") ?? defaults.judgeRepeats ?? null,
   };
 }
 

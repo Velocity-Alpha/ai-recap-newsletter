@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import { firstWords, sameNewsInput } from "@/evals/free-links/rubric";
-import { scoreFreeLinks, storyCostUsd, type CheckedFoundLink, type FreeLinksItem, type FreeLinksOutput } from "@/evals/free-links/score";
+import { scoreFreeLinks, type CheckedFoundLink, type FreeLinksGrade, type FreeLinksItem, type FreeLinksOutput } from "@/evals/free-links/score";
 import type { Outcome } from "@/evals/lib/sweep";
+import { outcomeOf } from "@/evals/lib/testing";
 
 const link = (change: Partial<CheckedFoundLink>): CheckedFoundLink => ({
   url: "https://example.com/a",
@@ -16,33 +17,26 @@ const link = (change: Partial<CheckedFoundLink>): CheckedFoundLink => ({
   ...change,
 });
 
-const outcome = (storyId: number, url: string, output: FreeLinksOutput | null): Outcome<FreeLinksItem, FreeLinksOutput> => ({
-  item: { story: { id: storyId, url } },
-  id: String(storyId),
-  repeat: 0,
-  latencyMs: 1,
-  output,
-  error: output ? null : "timeout",
-});
-
-const output = (links: CheckedFoundLink[], searches = 2): FreeLinksOutput => ({
-  searches,
-  answerParsed: true,
-  links,
-  searchMs: 10_000,
-  tokenUsd: 0.003,
-});
+/** A checked story: the search found the links, and the check made `links` of them. */
+const outcome = (storyId: number, url: string, links: CheckedFoundLink[] | null): Outcome<FreeLinksItem, FreeLinksOutput, FreeLinksGrade> =>
+  outcomeOf({
+    item: { story: { id: storyId, url } },
+    id: String(storyId),
+    output: links ? { answerParsed: true, found: links.map((entry) => ({ url: entry.url, title: "" })) } : null,
+    grade: links ? { links } : null,
+    error: links ? null : "timeout",
+  });
 
 describe("scoreFreeLinks", () => {
-  it("counts usable stories and links, failed reads, paywall sites, the owner's site, searches and cost", () => {
+  it("counts usable stories and links, failed reads, paywall sites and the owner's site; a failed search is a miss", () => {
     const metrics = scoreFreeLinks([
-      outcome(1, "https://wsj.com/x", output([link({}), link({ url: "https://b.com/x", site: "b.com", sameNews: "related" })])),
-      outcome(10844, "https://finance.yahoo.com/x", output([
+      outcome(1, "https://wsj.com/x", [link({}), link({ url: "https://b.com/x", site: "b.com", sameNews: "related" })]),
+      outcome(10844, "https://finance.yahoo.com/x", [
         link({ url: "https://finance.yahoo.com/y", site: "finance.yahoo.com", read: false, readStatus: null, kept: false, sameNews: null }),
         link({ url: "https://c.com/x", site: "c.com", readStatus: "blocked", kept: false, words: 0, sameNews: null }),
         link({ url: "https://d.com/x", site: "d.com", readStatus: "read", kept: false, words: 120, sameNews: null }),
         link({ url: "https://wsj.com/y", site: "wsj.com", onPaywallSite: true, read: false, readStatus: null, kept: false, sameNews: null }),
-      ], 4)),
+      ]),
       outcome(11042, "https://ctvnews.ca/x", null),
     ]);
     const byName = new Map(metrics.map((metric) => [metric.name, metric]));
@@ -54,13 +48,13 @@ describe("scoreFreeLinks", () => {
     expect(byName.get("Read but too short")).toEqual({ name: "Read but too short", hits: 1, n: 4 });
     expect(byName.get("Links on a paywall site")).toEqual({ name: "Links on a paywall site", hits: 1, n: 6 });
     expect(byName.get("Owner's replacement site found")).toEqual({ name: "Owner's replacement site found", hits: 1, n: 2 });
-    expect(byName.get("Searches per story")).toEqual({ name: "Searches per story", value: 3 });
-    expect((byName.get("Cost per story ¢ (incl. search fee)") as { value: number }).value).toBeCloseTo(3.3);
-    expect(byName.get("Search p95 s")).toEqual({ name: "Search p95 s", value: 10 });
+    expect(byName.get("Links per story")).toEqual({ name: "Links per story", value: 2 });
   });
 
-  it("prices a story's searches at $0.01 each on top of its tokens", () => {
-    expect(storyCostUsd(output([], 3))).toBeCloseTo(0.033);
+  it("leaves a repeat the judge skipped out of the story counts", () => {
+    const skipped = { ...outcome(1, "https://wsj.com/x", [link({})]), grade: null, gradeStatus: "skipped" as const };
+    const metrics = scoreFreeLinks([outcome(2, "https://wsj.com/z", [link({})]), skipped]);
+    expect(metrics[0]).toEqual({ name: "Stories with a usable link", hits: 1, n: 1 });
   });
 });
 

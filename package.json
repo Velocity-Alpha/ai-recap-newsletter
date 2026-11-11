@@ -9,6 +9,8 @@
     "lint": "eslint",
     "test": "vitest run",
     "eval": "vitest run --config evals/vitest.eval.config.ts",
+    "eval:build": "vite-node --config evals/vitest.eval.config.ts",
+    "eval:rerender": "vite-node --config evals/vitest.eval.config.ts evals/lib/rerender.ts --",
     "verify": "npm run lint && npm test && npm run build",
     "prepare": "git config core.hooksPath .githooks || true",
     "postinstall": "prisma generate",

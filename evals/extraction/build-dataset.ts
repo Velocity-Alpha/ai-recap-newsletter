@@ -1,6 +1,6 @@
 // Builds evals/data/extraction/dataset.json (gitignored) from manifest.json: fetches each public issue page,
 // turns it into extractor text, and reads the Neon dev reference (read-only). Third-party text: never commit it.
-//   with DATABASE_URL for Neon dev:  npx vite-node -c evals/vitest.eval.config.ts evals/extraction/build-dataset.ts
+//   with DATABASE_URL for Neon dev:  npm run eval:build -- evals/extraction/build-dataset.ts
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 

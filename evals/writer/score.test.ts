@@ -1,12 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import type { Metric } from "@/evals/lib/results";
-import type { Outcome } from "@/evals/lib/sweep";
+import { outcomeOf } from "@/evals/lib/testing";
+import { countSentences } from "@/evals/lib/text";
 import type { WriterCase } from "@/evals/writer/dataset";
-import { countSentences, withEvalNotes } from "@/evals/writer/notes";
+import { withEvalNotes } from "@/evals/writer/notes";
 import type { IssueGrade, StoryGrade } from "@/evals/writer/rubric";
 import { gradeInput, pairInput } from "@/evals/writer/rubric";
-import { bulletOverlap, scoreWriter, stringFields, type WriterRun } from "@/evals/writer/score";
+import { bulletOverlap, pairMetrics, scoreWriter, stringFields, writerColumns, type WriterOutcome, type WriterRun } from "@/evals/writer/score";
 import type { ApprovedStory, WrittenIssueContent } from "@/src/pipeline/draft/content";
 
 const story = (id: number, note = ""): ApprovedStory => ({
@@ -77,20 +78,20 @@ const run = (overrides: Partial<WriterRun> = {}): WriterRun => ({
   first: GOOD,
   firstProblems: [],
   finalProblems: [],
-  writerMs: [30_000],
-  grade: GRADE,
-  pair: null,
   ...overrides,
 });
 
-const outcome = (output: WriterRun | null, repeat = 0): Outcome<WriterCase, WriterRun> => ({
-  item: CASE,
-  id: CASE.date,
-  repeat,
-  latencyMs: output ? 50_000 : 250_000,
-  output,
-  error: output ? null : "The writer stopped before finishing (timeout).",
-});
+const outcome = (output: WriterRun | null, repeat = 0, grade: IssueGrade | null = output ? GRADE : null): WriterOutcome =>
+  outcomeOf({
+    item: CASE,
+    id: CASE.date,
+    repeat,
+    latencyMs: output ? 50_000 : 250_000,
+    callMs: output ? [30_000] : [],
+    output,
+    grade,
+    error: output ? null : "The writer stopped before finishing (timeout).",
+  });
 
 const byName = (metrics: Metric[]) => Object.fromEntries(metrics.map((metric) => [metric.name, metric]));
 
@@ -110,10 +111,8 @@ describe("scoreWriter", () => {
     expect(metrics["Bullets not repeating detail"]).toMatchObject({ hits: 9, n: 18 });
     // The eval's notes land on the 2nd top story, the 1st research story and the 1st quick hit.
     expect(metrics["Notes followed (code)"]).toMatchObject({ hits: 3, n: 6 });
-    // The failed run's call is counted at its latency, over the 240 s timeout.
+    // The failed run has no recorded call, so it counts at its own time, over the 240 s timeout.
     expect(metrics["Writer calls under 240 s"]).toMatchObject({ hits: 1, n: 2 });
-    expect(metrics["Writer max s"]).toEqual({ name: "Writer max s", value: 250 });
-    expect(metrics["Writer p50 s"]).toEqual({ name: "Writer p50 s", value: 30 });
   });
 
   it("finds broken rules: a moved story, markup, an em dash, a long title, a repeated bullet, and checks after rewrite", () => {
@@ -134,30 +133,30 @@ describe("scoreWriter", () => {
     expect(metrics["Bullets not repeating detail"]).toMatchObject({ hits: 8, n: 9 });
   });
 
-  it("turns the judge's grades into counts and means, and a missing grade into a judge failure", () => {
-    const metrics = byName(scoreWriter([outcome(run()), outcome(run({ grade: null }), 1)]));
+  it("turns the judge's grades into counts and means over the graded runs", () => {
+    const metrics = byName(scoreWriter([outcome(run()), outcome(run(), 1, null)]));
     expect(metrics["Unsupported claims per issue (judge)"]).toEqual({ name: "Unsupported claims per issue (judge)", value: 1 });
-    expect(metrics["Issues with no unsupported claim (judge)"]).toMatchObject({ hits: 0, n: 2 });
+    expect(metrics["Issues with no unsupported claim (judge)"]).toMatchObject({ hits: 0, n: 1 });
     expect(metrics["Bullets distinct from detail (judge)"]).toMatchObject({ hits: 6, n: 9 });
     // Only stories 1 and 3 have article text.
     expect(metrics["Bullets from article text (judge)"]).toMatchObject({ hits: 2, n: 6 });
     expect(metrics["Notes followed (judge)"]).toMatchObject({ hits: 2, n: 3 });
     expect(metrics["Editorial quality 1-5 (judge)"]).toEqual({ name: "Editorial quality 1-5 (judge)", value: 4 });
-    expect(metrics["Judge failures"]).toEqual({ name: "Judge failures", value: 1 });
+  });
+});
+
+describe("pairMetrics", () => {
+  it("counts wins and ties against the baseline, and gives nothing when no pair was judged", () => {
+    expect(pairMetrics([], "high")).toEqual([]);
+    const metrics = byName(pairMetrics(["win", "tie", "loss"], "high"));
+    expect(metrics["Wins vs high (pairwise)"]).toMatchObject({ hits: 1, n: 3 });
+    expect(metrics["Ties vs high (pairwise)"]).toMatchObject({ hits: 1, n: 3 });
+    expect(metrics["Preference vs high (win + tie/2)"]).toEqual({ name: "Preference vs high (win + tie/2)", value: 0.5 });
   });
 
-  it("adds pairwise metrics only when pairs ran", () => {
-    expect(byName(scoreWriter([outcome(run())]))["Wins vs low (pairwise)"]).toBeUndefined();
-    const metrics = byName(
-      scoreWriter([
-        outcome(run({ pair: { result: "win", thisFirst: true } })),
-        outcome(run({ pair: { result: "tie", thisFirst: false } }), 1),
-        outcome(run({ pair: { result: "loss", thisFirst: true } }), 1),
-      ])
-    );
-    expect(metrics["Wins vs low (pairwise)"]).toMatchObject({ hits: 1, n: 3 });
-    expect(metrics["Ties vs low (pairwise)"]).toMatchObject({ hits: 1, n: 3 });
-    expect(metrics["Preference vs low (win + tie/2)"]).toEqual({ name: "Preference vs low (win + tie/2)", value: 0.5 });
+  it("names the table's columns for the baseline, keeping the old rows' comparison with low", () => {
+    expect(writerColumns("high")).toEqual(expect.arrayContaining(["Wins vs high (pairwise)", "Preference vs low (win + tie/2)"]));
+    expect(writerColumns("low").filter((name) => name === "Preference vs low (win + tie/2)")).toHaveLength(1);
   });
 });
 

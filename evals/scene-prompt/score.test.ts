@@ -3,11 +3,11 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@/src/server/prisma", () => ({ prisma: {} }));
 
 import type { Outcome } from "@/evals/lib/sweep";
+import { outcomeOf } from "@/evals/lib/testing";
 import { sceneIssueFrom } from "@/evals/scene-prompt/issues";
 import {
   checkScenePrompt,
   checkSceneText,
-  countSentences,
   passesScenePromptRules,
   scoreScenePrompt,
   type ScenePromptGrade,
@@ -35,14 +35,8 @@ const GRADE: ScenePromptGrade = {
   note: "ok",
 };
 
-const outcome = (output: ScenePromptOutput | null): Outcome<unknown, ScenePromptOutput> => ({
-  item: {},
-  id: "2026-10-26",
-  repeat: 0,
-  latencyMs: 1,
-  output,
-  error: output ? null : "timeout",
-});
+const outcome = (output: ScenePromptOutput | null, grade: ScenePromptGrade | null = null): Outcome<unknown, ScenePromptOutput, ScenePromptGrade> =>
+  outcomeOf({ item: {}, output, grade, error: output ? null : "timeout" });
 
 describe("checkSceneText and checkScenePrompt", () => {
   it("passes a prompt that follows every hard rule", () => {
@@ -70,29 +64,22 @@ describe("checkSceneText and checkScenePrompt", () => {
     expect(checks.layers).toBe(true);
     expect(checks.interpretiveWords).toEqual([]);
   });
-
-  it("counts sentences", () => {
-    expect(countSentences("One. Two! Three?")).toBe(3);
-    expect(countSentences("No end")).toBe(1);
-    expect(countSentences("")).toBe(0);
-  });
 });
 
 describe("scoreScenePrompt", () => {
-  it("counts checks and grades over all runs; an error and an ungraded run are misses", () => {
+  it("counts checks over all runs (an error is a miss) and grades over the graded runs", () => {
     const metrics = scoreScenePrompt([
-      outcome({ scenePrompt: GOOD, rationale: "Short.", callMs: 2_000, grade: GRADE }),
-      outcome({ scenePrompt: "Too short, 16:9.", rationale: "Short.", callMs: 4_000, grade: null }),
+      outcome({ scenePrompt: GOOD, rationale: "Short." }, GRADE),
+      outcome({ scenePrompt: "Too short, 16:9.", rationale: "Short." }, { ...GRADE, depicted_story: 2, lead_relevance: 0 }),
+      outcome({ scenePrompt: "Too short, 16:9.", rationale: "Short." }),
       outcome(null),
     ]);
     const byName = new Map(metrics.map((metric) => [metric.name, metric]));
-    expect(byName.get("All hard rules")).toEqual({ name: "All hard rules", hits: 1, n: 3 });
-    expect(byName.get("16:9 once")).toEqual({ name: "16:9 once", hits: 2, n: 3 });
-    expect(byName.get("J: visible only")).toEqual({ name: "J: visible only", hits: 0, n: 3 });
-    expect(byName.get("J: depicts lead")).toEqual({ name: "J: depicts lead", hits: 1, n: 3 });
-    expect(byName.get("J: relevance mean (0–3)")).toEqual({ name: "J: relevance mean (0–3)", value: 2 });
-    expect(byName.get("Judged")).toEqual({ name: "Judged", hits: 1, n: 3 });
-    expect(byName.get("Call p95 s")).toEqual({ name: "Call p95 s", value: 4 });
+    expect(byName.get("All hard rules")).toEqual({ name: "All hard rules", hits: 1, n: 4 });
+    expect(byName.get("16:9 once")).toEqual({ name: "16:9 once", hits: 3, n: 4 });
+    expect(byName.get("J: visible only")).toEqual({ name: "J: visible only", hits: 0, n: 2 });
+    expect(byName.get("J: depicts lead")).toEqual({ name: "J: depicts lead", hits: 1, n: 2 });
+    expect(byName.get("J: relevance mean (0–3)")).toEqual({ name: "J: relevance mean (0–3)", value: 1 });
   });
 });
 

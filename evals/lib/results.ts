@@ -4,8 +4,14 @@ import { dirname, join } from "node:path";
 
 import { REASONING_EFFORTS } from "@/src/lib/reasoning-effort";
 
-/** A count (`hits` of `n`) or a plain number. */
-export type Metric = { name: string; hits: number; n: number } | { name: string; value: number };
+/** The lowest and highest per-repeat value of a metric: a share (0 to 1) for a count, the value for a number. */
+export interface Spread {
+  min: number;
+  max: number;
+}
+
+/** A count (`hits` of `n`) or a plain number. `spread` is set when two or more repeats gave the metric. */
+export type Metric = ({ name: string; hits: number; n: number } | { name: string; value: number }) & { spread?: Spread };
 
 /** One (model, effort) of a results file. Metrics, ids and our own headlines only: never third-party text. */
 export interface ResultRow {
@@ -16,11 +22,18 @@ export interface ResultRow {
   n: number;
   errors: number;
   metrics: Metric[];
+  /** Time of `run`, the model calls only (grading is not timed), over the runs without an error. */
   latencyMs: { p50: number | null; p95: number | null };
-  /** Model cost of one item run, or null when the model has no price in usage.ts. */
+  /** Model cost of one item run, per-call tool fees included, or null when the model has no price in usage.ts. */
   costPerCallUsd: number | null;
   /** Cost of the judge for one item run, or null when the eval uses no judge. */
   judgeCostPerCallUsd: number | null;
+  /** Web search calls per item run, when the call searched. */
+  webSearchesPerCall?: number;
+  /** Runs the judge graded, of the runs it tried (EVAL_JUDGE_REPEATS can leave runs out). Evals with a grade step. */
+  graded?: { hits: number; n: number };
+  /** The cost of the work shared across the whole sweep (reads and verdicts done once), not in the per-call costs. */
+  sharedCostUsd?: number;
   date: string;
   gitSha: string;
 }
@@ -30,12 +43,16 @@ export interface ResultsFile {
   title: string;
   /** Lines under the title: what is measured, ground truth, data source. */
   notes: string[];
+  /** The metric columns to show, in order. Default: every metric of the rows. All metrics stay in the stored rows. */
+  columns?: string[];
   rows: ResultRow[];
 }
 
 const ROOT = join(__dirname, "..", "..");
-const ROWS_START = "<!-- eval-rows";
-const ROWS_END = "-->";
+const STORE_START = "<!-- eval-results";
+/** The block of results files written before 2026-11-11: the rows only. */
+const OLD_STORE_START = "<!-- eval-rows";
+const STORE_END = "-->";
 
 export function resultsPath(task: string): string {
   return join(ROOT, "evals", "results", `${task}.md`);
@@ -45,18 +62,34 @@ export function rawOutputPath(task: string): string {
   return join(ROOT, "evals", "out", `${task}.json`);
 }
 
+/** 0 decimals from 100, 1 from 10, else 2; no trailing zeros. */
+export function roundValue(value: number): string {
+  const size = Math.abs(value);
+  const decimals = size >= 100 ? 0 : size >= 10 ? 1 : 2;
+  return String(Number(value.toFixed(decimals)));
+}
+
+const percent = (share: number) => Math.round(100 * share);
+
+/** The spread is shown when the repeats differ; when they agree, the total says it all. */
+const differs = (spread: Spread | undefined): spread is Spread => spread !== undefined && spread.min !== spread.max;
+
 function formatMetric(metric: Metric | undefined): string {
   if (!metric) return "–";
-  if ("hits" in metric) return `${metric.hits}/${metric.n} (${metric.n ? Math.round((100 * metric.hits) / metric.n) : 0}%)`;
-  return Number.isInteger(metric.value) ? String(metric.value) : metric.value.toFixed(2);
+  if ("hits" in metric) {
+    const total = `${metric.hits}/${metric.n} (${metric.n ? percent(metric.hits / metric.n) : 0}%`;
+    return differs(metric.spread) ? `${total}; ${percent(metric.spread.min)}–${percent(metric.spread.max)}%)` : `${total})`;
+  }
+  const value = roundValue(metric.value);
+  return differs(metric.spread) ? `${value} (${roundValue(metric.spread.min)}–${roundValue(metric.spread.max)})` : value;
 }
 
 function formatSeconds(ms: number | null): string {
   return ms === null ? "–" : `${(ms / 1000).toFixed(1)} s`;
 }
 
-function formatUsd(usd: number | null): string {
-  if (usd === null) return "unknown";
+function formatUsd(usd: number | null | undefined): string {
+  if (usd === null || usd === undefined) return "unknown";
   return usd >= 0.001 ? `$${usd.toFixed(4)}` : `$${usd.toFixed(6)}`;
 }
 
@@ -74,61 +107,96 @@ export function mergeRows(old: ResultRow[], fresh: ResultRow[]): ResultRow[] {
   );
 }
 
-export function renderResults(file: ResultsFile): string {
-  const metricNames = [...new Set(file.rows.flatMap((row) => row.metrics.map((metric) => metric.name)))];
-  const withJudge = file.rows.some((row) => row.judgeCostPerCallUsd !== null);
-  const header = [
-    "Model",
-    "Effort",
-    ...metricNames,
-    "Errors",
-    "p50",
-    "p95",
-    "Cost per call",
-    ...(withJudge ? ["Judge cost per call"] : []),
-    "n",
-    "Date",
-    "Git sha",
-  ];
-  const lines = file.rows.map((row) => {
-    const byName = new Map(row.metrics.map((metric) => [metric.name, metric]));
-    return [
-      row.model,
-      row.effort ?? "api default",
-      ...metricNames.map((name) => formatMetric(byName.get(name))),
-      String(row.errors),
-      formatSeconds(row.latencyMs.p50),
-      formatSeconds(row.latencyMs.p95),
-      formatUsd(row.costPerCallUsd),
-      ...(withJudge ? [formatUsd(row.judgeCostPerCallUsd)] : []),
-      String(row.n),
-      row.date,
-      row.gitSha,
-    ];
+interface Column {
+  header: string;
+  cell: (row: ResultRow) => string | null;
+}
+
+/** The table's columns: the metrics, then the standard ones. A column with no value in any row is left out. */
+function tableColumns(file: ResultsFile): Column[] {
+  const allMetrics = [...new Set(file.rows.flatMap((row) => row.metrics.map((metric) => metric.name)))];
+  const metricNames = file.columns ?? allMetrics;
+  const metric = (name: string): Column => ({
+    header: name,
+    cell: (row) => {
+      const found = row.metrics.find((entry) => entry.name === name);
+      return found ? formatMetric(found) : null;
+    },
   });
+  const columns: Column[] = [
+    { header: "Model", cell: (row) => row.model },
+    { header: "Effort", cell: (row) => row.effort ?? "api default" },
+    ...metricNames.map(metric),
+    { header: "Errors", cell: (row) => String(row.errors) },
+    { header: "Graded", cell: (row) => (row.graded ? `${row.graded.hits}/${row.graded.n}` : null) },
+    { header: "p50", cell: (row) => (row.latencyMs.p50 === null ? null : formatSeconds(row.latencyMs.p50)) },
+    { header: "p95", cell: (row) => (row.latencyMs.p95 === null ? null : formatSeconds(row.latencyMs.p95)) },
+    { header: "Searches per call", cell: (row) => (row.webSearchesPerCall === undefined ? null : roundValue(row.webSearchesPerCall)) },
+    { header: "Cost per call", cell: (row) => formatUsd(row.costPerCallUsd) },
+    { header: "Judge cost per call", cell: (row) => (row.judgeCostPerCallUsd === null ? null : formatUsd(row.judgeCostPerCallUsd)) },
+    { header: "n", cell: (row) => String(row.n) },
+    { header: "Date", cell: (row) => row.date },
+    { header: "Git sha", cell: (row) => row.gitSha },
+  ];
+  return columns.filter((column) => file.rows.some((row) => column.cell(row) !== null));
+}
+
+/** One line per run that shared work across configs: its cost is not in the per-call columns. */
+function sharedCostLines(rows: ResultRow[]): string[] {
+  const runs = new Map<string, string>();
+  for (const row of rows) {
+    if (row.sharedCostUsd === undefined) continue;
+    const key = `${row.date} (${row.gitSha})`;
+    runs.set(key, `Shared work of the run of ${key}, done once for all its configs: ${formatUsd(row.sharedCostUsd)}.`);
+  }
+  return [...runs.values()];
+}
+
+export function renderResults(file: ResultsFile): string {
+  const columns = tableColumns(file);
+  const header = columns.map((column) => column.header);
+  const lines = file.rows.map((row) => columns.map((column) => column.cell(row) ?? "–"));
   const table = [header, header.map(() => "---"), ...lines].map((cells) => `| ${cells.join(" | ")} |`);
+  const shared = sharedCostLines(file.rows);
+  const stored = { title: file.title, notes: file.notes, ...(file.columns ? { columns: file.columns } : {}), rows: file.rows };
   return [
     `# ${file.title}`,
     "",
-    `Written by \`npm run eval -- evals/${file.task}\`. Do not edit by hand. A run replaces the rows of the model and`,
-    "effort it ran; other rows stay. Latency and cost are for one item run. See evals/README.md.",
+    `Written by \`npm run eval -- evals/${file.task}\`; \`npm run eval:rerender -- ${file.task}\` rebuilds it from the`,
+    "rows stored below. Do not edit by hand. A run replaces the rows of the model and effort it ran; other rows stay.",
+    "Latency and cost are for one item run; a range in brackets is the lowest and highest repeat. See evals/README.md.",
     "",
     ...file.notes.flatMap((note) => [note, ""]),
     ...table,
     "",
-    ROWS_START,
-    JSON.stringify(file.rows),
-    ROWS_END,
+    ...(shared.length ? [...shared, ""] : []),
+    STORE_START,
+    JSON.stringify(stored),
+    STORE_END,
     "",
   ].join("\n");
 }
 
+/** What a results file stores. Files from before 2026-11-11 stored only rows: their title and notes are read from the text. */
+export function readStored(markdown: string): Omit<ResultsFile, "task"> | null {
+  const start = markdown.indexOf(STORE_START);
+  if (start !== -1) {
+    const end = markdown.indexOf(STORE_END, start);
+    return JSON.parse(markdown.slice(start + STORE_START.length, end).trim()) as Omit<ResultsFile, "task">;
+  }
+  const oldStart = markdown.indexOf(OLD_STORE_START);
+  if (oldStart === -1) return null;
+  const end = markdown.indexOf(STORE_END, oldStart);
+  const rows = JSON.parse(markdown.slice(oldStart + OLD_STORE_START.length, end).trim()) as ResultRow[];
+  // Old layout: "# title", the two-line header, then each note as a paragraph, then the table.
+  const paragraphs = markdown.slice(0, markdown.indexOf("\n|")).split(/\n\s*\n/).map((part) => part.trim());
+  const title = paragraphs[0].replace(/^#\s*/, "");
+  return { title, notes: paragraphs.slice(2).filter(Boolean), rows };
+}
+
 /** The rows stored at the end of a results file, so a later run can keep the configs it did not run. */
 export function readRows(markdown: string): ResultRow[] {
-  const start = markdown.indexOf(ROWS_START);
-  if (start === -1) return [];
-  const end = markdown.indexOf(ROWS_END, start);
-  return JSON.parse(markdown.slice(start + ROWS_START.length, end).trim()) as ResultRow[];
+  return readStored(markdown)?.rows ?? [];
 }
 
 /** The short sha of HEAD, with "+changes" when the working tree has uncommitted changes. */
@@ -156,5 +224,14 @@ export function writeResults(file: ResultsFile, raw: unknown): string {
   const old = existsSync(path) ? readRows(readFileSync(path, "utf8")) : [];
   writeFile(path, renderResults({ ...file, rows: mergeRows(old, file.rows) }));
   writeFile(rawOutputPath(file.task), `${JSON.stringify(raw, null, 2)}\n`);
+  return path;
+}
+
+/** Rebuilds `evals/results/<task>.md` from its stored rows, with no API calls. `change` replaces stored fields. */
+export function rerenderResults(task: string, change: Partial<Pick<ResultsFile, "title" | "notes" | "columns">> = {}): string {
+  const path = resultsPath(task);
+  const stored = readStored(readFileSync(path, "utf8"));
+  if (!stored) throw new Error(`${path} has no stored rows`);
+  writeFile(path, renderResults({ task, ...stored, ...change }));
   return path;
 }

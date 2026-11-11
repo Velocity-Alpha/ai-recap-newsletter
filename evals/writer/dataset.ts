@@ -51,7 +51,7 @@ export function loadCases(manifest: ManifestEntry[] = readManifest()): WriterCas
     const file = caseFile(entry.date);
     if (!existsSync(file)) {
       throw new Error(
-        `${file} is missing. Build the test set first: npx vite-node --config vitest.config.ts evals/writer/build-dataset.ts`
+        `${file} is missing. Build the test set first: npm run eval:build -- evals/writer/build-dataset.ts`
       );
     }
     return JSON.parse(readFileSync(file, "utf8")) as WriterCase;

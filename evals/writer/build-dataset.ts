@@ -3,7 +3,7 @@
 // lead first, notes, and article text for feature stories (the saved copy in story_articles, else the repo's
 // article reader, else none). Writes evals/data/writer/<date>.json, which git ignores.
 //
-// Usage: npx vite-node --config vitest.config.ts evals/writer/build-dataset.ts
+// Usage: npm run eval:build -- evals/writer/build-dataset.ts
 // Needs DATABASE_URL (the Neon dev branch). JINA_API_KEY and GITHUB_TOKEN help the article reader, if set.
 
 import { mkdirSync, writeFileSync } from "node:fs";

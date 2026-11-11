@@ -5,26 +5,23 @@ import { readDataset, type ExtractionCase } from "@/evals/extraction/dataset";
 import { GRADE_RUBRIC, GRADE_SCHEMA, gradeInput, type ExtractionGrade } from "@/evals/extraction/judge";
 import { checkExtraction, linkedStoryUrls, scoreExtraction, urlsInText, type ExtractionOutput } from "@/evals/extraction/score";
 import { evalSettings } from "@/evals/lib/settings";
-import { runSweep, type RunContext } from "@/evals/lib/sweep";
+import { runSweep, type GradeContext, type RunContext } from "@/evals/lib/sweep";
 import { createOpenAIExtractor, EXTRACTION_MODEL } from "@/src/pipeline/ingest/extract";
 import { cleanStoryUrl } from "@/src/pipeline/ingest/url";
 
 async function extract(item: ExtractionCase, context: RunContext): Promise<ExtractionOutput> {
   const extractor = createOpenAIExtractor({ client: context.client, model: context.config.model, effort: context.config.effort });
-  const stories = await extractor({ sourceDate: item.date, text: item.text });
-  let grade: ExtractionGrade | null = null;
-  try {
-    grade = await context.judge<ExtractionGrade>({
-      name: "extraction_grade",
-      instructions: GRADE_RUBRIC,
-      input: gradeInput({ sourceDate: item.date, text: item.text, stories }),
-      schema: GRADE_SCHEMA,
-    });
-  } catch (error) {
-    // A judge failure leaves the run ungraded ("Graded runs"), not failed: the extraction itself worked.
-    console.warn(`[extraction] judge failed on ${item.id}: ${error instanceof Error ? error.message : String(error)}`);
-  }
-  return { stories, grade };
+  return { stories: await extractor({ sourceDate: item.date, text: item.text }) };
+}
+
+/** A judge failure leaves the run ungraded (the Graded column), not failed: the extraction itself worked. */
+function grade(item: ExtractionCase, output: ExtractionOutput, context: GradeContext): Promise<ExtractionGrade> {
+  return context.judge<ExtractionGrade>({
+    name: "extraction_grade",
+    instructions: GRADE_RUBRIC,
+    input: gradeInput({ sourceDate: item.date, text: item.text, stories: output.stories }),
+    schema: GRADE_SCHEMA,
+  });
 }
 
 it("extraction: stories from past issues, checked and judged", async () => {
@@ -56,10 +53,11 @@ it("extraction: stories from past issues, checked and judged", async () => {
     items,
     id: (item) => item.id,
     run: extract,
+    grade,
     score: scoreExtraction,
     raw: (outcome) => {
       const stories = outcome.output?.stories ?? [];
-      const grade = outcome.output?.grade ?? null;
+      const grade = outcome.grade;
       return {
         stories: stories.length,
         saved: linkedStoryUrls(stories, outcome.item.url).length,

@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import { reasoningField, type EffortSetting } from "@/src/lib/reasoning-effort";
 
 import type { RecordingClient } from "@/evals/lib/usage";
@@ -5,7 +7,7 @@ import type { RecordingClient } from "@/evals/lib/usage";
 export interface JudgeRequest {
   /** The schema's name, for example "story_grade". */
   name: string;
-  /** What to judge and how: the rubric. */
+  /** What to judge and how: the rubric. It goes first, so OpenAI can cache it across calls. */
   instructions: string;
   /** The text to judge. */
   input: string;
@@ -16,7 +18,13 @@ export interface JudgeRequest {
 /** Asks the judge model for a grade in strict JSON. Tries twice, then throws. */
 export type Judge = <T>(request: JudgeRequest) => Promise<T>;
 
-/** A judge on EVAL_JUDGE_MODEL (default gpt-6-sol, high effort). Its usage goes to its own recorder. */
+/** One `prompt_cache_key` per rubric and schema, so calls with the same rubric land on the same cache. */
+export function judgeCacheKey(request: Pick<JudgeRequest, "name" | "instructions" | "schema">): string {
+  const hash = createHash("sha256").update(request.instructions).update(JSON.stringify(request.schema)).digest("hex").slice(0, 16);
+  return `eval-judge:${request.name.slice(0, 32)}:${hash}`;
+}
+
+/** A judge on EVAL_JUDGE_MODEL (default gpt-6-sol, high effort). Its usage goes to its client's recorder. */
 export function createJudge(options: { model: string; effort: EffortSetting; client: RecordingClient }): Judge {
   return async <T>(request: JudgeRequest): Promise<T> => {
     const body = {
@@ -24,6 +32,7 @@ export function createJudge(options: { model: string; effort: EffortSetting; cli
       ...reasoningField(options.effort),
       instructions: request.instructions,
       input: request.input,
+      prompt_cache_key: judgeCacheKey(request),
       store: false,
       text: { format: { type: "json_schema", name: request.name, strict: true, schema: request.schema } },
     };

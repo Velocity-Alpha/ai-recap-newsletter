@@ -1,7 +1,16 @@
 import { describe, expect, it } from "vitest";
 
-import { checkIdea, passesIdeaRules, rawIdeaCount, scoreSceneIdeas, type IdeaGrade, type SceneIdeasOutput } from "@/evals/scene-ideas/score";
 import type { Outcome } from "@/evals/lib/sweep";
+import { outcomeOf } from "@/evals/lib/testing";
+import {
+  checkIdea,
+  passesIdeaRules,
+  rawIdeaCount,
+  scoreSceneIdeas,
+  type IdeaGrade,
+  type SceneIdeasGrade,
+  type SceneIdeasOutput,
+} from "@/evals/scene-ideas/score";
 
 const filler = (count: number) => Array.from({ length: count }, () => "stone").join(" ");
 const SCENE =
@@ -23,14 +32,12 @@ const IDEA_GRADE: IdeaGrade = {
   lead_relevance: 3,
 };
 
-const outcome = (output: SceneIdeasOutput | null): Outcome<unknown, SceneIdeasOutput> => ({
-  item: {},
-  id: "2026-10-26",
-  repeat: 0,
-  latencyMs: 1,
-  output,
-  error: output ? null : "Scene ideas failed: Request timed out.",
-});
+const outcome = (
+  output: SceneIdeasOutput | null,
+  latencyMs: number,
+  grade: SceneIdeasGrade | null = null
+): Outcome<unknown, SceneIdeasOutput, SceneIdeasGrade> =>
+  outcomeOf({ item: {}, output, latencyMs, grade, error: output ? null : "Scene ideas failed: Request timed out." });
 
 describe("checkIdea", () => {
   it("passes an idea that follows the hard rules", () => {
@@ -52,26 +59,25 @@ describe("rawIdeaCount", () => {
 });
 
 describe("scoreSceneIdeas", () => {
-  it("counts runs and ideas; a timeout is a miss for every column and for the 45 s limit", () => {
+  it("counts runs and ideas (a timeout is a miss, also for the 45 s limit), and grades over the graded runs", () => {
     const metrics = scoreSceneIdeas([
-      outcome({
-        ideas: [GOOD, GOOD, GOOD],
-        rawIdeaCount: 3,
-        callMs: 10_000,
-        grade: { lead_story: 1, ideas: [IDEA_GRADE, IDEA_GRADE, { ...IDEA_GRADE, depicted_story: 2 }], clearly_different: false, note: "" },
+      outcome({ ideas: [GOOD, GOOD, GOOD], rawIdeaCount: 3 }, 10_000, {
+        lead_story: 1,
+        ideas: [IDEA_GRADE, IDEA_GRADE, { ...IDEA_GRADE, depicted_story: 2 }],
+        clearly_different: false,
+        note: "",
       }),
-      outcome({ ideas: [GOOD, { ...GOOD, label: "Key" }], rawIdeaCount: 2, callMs: 30_000, grade: null }),
-      outcome(null),
+      outcome({ ideas: [GOOD, { ...GOOD, label: "Key" }], rawIdeaCount: 2 }, 30_000),
+      outcome(null, 45_000),
     ]);
     const byName = new Map(metrics.map((metric) => [metric.name, metric]));
     expect(byName.get("Exactly 3 ideas")).toEqual({ name: "Exactly 3 ideas", hits: 1, n: 3 });
     expect(byName.get("All ideas pass hard rules")).toEqual({ name: "All ideas pass hard rules", hits: 1, n: 3 });
     expect(byName.get("Idea: all hard rules")).toEqual({ name: "Idea: all hard rules", hits: 4, n: 9 });
-    expect(byName.get("J: no extras")).toEqual({ name: "J: no extras", hits: 0, n: 9 });
-    expect(byName.get("J: visible only")).toEqual({ name: "J: visible only", hits: 3, n: 9 });
-    expect(byName.get("J: an idea shows the lead")).toEqual({ name: "J: an idea shows the lead", hits: 1, n: 3 });
-    expect(byName.get("J: clearly different")).toEqual({ name: "J: clearly different", hits: 0, n: 3 });
+    expect(byName.get("J: no extras")).toEqual({ name: "J: no extras", hits: 0, n: 3 });
+    expect(byName.get("J: visible only")).toEqual({ name: "J: visible only", hits: 3, n: 3 });
+    expect(byName.get("J: an idea shows the lead")).toEqual({ name: "J: an idea shows the lead", hits: 1, n: 1 });
+    expect(byName.get("J: clearly different")).toEqual({ name: "J: clearly different", hits: 0, n: 1 });
     expect(byName.get("Done in 45 s")).toEqual({ name: "Done in 45 s", hits: 2, n: 3 });
-    expect(byName.get("Call p95 s")).toEqual({ name: "Call p95 s", value: 30 });
   });
 });

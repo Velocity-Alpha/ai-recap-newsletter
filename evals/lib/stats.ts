@@ -19,3 +19,8 @@ export async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T, in
   await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
   return results;
 }
+
+/** The mean, or 0 for no values. */
+export function mean(values: number[]): number {
+  return values.length === 0 ? 0 : values.reduce((sum, value) => sum + value, 0) / values.length;
+}

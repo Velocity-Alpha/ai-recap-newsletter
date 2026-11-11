@@ -1,4 +1,4 @@
-import { countWords } from "@/src/pipeline/draft/validate";
+import { countSentences, countWords } from "@/evals/lib/text";
 import type { ApprovedSections, WrittenIssueContent } from "@/src/pipeline/draft/content";
 import type { WriterInput } from "@/src/pipeline/draft/writer";
 
@@ -16,13 +16,6 @@ export interface EvalNote {
   followed: (content: WrittenIssueContent, storyId: number) => boolean;
 }
 
-/** Sentences in a plain-text field: ends of sentence followed by a space and a capital or digit. */
-export function countSentences(text: string): number {
-  return text
-    .trim()
-    .split(/(?<=[.!?])\s+(?=["'A-Z0-9])/)
-    .filter((part) => /[\p{L}\p{N}]/u.test(part)).length;
-}
 
 function feature(content: WrittenIssueContent, storyId: number) {
   return [...content.headlines, ...content.research_and_analysis].find((item) => item.story_id === storyId);

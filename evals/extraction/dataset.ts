@@ -46,7 +46,7 @@ export function readManifest(): ManifestIssue[] {
 
 export function readDataset(): ExtractionCase[] {
   if (!existsSync(DATASET_PATH)) {
-    throw new Error(`No dataset at ${DATASET_PATH}. Build it first: npx vite-node -c evals/vitest.eval.config.ts evals/extraction/build-dataset.ts`);
+    throw new Error(`No dataset at ${DATASET_PATH}. Build it first: npm run eval:build -- evals/extraction/build-dataset.ts`);
   }
   return JSON.parse(readFileSync(DATASET_PATH, "utf8")) as ExtractionCase[];
 }

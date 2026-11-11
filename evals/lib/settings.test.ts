@@ -14,6 +14,7 @@ describe("evalSettings", () => {
       concurrency: 4,
       judgeModel: "gpt-6-sol",
       judgeEffort: "high",
+      judgeRepeats: null,
     });
   });
 
@@ -28,6 +29,7 @@ describe("evalSettings", () => {
         EVAL_CONCURRENCY: "8",
         EVAL_JUDGE_MODEL: "gpt-6-luna",
         EVAL_JUDGE_EFFORT: "medium",
+        EVAL_JUDGE_REPEATS: "1",
       }
     );
     expect(settings).toMatchObject({
@@ -38,6 +40,7 @@ describe("evalSettings", () => {
       concurrency: 8,
       judgeModel: "gpt-6-luna",
       judgeEffort: "medium",
+      judgeRepeats: 1,
     });
   });
 

@@ -6,16 +6,11 @@ vi.mock("@/src/server/observability", () => ({ logServerInfo: vi.fn(), logServer
 import { leadPickCases } from "@/evals/lead-pick/boards";
 import { scoreLeadPick, type LeadPickOutput } from "@/evals/lead-pick/score";
 import type { Outcome } from "@/evals/lib/sweep";
+import { outcomeOf } from "@/evals/lib/testing";
 
 const CASE = { ownerLeadId: 7, scoredLeadId: 9, shortlist: [{ id: 9 }, { id: 7 }] };
-const outcome = (output: LeadPickOutput | null, item = CASE): Outcome<typeof CASE, LeadPickOutput> => ({
-  item,
-  id: "2026-10-22",
-  repeat: 0,
-  latencyMs: 1,
-  output,
-  error: output ? null : "network",
-});
+const outcome = (output: LeadPickOutput | null, item = CASE): Outcome<typeof CASE, LeadPickOutput> =>
+  outcomeOf({ item, id: "2026-10-22", output, error: output ? null : "network" });
 
 describe("scoreLeadPick", () => {
   it("counts AI hits, usable picks, the shortlist and the score-only baseline; an error is a miss for the AI only", () => {

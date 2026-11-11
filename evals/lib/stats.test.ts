@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { mapLimit, percentile } from "@/evals/lib/stats";
+import { mapLimit, mean, percentile } from "@/evals/lib/stats";
 
 describe("percentile", () => {
   it("takes the nearest rank", () => {
@@ -28,5 +28,12 @@ describe("mapLimit", () => {
     });
     expect(result).toEqual([0, 10, 20, 30, 40]);
     expect(most).toBe(2);
+  });
+});
+
+describe("mean", () => {
+  it("is 0 for no values", () => {
+    expect(mean([1, 2, 6])).toBe(3);
+    expect(mean([])).toBe(0);
   });
 });

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { ExtractionGrade, StoryVerdict } from "@/evals/extraction/judge";
 import { checkExtraction, linkedStoryUrls, scoreExtraction, urlsInText, type ExtractionOutput, type ScoredIssue } from "@/evals/extraction/score";
 import type { Outcome } from "@/evals/lib/sweep";
+import { outcomeOf } from "@/evals/lib/testing";
 import type { ExtractedStory } from "@/src/pipeline/ingest/extract";
 
 // Made-up text and stories: no third-party text in tests.
@@ -35,8 +36,12 @@ const verdict = (index: number, extra: Partial<StoryVerdict> = {}): StoryVerdict
 
 const ISSUE: ScoredIssue = { text: TEXT, url: "https://news.example/p/issue", referenceCount: 2, referenceUrls: ["https://acme.example/model", "https://gamma.example/x"] };
 
-function outcome(output: ExtractionOutput | null, error: string | null = null): Outcome<ScoredIssue, ExtractionOutput> {
-  return { item: ISSUE, id: "i", repeat: 0, latencyMs: 1, output, error };
+function outcome(
+  output: ExtractionOutput | null,
+  grade: ExtractionGrade | null = null,
+  error: string | null = null
+): Outcome<ScoredIssue, ExtractionOutput, ExtractionGrade> {
+  return outcomeOf({ item: ISSUE, output, grade, error });
 }
 
 describe("urlsInText", () => {
@@ -81,11 +86,10 @@ describe("scoreExtraction", () => {
   };
   const good: ExtractionOutput = {
     stories: [story("https://acme.example/model"), story("https://made.up/link", { importance_score: 3 })],
-    grade,
   };
 
   it("scores issue checks, judge counts over stories, and the reference comparison; an error is a miss", () => {
-    const metrics = scoreExtraction([outcome(good), outcome(null, "boom")]);
+    const metrics = scoreExtraction([outcome(good, grade), outcome(null, null, "boom")]);
     const byName = Object.fromEntries(metrics.map((metric) => [metric.name, metric]));
     expect(byName["Valid output"]).toEqual({ name: "Valid output", hits: 1, n: 2 });
     expect(byName["Issues: all story URLs in text"]).toEqual({ name: "Issues: all story URLs in text", hits: 0, n: 2 });
@@ -100,7 +104,6 @@ describe("scoreExtraction", () => {
     expect(byName["Headline rules"]).toEqual({ name: "Headline rules", hits: 1, n: 2 });
     expect(byName["URL right"]).toEqual({ name: "URL right", hits: 1, n: 2 });
     expect(byName["Importance within 1"]).toEqual({ name: "Importance within 1", hits: 1, n: 1 });
-    expect(byName["Graded runs"]).toEqual({ name: "Graded runs", hits: 1, n: 2 });
     expect(byName["Stories per issue"]).toEqual({ name: "Stories per issue", value: 2 });
     expect(byName["Saved per issue"]).toEqual({ name: "Saved per issue", value: 2 });
     expect(byName["Dev DB per issue"]).toEqual({ name: "Dev DB per issue", value: 2 });
@@ -109,7 +112,7 @@ describe("scoreExtraction", () => {
   });
 
   it("leaves out judge metrics when no run was graded, and the reference when there is none", () => {
-    const metrics = scoreExtraction([{ ...outcome({ stories: [story("")], grade: null }), item: { ...ISSUE, referenceCount: null, referenceUrls: [] } }]);
+    const metrics = scoreExtraction([{ ...outcome({ stories: [story("")] }), item: { ...ISSUE, referenceCount: null, referenceUrls: [] } }]);
     const names = metrics.map((metric) => metric.name);
     expect(names).toContain("Valid output");
     expect(names).not.toContain("Recall (judge)");

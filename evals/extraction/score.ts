@@ -1,14 +1,16 @@
 import type { ExtractionGrade, StoryVerdict } from "@/evals/extraction/judge";
 import type { Metric } from "@/evals/lib/results";
-import { countHits, type Outcome } from "@/evals/lib/sweep";
+import { mean } from "@/evals/lib/stats";
+import { countHits, gradedOutcomes, type Outcome } from "@/evals/lib/sweep";
 import { STORY_CATEGORIES, type ExtractedStory, type StoryCategory } from "@/src/pipeline/ingest/extract";
 import { cleanStoryUrl } from "@/src/pipeline/ingest/url";
 
-/** What one extraction run gives: the stories, and the judge's grade (null when the judge failed). */
+/** What one extraction run gives: the stories. The judge's grade is the outcome's `grade`. */
 export interface ExtractionOutput {
   stories: ExtractedStory[];
-  grade: ExtractionGrade | null;
 }
+
+type ExtractionOutcome<I> = Outcome<I, ExtractionOutput, ExtractionGrade>;
 
 /** The fields of an issue scoring needs. */
 export interface ScoredIssue {
@@ -84,17 +86,15 @@ export function linkedStoryUrls(stories: ExtractedStory[], issueUrl: string): st
   return [...new Set(urls)];
 }
 
-const mean = (values: number[]) => (values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0);
-
 /** A count over the stories of every graded run. */
 function storyHits(name: string, pairs: { story: ExtractedStory; verdict: StoryVerdict }[], test: (story: ExtractedStory, verdict: StoryVerdict) => boolean): Metric {
   return { name, hits: pairs.filter(({ story, verdict }) => test(story, verdict)).length, n: pairs.length };
 }
 
-export function scoreExtraction<I extends ScoredIssue>(outcomes: Outcome<I, ExtractionOutput>[]): Metric[] {
-  const ok = outcomes.filter((outcome): outcome is Outcome<I, ExtractionOutput> & { output: ExtractionOutput } => outcome.error === null && outcome.output !== null);
+export function scoreExtraction<I extends ScoredIssue>(outcomes: ExtractionOutcome<I>[]): Metric[] {
+  const ok = outcomes.filter((outcome): outcome is ExtractionOutcome<I> & { output: ExtractionOutput } => outcome.error === null && outcome.output !== null);
   const checks = new Map(ok.map((outcome) => [outcome, checkExtraction(outcome.item.text, outcome.output.stories)]));
-  const check = (outcome: Outcome<I, ExtractionOutput>) => checks.get(outcome as never)!;
+  const check = (outcome: ExtractionOutcome<I>) => checks.get(outcome as never)!;
 
   const metrics: Metric[] = [
     countHits("Valid output", outcomes, () => true),
@@ -125,20 +125,19 @@ export function scoreExtraction<I extends ScoredIssue>(outcomes: Outcome<I, Extr
     );
   }
 
-  const graded = ok.filter((outcome) => outcome.output.grade !== null);
+  const graded = gradedOutcomes(outcomes);
   if (graded.length > 0) {
     const pairs = graded.flatMap((outcome) => {
-      const verdicts = new Map(outcome.output.grade!.stories.map((verdict) => [verdict.index, verdict]));
+      const verdicts = new Map(outcome.grade.stories.map((verdict) => [verdict.index, verdict]));
       return outcome.output.stories.flatMap((story, index) => {
         const verdict = verdicts.get(index + 1);
         return verdict ? [{ story, verdict }] : [];
       });
     });
     const real = pairs.filter(({ verdict }) => verdict.kind === "story");
-    const qualifying = graded.reduce((sum, outcome) => sum + outcome.output.grade!.qualifying_in_text, 0);
-    const missed = graded.reduce((sum, outcome) => sum + Math.min(outcome.output.grade!.missed, outcome.output.grade!.qualifying_in_text), 0);
+    const qualifying = graded.reduce((sum, outcome) => sum + outcome.grade.qualifying_in_text, 0);
+    const missed = graded.reduce((sum, outcome) => sum + Math.min(outcome.grade.missed, outcome.grade.qualifying_in_text), 0);
     metrics.push(
-      countHits("Graded runs", outcomes, (outcome) => outcome.output.grade !== null),
       { name: "Recall (judge)", hits: qualifying - missed, n: qualifying },
       storyHits("Precision (judge)", pairs, (_, verdict) => verdict.kind === "story"),
       storyHits("Faithful stories", pairs, (_, verdict) => verdict.unsupported_facts === 0),
@@ -146,7 +145,7 @@ export function scoreExtraction<I extends ScoredIssue>(outcomes: Outcome<I, Extr
       storyHits("Headline rules", pairs, (_, verdict) => verdict.headline_ok),
       storyHits("URL right", pairs, (_, verdict) => verdict.url_ok),
       storyHits("Importance within 1", real, (story, verdict) => Math.abs(story.importance_score - verdict.expected_importance) <= 1),
-      { name: "Missed per issue", value: mean(graded.map((outcome) => outcome.output.grade!.missed)) }
+      { name: "Missed per issue", value: mean(graded.map((outcome) => outcome.grade.missed)) }
     );
   }
   return metrics;
