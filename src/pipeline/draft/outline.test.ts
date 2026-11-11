@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { hashOutline, normalizeOutline, type ApprovalOutline } from "@/src/pipeline/draft/outline";
+import { hashOutline, normalizeOutline, outlineLeadStoryId, type ApprovalOutline } from "@/src/pipeline/draft/outline";
 
 /** A board commit body like ApprovalBoard sends, with made-up stories. */
 function boardBody() {
@@ -115,5 +115,22 @@ describe("hashOutline", () => {
     expect(hashOutline(normalizeOutline(reordered, "2026-11-09"))).not.toBe(
       hashOutline(normalizeOutline(body, "2026-11-09")),
     );
+  });
+});
+
+describe("outlineLeadStoryId", () => {
+  it("gives the lead story id of a saved outline payload", () => {
+    expect(outlineLeadStoryId(normalizeOutline(boardBody(), "2026-11-09"))).toBe(12);
+    expect(outlineLeadStoryId({ leadStoryId: 502 })).toBe(502);
+  });
+
+  it("gives null for an outline with no lead story", () => {
+    expect(outlineLeadStoryId({ leadStoryId: null })).toBeNull();
+  });
+
+  it("gives undefined when the payload does not say: no payload, no key, or a value that is not a story id", () => {
+    for (const payload of [null, undefined, "text", [], {}, { leadStoryId: "lead" }, { leadStoryId: 0 }, { leadStoryId: 1.5 }, { leadStoryId: {} }]) {
+      expect(outlineLeadStoryId(payload)).toBeUndefined();
+    }
   });
 });

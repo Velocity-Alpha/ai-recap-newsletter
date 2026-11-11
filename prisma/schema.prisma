@@ -420,3 +420,24 @@ model PaywallSite {
   @@map("paywall_sites")
   @@schema("newsletter")
 }
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// One row for each story in each published issue (#118, ADR 0007): what the sent email held, written at publish
+/// from the parsed email (publish-store.ts). section is headlines, research_and_analysis, tools, or quick_hits
+/// (CHECK constraint in the migration). position is the place in the section, from 1. url is the link that was
+/// sent. is_lead is null when the sent draft is not known (the backfill, and emails that name no draft).
+/// No foreign keys, like the other pipeline tables.
+model IssueStory {
+  issueId   BigInt   @map("issue_id")
+  storyId   Int      @map("story_id")
+  section   String
+  position  Int
+  url       String?
+  isLead    Boolean? @map("is_lead")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@id([issueId, storyId])
+  @@index([storyId])
+  @@map("issue_stories")
+  @@schema("newsletter")
+}

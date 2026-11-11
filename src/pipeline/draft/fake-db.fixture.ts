@@ -132,6 +132,7 @@ export function createFakeDb() {
     stories: { rows: [], updates: [] } as FakeTable,
     publishEvents: { rows: [], updates: [] } as FakeTable,
     stagedVersions: { rows: [], updates: [] } as FakeTable,
+    issueStories: { rows: [], updates: [] } as FakeTable,
     settings: { rows: [], updates: [] } as FakeTable,
     freeLinks: { rows: [], updates: [] } as FakeTable,
     paywallSites: { rows: [], updates: [] } as FakeTable,
@@ -186,6 +187,7 @@ export function createFakeDb() {
     approvalOutline: table(state.outlines, { nextId: id, defaults: () => ({ committedAt: now() }) }),
     story: table(state.stories, { nextId: id, defaults: () => ({}) }),
     publishEvent: table(state.publishEvents, { nextId: id, defaults: () => ({ draftId: null, stagedVersionId: null }) }),
+    issueStory: table(state.issueStories, { nextId: id, defaults: () => ({ createdAt: now() }) }),
     pipelineSetting: table(state.settings, { nextId: id, defaults: () => ({}) }),
     paywallSite: table(state.paywallSites, { nextId: id, unique: ["site"], defaults: () => ({ storyIds: [], ignored: false, createdAt: now(), updatedAt: now() }) }),
     storyFreeLink: table(state.freeLinks, { nextId: id, unique: ["storyId", "url"], defaults: () => ({ title: null, originStoryId: null, createdAt: now() }) }),
@@ -201,11 +203,13 @@ export function createFakeDb() {
         stories: state.stories.rows,
         publishEvents: state.publishEvents.rows,
         stagedVersions: state.stagedVersions.rows,
+        issueStories: state.issueStories.rows,
       });
       try {
         return await run(client);
       } catch (error) {
         state.stagedVersions.rows = snapshot.stagedVersions;
+        state.issueStories.rows = snapshot.issueStories;
         state.issues.rows = snapshot.issues;
         state.drafts.rows = snapshot.drafts;
         state.outlines.rows = snapshot.outlines;
@@ -220,7 +224,7 @@ export function createFakeDb() {
     state,
     client,
     reset() {
-      for (const key of ["issues", "drafts", "outlines", "stories", "publishEvents", "stagedVersions", "settings", "freeLinks", "paywallSites"] as const) {
+      for (const key of ["issues", "drafts", "outlines", "stories", "publishEvents", "stagedVersions", "issueStories", "settings", "freeLinks", "paywallSites"] as const) {
         state[key].rows = [];
         state[key].updates = [];
       }
