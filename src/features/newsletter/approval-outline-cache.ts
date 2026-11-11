@@ -1,5 +1,5 @@
-import type { AlsoFrom, RepeatOf } from "@/src/features/newsletter/board-repeats";
-import { CANDIDATE_SECTION_CONFIGS, type SectionKey } from "@/src/features/newsletter/section-config";
+import type { AlsoFrom, RestorableRepeat } from "@/src/features/newsletter/board-repeats";
+import { CANDIDATE_SECTION_CONFIGS } from "@/src/features/newsletter/section-config";
 import type { SimilarStory } from "@/src/pipeline/repeats/repeat-rules";
 
 export const APPROVAL_OUTLINE_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -51,7 +51,7 @@ export type ApprovalOutlineData = {
   >;
   selected_story_ids: number[];
   // Candidates the repeat check removed. Their full stories are in candidate_map, so the owner can restore them.
-  repeats_removed: { story: { id: number; headline: string | null }; repeat_of: RepeatOf; section: SectionKey }[];
+  repeats_removed: RestorableRepeat<{ id: number; headline: string | null }>[];
   // True when the repeat check did not finish for some candidates.
   repeat_check_incomplete?: boolean;
   // The lead the board pre-sets (#58). Missing on boards cached before it.

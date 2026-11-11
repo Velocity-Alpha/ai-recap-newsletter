@@ -68,7 +68,8 @@
              then reads story_matches. A sure repeat of a story published in the window or held for an
              unsent draft goes to "Repeats removed" (the owner can restore it for the session); duplicates
              merge into one story (sources + also_from); similar stories get a label. If the check fails,
-             the board still loads with the stored matches and says "The repeat check did not finish"
+             the board still loads with the stored matches and says "The repeat check did not finish".
+             GET /api/newsletters/outline builds the same board, so it runs the same check
            + proposed lead story (lead-story.ts): importance + sources that covered it + editorial rubric,
              pre-set on the board and moved to the top of Top Stories; the owner can change it
            + AI lead pick, started by the same request (openai-lead-pick.ts, gpt-6-luna): the lead score shortlists 8 stories,
@@ -164,7 +165,7 @@ If the issue is missing after a send: /approval/issues -> "Mark as published"
 <h2 id="data">6. Data (Postgres schema <code>newsletter</code>)</h2>
 <table>
   <tr><th>Table</th><th>Holds</th><th>Written by</th></tr>
-  <tr><td><code>stories</code></td><td>Extracted stories per day and source (snake_case columns, but <code>"createdAt"</code> is camelCase). <code>matched_at</code>: when the repeat check went through the story. <code>excluded_on</code>: the board date of the commit that excluded it (null for older exclusions)</td><td>ingest job</td></tr>
+  <tr><td><code>stories</code></td><td>Extracted stories per day and source (snake_case columns, but <code>"createdAt"</code> is camelCase). <code>matched_at</code>: when the repeat check went through the story. <code>excluded_on</code>: the board date of the commit that excluded it (null for older exclusions)</td><td>ingest job; the commit (exclusions, queue date, edits)</td></tr>
   <tr><td><code>story_sources</code></td><td>Which newsletters covered each story, one row per story and source key. <code>stories.source</code> keeps only the last writer, so the board reads coverage here. If the table is missing, ingestion and the board log and fall back to <code>stories.source</code>.</td><td>ingest job</td></tr>
   <tr><td><code>story_embeddings</code></td><td>One embedding for each story (512 numbers, <code>real[]</code>, length 1), made once by the repeat check</td><td>ingest job; the board for candidates ingestion did not check</td></tr>
   <tr><td><code>story_matches</code></td><td>Story matches: one row for each judged pair (<code>newer_story_id</code>, <code>older_story_id</code>, <code>similarity</code>, and the judge's <code>same</code> and <code>news</code>). <code>stories.matched_at</code> is set when a story went through the check; null means not checked yet</td><td>ingest job; the board for candidates ingestion did not check</td></tr>

@@ -4,7 +4,12 @@ import { CANDIDATE_SECTION_CONFIGS, type SectionKey } from "@/src/features/newsl
 import { storyUrlKey } from "@/src/features/newsletter/story-url";
 import { findUnsentDrafts } from "@/src/features/newsletter/unsent-drafts";
 import { moveLeadToTopStories, proposeLeadStory, storySources } from "@/src/features/newsletter/lead-story";
-import { applyBoardRepeats, type AlsoFrom, type RepeatOf } from "@/src/features/newsletter/board-repeats";
+import {
+  applyBoardRepeats,
+  type AlsoFrom,
+  type BoardRepeats,
+  type RestorableRepeat,
+} from "@/src/features/newsletter/board-repeats";
 import type { SimilarStory } from "@/src/pipeline/repeats/repeat-rules";
 
 export interface StoryRecord {
@@ -84,15 +89,19 @@ export interface ApprovalOutlineData {
    * Candidates the repeat check removed, with the story each repeats and the section a restored copy goes to.
    * They are in `candidate_map` too.
    */
-  repeats_removed: { story: ProcessedStory; repeat_of: RepeatOf; section: SectionKey }[];
+  repeats_removed: RestorableRepeat<ProcessedStory>[];
   /** True when the repeat check did not finish for some candidates. */
   repeat_check_incomplete?: boolean;
 }
 
 /** What the repeat check took off the board. */
-export interface BoardRepeatResult {
-  removed: { story: ProcessedStory; repeat_of: RepeatOf }[];
-  incomplete: boolean;
+type BoardRepeatResult = Omit<BoardRepeats<ProcessedStory>, "heads">;
+
+/** The parts of a board that do not come from the ranked stories. */
+export interface OutlineExtras {
+  unsentDrafts?: UnsentDraftNotice[];
+  candidateMarker?: number | null;
+  repeats?: BoardRepeatResult;
 }
 
 export interface UnsentDraftNotice {
@@ -696,9 +705,7 @@ function createSectionBlueprints(
 export function buildApprovalOutline(
   rankedStories: ProcessedStory[],
   referencedStories: StoryRecord[],
-  unsentDrafts: UnsentDraftNotice[] = [],
-  candidateMarker: number | null = null,
-  repeats: BoardRepeatResult = { removed: [], incomplete: false }
+  { unsentDrafts = [], candidateMarker = null, repeats = { removed: [], incomplete: false } }: OutlineExtras = {}
 ): ApprovalOutlineData {
   const grouped = groupStoriesByCategory(rankedStories);
 
@@ -906,7 +913,7 @@ async function loadRankedCandidates(
     ranked,
     publishedUrlKeys
   );
-  const { heads: rankedCandidates, repeatsRemoved, incomplete } = await applyBoardRepeats({
+  const { heads: rankedCandidates, ...repeats } = await applyBoardRepeats({
     date: toDateOnlyIso(date),
     candidates: urlKept,
     held: heldStories,
@@ -916,7 +923,7 @@ async function loadRankedCandidates(
     rankedCount: rankedCandidates.length,
     sameUrlCount,
     publishedUrlCount,
-    repeatCount: repeatsRemoved.length,
+    repeatCount: repeats.removed.length,
   });
 
   // Taken before holds and duplicate checks, so stories the board does not show never look new.
@@ -927,7 +934,7 @@ async function loadRankedCandidates(
     rankedCandidates,
     unsentDrafts,
     candidateMarker,
-    repeats: { removed: repeatsRemoved, incomplete },
+    repeats,
   };
 }
 
@@ -947,7 +954,7 @@ export async function createOutlineCandidateStories(
     await loadRankedCandidates(date, options);
 
   return {
-    outline: buildApprovalOutline(rankedCandidates, referencedStories, unsentDrafts, candidateMarker, repeats),
+    outline: buildApprovalOutline(rankedCandidates, referencedStories, { unsentDrafts, candidateMarker, repeats }),
     referencedStories,
     rankedCandidates,
   };

@@ -57,7 +57,8 @@ default) or of an unsent draft.
 _Avoid_: dupe, already published
 
 **Duplicate**:
-A candidate that reports the same news as another candidate on the same board.
+A candidate that reports the same news as another candidate on the same board. The board shows one story for the
+group, the **head**: the highest-ranked one. The others go in its `also_from` list.
 _Avoid_: repeat (that is against earlier issues)
 
 **Similar story**:

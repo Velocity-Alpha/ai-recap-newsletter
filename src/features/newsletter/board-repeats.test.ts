@@ -54,7 +54,7 @@ describe("applyBoardRepeats", () => {
 
     expect(check).toHaveBeenCalledWith([1, 2]);
     expect(result.heads.map((s) => s.id)).toEqual([2]);
-    expect(result.repeatsRemoved).toEqual([
+    expect(result.removed).toEqual([
       { story: story(1), repeat_of: { id: 100, headline: "Published 100", date: "2026-11-06", kind: "published" } },
     ]);
     expect(result.incomplete).toBe(false);
@@ -65,7 +65,7 @@ describe("applyBoardRepeats", () => {
     db.stories = [published(100, "2026-10-26"), published(101, DATE)];
     const result = await applyBoardRepeats({ date: DATE, candidates: [story(1), story(2)], held: [] }, { check: noCheck });
     expect(result.heads.map((s) => s.id)).toEqual([1, 2]);
-    expect(result.repeatsRemoved).toEqual([]);
+    expect(result.removed).toEqual([]);
   });
 
   it("removes a sure repeat of a held story, with the draft's date", async () => {
@@ -75,7 +75,7 @@ describe("applyBoardRepeats", () => {
       { date: DATE, candidates: [story(1)], held: [{ id: 50, headline: "In the draft", held_for_date: "2026-11-09" }] },
       { check: noCheck },
     );
-    expect(result.repeatsRemoved[0].repeat_of).toEqual({ id: 50, headline: "In the draft", date: "2026-11-09", kind: "held" });
+    expect(result.removed[0].repeat_of).toEqual({ id: 50, headline: "In the draft", date: "2026-11-09", kind: "held" });
   });
 
   it("merges a duplicate into the higher-ranked story, with its sources and an also_from entry", async () => {
@@ -122,7 +122,7 @@ describe("applyBoardRepeats", () => {
     for (const check of [throwing, failing]) {
       const result = await applyBoardRepeats({ date: DATE, candidates: [story(1)], held: [] }, { check });
       expect(result.incomplete).toBe(true);
-      expect(result.repeatsRemoved).toHaveLength(1);
+      expect(result.removed).toHaveLength(1);
     }
   });
 
@@ -130,7 +130,7 @@ describe("applyBoardRepeats", () => {
     const check = vi.fn(noCheck);
     await expect(applyBoardRepeats({ date: DATE, candidates: [], held: [] }, { check })).resolves.toEqual({
       heads: [],
-      repeatsRemoved: [],
+      removed: [],
       incomplete: false,
     });
     expect(check).not.toHaveBeenCalled();

@@ -80,7 +80,7 @@ const REPEAT_OF = { id: 900, headline: "Published earlier", date: "2026-06-05", 
 function removeByRepeatCheck(ids: number[], incomplete = false) {
   applyBoardRepeatsMock.mockImplementationOnce(async ({ candidates }: { candidates: { id: number }[] }) => ({
     heads: candidates.filter((story) => !ids.includes(story.id)),
-    repeatsRemoved: candidates.filter((story) => ids.includes(story.id)).map((story) => ({ story, repeat_of: REPEAT_OF })),
+    removed: candidates.filter((story) => ids.includes(story.id)).map((story) => ({ story, repeat_of: REPEAT_OF })),
     incomplete,
   }));
 }
@@ -110,7 +110,7 @@ describe("newsletter curation", () => {
     applyBoardRepeatsMock.mockReset();
     applyBoardRepeatsMock.mockImplementation(async ({ candidates }: { candidates: unknown[] }) => ({
       heads: candidates,
-      repeatsRemoved: [],
+      removed: [],
       incomplete: false,
     }));
   });
@@ -480,7 +480,7 @@ describe("newsletter curation", () => {
               ? { ...story, sources: ["source", "tldr"], also_from: [{ id: 2, source: "tldr", headline: "Item 2", url: "u", paywall_detected: "no" }] }
               : story
           ),
-        repeatsRemoved: [],
+        removed: [],
         incomplete: false,
       }));
 

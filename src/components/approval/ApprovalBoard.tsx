@@ -4,7 +4,7 @@ import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { hasBoardEdits } from "@/components/approval/board-edits";
 import { repeatOfText, restoreRepeat, similarLabel, similarTooltip } from "@/components/approval/repeat-labels";
-import type { AlsoFrom, RepeatOf } from "@/src/features/newsletter/board-repeats";
+import type { AlsoFrom, RestorableRepeat } from "@/src/features/newsletter/board-repeats";
 import type { SimilarStory } from "@/src/pipeline/repeats/repeat-rules";
 import { storySources } from "@/src/features/newsletter/lead-story";
 import {
@@ -107,7 +107,7 @@ type ApprovalBoardProps = {
   /** The AI lead pick's one-line reason for the proposed lead. Null while the board shows the scored lead. */
   proposedLeadReason?: string | null;
   /** Candidates the repeat check removed. The owner can restore each one for this session. */
-  repeatsRemoved?: { story: { id: number; headline: string | null }; repeat_of: RepeatOf; section: string }[];
+  repeatsRemoved?: RestorableRepeat<{ id: number; headline: string | null }>[];
   /** True when the repeat check did not finish for some candidates. */
   repeatCheckIncomplete?: boolean;
   /** Builds the board again, so the repeat check runs again. */
@@ -1022,7 +1022,7 @@ export default function ApprovalBoard({
                                       ].join("\n")}
                                       className="shrink-0 rounded-full border border-[rgba(107,155,184,0.24)] bg-[rgba(232,242,248,0.8)] px-1.5 text-[10px] font-medium text-[var(--watercolor-ink)]"
                                     >
-                                      {sourceCount} sources
+                                      {sourceCount > 1 ? `${sourceCount} sources` : `${alsoFrom.length + 1} stories`}
                                     </span>
                                   ) : null}
                                   {similar.length > 0 ? (

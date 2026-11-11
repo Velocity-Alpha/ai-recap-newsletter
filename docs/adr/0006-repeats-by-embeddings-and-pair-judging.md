@@ -38,5 +38,8 @@ The thresholds come from the measured test set. Do not change them without runni
 
 - About 40 new stories a day: one embedding request and about 40 Decisions requests, under one cent a day.
 - A failure of the check never fails ingestion. A story with `matched_at` null is tried again.
+- The board runs the same check, before it reads the matches, for each candidate with `matched_at` null (a story
+  that a failed run left, or one that arrived after the last run). That is a few pairs, not one large call. If it
+  fails, the board still loads with the stored matches and says that the check did not finish.
 - The `story_matches` rows are raw material for a stable story key later (#118).
 - The installed `openai` package (6.x) has no Decisions method, so the endpoint is called with `fetch`.

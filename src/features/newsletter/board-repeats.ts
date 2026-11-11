@@ -1,4 +1,6 @@
 import { storySources } from "@/src/features/newsletter/lead-story";
+import type { SectionKey } from "@/src/features/newsletter/section-config";
+import type { PaywallStatus } from "@/src/pipeline/ingest/paywall";
 import { shiftDay } from "@/src/pipeline/repeats/match-stories";
 import { createRepeatCheck, type RepeatCheck } from "@/src/pipeline/repeats/repeat-check";
 import {
@@ -24,7 +26,7 @@ export interface AlsoFrom {
   source: string | null;
   headline: string | null;
   url: string | null;
-  paywall_detected?: "yes" | "no" | "unknown" | "error";
+  paywall_detected?: PaywallStatus;
 }
 
 export interface RepeatOf {
@@ -40,7 +42,7 @@ export interface BoardStory {
   sources?: string[];
   headline: string | null;
   url: string | null;
-  paywall_detected?: "yes" | "no" | "unknown" | "error";
+  paywall_detected?: PaywallStatus;
   also_from?: AlsoFrom[];
   similar_to?: SimilarStory[];
 }
@@ -52,15 +54,30 @@ export interface HeldStory {
   held_for_date?: string | null;
 }
 
+/** A candidate the repeat check took off the board, and the story it repeats. */
+export interface RemovedRepeat<S> {
+  story: S;
+  repeat_of: RepeatOf;
+}
+
+/** A removed repeat as the board lists it: with the section a restored copy goes to. */
+export interface RestorableRepeat<S> extends RemovedRepeat<S> {
+  section: SectionKey;
+}
+
 export interface BoardRepeats<T> {
-  /** The candidates that stay, in rank order, with merged `sources`, `also_from` and `similar_to`. */
+  /**
+   * The candidates that stay, in rank order. A head is the story the board shows for a group of duplicates: it
+   * carries the group's `sources` and `also_from`, and its `similar_to` labels.
+   */
   heads: T[];
-  repeatsRemoved: { story: T; repeat_of: RepeatOf }[];
+  removed: RemovedRepeat<T>[];
   /** True when the check failed for some candidates: they may still hold repeats. */
   incomplete: boolean;
 }
 
-const fromDay = (date: Date | null) => (date ? date.toISOString().slice(0, 10) : null);
+/** The day ("2026-11-06") of a date-only column. */
+const dayOf = (date: Date | null) => (date ? date.toISOString().slice(0, 10) : null);
 
 async function checkUnchecked(ids: number[], check: RepeatCheck): Promise<boolean> {
   try {
@@ -81,7 +98,8 @@ async function loadMatches(ids: number[]): Promise<StoryMatchRow[]> {
   });
 }
 
-function otherIds(matches: StoryMatchRow[], known: Set<number>): number[] {
+/** The stories in the matches that are not in `known`. */
+function storiesReached(matches: StoryMatchRow[], known: Set<number>): number[] {
   const ids = new Set<number>();
   for (const match of matches) {
     for (const id of [match.newerStoryId, match.olderStoryId]) if (!known.has(id)) ids.add(id);
@@ -94,18 +112,17 @@ export async function applyBoardRepeats<T extends BoardStory>(
   deps: { check?: RepeatCheck } = {},
 ): Promise<BoardRepeats<T>> {
   const { date, candidates, held } = input;
-  if (candidates.length === 0) return { heads: [], repeatsRemoved: [], incomplete: false };
+  if (candidates.length === 0) return { heads: [], removed: [], incomplete: false };
   const check = deps.check ?? createRepeatCheck({ apiKey: process.env.OPENAI_API_KEY ?? "" });
   const candidateIds = new Set(candidates.map((story) => story.id));
 
   const complete = await checkUnchecked([...candidateIds], check);
 
   // Every pair that touches a candidate, and every pair of the stories those pairs reach (for chain labels).
-  const direct = await loadMatches([...candidateIds]);
-  const reached = otherIds(direct, candidateIds);
-  const second = await loadMatches(reached);
+  const candidateMatches = await loadMatches([...candidateIds]);
+  const nextHopMatches = await loadMatches(storiesReached(candidateMatches, candidateIds));
   const seen = new Set<string>();
-  const matches = [...direct, ...second].filter((match) => {
+  const matches = [...candidateMatches, ...nextHopMatches].filter((match) => {
     const key = `${match.newerStoryId}-${match.olderStoryId}`;
     if (seen.has(key)) return false;
     seen.add(key);
@@ -113,10 +130,10 @@ export async function applyBoardRepeats<T extends BoardStory>(
   });
 
   const windowStart = shiftDay(date, -(await readRepeatWindowDays()));
-  const others = otherIds(matches, candidateIds);
-  const rows = others.length
+  const otherStoryIds = storiesReached(matches, candidateIds);
+  const rows = otherStoryIds.length
     ? await prisma.story.findMany({
-        where: { id: { in: others } },
+        where: { id: { in: otherStoryIds } },
         select: { id: true, headline: true, usedInPublicationDate: true, excludeFromCandidates: true, excludedOn: true },
       })
     : [];
@@ -124,11 +141,11 @@ export async function applyBoardRepeats<T extends BoardStory>(
   const references = new Map<number, RepeatReference>();
   const excluded = new Map<number, ExcludedStory>();
   for (const row of rows) {
-    const published = fromDay(row.usedInPublicationDate);
+    const published = dayOf(row.usedInPublicationDate);
     if (published && published >= windowStart && published < date) {
       references.set(row.id, { headline: row.headline ?? "", date: published, kind: "published" });
     } else if (!published && row.excludeFromCandidates) {
-      excluded.set(row.id, { headline: row.headline ?? "", excludedOn: fromDay(row.excludedOn) });
+      excluded.set(row.id, { headline: row.headline ?? "", excludedOn: dayOf(row.excludedOn) });
     }
   }
   for (const story of held) {
@@ -137,29 +154,7 @@ export async function applyBoardRepeats<T extends BoardStory>(
 
   const result = applyRepeatRules({ candidates, matches, references, excluded });
 
-  const membersByHead = new Map<number, T[]>();
-  for (const { story, into } of result.merged) membersByHead.set(into, [...(membersByHead.get(into) ?? []), story]);
-  const heads = result.heads.map((head) => {
-    const members = membersByHead.get(head.id) ?? [];
-    const similar = result.similarTo.get(head.id);
-    if (members.length === 0 && !similar) return head;
-    return {
-      ...head,
-      ...(members.length > 0
-        ? {
-            sources: storySources({ source: head.source, sources: [...storySources(head), ...members.flatMap((member) => storySources(member))] }),
-            also_from: members.map((member) => ({
-              id: member.id,
-              source: member.source,
-              headline: member.headline,
-              url: member.url,
-              paywall_detected: member.paywall_detected,
-            })),
-          }
-        : {}),
-      ...(similar ? { similar_to: similar } : {}),
-    };
-  });
+  const heads = withGroups(result.heads, result.merged, result.similarTo);
 
   logServerInfo("approval.repeats.applied", {
     candidateCount: candidates.length,
@@ -171,7 +166,38 @@ export async function applyBoardRepeats<T extends BoardStory>(
 
   return {
     heads,
-    repeatsRemoved: result.removed.map(({ story, repeatOf }) => ({ story, repeat_of: repeatOf })),
+    removed: result.removed.map(({ story, repeatOf }) => ({ story, repeat_of: repeatOf })),
     incomplete: !complete,
   };
+}
+
+/** Gives each head its duplicates' sources, an `also_from` entry for each duplicate, and its labels. */
+function withGroups<T extends BoardStory>(
+  heads: T[],
+  merged: { story: T; into: number }[],
+  similarTo: Map<number, SimilarStory[]>,
+): T[] {
+  const duplicatesByHead = new Map<number, T[]>();
+  for (const { story, into } of merged) duplicatesByHead.set(into, [...(duplicatesByHead.get(into) ?? []), story]);
+  return heads.map((head) => {
+    const duplicates = duplicatesByHead.get(head.id) ?? [];
+    const similar = similarTo.get(head.id);
+    if (duplicates.length === 0 && !similar) return head;
+    return {
+      ...head,
+      ...(duplicates.length > 0
+        ? {
+            sources: storySources({ source: null, sources: [head, ...duplicates].flatMap((story) => storySources(story)) }),
+            also_from: duplicates.map((duplicate) => ({
+              id: duplicate.id,
+              source: duplicate.source,
+              headline: duplicate.headline,
+              url: duplicate.url,
+              paywall_detected: duplicate.paywall_detected,
+            })),
+          }
+        : {}),
+      ...(similar ? { similar_to: similar } : {}),
+    };
+  });
 }
