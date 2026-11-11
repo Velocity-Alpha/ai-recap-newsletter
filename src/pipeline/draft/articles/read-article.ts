@@ -189,6 +189,7 @@ export async function readArticle(url: string, options: ReadArticleOptions): Pro
   for (const step of stepsFor(url, timeouts)) {
     if (options.signal?.aborted) break;
 
+    let method = step.method;
     const controller = new AbortController();
     const clock = methodClock(now, { network: step.timeoutMs, text: timeouts.text }, (reason) => controller.abort(reason));
     // With no limiter there is no slot to wait for, so the clock starts now.
@@ -208,6 +209,9 @@ export async function readArticle(url: string, options: ReadArticleOptions): Pro
       },
       limiter: options.limiter,
       onStart: () => clock.startNetwork(),
+      readingAs: (other) => {
+        method = other;
+      },
       jinaApiKey: options.jinaApiKey,
       githubToken: options.githubToken,
     };
@@ -215,13 +219,13 @@ export async function readArticle(url: string, options: ReadArticleOptions): Pro
       // The race stops a method that ignores its abort signal.
       const result = await Promise.race([step.run(context), rejectOnAbort(controller.signal)]);
       const verdict = checkArticleText(result.text, result.httpStatus);
-      const attempt = { method: step.method, ...clock.timings(), chars: result.text.length, httpStatus: result.httpStatus };
+      const attempt = { method, ...clock.timings(), chars: result.text.length, httpStatus: result.httpStatus };
       if (verdict.ok) {
         attempts.push({ ...attempt, outcome: "read" });
         return {
           url,
           status: "read",
-          method: step.method,
+          method,
           text: result.text.slice(0, MAX_TEXT_CHARS),
           finalUrl: result.finalUrl,
           chars: result.text.length,
@@ -233,7 +237,7 @@ export async function readArticle(url: string, options: ReadArticleOptions): Pro
       attempts.push({ ...attempt, outcome: verdict.status, error: verdict.reason });
     } catch (error) {
       const outcome = error instanceof MethodError ? error.status : "failed";
-      attempts.push({ method: step.method, ...clock.timings(), chars: 0, outcome, error: errorMessage(error) });
+      attempts.push({ method, ...clock.timings(), chars: 0, outcome, error: errorMessage(error) });
       // A redirect or DNS answer pointing at a private address: no other method should go there either.
       if (error instanceof RefusedUrlError) break;
     } finally {

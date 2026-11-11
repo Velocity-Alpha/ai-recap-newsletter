@@ -73,16 +73,16 @@ describe("readWithReadability", () => {
     expect(result.text).toBe("Plain pretend notes.");
   });
 
-  it("fails on a PDF or other non-HTML page from its content type, without downloading it, so the next method can try", async () => {
+  it("fails on an image or other non-page type from its content type, without downloading it, so the next method can try", async () => {
     const pulls = vi.fn();
     const cancel = vi.fn();
-    const pdf = new ReadableStream<Uint8Array>({ pull: pulls, cancel }, { highWaterMark: 0 });
-    const fetch = vi.fn<FetchLike>(async () => new Response(pdf, { headers: { "content-type": "application/pdf" } }));
+    const image = new ReadableStream<Uint8Array>({ pull: pulls, cancel }, { highWaterMark: 0 });
+    const fetch = vi.fn<FetchLike>(async () => new Response(image, { headers: { "content-type": "image/png" } }));
 
-    const error = await readWithReadability("https://news.example.com/paper.pdf", context(fetch)).catch((reason: unknown) => reason);
+    const error = await readWithReadability("https://news.example.com/chart.png", context(fetch)).catch((reason: unknown) => reason);
 
     expect(error).toBeInstanceOf(FetchFailure);
-    expect(error).toMatchObject({ kind: "wrong_type", message: "Not an HTML page (application/pdf)." });
+    expect(error).toMatchObject({ kind: "wrong_type", message: "Not an HTML page (image/png)." });
     expect(pulls).not.toHaveBeenCalled();
     expect(cancel).toHaveBeenCalled();
     // A wrong type is not retried.

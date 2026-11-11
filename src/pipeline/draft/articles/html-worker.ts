@@ -28,10 +28,10 @@ type WorkerReply = { text: string } | { error: string };
 // Inside a worker started below: do the one job and send back the text.
 if (!isMainThread && parentPort && (workerData as Record<string, unknown> | null)?.[WORKER_KEY] === true) {
   const port = parentPort;
-  port.once("message", (job: ParseJob) => {
+  port.once("message", async (job: ParseJob) => {
     let reply: WorkerReply;
     try {
-      reply = { text: parseJobText(job) };
+      reply = { text: await parseJobText(job) };
     } catch (error) {
       reply = { error: error instanceof Error ? error.message : String(error) };
     }
@@ -85,7 +85,8 @@ function runInWorker(entry: URL, job: ParseJob, signal: AbortSignal, heapMb: num
       ),
     );
     worker.once("exit", (code) => finish(() => reject(new HtmlParseError(`The text worker stopped early (exit code ${code}).`))));
-    worker.postMessage(job);
+    // A PDF's bytes move to the worker instead of being copied (up to 20 MB).
+    worker.postMessage(job, job.kind === "pdf" ? [job.bytes.buffer as ArrayBuffer] : []);
   });
 }
 

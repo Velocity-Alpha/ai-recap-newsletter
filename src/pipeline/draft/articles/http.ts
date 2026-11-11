@@ -39,7 +39,16 @@ export interface FetchedText {
   /** After redirects. */
   url: string;
   contentType: string;
+  /** The decoded text. "" when the body was kept as bytes. */
   body: string;
+  /** The raw body, for a successful answer of a `binary` type (a PDF). */
+  bytes?: Uint8Array;
+}
+
+/** Media types whose body is kept as bytes, not decoded, with their own size cap. */
+export interface BinaryBodies {
+  types: ReadonlySet<string>;
+  maxBytes: number;
 }
 
 export interface FetchTextOptions {
@@ -53,6 +62,8 @@ export interface FetchTextOptions {
   onStart?: () => void;
   /** Checks a successful answer's media type before its body is read: a reason refuses it, null reads it. */
   rejectType?: (mediaType: string) => string | null;
+  /** A successful answer of one of these types is kept as bytes, under their cap instead of `maxBytes`. */
+  binary?: BinaryBodies;
 }
 
 const MAX_REDIRECTS = 5;
@@ -122,15 +133,14 @@ function decoderFor(contentType: string): TextDecoder {
   }
 }
 
-async function readBody(response: FetchResponse, maxBytes: number): Promise<string> {
-  const contentType = response.headers.get("content-type") ?? "";
+async function readBody(response: FetchResponse, maxBytes: number): Promise<Uint8Array> {
   const declared = Number(response.headers.get("content-length"));
   const tooLarge = () => new FetchFailure("too_large", `The response is over the ${formatBytes(maxBytes)} cap.`);
   if (Number.isFinite(declared) && declared > maxBytes) {
     await response.body?.getReader().cancel().catch(() => undefined);
     throw tooLarge();
   }
-  if (!response.body) return "";
+  if (!response.body) return new Uint8Array(0);
 
   const reader = response.body.getReader();
   const chunks: Uint8Array[] = [];
@@ -152,7 +162,7 @@ async function readBody(response: FetchResponse, maxBytes: number): Promise<stri
     bytes.set(chunk, offset);
     offset += chunk.byteLength;
   }
-  return decoderFor(contentType).decode(bytes);
+  return bytes;
 }
 
 function networkFailure(error: unknown): FetchFailure {
@@ -169,7 +179,9 @@ function finalError(error: unknown): unknown {
   return cause instanceof RefusedUrlError ? cause : null;
 }
 
-async function requestOnce(url: URL, headers: Record<string, string>, options: FetchTextOptions): Promise<{ response: FetchResponse; body: string | null }> {
+type Body = { text: string } | { bytes: Uint8Array };
+
+async function requestOnce(url: URL, headers: Record<string, string>, options: FetchTextOptions): Promise<{ response: FetchResponse; body: Body | null }> {
   const send = async () => {
     options.onStart?.();
     const response = await options.fetch(url.href, { method: "GET", headers, redirect: "manual", signal: options.signal });
@@ -177,12 +189,17 @@ async function requestOnce(url: URL, headers: Record<string, string>, options: F
       await response.body?.getReader().cancel().catch(() => undefined);
       return { response, body: null };
     }
-    const refused = response.status < 400 ? options.rejectType?.(mediaType(response.headers.get("content-type") ?? "")) : null;
+    const contentType = response.headers.get("content-type") ?? "";
+    const type = mediaType(contentType);
+    const refused = response.status < 400 ? options.rejectType?.(type) : null;
     if (refused) {
       await response.body?.getReader().cancel().catch(() => undefined);
       throw new FetchFailure("wrong_type", refused);
     }
-    return { response, body: await readBody(response, options.maxBytes) };
+    if (response.status < 400 && options.binary?.types.has(type)) {
+      return { response, body: { bytes: await readBody(response, options.binary.maxBytes) } };
+    }
+    return { response, body: { text: decoderFor(contentType).decode(await readBody(response, options.maxBytes)) } };
   };
   const run = () => (options.limiter ? options.limiter.run(url.host, options.signal, send) : send());
 
@@ -203,8 +220,9 @@ async function requestOnce(url: URL, headers: Record<string, string>, options: F
 }
 
 /**
- * GETs a URL and returns its body as text. Every hop is checked with `assertPublicUrl`, at most 5 redirects are
- * followed, the body stops at `maxBytes`, and an Authorization header is dropped when a redirect leaves the origin.
+ * GETs a URL and returns its body as text, or as bytes for a `binary` type. Every hop is checked with
+ * `assertPublicUrl`, at most 5 redirects are followed, the body stops at its cap, and an Authorization header is
+ * dropped when a redirect leaves the origin.
  */
 export async function fetchText(link: string, options: FetchTextOptions): Promise<FetchedText> {
   let url = assertPublicUrl(link);
@@ -220,7 +238,10 @@ export async function fetchText(link: string, options: FetchTextOptions): Promis
       url = next;
       continue;
     }
-    return { status: response.status, url: url.href, contentType: response.headers.get("content-type") ?? "", body };
+    const contentType = response.headers.get("content-type") ?? "";
+    return "bytes" in body
+      ? { status: response.status, url: url.href, contentType, body: "", bytes: body.bytes }
+      : { status: response.status, url: url.href, contentType, body: body.text };
   }
   throw new FetchFailure("redirects", `Too many redirects (over ${MAX_REDIRECTS}).`);
 }

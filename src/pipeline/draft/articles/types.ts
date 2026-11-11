@@ -4,8 +4,11 @@ import type { NotReadStatus } from "@/src/pipeline/draft/articles/quality";
 
 export type { ArticleStatus, NotReadStatus } from "@/src/pipeline/draft/articles/quality";
 
-/** How an article was read: a site adapter (arxiv, github, huggingface), the page itself (fetch), or Jina Reader. */
-export type ArticleMethod = "arxiv" | "github" | "huggingface" | "fetch" | "jina";
+/**
+ * How an article was read: a site adapter (arxiv, github, huggingface), the page itself (fetch), the page's link
+ * answered with a PDF (pdf), or Jina Reader.
+ */
+export type ArticleMethod = "arxiv" | "github" | "huggingface" | "fetch" | "pdf" | "jina";
 
 /** Names the site, so publishers can see who reads them. No personal contact details. */
 export const READER_USER_AGENT = "AIRecapReader/1.0 (+https://airecap.news)";
@@ -14,6 +17,8 @@ export const READER_USER_AGENT = "AIRecapReader/1.0 (+https://airecap.news)";
 export const PAGE_MAX_BYTES = 5_000_000;
 /** arXiv HTML papers with a lot of math run to a few MB. */
 export const ADAPTER_MAX_BYTES = 10_000_000;
+/** #170: PDFs (papers, court filings, government notices) run larger than HTML pages. */
+export const PDF_MAX_BYTES = 20_000_000;
 
 export interface MethodContext {
   fetch: FetchLike;
@@ -24,6 +29,8 @@ export interface MethodContext {
   limiter?: HostLimiter;
   /** Called when a request gets its host slot. The method's timeout starts at the first call. */
   onStart?: () => void;
+  /** The method found it reads the link another way (the page method got a PDF): its attempt is stored under that method. */
+  readingAs?: (method: ArticleMethod) => void;
   jinaApiKey?: string;
   githubToken?: string;
 }

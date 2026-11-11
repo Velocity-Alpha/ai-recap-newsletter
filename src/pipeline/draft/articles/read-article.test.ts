@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { fakeWeb, hang, hostileHtml, htmlPage, jinaAnswer, jinaError, jinaUrl, prose, rawHtml } from "@/src/pipeline/draft/articles/fake-web.fixture";
+import { fakeWeb, hang, hostileHtml, htmlPage, jinaAnswer, jinaError, jinaUrl, pdfDocument, pdfResponse, prose, rawHtml } from "@/src/pipeline/draft/articles/fake-web.fixture";
 import { parseInThisThread, type HtmlParser } from "@/src/pipeline/draft/articles/html-worker";
 import { HostLimiter } from "@/src/pipeline/draft/articles/http";
 import { DEFAULT_TIMEOUTS, MAX_TEXT_CHARS, readArticle } from "@/src/pipeline/draft/articles/read-article";
@@ -208,6 +208,75 @@ describe("readArticle", () => {
     await busy;
 
     expect(read).toMatchObject({ status: "read", method: "fetch" });
+  });
+
+  it("reads a page served as Markdown", async () => {
+    const web = fakeWeb({
+      [STORY]: () =>
+        new Response(`# Pretend story\n\n**${prose("markdown")}**\n`, { headers: { "content-type": "text/markdown; charset=utf-8" } }),
+    });
+
+    const read = await readArticle(STORY, { fetch: web.fetch });
+
+    expect(read).toMatchObject({ status: "read", method: "fetch" });
+    expect(read.text).toContain("Pretend story");
+    expect(read.text).toContain("The markdown pretend lab shared");
+    expect(read.text).not.toContain("**");
+  });
+
+  it("reads a PDF link as a PDF, from the one download, and stores the method as pdf", async () => {
+    const web = fakeWeb({ [STORY]: pdfResponse(pdfDocument(prose("filing"))) });
+
+    const read = await readArticle(STORY, { fetch: web.fetch });
+
+    expect(web.calls).toEqual([STORY]);
+    expect(read).toMatchObject({ status: "read", method: "pdf", finalUrl: STORY, error: null });
+    expect(read.text).toContain("The filing pretend lab shared made-up results");
+    expect(read.attempts).toEqual([expect.objectContaining({ method: "pdf", outcome: "read", httpStatus: 200 })]);
+  });
+
+  it("reads a PDF over the 5 MB page cap, but refuses one over the 20 MB PDF cap as too large and lets Jina try", async () => {
+    const pdf = pdfDocument(prose("filing"));
+    const big = "https://news.example.com/big.pdf";
+    const huge = "https://news.example.com/huge.pdf";
+    const web = fakeWeb({
+      // The cap is checked against the declared length first, so these stand in for 6 MB and 21 MB files.
+      [big]: pdfResponse(pdf, { "content-length": "6000000" }),
+      [huge]: pdfResponse(pdf, { "content-length": "21000000" }),
+      [jinaUrl(huge)]: jinaError(422, "No content."),
+    });
+
+    await expect(readArticle(big, { fetch: web.fetch })).resolves.toMatchObject({ status: "read", method: "pdf" });
+    const read = await readArticle(huge, { fetch: web.fetch });
+
+    expect(read).toMatchObject({ status: "failed", method: null });
+    expect(read.attempts.map(({ method, outcome, error }) => ({ method, outcome, error }))).toEqual([
+      { method: "fetch", outcome: "failed", error: "The response is over the 20 MB cap." },
+      { method: "jina", outcome: "failed", error: "Jina returned HTTP 422: No content." },
+    ]);
+  });
+
+  it("fails a broken PDF as a pdf attempt and goes on to Jina", async () => {
+    const web = fakeWeb({
+      [STORY]: pdfResponse(new TextEncoder().encode("%PDF-1.4\nThis is not really a PDF.")),
+      [jinaUrl(STORY)]: jinaAnswer(STORY, prose("rescued")),
+    });
+
+    const read = await readArticle(STORY, { fetch: web.fetch });
+
+    expect(read).toMatchObject({ status: "read", method: "jina" });
+    expect(read.attempts.map(({ method, outcome, error }) => ({ method, outcome, error }))).toEqual([
+      { method: "pdf", outcome: "failed", error: expect.stringMatching(/^Not a readable PDF: /) },
+      { method: "jina", outcome: "read", error: undefined },
+    ]);
+  });
+
+  it("refuses an HTML page over the 5 MB cap", async () => {
+    const web = fakeWeb({ [STORY]: () => new Response("<html></html>", { headers: { "content-type": "text/html", "content-length": "6000000" } }) });
+
+    const read = await readArticle(STORY, { fetch: web.fetch });
+
+    expect(read.attempts[0]).toMatchObject({ method: "fetch", outcome: "failed", error: "The response is over the 5 MB cap." });
   });
 
   it("stops, without passing the link to Jina, when a redirect points at a private address", async () => {
