@@ -13,7 +13,8 @@ export default defineConfig({
     environment: "node",
     globals: true,
     include: ["evals/**/*.eval.ts"],
-    // One eval file at a time: each one is a sweep with its own concurrency limit.
+    // One eval file at a time: each sweep has its own caps on runs and judge calls (EVAL_CONCURRENCY,
+    // EVAL_JUDGE_CONCURRENCY), and every call shares the process-wide rate limiters (evals/lib/rate-limit.ts).
     fileParallelism: false,
     testTimeout: 4 * 60 * 60 * 1000,
     hookTimeout: 10 * 60 * 1000,

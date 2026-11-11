@@ -1,0 +1,5 @@
+{
+  "about": "Scene evals: for each published issue (keyed by date), the lead story (1-based Top Story number the subject line is about) and 1-4 concrete identifiers of its news a scene should show, with optional misreads. Our own text only. evals/scenes/golden-todo.md.",
+  "producer": "claude-opus-5-5",
+  "entries": {}
+}

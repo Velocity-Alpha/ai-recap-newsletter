@@ -1,12 +1,13 @@
 // Builds the writer eval's test set (evals/writer/dataset.ts) from the Neon dev branch, read-only, the way
 // drafting builds the writer's input: the issue's approved sections (approved-stories.ts toApprovedSections), the
 // lead first, notes, and article text for feature stories (the saved copy in story_articles, else the repo's
-// article reader, else none). Writes evals/data/writer/<date>.json, which git ignores.
+// article reader, else none). Writes evals/data/writer/<date>.json, which git ignores. An issue already built is
+// kept, so its article text stays as read on its build day; pass --rebuild to read every issue again.
 //
-// Usage: npm run eval:build -- evals/writer/build-dataset.ts
+// Usage: npm run eval:build -- evals/writer/build-dataset.ts [--rebuild]
 // Needs DATABASE_URL (the Neon dev branch). JINA_API_KEY and GITHUB_TOKEN help the article reader, if set.
 
-import { mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 
 import { readOnlyQuery } from "@/evals/lib/dev-db";
 import { caseFile, DATA_DIR, readManifest, type ArticleSource, type ManifestEntry, type WriterCase } from "@/evals/writer/dataset";
@@ -125,7 +126,12 @@ async function buildCase(entry: ManifestEntry): Promise<WriterCase> {
 async function main() {
   if (process.env.APP_ENV === "production") throw new Error("Refusing to run with APP_ENV=production.");
   mkdirSync(DATA_DIR, { recursive: true });
+  const rebuild = process.argv.includes("--rebuild");
   for (const entry of readManifest()) {
+    if (!rebuild && existsSync(caseFile(entry.date))) {
+      console.info(`${entry.date}: already built, kept`);
+      continue;
+    }
     const built = await buildCase(entry);
     writeFileSync(caseFile(entry.date), `${JSON.stringify(built, null, 2)}\n`);
     const counts = Object.values(built.articleSources).join(", ");

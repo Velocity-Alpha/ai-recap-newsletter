@@ -9,6 +9,10 @@ describe("labelledPairs", () => {
     expect(pairs.filter((pair) => pair.label === "same")).toHaveLength(113);
   });
 
+  it("says the labels are the fixture's", () => {
+    expect(labelledPairs().every((pair) => pair.labelSource === "fixture")).toBe(true);
+  });
+
   it("gives each pair its own id", () => {
     expect(new Set(labelledPairs().map((pair) => pair.id)).size).toBe(243);
   });

@@ -30,3 +30,16 @@ export function readSceneIssues(path = SCENE_ISSUES_PATH): SceneIssuesFile {
   if (!Array.isArray(file.issues) || file.issues.length === 0) throw new Error(`${path} holds no issues.`);
   return file;
 }
+
+/**
+ * `count` of the items, spread evenly over them: every item `keep` accepts, then evenly spaced others to make up
+ * the count. Keeps the items' order. All items when there are no more than `count`.
+ */
+export function pickSpread<T>(items: readonly T[], count: number, keep: (item: T) => boolean = () => false): T[] {
+  if (items.length <= count) return [...items];
+  const kept = new Set(items.filter(keep).slice(0, count));
+  const rest = items.filter((item) => !kept.has(item));
+  const need = count - kept.size;
+  const chosen = new Set([...kept, ...Array.from({ length: need }, (_, index) => rest[Math.floor((index * rest.length) / need)])]);
+  return items.filter((item) => chosen.has(item));
+}

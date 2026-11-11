@@ -3,8 +3,8 @@ import type OpenAI from "openai";
 import { createJudge, type Judge } from "@/evals/lib/judge";
 import { gitSha, writeResults, type Metric, type ResultRow, type ResultsFile } from "@/evals/lib/results";
 import { effortLabel, sweepConfigs, type EvalConfig, type EvalSettings } from "@/evals/lib/settings";
-import { mapLimit } from "@/evals/lib/concurrency";
-import { percentile } from "@/evals/lib/stats";
+import { createLimit, mapLimit } from "@/evals/lib/concurrency";
+import { pairedBootstrap, percentile } from "@/evals/lib/stats";
 import {
   addUsage,
   costUsd,
@@ -24,7 +24,10 @@ export interface RunContext {
   config: EvalConfig;
   /** 0 to EVAL_REPEATS - 1. */
   repeat: number;
-  /** A Responses API client that records this run's usage, web searches and call times. */
+  /**
+   * A Responses API client that records this run's usage, web searches and call times. It is always on the standard
+   * tier, as in production; it waits out rate limits, and that wait is not in the latency.
+   */
   client: RecordingClient;
   /** A fetch that records this run's usage and call times (for the Decisions API). */
   fetch: typeof fetch;
@@ -43,7 +46,7 @@ export type Shared = <T>(key: string, work: (tools: { judge: Judge }) => Promise
 export interface GradeContext {
   config: EvalConfig;
   repeat: number;
-  /** The judge (EVAL_JUDGE_MODEL). Its cost goes to this config's judge cost. */
+  /** The judge (EVAL_JUDGE_MODEL, on EVAL_JUDGE_TIER). Its cost goes to this config's judge cost. */
   judge: Judge;
   shared: Shared;
 }
@@ -56,7 +59,7 @@ export interface Outcome<Item, Output, Grade = never> {
   item: Item;
   id: string;
   repeat: number;
-  /** The time of `run`: the model calls, not grading. */
+  /** The time of `run`, less its waits on rate limits: the model calls, not grading. */
   latencyMs: number;
   output: Output | null;
   error: string | null;
@@ -155,6 +158,38 @@ export function countGraded<Item, Output, Grade>(
 export const NO_EFFORT = "n/a";
 
 /**
+ * Adds to each count of `metrics` its difference against the baseline's count of the same name, with a 95% paired
+ * bootstrap interval that resamples items. `perItem[i]` and `baselinePerItem[i]` are the scores of item i alone (all
+ * its repeats). A count whose per-item scores do not add up to its total, on either side, is left as it is.
+ */
+export function compareToBaseline(
+  metrics: Metric[],
+  perItem: Metric[][],
+  baselineTotal: Metric[],
+  baselinePerItem: Metric[][]
+): Metric[] {
+  type Count = { hits: number; n: number };
+  const countOf = (list: Metric[], name: string): Count | null => {
+    const found = list.find((entry) => entry.name === name);
+    return found && "hits" in found ? { hits: found.hits, n: found.n } : null;
+  };
+  const addsUp = (total: Count, parts: Array<Count | null>) =>
+    parts.every((part) => part !== null) &&
+    parts.reduce((sum, part) => sum + part!.hits, 0) === total.hits &&
+    parts.reduce((sum, part) => sum + part!.n, 0) === total.n;
+  return metrics.map((metric) => {
+    if (!("hits" in metric)) return metric;
+    const base = countOf(baselineTotal, metric.name);
+    if (!base || perItem.length !== baselinePerItem.length) return metric;
+    const own = perItem.map((list) => countOf(list, metric.name));
+    const theirs = baselinePerItem.map((list) => countOf(list, metric.name));
+    if (!addsUp(metric, own) || !addsUp(base, theirs)) return metric;
+    const vsBaseline = pairedBootstrap(own.map((other, index) => ({ baseline: theirs[index]!, other: other! })));
+    return vsBaseline ? { ...metric, vsBaseline } : metric;
+  });
+}
+
+/**
  * Adds to each metric the lowest and highest of its per-repeat values (`perRepeat[r]` is the score of repeat r).
  * Counts with no runs in a repeat and numbers that are not finite are left out; `valueRepeats` limits the repeats a
  * number comes from (the graded ones). A spread needs two or more repeats.
@@ -181,8 +216,10 @@ function perCall(usage: Usage, price: Price | null, runs: number): number | null
 }
 
 /**
- * Runs every item (capped by EVAL_LIMIT) EVAL_REPEATS times for each config of the sweep, one config after
- * another; grades each run; runs `afterSweep`; then writes the results file and the raw JSON.
+ * Runs every item (capped by EVAL_LIMIT) EVAL_REPEATS times for each config of the sweep, all configs at the same
+ * time with at most EVAL_CONCURRENCY runs in flight; grades each run (at most EVAL_JUDGE_CONCURRENCY grades and
+ * judge calls in flight); runs `afterSweep`; compares each row to the baseline row; then writes the results file
+ * and the raw JSON. Outcomes keep the sweep's order, whatever order the runs finish in.
  */
 export async function runSweep<Item, Output, Grade = never>(spec: SweepSpec<Item, Output, Grade>): Promise<SweepResult> {
   const { settings } = spec;
@@ -191,8 +228,16 @@ export async function runSweep<Item, Output, Grade = never>(spec: SweepSpec<Item
   const date = new Date().toISOString().slice(0, 10);
   const sha = gitSha();
   const judgeRepeats = Math.min(settings.repeats, settings.judgeRepeats ?? settings.repeats);
-  const makeJudge = (recorder: UsageRecorder) =>
-    createJudge({ model: settings.judgeModel, effort: settings.judgeEffort, client: recordingClient(recorder, { api: spec.api }) });
+  const judgeCalls = createLimit(settings.judgeConcurrency);
+  const grades = createLimit(settings.judgeConcurrency);
+  const makeJudge = (recorder: UsageRecorder): Judge => {
+    const judge = createJudge({
+      model: settings.judgeModel,
+      effort: settings.judgeEffort,
+      client: recordingClient(recorder, { tier: settings.judgeTier, api: spec.api }),
+    });
+    return (request) => judgeCalls(() => judge(request));
+  };
 
   const sharedRecorder = new UsageRecorder();
   const sharedJudge = makeJudge(sharedRecorder);
@@ -204,60 +249,70 @@ export async function runSweep<Item, Output, Grade = never>(spec: SweepSpec<Item
 
   const configs = sweepConfigs(settings);
   const judgeRecorders = configs.map(() => new UsageRecorder());
-  const swept: ConfigOutcomes<Item, Output, Grade>[] = [];
+  const judges = judgeRecorders.map(makeJudge);
+  // Repeat, then item, then config: every config starts at once, and each config's runs stay in that order.
+  const runs = Array.from({ length: settings.repeats }, (_, repeat) =>
+    items.flatMap((item) => configs.map((config, configIndex) => ({ config, configIndex, item, repeat })))
+  ).flat();
 
-  for (const [index, config] of configs.entries()) {
-    const judge = makeJudge(judgeRecorders[index]);
-    const runs = Array.from({ length: settings.repeats }, (_, repeat) => items.map((item) => ({ item, repeat }))).flat();
+  async function gradeOutcome(outcome: Outcome<Item, Output, Grade>, config: EvalConfig, judge: Judge) {
+    try {
+      outcome.grade = await spec.grade!(outcome.item, outcome.output as Output, { config, repeat: outcome.repeat, judge, shared });
+      outcome.gradeStatus = "graded";
+    } catch (thrown) {
+      outcome.gradeStatus = "failed";
+      outcome.gradeError = errorMessage(thrown);
+      console.warn(`[${spec.task}] ${outcome.id}: grading failed: ${outcome.gradeError}`);
+    }
+  }
 
-    const outcomes = await mapLimit(runs, settings.concurrency, async ({ item, repeat }): Promise<Outcome<Item, Output, Grade>> => {
-      const recorder = new UsageRecorder();
-      const context: RunContext = {
-        config,
-        repeat,
-        client: recordingClient(recorder, { sendNoEffort: config.effort === undefined, api: spec.api }),
-        fetch: recordingFetch(recorder),
-        responses: () => [...recorder.responses],
-      };
-      const started = performance.now();
-      let output: Output | null = null;
-      let error: string | null = null;
-      try {
-        output = await spec.run(item, context);
-      } catch (thrown) {
-        error = errorMessage(thrown);
-      }
-      const outcome: Outcome<Item, Output, Grade> = {
-        item,
-        id: spec.id(item),
-        repeat,
-        latencyMs: performance.now() - started,
-        output,
-        error,
-        usage: recorder.total(),
-        callMs: [...recorder.callMs],
-        grade: null,
-        gradeStatus: "none",
-        gradeError: null,
-      };
-      if (spec.grade && error === null) {
-        if (repeat >= judgeRepeats) {
-          outcome.gradeStatus = "skipped";
-        } else {
-          try {
-            outcome.grade = await spec.grade(item, output as Output, { config, repeat, judge, shared });
-            outcome.gradeStatus = "graded";
-          } catch (thrown) {
-            outcome.gradeStatus = "failed";
-            outcome.gradeError = errorMessage(thrown);
-            console.warn(`[${spec.task}] ${outcome.id}: grading failed: ${outcome.gradeError}`);
-          }
-        }
-      }
-      return outcome;
-    });
-    swept.push({ config, outcomes });
-    console.info(`[${spec.task}] ${config.model} / ${effortLabel(config.effort)}: ${outcomes.length} runs done`);
+  const grading: Promise<void>[] = [];
+  const outcomes = await mapLimit(runs, settings.concurrency, async ({ config, configIndex, item, repeat }): Promise<Outcome<Item, Output, Grade>> => {
+    const recorder = new UsageRecorder();
+    const context: RunContext = {
+      config,
+      repeat,
+      // The call under test is always on the standard tier: its latency is a metric and its timeouts mirror production.
+      client: recordingClient(recorder, { tier: "standard", sendNoEffort: config.effort === undefined, api: spec.api }),
+      fetch: recordingFetch(recorder),
+      responses: () => [...recorder.responses],
+    };
+    const started = performance.now();
+    let output: Output | null = null;
+    let error: string | null = null;
+    try {
+      output = await spec.run(item, context);
+    } catch (thrown) {
+      error = errorMessage(thrown);
+    }
+    const outcome: Outcome<Item, Output, Grade> = {
+      item,
+      id: spec.id(item),
+      repeat,
+      latencyMs: Math.max(0, performance.now() - started - recorder.waitMs),
+      output,
+      error,
+      usage: recorder.total(),
+      callMs: [...recorder.callMs],
+      grade: null,
+      gradeStatus: "none",
+      gradeError: null,
+    };
+    if (spec.grade && error === null) {
+      if (repeat >= judgeRepeats) outcome.gradeStatus = "skipped";
+      // Grading does not hold a run's slot: the next run starts while this one is graded.
+      else grading.push(grades(() => gradeOutcome(outcome, config, judges[configIndex])));
+    }
+    return outcome;
+  });
+  await Promise.all(grading);
+
+  const swept: ConfigOutcomes<Item, Output, Grade>[] = configs.map((config, index) => ({
+    config,
+    outcomes: outcomes.filter((_, run) => runs[run].configIndex === index),
+  }));
+  for (const { config, outcomes: done } of swept) {
+    console.info(`[${spec.task}] ${config.model} / ${effortLabel(config.effort)}: ${done.length} runs done`);
   }
 
   const after = spec.afterSweep
@@ -266,6 +321,13 @@ export async function runSweep<Item, Output, Grade = never>(spec: SweepSpec<Item
         shared,
       })
     : [];
+
+  const baselineIndex = settings.baseline === null ? -1 : configs.findIndex((config) => config.effort === settings.baseline);
+  const scorePerItem = (done: Outcome<Item, Output, Grade>[]) => items.map((item) => spec.score(done.filter((outcome) => outcome.item === item)));
+  const baseline =
+    baselineIndex === -1
+      ? null
+      : { total: spec.score(swept[baselineIndex].outcomes), perItem: scorePerItem(swept[baselineIndex].outcomes) };
 
   const sharedUsage = sharedRecorder.total();
   const sharedCostUsd = sharedUsage.calls === 0 ? undefined : (perCall(sharedUsage, price(settings.judgeModel), 1) ?? undefined);
@@ -278,12 +340,16 @@ export async function runSweep<Item, Output, Grade = never>(spec: SweepSpec<Item
     const latencies = outcomes.filter((outcome) => outcome.error === null).map((outcome) => outcome.latencyMs);
     const perRepeat = Array.from({ length: settings.repeats }, (_, repeat) => spec.score(outcomes.filter((outcome) => outcome.repeat === repeat)));
     const tried = outcomes.filter((outcome) => outcome.gradeStatus === "graded" || outcome.gradeStatus === "failed");
+    const isBaseline = index === baselineIndex;
+    const spread = withSpread(spec.score(outcomes), perRepeat, spec.grade ? judgeRepeats : settings.repeats);
+    const metrics = baseline && !isBaseline ? compareToBaseline(spread, scorePerItem(outcomes), baseline.total, baseline.perItem) : spread;
     const row: ResultRow = {
       model: config.model,
       effort: settings.effortApplies ? (config.effort ?? null) : NO_EFFORT,
+      ...(isBaseline ? { baseline: true } : {}),
       n: outcomes.length,
       errors: outcomes.filter((outcome) => outcome.error !== null).length,
-      metrics: [...withSpread(spec.score(outcomes), perRepeat, spec.grade ? judgeRepeats : settings.repeats), ...(after[index]?.metrics ?? [])],
+      metrics: [...metrics, ...(after[index]?.metrics ?? [])],
       latencyMs: { p50: roundMs(percentile(latencies, 50)), p95: roundMs(percentile(latencies, 95)) },
       costPerCallUsd: perCall(usage, price(config.model), outcomes.length),
       judgeCostPerCallUsd: judgeUsage.calls === 0 ? null : perCall(judgeUsage, price(settings.judgeModel), outcomes.length),

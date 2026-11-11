@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { scoreFreeLinks, type CheckedFoundLink, type FreeLinksGrade, type FreeLinksItem, type FreeLinksOutput } from "@/evals/free-links/score";
+import {
+  linkKey,
+  scoreFreeLinks,
+  type CheckedFoundLink,
+  type FreeLinksGolden,
+  type FreeLinksGrade,
+  type FreeLinksItem,
+  type FreeLinksOutput,
+} from "@/evals/free-links/score";
 import type { Outcome } from "@/evals/lib/sweep";
 import { outcomeOf } from "@/evals/lib/testing";
 
@@ -17,9 +25,17 @@ const link = (change: Partial<CheckedFoundLink>): CheckedFoundLink => ({
 });
 
 /** A checked story: the search found the links, and the check made `links` of them. */
-const outcome = (storyId: number, url: string, links: CheckedFoundLink[] | null): Outcome<FreeLinksItem, FreeLinksOutput, FreeLinksGrade> =>
+const FREE: FreeLinksGolden = { free_source_exists: true, urls: ["https://example.com/a"] };
+const NONE: FreeLinksGolden = { free_source_exists: false, urls: [] };
+
+const outcome = (
+  storyId: number,
+  url: string,
+  links: CheckedFoundLink[] | null,
+  golden: FreeLinksGolden = FREE
+): Outcome<FreeLinksItem, FreeLinksOutput, FreeLinksGrade> =>
   outcomeOf({
-    item: { story: { id: storyId, url } },
+    item: { story: { id: storyId, url }, golden },
     id: String(storyId),
     output: links ? { answerParsed: true, found: links.map((entry) => ({ url: entry.url, title: "" })) } : null,
     grade: links ? { links } : null,
@@ -40,6 +56,34 @@ describe("scoreFreeLinks", () => {
         outcome(11042, "https://ctvnews.ca/x", null),
       ]).map((metric) => [metric.name, metric])
     );
+
+  it("counts recall over the stories golden says have a free link: a usable link found", () => {
+    expect(metrics().get("Recall: usable link, golden has one")).toEqual({ name: "Recall: usable link, golden has one", hits: 1, n: 3 });
+  });
+
+  it("counts precision as kept links the judge calls the same news", () => {
+    expect(metrics().get("Precision: kept links judged same news")).toEqual({ name: "Precision: kept links judged same news", hits: 1, n: 2 });
+  });
+
+  it("counts apart the stories golden says have no free link, but that got a kept link", () => {
+    const counted = scoreFreeLinks([
+      outcome(7, "https://ft.com/x", [link({ url: "https://e.com/kept", site: "e.com", sameNews: "different" })], NONE),
+      outcome(8, "https://ft.com/y", [link({ kept: false, sameNews: null })], NONE),
+    ]);
+    expect(counted.find((metric) => metric.name === "No free source (golden): stories with a kept link")).toEqual({
+      name: "No free source (golden): stories with a kept link",
+      hits: 1,
+      n: 2,
+    });
+  });
+
+  it("counts kept links that are golden URLs, matched without scheme, www, query or trailing slash", () => {
+    expect(metrics().get("Kept links among golden URLs")).toEqual({ name: "Kept links among golden URLs", hits: 1, n: 2 });
+  });
+
+  it("matches a golden URL without scheme, www, query, fragment or trailing slash", () => {
+    expect(linkKey("http://www.Example.com/a/?utm=x#top")).toBe(linkKey("https://example.com/a"));
+  });
 
   it("counts a story with a kept link the judge calls the same news as usable, a failed search as a miss", () => {
     expect(metrics().get("Stories with a usable link")).toEqual({ name: "Stories with a usable link", hits: 1, n: 3 });
@@ -80,6 +124,6 @@ describe("scoreFreeLinks", () => {
   it("leaves a repeat the judge skipped out of the story counts", () => {
     const skipped = { ...outcome(1, "https://wsj.com/x", [link({})]), grade: null, gradeStatus: "skipped" as const };
     const counted = scoreFreeLinks([outcome(2, "https://wsj.com/z", [link({})]), skipped]);
-    expect(counted[0]).toEqual({ name: "Stories with a usable link", hits: 1, n: 1 });
+    expect(counted.find((metric) => metric.name === "Stories with a usable link")).toEqual({ name: "Stories with a usable link", hits: 1, n: 1 });
   });
 });

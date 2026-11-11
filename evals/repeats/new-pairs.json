@@ -1,0 +1,545 @@
+{
+  "note": "60 pairs of src/pipeline/repeats/__fixtures__/judged-pairs.jsonl with no label in labelled-pairs.jsonl, picked by evals/repeats/build-pairs.ts: 20 haiku_same, 15 haiku_follow_up, 5 haiku_unsure, 20 similarity. haiku_*: a pair Claude Haiku grouped as the same news, marked a follow-up, or was unsure of (blocks.jsonl); similarity: spread over the bands 0.55-0.65, 0.65-0.75, 0.75-0.85, 0.85-1. Within a kind, spread over similarity. The labels are Claude Opus's, in evals/repeats/golden.json.",
+  "pairs": [
+    {
+      "newer": 10133,
+      "older": 9993,
+      "similarity": 0.6505,
+      "rank": 1,
+      "same": 0.85,
+      "news": 0.96,
+      "picked": "haiku_same"
+    },
+    {
+      "newer": 10749,
+      "older": 10705,
+      "similarity": 0.6822,
+      "rank": 3,
+      "same": 0.89,
+      "news": 1,
+      "picked": "haiku_same"
+    },
+    {
+      "newer": 10749,
+      "older": 10661,
+      "similarity": 0.7119,
+      "rank": 2,
+      "same": 0.9,
+      "news": 1,
+      "picked": "haiku_same"
+    },
+    {
+      "newer": 10371,
+      "older": 10388,
+      "similarity": 0.7359,
+      "rank": 1,
+      "same": 0.95,
+      "news": 0.57,
+      "picked": "haiku_same"
+    },
+    {
+      "newer": 10576,
+      "older": 10410,
+      "similarity": 0.7527,
+      "rank": 1,
+      "same": 0.96,
+      "news": 0,
+      "picked": "haiku_same"
+    },
+    {
+      "newer": 11186,
+      "older": 11155,
+      "similarity": 0.7652,
+      "rank": 1,
+      "same": 0.97,
+      "news": 0.03,
+      "picked": "haiku_same"
+    },
+    {
+      "newer": 10648,
+      "older": 10597,
+      "similarity": 0.7788,
+      "rank": 1,
+      "same": 0.94,
+      "news": 0.87,
+      "picked": "haiku_same"
+    },
+    {
+      "newer": 11091,
+      "older": 10961,
+      "similarity": 0.7908,
+      "rank": 1,
+      "same": 0.97,
+      "news": 0,
+      "picked": "haiku_same"
+    },
+    {
+      "newer": 11176,
+      "older": 11163,
+      "similarity": 0.8069,
+      "rank": 1,
+      "same": 0.94,
+      "news": 0.01,
+      "picked": "haiku_same"
+    },
+    {
+      "newer": 11001,
+      "older": 10950,
+      "similarity": 0.8184,
+      "rank": 2,
+      "same": 0.99,
+      "news": 0,
+      "picked": "haiku_same"
+    },
+    {
+      "newer": 10506,
+      "older": 10426,
+      "similarity": 0.8244,
+      "rank": 3,
+      "same": 0.95,
+      "news": 0.79,
+      "picked": "haiku_same"
+    },
+    {
+      "newer": 10705,
+      "older": 10661,
+      "similarity": 0.8314,
+      "rank": 1,
+      "same": 0.96,
+      "news": 0,
+      "picked": "haiku_same"
+    },
+    {
+      "newer": 11096,
+      "older": 11055,
+      "similarity": 0.8387,
+      "rank": 2,
+      "same": 0.94,
+      "news": 0.02,
+      "picked": "haiku_same"
+    },
+    {
+      "newer": 10490,
+      "older": 10452,
+      "similarity": 0.8489,
+      "rank": 1,
+      "same": 0.98,
+      "news": 0,
+      "picked": "haiku_same"
+    },
+    {
+      "newer": 10293,
+      "older": 10261,
+      "similarity": 0.8589,
+      "rank": 1,
+      "same": 0.98,
+      "news": 0.02,
+      "picked": "haiku_same"
+    },
+    {
+      "newer": 10298,
+      "older": 10375,
+      "similarity": 0.8718,
+      "rank": 2,
+      "same": 0.95,
+      "news": 0.98,
+      "picked": "haiku_same"
+    },
+    {
+      "newer": 10310,
+      "older": 10212,
+      "similarity": 0.8834,
+      "rank": 1,
+      "same": 0.95,
+      "news": 0.01,
+      "picked": "haiku_same"
+    },
+    {
+      "newer": 11201,
+      "older": 11096,
+      "similarity": 0.9038,
+      "rank": 1,
+      "same": 0.96,
+      "news": 0.01,
+      "picked": "haiku_same"
+    },
+    {
+      "newer": 10540,
+      "older": 10370,
+      "similarity": 0.9231,
+      "rank": 2,
+      "same": 1,
+      "news": 0.9,
+      "picked": "haiku_same"
+    },
+    {
+      "newer": 10828,
+      "older": 10752,
+      "similarity": 0.9544,
+      "rank": 1,
+      "same": 1,
+      "news": 0,
+      "picked": "haiku_same"
+    },
+    {
+      "newer": 10377,
+      "older": 10375,
+      "similarity": 0.6352,
+      "rank": 3,
+      "same": 0.96,
+      "news": 0.99,
+      "picked": "haiku_follow_up"
+    },
+    {
+      "newer": 10086,
+      "older": 9968,
+      "similarity": 0.6887,
+      "rank": 4,
+      "same": 0,
+      "news": 0.92,
+      "picked": "haiku_follow_up"
+    },
+    {
+      "newer": 10989,
+      "older": 10621,
+      "similarity": 0.7066,
+      "rank": 5,
+      "same": 1,
+      "news": 0.9,
+      "picked": "haiku_follow_up"
+    },
+    {
+      "newer": 11082,
+      "older": 10989,
+      "similarity": 0.7161,
+      "rank": 5,
+      "same": 0.95,
+      "news": 0.97,
+      "picked": "haiku_follow_up"
+    },
+    {
+      "newer": 10359,
+      "older": 10163,
+      "similarity": 0.7258,
+      "rank": 1,
+      "same": 0.53,
+      "news": 1,
+      "picked": "haiku_follow_up"
+    },
+    {
+      "newer": 9966,
+      "older": 9863,
+      "similarity": 0.7314,
+      "rank": 1,
+      "same": 0.73,
+      "news": 1,
+      "picked": "haiku_follow_up"
+    },
+    {
+      "newer": 10421,
+      "older": 9987,
+      "similarity": 0.7563,
+      "rank": 3,
+      "same": 0.94,
+      "news": 1,
+      "picked": "haiku_follow_up"
+    },
+    {
+      "newer": 11004,
+      "older": 10710,
+      "similarity": 0.7668,
+      "rank": 5,
+      "same": 0.91,
+      "news": 1,
+      "picked": "haiku_follow_up"
+    },
+    {
+      "newer": 10994,
+      "older": 10710,
+      "similarity": 0.7699,
+      "rank": 4,
+      "same": 0.95,
+      "news": 1,
+      "picked": "haiku_follow_up"
+    },
+    {
+      "newer": 11269,
+      "older": 11004,
+      "similarity": 0.7768,
+      "rank": 5,
+      "same": 0.95,
+      "news": 0.98,
+      "picked": "haiku_follow_up"
+    },
+    {
+      "newer": 11179,
+      "older": 11004,
+      "similarity": 0.7823,
+      "rank": 4,
+      "same": 0.84,
+      "news": 1,
+      "picked": "haiku_follow_up"
+    },
+    {
+      "newer": 10081,
+      "older": 9963,
+      "similarity": 0.8007,
+      "rank": 2,
+      "same": 0.93,
+      "news": 0.99,
+      "picked": "haiku_follow_up"
+    },
+    {
+      "newer": 11200,
+      "older": 11180,
+      "similarity": 0.8028,
+      "rank": 2,
+      "same": 0.95,
+      "news": 1,
+      "picked": "haiku_follow_up"
+    },
+    {
+      "newer": 11179,
+      "older": 10994,
+      "similarity": 0.8098,
+      "rank": 4,
+      "same": 0.9,
+      "news": 0.99,
+      "picked": "haiku_follow_up"
+    },
+    {
+      "newer": 9975,
+      "older": 9968,
+      "similarity": 0.8197,
+      "rank": 1,
+      "same": 0.83,
+      "news": 1,
+      "picked": "haiku_follow_up"
+    },
+    {
+      "newer": 11211,
+      "older": 10947,
+      "similarity": 0.6361,
+      "rank": 3,
+      "same": 0.52,
+      "news": 1,
+      "picked": "haiku_unsure"
+    },
+    {
+      "newer": 9988,
+      "older": 9999,
+      "similarity": 0.6925,
+      "rank": 3,
+      "same": 0.84,
+      "news": 0.21,
+      "picked": "haiku_unsure"
+    },
+    {
+      "newer": 10504,
+      "older": 10452,
+      "similarity": 0.7223,
+      "rank": 3,
+      "same": 0.95,
+      "news": 0.97,
+      "picked": "haiku_unsure"
+    },
+    {
+      "newer": 10087,
+      "older": 10026,
+      "similarity": 0.7496,
+      "rank": 2,
+      "same": 0.65,
+      "news": 0.23,
+      "picked": "haiku_unsure"
+    },
+    {
+      "newer": 11078,
+      "older": 11037,
+      "similarity": 0.7953,
+      "rank": 2,
+      "same": 1,
+      "news": 0.04,
+      "picked": "haiku_unsure"
+    },
+    {
+      "newer": 10758,
+      "older": 10721,
+      "similarity": 0.5581,
+      "rank": 5,
+      "same": 0.08,
+      "news": 0.75,
+      "picked": "similarity"
+    },
+    {
+      "newer": 10822,
+      "older": 10567,
+      "similarity": 0.5746,
+      "rank": 3,
+      "same": 0,
+      "news": 1,
+      "picked": "similarity"
+    },
+    {
+      "newer": 10978,
+      "older": 10758,
+      "similarity": 0.5951,
+      "rank": 3,
+      "same": 0.06,
+      "news": 0.89,
+      "picked": "similarity"
+    },
+    {
+      "newer": 10855,
+      "older": 10374,
+      "similarity": 0.6257,
+      "rank": 5,
+      "same": 0.48,
+      "news": 0.73,
+      "picked": "similarity"
+    },
+    {
+      "newer": 10511,
+      "older": 10104,
+      "similarity": 0.6547,
+      "rank": 1,
+      "same": 0.73,
+      "news": 0.08,
+      "picked": "similarity"
+    },
+    {
+      "newer": 10633,
+      "older": 10181,
+      "similarity": 0.6666,
+      "rank": 2,
+      "same": 0.21,
+      "news": 0.99,
+      "picked": "similarity"
+    },
+    {
+      "newer": 10407,
+      "older": 10406,
+      "similarity": 0.6783,
+      "rank": 1,
+      "same": 0.01,
+      "news": 0.92,
+      "picked": "similarity"
+    },
+    {
+      "newer": 10726,
+      "older": 10583,
+      "similarity": 0.7031,
+      "rank": 1,
+      "same": 0.08,
+      "news": 1,
+      "picked": "similarity"
+    },
+    {
+      "newer": 10379,
+      "older": 9987,
+      "similarity": 0.7334,
+      "rank": 4,
+      "same": 0.32,
+      "news": 0.99,
+      "picked": "similarity"
+    },
+    {
+      "newer": 10570,
+      "older": 10423,
+      "similarity": 0.7601,
+      "rank": 1,
+      "same": 0.92,
+      "news": 0,
+      "picked": "similarity"
+    },
+    {
+      "newer": 10448,
+      "older": 9956,
+      "similarity": 0.7747,
+      "rank": 1,
+      "same": 0.11,
+      "news": 0.95,
+      "picked": "similarity"
+    },
+    {
+      "newer": 10072,
+      "older": 9963,
+      "similarity": 0.7968,
+      "rank": 2,
+      "same": 0.03,
+      "news": 0.92,
+      "picked": "similarity"
+    },
+    {
+      "newer": 11136,
+      "older": 11037,
+      "similarity": 0.8174,
+      "rank": 1,
+      "same": 0.99,
+      "news": 0,
+      "picked": "similarity"
+    },
+    {
+      "newer": 11149,
+      "older": 11205,
+      "similarity": 0.8337,
+      "rank": 1,
+      "same": 0.93,
+      "news": 0.9,
+      "picked": "similarity"
+    },
+    {
+      "newer": 10308,
+      "older": 10214,
+      "similarity": 0.8536,
+      "rank": 1,
+      "same": 0.9,
+      "news": 0,
+      "picked": "similarity"
+    },
+    {
+      "newer": 10975,
+      "older": 10950,
+      "similarity": 0.8679,
+      "rank": 1,
+      "same": 1,
+      "news": 0,
+      "picked": "similarity"
+    },
+    {
+      "newer": 11293,
+      "older": 11218,
+      "similarity": 0.8801,
+      "rank": 1,
+      "same": 0.98,
+      "news": 0.01,
+      "picked": "similarity"
+    },
+    {
+      "newer": 11201,
+      "older": 11116,
+      "similarity": 0.8987,
+      "rank": 1,
+      "same": 0.95,
+      "news": 0,
+      "picked": "similarity"
+    },
+    {
+      "newer": 11004,
+      "older": 10994,
+      "similarity": 0.9205,
+      "rank": 1,
+      "same": 0.96,
+      "news": 0,
+      "picked": "similarity"
+    },
+    {
+      "newer": 10132,
+      "older": 10084,
+      "similarity": 0.9523,
+      "rank": 1,
+      "same": 0.99,
+      "news": 0,
+      "picked": "similarity"
+    }
+  ]
+}

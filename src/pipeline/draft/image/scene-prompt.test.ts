@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -90,6 +92,16 @@ describe("writeScenePrompt", () => {
     const { request } = await sentCall();
     expect(request.instructions).toMatch(/^You are an editorial image creative director/);
     expect(request.input).toBe(buildScenePromptInput(CONTEXT));
+  });
+
+  it("sends the same instructions, input and schema bytes as before the prompt was split into named parts", async () => {
+    const { request } = await sentCall();
+    const sha = (text: string) => createHash("sha256").update(text).digest("hex");
+    expect([sha(String(request.instructions)), sha(String(request.input)), sha(JSON.stringify(request.text))]).toEqual([
+      "6cffaaf7c83b8e2cc08ade527e6219fd0cc21c2fc6010b300fbf050f69024036",
+      "fa77a9368d3be27046007d6e66b376c724e104865aae774d2b574e2b7a3caa80",
+      "5bfa2b327443380391dcde8d43390c8e89e266ec9b46c685836d35a7866dcea1",
+    ]);
   });
 
   it("uses no web search", async () => {

@@ -1,0 +1,546 @@
+{
+  "about": "Repeat-check golden labels: per new pair of evals/repeats/new-pairs.json (\"<newer>-<older>\"), Claude Opus's label (same, follow_up, different) and confidence by the labelling rules of src/pipeline/repeats/__fixtures__/README.md, with one short reason (evals/repeats/golden-todo.md). The 243 older labels stay in labelled-pairs.jsonl.",
+  "producer": "claude-opus-5-5",
+  "entries": {
+    "10072-9963": {
+      "inputHash": "6a1b04642bc15013",
+      "date": "2026-11-11",
+      "value": {
+        "label": "different",
+        "confidence": "medium",
+        "why": "One announces a new Super Intelligence Force team for federal AI policy; the other a planned order renaming AI, two separate moves."
+      }
+    },
+    "10081-9963": {
+      "inputHash": "5034ea69d43bb3a3",
+      "date": "2026-11-11",
+      "value": {
+        "label": "follow_up",
+        "confidence": "medium",
+        "why": "The older story says Trump plans an order renaming AI; the newer one reports the order signed, telling agencies to use SI."
+      }
+    },
+    "10086-9968": {
+      "inputHash": "b1648d543119a600",
+      "date": "2026-11-11",
+      "value": {
+        "label": "different",
+        "confidence": "medium",
+        "why": "One is the launch of the cheaper GPT-6.1 Sol; the other the reported cancellation of the GPT-6.1 Astra release."
+      }
+    },
+    "10087-10026": {
+      "inputHash": "4ccfdb344ae254dd",
+      "date": "2026-11-11",
+      "value": {
+        "label": "same",
+        "confidence": "medium",
+        "why": "Both cover OpenAI's launch of the Ultrafast speed model or tier, one adding the Pro plan, the other GPT-6.1 Sol."
+      }
+    },
+    "10132-10084": {
+      "inputHash": "c3c4ab8753f75e7d",
+      "date": "2026-11-11",
+      "value": {
+        "label": "same",
+        "confidence": "high",
+        "why": "Both report the Pentagon launching the 120-day Project Meridian study co-led by Musk."
+      }
+    },
+    "10133-9993": {
+      "inputHash": "51ed8f8ad2d8febb",
+      "date": "2026-11-11",
+      "value": {
+        "label": "same",
+        "confidence": "medium",
+        "why": "Both are OpenAI's launch of its always-on agent, one a DevDay news story, the other a tool listing."
+      }
+    },
+    "10293-10261": {
+      "inputHash": "7754927ce9e8792e",
+      "date": "2026-11-11",
+      "value": {
+        "label": "same",
+        "confidence": "high",
+        "why": "Both report Anthropic launching its Cyber Mission for critical infrastructure and open-source security."
+      }
+    },
+    "10298-10375": {
+      "inputHash": "e610aa2861a4fddc",
+      "date": "2026-11-11",
+      "value": {
+        "label": "follow_up",
+        "confidence": "medium",
+        "why": "Both cover OpenAI's 722 math papers; the newer adds that three papers were withdrawn over a sign error."
+      }
+    },
+    "10308-10214": {
+      "inputHash": "34acd42a9a7063fe",
+      "date": "2026-11-11",
+      "value": {
+        "label": "same",
+        "confidence": "high",
+        "why": "Both report Liquid AI's release of its open-weight d1 decision models, including d1-3B."
+      }
+    },
+    "10310-10212": {
+      "inputHash": "30f270ab5ba316f6",
+      "date": "2026-11-11",
+      "value": {
+        "label": "same",
+        "confidence": "high",
+        "why": "Both report Perplexity releasing its pplx-embed-v2-late multimodal embedding models."
+      }
+    },
+    "10359-10163": {
+      "inputHash": "3f059118d4ec920a",
+      "date": "2026-11-11",
+      "value": {
+        "label": "follow_up",
+        "confidence": "low",
+        "why": "The older is a listing of the Mistral Large 4 model; the newer reports a visual grounding score for it."
+      }
+    },
+    "10371-10388": {
+      "inputHash": "c3cd8be67625d20a",
+      "date": "2026-11-11",
+      "value": {
+        "label": "same",
+        "confidence": "high",
+        "why": "Both report the launch of the X Subscription bundling X Premium, Grok and Cursor."
+      }
+    },
+    "10377-10375": {
+      "inputHash": "0d5a794741a62710",
+      "date": "2026-11-11",
+      "value": {
+        "label": "follow_up",
+        "confidence": "high",
+        "why": "The older reports OpenAI's release of 722 math papers; the newer a mathematicians' group urging a boycott in response."
+      }
+    },
+    "10379-9987": {
+      "inputHash": "8e1315ec0f2aac58",
+      "date": "2026-11-11",
+      "value": {
+        "label": "follow_up",
+        "confidence": "medium",
+        "why": "The older reports Gemini 4 Argon unveiled for vetted defenders first; the newer its availability on Google Cloud."
+      }
+    },
+    "10407-10406": {
+      "inputHash": "cd2dfb99e704a7e7",
+      "date": "2026-11-11",
+      "value": {
+        "label": "different",
+        "confidence": "high",
+        "why": "Two separate papers on system-one decision models, VideoJev for video and Jeva as an architecture."
+      }
+    },
+    "10421-9987": {
+      "inputHash": "b78615aa0ead84ba",
+      "date": "2026-11-11",
+      "value": {
+        "label": "follow_up",
+        "confidence": "high",
+        "why": "The older reports Gemini 4 Argon's restricted preview for defenders; the newer its broad general release."
+      }
+    },
+    "10448-9956": {
+      "inputHash": "484210bfad39e0cd",
+      "date": "2026-11-11",
+      "value": {
+        "label": "different",
+        "confidence": "high",
+        "why": "Two separate papers on multi-teacher on-policy distillation, cross-teacher guarding versus domain normalization."
+      }
+    },
+    "10490-10452": {
+      "inputHash": "039a495c28f1e420",
+      "date": "2026-11-11",
+      "value": {
+        "label": "same",
+        "confidence": "high",
+        "why": "Both report Meta's release of the 816B open-weight Muse Spark Open model."
+      }
+    },
+    "10504-10452": {
+      "inputHash": "d51ebb9e97568956",
+      "date": "2026-11-11",
+      "value": {
+        "label": "same",
+        "confidence": "medium",
+        "why": "Both cover the release of Muse Spark Open; the newer also names the Muse Wonder model launched with it."
+      }
+    },
+    "10506-10426": {
+      "inputHash": "be602a0ff6247a3e",
+      "date": "2026-11-11",
+      "value": {
+        "label": "same",
+        "confidence": "low",
+        "why": "Both report the case of an OpenAI engineer accused of hiding a recording device; arrest and charges likely came together."
+      }
+    },
+    "10511-10104": {
+      "inputHash": "95ba8bd3c1f4c3b3",
+      "date": "2026-11-11",
+      "value": {
+        "label": "different",
+        "confidence": "high",
+        "why": "Two unrelated product listings: Framefields for code-first video and HyperFrames Studio for agent video editing."
+      }
+    },
+    "10540-10370": {
+      "inputHash": "1c9f299f1df28aba",
+      "date": "2026-11-11",
+      "value": {
+        "label": "same",
+        "confidence": "medium",
+        "why": "Both report Google opening Gemini 4 Argon to the API, the Gemini app and AI Mode."
+      }
+    },
+    "10570-10423": {
+      "inputHash": "09c86c621d2e9d29",
+      "date": "2026-11-11",
+      "value": {
+        "label": "same",
+        "confidence": "medium",
+        "why": "Both are Intel's launch of its D-Series inference GPU without HBM, one a listing, one a news story."
+      }
+    },
+    "10576-10410": {
+      "inputHash": "11a554640b8463e1",
+      "date": "2026-11-11",
+      "value": {
+        "label": "same",
+        "confidence": "medium",
+        "why": "Both are the Harness^2 recursive agent-harness framework, one a listing, the other the paper."
+      }
+    },
+    "10633-10181": {
+      "inputHash": "77639f75809d5fa0",
+      "date": "2026-11-11",
+      "value": {
+        "label": "different",
+        "confidence": "medium",
+        "why": "One describes DeepSeek's inference deployment and economics; the other V4.1 Flash leading coding benchmarks."
+      }
+    },
+    "10648-10597": {
+      "inputHash": "d3ae202799b091cf",
+      "date": "2026-11-11",
+      "value": {
+        "label": "same",
+        "confidence": "high",
+        "why": "Both report Anthropic's Claude-run protein design campaign against scorpion toxins with 17 working binders."
+      }
+    },
+    "10705-10661": {
+      "inputHash": "d3f6a7d6bd93d564",
+      "date": "2026-11-11",
+      "value": {
+        "label": "same",
+        "confidence": "high",
+        "why": "Both report Anthropic's research preview of the proactive Claude Duet app."
+      }
+    },
+    "10726-10583": {
+      "inputHash": "d6cc74dcf0d5081c",
+      "date": "2026-11-11",
+      "value": {
+        "label": "different",
+        "confidence": "high",
+        "why": "Two different Anthropic security products: Claude Security for enterprise code and the free OSS Scanner."
+      }
+    },
+    "10749-10661": {
+      "inputHash": "fb868b8fc8fb4766",
+      "date": "2026-11-11",
+      "value": {
+        "label": "same",
+        "confidence": "medium",
+        "why": "Both cover Anthropic's Claude Duet preview launch; the newer bundles it with two research results."
+      }
+    },
+    "10749-10705": {
+      "inputHash": "4024da1f289abc69",
+      "date": "2026-11-11",
+      "value": {
+        "label": "same",
+        "confidence": "medium",
+        "why": "Both cover Anthropic's Claude Duet preview launch; the newer bundles it with two research results."
+      }
+    },
+    "10758-10721": {
+      "inputHash": "617b6025d4a76245",
+      "date": "2026-11-11",
+      "value": {
+        "label": "different",
+        "confidence": "high",
+        "why": "Two unrelated product listings: ManyAgents for running coding agents on a Mac and Termi Protocol for 3D agent views."
+      }
+    },
+    "10822-10567": {
+      "inputHash": "0e40605ebac8f620",
+      "date": "2026-11-11",
+      "value": {
+        "label": "different",
+        "confidence": "high",
+        "why": "One is DeepMind's Genie 4 world model; the other Gemini Notebook tools for slides and videos."
+      }
+    },
+    "10828-10752": {
+      "inputHash": "4418d241cdc151bb",
+      "date": "2026-11-11",
+      "value": {
+        "label": "same",
+        "confidence": "high",
+        "why": "Both report Nebius publishing live GPU spot prices and signing a $3.5 billion Citi loan facility."
+      }
+    },
+    "10855-10374": {
+      "inputHash": "24bc3a9638d25634",
+      "date": "2026-11-11",
+      "value": {
+        "label": "different",
+        "confidence": "medium",
+        "why": "One is Liquid AI's six 2B on-device models; the other its single LFM2.5-24B-A2B reasoning model, two releases."
+      }
+    },
+    "10975-10950": {
+      "inputHash": "aa1760d035a63d41",
+      "date": "2026-11-11",
+      "value": {
+        "label": "same",
+        "confidence": "high",
+        "why": "Both report Anthropic renaming its Max plans and dropping the 5-hour limit for verified Ultra accounts."
+      }
+    },
+    "10978-10758": {
+      "inputHash": "2db2f78251427a11",
+      "date": "2026-11-11",
+      "value": {
+        "label": "different",
+        "confidence": "high",
+        "why": "One is Vercel Labs' open-source agent-desktop tool; the other the ManyAgents Mac app, two products."
+      }
+    },
+    "10989-10621": {
+      "inputHash": "733e8d24c6c5bd94",
+      "date": "2026-11-11",
+      "value": {
+        "label": "follow_up",
+        "confidence": "medium",
+        "why": "The older reports a draft Anthropic prospectus seen by the WSJ; the newer the public S-1 filing for a Nasdaq listing."
+      }
+    },
+    "10994-10710": {
+      "inputHash": "d6be2d7750312b08",
+      "date": "2026-11-11",
+      "value": {
+        "label": "follow_up",
+        "confidence": "high",
+        "why": "The older reports OpenAI nearing a $30 billion round; the newer that the target was cut to $20 billion."
+      }
+    },
+    "11001-10950": {
+      "inputHash": "f5ac1ed38139204a",
+      "date": "2026-11-11",
+      "value": {
+        "label": "same",
+        "confidence": "high",
+        "why": "Both report Anthropic renaming Max 20x to Ultra and removing the 5-hour limit for verified accounts."
+      }
+    },
+    "11004-10710": {
+      "inputHash": "f398e111e7d3e591",
+      "date": "2026-11-11",
+      "value": {
+        "label": "follow_up",
+        "confidence": "high",
+        "why": "The older reports OpenAI nearing a $30 billion round; the newer that the target was cut to about $20 billion."
+      }
+    },
+    "11004-10994": {
+      "inputHash": "9dbdf5bebefb0b07",
+      "date": "2026-11-11",
+      "value": {
+        "label": "same",
+        "confidence": "high",
+        "why": "Both report OpenAI cutting its funding round target from $30 billion to $20 billion."
+      }
+    },
+    "11078-11037": {
+      "inputHash": "5156b559c1634069",
+      "date": "2026-11-11",
+      "value": {
+        "label": "same",
+        "confidence": "high",
+        "why": "Both report OpenAI agreeing to acquire Pierre Computer Company; the older also covers Meta's Conductor deal."
+      }
+    },
+    "11082-10989": {
+      "inputHash": "eb0f9baf152dc8ef",
+      "date": "2026-11-11",
+      "value": {
+        "label": "follow_up",
+        "confidence": "high",
+        "why": "The older reports Anthropic's S-1 filing; the newer an amended S-1 disclosing Q3 revenue and new risk language."
+      }
+    },
+    "11091-10961": {
+      "inputHash": "2a608b76dc566d78",
+      "date": "2026-11-11",
+      "value": {
+        "label": "same",
+        "confidence": "high",
+        "why": "Both are Nvidia's release of the Nemotron 3.5 Transcribe speech model, one a listing, one a news story."
+      }
+    },
+    "11096-11055": {
+      "inputHash": "65929966f0e1673b",
+      "date": "2026-11-11",
+      "value": {
+        "label": "follow_up",
+        "confidence": "medium",
+        "why": "The older says GIF output is coming to ChatGPT image generation; the newer reports Images 2.6 released with GIFs."
+      }
+    },
+    "11136-11037": {
+      "inputHash": "4d6a5c6e7c5cc6d6",
+      "date": "2026-11-11",
+      "value": {
+        "label": "same",
+        "confidence": "high",
+        "why": "Both report Meta acquiring the AI coding startup Conductor; the older also covers OpenAI's Pierre deal."
+      }
+    },
+    "11149-11205": {
+      "inputHash": "86d8276bbab45b11",
+      "date": "2026-11-11",
+      "value": {
+        "label": "same",
+        "confidence": "high",
+        "why": "Both report Anthropic's biology team using Claude to map the structure of a bacterial vault particle."
+      }
+    },
+    "11176-11163": {
+      "inputHash": "f7fea2a5ccd49114",
+      "date": "2026-11-11",
+      "value": {
+        "label": "same",
+        "confidence": "medium",
+        "why": "Both are Higgsfield's Miracle video editing feature, one a beta preview story, the other a listing."
+      }
+    },
+    "11179-10994": {
+      "inputHash": "dceb5effd033caad",
+      "date": "2026-11-11",
+      "value": {
+        "label": "follow_up",
+        "confidence": "high",
+        "why": "The older reports OpenAI cutting its round target to $20 billion; the newer that it closed about $11 billion."
+      }
+    },
+    "11179-11004": {
+      "inputHash": "54bf1ce3680f7167",
+      "date": "2026-11-11",
+      "value": {
+        "label": "follow_up",
+        "confidence": "high",
+        "why": "The older reports OpenAI cutting its round target to $20 billion; the newer that it closed about $11 billion."
+      }
+    },
+    "11186-11155": {
+      "inputHash": "387bb9ac929cc0a1",
+      "date": "2026-11-11",
+      "value": {
+        "label": "same",
+        "confidence": "high",
+        "why": "Both are NVIDIA's VFlash model for parallel visual planning, one a short note, the other the paper."
+      }
+    },
+    "11200-11180": {
+      "inputHash": "2f38d655b949709a",
+      "date": "2026-11-11",
+      "value": {
+        "label": "same",
+        "confidence": "medium",
+        "why": "Both report OpenAI's launch of the GPT-6 Cyber security model; the newer adds a Linux bug-hunting test."
+      }
+    },
+    "11201-11096": {
+      "inputHash": "47e24217750762f8",
+      "date": "2026-11-11",
+      "value": {
+        "label": "same",
+        "confidence": "high",
+        "why": "Both report OpenAI releasing Images 2.6 with GIF creation in ChatGPT and two API models."
+      }
+    },
+    "11201-11116": {
+      "inputHash": "dcff5381ca2a8a0b",
+      "date": "2026-11-11",
+      "value": {
+        "label": "same",
+        "confidence": "high",
+        "why": "Both report the release of ChatGPT Images 2.6 with animated GIFs and persistent references."
+      }
+    },
+    "11211-10947": {
+      "inputHash": "34897caa91d83bf5",
+      "date": "2026-11-11",
+      "value": {
+        "label": "follow_up",
+        "confidence": "high",
+        "why": "The older previews data center ballot measures in the elections; the newer reports voters rejected 40 of 41."
+      }
+    },
+    "11269-11004": {
+      "inputHash": "3258b2f3a40ec18a",
+      "date": "2026-11-11",
+      "value": {
+        "label": "follow_up",
+        "confidence": "high",
+        "why": "The older reports OpenAI cutting its round target to $20 billion; the newer that it raised $11 billion so far."
+      }
+    },
+    "11293-11218": {
+      "inputHash": "3a8db560d0306c79",
+      "date": "2026-11-11",
+      "value": {
+        "label": "same",
+        "confidence": "high",
+        "why": "Both report Anthropic taking over a $3.4 billion order for 1.7 GW of gas generators from OnePWR."
+      }
+    },
+    "9966-9863": {
+      "inputHash": "07b1f8c0f427662a",
+      "date": "2026-11-11",
+      "value": {
+        "label": "follow_up",
+        "confidence": "high",
+        "why": "The older reports a leaked $500 ChatGPT plan in preparation; the newer its launch with Ultrafast access."
+      }
+    },
+    "9975-9968": {
+      "inputHash": "33f786702662cc83",
+      "date": "2026-11-11",
+      "value": {
+        "label": "follow_up",
+        "confidence": "high",
+        "why": "The older reports OpenAI reportedly cancelling GPT-6.1 Astra; the newer adds that it then shipped GPT-6.1 Sol."
+      }
+    },
+    "9988-9999": {
+      "inputHash": "02986d823ac01526",
+      "date": "2026-11-11",
+      "value": {
+        "label": "same",
+        "confidence": "low",
+        "why": "Both appear to report frontier AI leaders signing a voluntary safety pact at a White House event, under different names."
+      }
+    }
+  }
+}

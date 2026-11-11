@@ -1,3 +1,4 @@
+import type { ExtractionGolden, GoldenStory } from "@/evals/extraction/golden";
 import type { ExtractionGrade, StoryVerdict } from "@/evals/extraction/judge";
 import type { Metric } from "@/evals/lib/results";
 import { mean } from "@/evals/lib/stats";
@@ -19,6 +20,8 @@ export interface ScoredIssue {
   url: string;
   referenceCount: number | null;
   referenceUrls: string[];
+  /** The issue's golden value (golden.ts). */
+  golden: ExtractionGolden;
 }
 
 export interface DeterministicChecks {
@@ -86,15 +89,42 @@ export function linkedStoryUrls(stories: ExtractedStory[], issueUrl: string): st
   return [...new Set(urls)];
 }
 
+/** One extracted story of a graded run, its verdict, and the golden story it is matched to (story kind only). */
+interface Judged {
+  story: ExtractedStory;
+  verdict: StoryVerdict;
+  golden: GoldenStory | null;
+}
+type Matched = Judged & { golden: GoldenStory };
+
 /** A count over the stories of every graded run. */
-function storyHits(name: string, pairs: { story: ExtractedStory; verdict: StoryVerdict }[], test: (story: ExtractedStory, verdict: StoryVerdict) => boolean): Metric {
-  return { name, hits: pairs.filter(({ story, verdict }) => test(story, verdict)).length, n: pairs.length };
+function storyHits<T extends Judged>(name: string, judged: T[], test: (entry: T) => boolean): Metric {
+  return { name, hits: judged.filter(test).length, n: judged.length };
+}
+
+/** The golden story numbers a run found: those an extracted story is matched to as a story or a roundup item. */
+export function foundGolden(golden: ExtractionGolden, verdicts: StoryVerdict[]): Set<number> {
+  const found = new Set<number>();
+  for (const verdict of verdicts) {
+    if (verdict.kind !== "story" && verdict.kind !== "roundup_item") continue;
+    for (const number of verdict.golden) if (number >= 1 && number <= golden.stories.length) found.add(number);
+  }
+  return found;
+}
+
+/** Golden stories with a url that some extracted story has (both cleaned): recall by link, with no judge. */
+function goldenUrlsFound(golden: ExtractionGolden, stories: ExtractedStory[]): { hits: number; n: number } {
+  const urls = new Set(stories.map((story) => cleanStoryUrl(story.url)).filter(Boolean));
+  const wanted = golden.stories.map((story) => cleanStoryUrl(story.url)).filter(Boolean);
+  return { hits: wanted.filter((url) => urls.has(url)).length, n: wanted.length };
 }
 
 export function scoreExtraction<I extends ScoredIssue>(outcomes: ExtractionOutcome<I>[]): Metric[] {
   const ok = outcomes.filter((outcome): outcome is ExtractionOutcome<I> & { output: ExtractionOutput } => outcome.error === null && outcome.output !== null);
   const checks = new Map(ok.map((outcome) => [outcome, checkExtraction(outcome.item.text, outcome.output.stories)]));
   const check = (outcome: ExtractionOutcome<I>) => checks.get(outcome as never)!;
+  // An error is a miss: no stories.
+  const byUrl = outcomes.map((outcome) => goldenUrlsFound(outcome.item.golden, outcome.error === null && outcome.output ? outcome.output.stories : []));
 
   const metrics: Metric[] = [
     countHits("Valid output", outcomes, () => true),
@@ -103,6 +133,8 @@ export function scoreExtraction<I extends ScoredIssue>(outcomes: ExtractionOutco
     countHits("Issues: categories allowed", outcomes, (outcome) => check(outcome).badCategories === 0),
     countHits("Issues: no duplicates", outcomes, (outcome) => check(outcome).duplicates === 0),
     { name: "Stories per issue", value: mean(ok.map((outcome) => outcome.output.stories.length)) },
+    { name: "Golden per issue", value: mean(outcomes.map((outcome) => outcome.item.golden.stories.length)) },
+    { name: "Golden URLs found", hits: byUrl.reduce((sum, count) => sum + count.hits, 0), n: byUrl.reduce((sum, count) => sum + count.n, 0) },
     { name: "Saved per issue", value: mean(ok.map((outcome) => linkedStoryUrls(outcome.output.stories, outcome.item.url).length)) },
   ];
 
@@ -127,25 +159,31 @@ export function scoreExtraction<I extends ScoredIssue>(outcomes: ExtractionOutco
 
   const graded = gradedOutcomes(outcomes);
   if (graded.length > 0) {
-    const pairs = graded.flatMap((outcome) => {
+    const judged: Judged[] = graded.flatMap((outcome) => {
+      const golden = outcome.item.golden.stories;
       const verdicts = new Map(outcome.grade.stories.map((verdict) => [verdict.index, verdict]));
       return outcome.output.stories.flatMap((story, index) => {
         const verdict = verdicts.get(index + 1);
-        return verdict ? [{ story, verdict }] : [];
+        if (!verdict) return [];
+        const match = verdict.kind === "story" && verdict.golden.length === 1 ? (golden[verdict.golden[0] - 1] ?? null) : null;
+        return [{ story, verdict, golden: match }];
       });
     });
-    const real = pairs.filter(({ verdict }) => verdict.kind === "story");
-    const qualifying = graded.reduce((sum, outcome) => sum + outcome.grade.qualifying_in_text, 0);
-    const missed = graded.reduce((sum, outcome) => sum + Math.min(outcome.grade.missed, outcome.grade.qualifying_in_text), 0);
+    // A roundup returned as one story per item is right too: its items count neither for nor against precision.
+    const counted = judged.filter(({ verdict }) => verdict.kind !== "roundup_item");
+    const matched = judged.filter((entry): entry is Matched => entry.golden !== null);
+    const found = graded.map((outcome) => foundGolden(outcome.item.golden, outcome.grade.stories).size);
+    const goldenTotal = graded.reduce((sum, outcome) => sum + outcome.item.golden.stories.length, 0);
     metrics.push(
-      { name: "Recall (judge)", hits: qualifying - missed, n: qualifying },
-      storyHits("Precision (judge)", pairs, (_, verdict) => verdict.kind === "story"),
-      storyHits("Faithful stories", pairs, (_, verdict) => verdict.unsupported_facts === 0),
-      storyHits("Category right", real, (story, verdict) => story.category === verdict.expected_category),
-      storyHits("Headline rules", pairs, (_, verdict) => verdict.headline_ok),
-      storyHits("URL right", pairs, (_, verdict) => verdict.url_ok),
-      storyHits("Importance within 1", real, (story, verdict) => Math.abs(story.importance_score - verdict.expected_importance) <= 1),
-      { name: "Missed per issue", value: mean(graded.map((outcome) => outcome.grade.missed)) }
+      { name: "Recall (golden)", hits: found.reduce((sum, count) => sum + count, 0), n: goldenTotal },
+      storyHits("Precision (golden)", counted, ({ verdict }) => verdict.kind === "story"),
+      storyHits("Category = golden", matched, ({ story, golden }) => story.category === golden.category),
+      storyHits("Importance within 1 of golden", matched, ({ story, golden }) => Math.abs(story.importance_score - golden.importance) <= 1),
+      storyHits("URL = golden", matched, ({ story, golden }) => cleanStoryUrl(story.url) === cleanStoryUrl(golden.url)),
+      storyHits("Faithful stories", judged, ({ verdict }) => verdict.unsupported_facts === 0),
+      storyHits("Headline rules", judged, ({ verdict }) => verdict.headline_ok),
+      { name: "Missed per issue", value: mean(graded.map((outcome, index) => outcome.item.golden.stories.length - found[index])) },
+      { name: "Extra per issue", value: mean(graded.map((outcome) => outcome.grade.stories.filter((verdict) => verdict.kind === "extra").length)) }
     );
   }
   return metrics;

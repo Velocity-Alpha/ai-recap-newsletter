@@ -70,6 +70,21 @@ describe("renderResults", () => {
     expect(markdown).toContain("| 123 (101–141) |");
   });
 
+  it("shows a count's difference against the baseline, with its interval, in points", () => {
+    const vsBaseline = { diff: 0.0612, low: -0.021, high: 0.139 };
+    const markdown = render([row("low", 21, { metrics: [{ name: "Hit", hits: 21, n: 30, vsBaseline }] })]);
+    expect(markdown).toContain("| 21/30 (70%), +6 pts (−2 to +14) |");
+  });
+
+  it("shows a difference of zero without a sign", () => {
+    const vsBaseline = { diff: 0, low: -0.1, high: 0.1 };
+    expect(render([row("low", 21, { metrics: [{ name: "Hit", hits: 21, n: 30, vsBaseline }] })])).toContain("0 pts (−10 to +10)");
+  });
+
+  it("marks the baseline row", () => {
+    expect(render([row("medium", 21, { baseline: true })])).toContain("| gpt-6-luna | medium (baseline) |");
+  });
+
   it("shows no spread when every repeat is the same", () => {
     expect(render([row("low", 3, { metrics: [{ name: "Same", hits: 3, n: 3, spread: { min: 1, max: 1 } }] })])).toContain("| 3/3 (100%) |");
   });

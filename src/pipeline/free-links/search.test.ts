@@ -1,7 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
 
 import answers from "@/src/pipeline/free-links/__fixtures__/search-answers.json";
-import { buildSearchPrompt, parseSearchAnswer, SEARCH_EFFORT, searchFreeLinks, type SearchClient } from "@/src/pipeline/free-links/search";
+import {
+  buildSearchPrompt,
+  FREE_ARTICLES_ASK,
+  FREE_LINK_EXCLUSIONS,
+  FREE_LINK_PREFERENCE,
+  parseSearchAnswer,
+  SEARCH_EFFORT,
+  searchFreeLinks,
+  type SearchClient,
+} from "@/src/pipeline/free-links/search";
 
 const STORY = {
   headline: "Pretend Lab Ships A Toy Model",
@@ -24,6 +33,11 @@ describe("buildSearchPrompt", () => {
 
       Search the web and find up to 3 free-to-read articles that report this same news. Prefer original reporting, large news sites, and primary sources (a company post, a filing, a court document). Do not return paywalled sites (WSJ, FT, Bloomberg, NYT, The Information, Reuters, CNBC Pro), social media posts, aggregators, or short rewrites. Answer with JSON only: {"links":[{"url":"...","title":"...","site":"..."}]}. Use an empty list when you find none."
     `);
+  });
+
+  it("is built from the exported rules the free-links eval uses", () => {
+    const prompt = buildSearchPrompt(STORY);
+    for (const part of [FREE_ARTICLES_ASK, FREE_LINK_PREFERENCE, FREE_LINK_EXCLUSIONS]) expect(prompt).toContain(part);
   });
 });
 

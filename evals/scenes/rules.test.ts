@@ -35,6 +35,14 @@ describe("checkSceneText", () => {
     expect(checkSceneText(`${GOOD} Painted in watercolor.`).styleWords).toEqual(["watercolor"]);
   });
 
+  it("finds the forms of a forbidden word", () => {
+    const text = `${GOOD} It symbolises, implied, representing, a watercolour, metaphors, in negative space.`;
+    expect(checkSceneText(text)).toMatchObject({
+      interpretiveWords: ["representing", "symbolises", "implied", "metaphors"],
+      styleWords: ["watercolour", "negative space"],
+    });
+  });
+
   it("checks the interpretive words of the list it is given", () => {
     // "implies" is on the scene prompt's list only.
     expect(checkSceneText(`${GOOD} It implies trust.`).interpretiveWords).toEqual(["implies"]);

@@ -21,6 +21,8 @@ const GRADE: ScenePromptGrade = {
   logo_rule: true,
   visible_only: false,
   no_extra_elements: true,
+  identifier_shown: true,
+  misread: false,
   thumbnail_readability: 3,
   lead_relevance: 2,
   note: "ok",
@@ -60,7 +62,7 @@ describe("scoreScenePrompt", () => {
     new Map(
       scoreScenePrompt([
         outcome({ scenePrompt: GOOD, rationale: "Short." }, GRADE),
-        outcome({ scenePrompt: "Too short, 16:9.", rationale: "Short." }, { ...GRADE, depicted_story: 2, lead_relevance: 0 }),
+        outcome({ scenePrompt: "Too short, 16:9.", rationale: "Short." }, { ...GRADE, depicted_story: 2, lead_relevance: 0, misread: true }),
         outcome({ scenePrompt: "Too short, 16:9.", rationale: "Short." }),
         outcome(null),
       ]).map((metric) => [metric.name, metric])
@@ -78,8 +80,17 @@ describe("scoreScenePrompt", () => {
     expect(metrics().get("J: visible only")).toEqual({ name: "J: visible only", hits: 0, n: 2 });
   });
 
-  it("counts a scene as depicting the lead when it shows the story the subject line is about", () => {
+  it("counts a scene as depicting the lead when it shows the golden lead story", () => {
     expect(metrics().get("J: depicts lead")).toEqual({ name: "J: depicts lead", hits: 1, n: 2 });
+  });
+
+  it("counts a lead identifier only for a scene of the golden lead", () => {
+    // The second graded run shows an identifier, but of story 2.
+    expect(metrics().get("J: shows a lead identifier")).toEqual({ name: "J: shows a lead identifier", hits: 1, n: 2 });
+  });
+
+  it("counts the scenes that show none of the golden misreads", () => {
+    expect(metrics().get("J: no misread")).toEqual({ name: "J: no misread", hits: 1, n: 2 });
   });
 
   it("averages the judge's scores over the graded runs", () => {

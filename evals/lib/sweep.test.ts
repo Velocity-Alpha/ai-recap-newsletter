@@ -101,7 +101,150 @@ describe("runSweep", () => {
       api: () => api,
       grade: (_item, _output, context) => context.judge<{ good: boolean }>({ name: "g", instructions: "i", input: "x", schema: {} }),
     });
-    expect(result.rows[0].judge).toBe("gpt-6-sol / high");
+    expect(result.rows[0].judge).toBe("gpt-6.1-terra / medium");
+  });
+
+  it("sends judge calls on the flex tier and the call under test on standard", async () => {
+    const answer = { id: "resp_1", status: "completed", output: [], output_text: '{"good":true}', usage: { input_tokens: 7, output_tokens: 3 } };
+    const api = { create: vi.fn<(...args: unknown[]) => Promise<typeof answer>>(async () => answer), retrieve: vi.fn(async () => answer) };
+    await toySweep<{ good: boolean }>({
+      items: ITEMS.slice(0, 1),
+      api: () => api as unknown as ResponsesApi,
+      run: async (item, context) => {
+        await context.client.responses.create({ model: "gpt-6-luna", input: "x", service_tier: "flex" } as never);
+        return item.answer;
+      },
+      grade: (_item, _output, context) => context.judge<{ good: boolean }>({ name: "g", instructions: "i", input: "x", schema: {} }),
+    });
+    const bodies = api.create.mock.calls.map((call) => call[0] as Record<string, unknown>);
+    expect(bodies.find((body) => body.model === "gpt-6-luna")).not.toHaveProperty("service_tier");
+    expect(bodies.find((body) => body.model === "gpt-6.1-terra")).toMatchObject({ service_tier: "flex" });
+  });
+
+  it("runs every config of the sweep at the same time", async () => {
+    const running = new Set<string>();
+    let configsAtOnce = 0;
+    await toySweep({
+      settings: evalSettings({ model: "gpt-6-luna", efforts: ["low", "high"] }, {}),
+      async run(item, context) {
+        running.add(`${context.config.effort}:${item.id}`);
+        configsAtOnce = Math.max(configsAtOnce, new Set([...running].map((key) => key.split(":")[0])).size);
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        running.delete(`${context.config.effort}:${item.id}`);
+        return item.answer;
+      },
+    });
+    expect(configsAtOnce).toBe(2);
+  });
+
+  async function mostAtOnce(changes: (track: <T>(work: () => Promise<T>) => Promise<T>) => Partial<SweepSpec<Item, string, { good: boolean }>>) {
+    let running = 0;
+    let most = 0;
+    const track = async <T>(work: () => Promise<T>) => {
+      running += 1;
+      most = Math.max(most, running);
+      try {
+        return await work();
+      } finally {
+        running -= 1;
+      }
+    };
+    await toySweep<{ good: boolean }>(changes(track));
+    return most;
+  }
+
+  it("keeps the runs in flight, over all configs, under EVAL_CONCURRENCY", async () => {
+    const most = await mostAtOnce((track) => ({
+      settings: evalSettings({ model: "gpt-6-luna", efforts: ["low", "medium", "high"], repeats: 2 }, { EVAL_CONCURRENCY: "4" }),
+      run: (item) => track(() => new Promise<string>((resolve) => setTimeout(() => resolve(item.answer), 5))),
+    }));
+    expect(most).toBe(4);
+  });
+
+  it("keeps the judge calls in flight under EVAL_JUDGE_CONCURRENCY", async () => {
+    const most = await mostAtOnce((track) => {
+      const answer = { id: "r", status: "completed", output: [], output_text: '{"good":true}', usage: { input_tokens: 1, output_tokens: 1 } };
+      const create = () => track(() => new Promise((resolve) => setTimeout(() => resolve(answer), 5)));
+      return {
+        settings: evalSettings({ model: "gpt-6-luna", efforts: ["low", "high"], repeats: 2 }, { EVAL_JUDGE_CONCURRENCY: "2" }),
+        api: () => ({ create, retrieve: create }) as unknown as ResponsesApi,
+        grade: (_item, _output, context) => context.judge<{ good: boolean }>({ name: "g", instructions: "i", input: "x", schema: {} }),
+      };
+    });
+    expect(most).toBe(2);
+  });
+
+  it("keeps the outcomes of each config in item and repeat order", async () => {
+    const write = vi.fn((file: ResultsFile, raw: unknown) => {
+      void raw;
+      return `evals/results/${file.task}.md`;
+    });
+    await toySweep({
+      settings: evalSettings({ model: "gpt-6-luna", efforts: ["low", "high"], repeats: 2 }, {}),
+      run: async (item) => {
+        await new Promise((resolve) => setTimeout(resolve, 10 - 3 * item.id));
+        return item.answer;
+      },
+      write,
+    });
+    const raw = write.mock.calls[0][1] as { configs: Array<{ outcomes: Array<{ id: string; repeat: number }> }> };
+    const order = raw.configs.map((config) => config.outcomes.map((outcome) => `${outcome.id}:${outcome.repeat}`));
+    expect(order).toEqual([
+      ["1:0", "2:0", "3:0", "1:1", "2:1", "3:1"],
+      ["1:0", "2:0", "3:0", "1:1", "2:1", "3:1"],
+    ]);
+  });
+
+  it("leaves a rate-limit wait out of the latency, and does not count it as an error", async () => {
+    const answer = { id: "r", status: "completed", output: [], usage: { input_tokens: 1, output_tokens: 1 } };
+    const create = vi
+      .fn()
+      .mockRejectedValueOnce(Object.assign(new Error("429"), { status: 429, code: "rate_limit_exceeded", headers: new Headers({ "retry-after-ms": "60" }) }))
+      .mockResolvedValue(answer);
+    const result = await toySweep({
+      items: ITEMS.slice(0, 1),
+      api: () => ({ create, retrieve: create }) as unknown as ResponsesApi,
+      run: async (item, context) => {
+        await context.client.responses.create({ model: "gpt-6-luna", input: "x" } as never);
+        return item.answer;
+      },
+    });
+    expect(result.rows[0].errors).toBe(0);
+    expect(result.rows[0].latencyMs.p95).toBeLessThan(40);
+  });
+
+  describe("against the baseline", () => {
+    const sweepWithBaseline = () =>
+      toySweep({
+        settings: evalSettings({ model: "gpt-6-luna", efforts: ["low", "high"], baseline: "low", repeats: 2 }, {}),
+        run: async (item, context) => (context.config.effort === "high" && item.id === 2 ? "wrong" : item.answer),
+        score: (outcomes) => [
+          countHits("Right answer", outcomes, (outcome) => outcome.output === outcome.item.answer),
+          { name: "Not per item", hits: 1, n: 1 },
+          { name: "Runs", value: outcomes.length },
+        ],
+      });
+
+    it("marks the baseline row, and gives it no comparison", async () => {
+      const [low] = (await sweepWithBaseline()).rows;
+      expect(low.baseline).toBe(true);
+      expect(low.metrics[0]).not.toHaveProperty("vsBaseline");
+    });
+
+    it("adds each count's difference against the baseline, with its interval", async () => {
+      const [, high] = (await sweepWithBaseline()).rows;
+      expect(high.baseline).toBeUndefined();
+      const vsBaseline = (high.metrics[0] as { vsBaseline?: { diff: number; low: number; high: number } }).vsBaseline!;
+      expect(vsBaseline.diff).toBeCloseTo(-1 / 3, 10);
+      expect(vsBaseline.low).toBeLessThanOrEqual(vsBaseline.diff);
+      expect(vsBaseline.high).toBeGreaterThanOrEqual(vsBaseline.diff);
+    });
+
+    it("compares only counts that add up over items", async () => {
+      const [, high] = (await sweepWithBaseline()).rows;
+      expect(high.metrics[1]).not.toHaveProperty("vsBaseline");
+      expect(high.metrics[2]).not.toHaveProperty("vsBaseline");
+    });
   });
 
   it("records no judge when no judge call was made", async () => {

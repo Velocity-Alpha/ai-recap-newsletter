@@ -1,8 +1,1874 @@
 {
-  "note": "The published issues of the scene evals, read from the Neon dev branch by evals/scenes/build-issues.ts: each issue's subject line and Top Stories (headline and story detail), as imageContextFor builds them. Our own text only.",
-  "from": "2026-10-26",
+  "note": "100 published issues of the scene evals, read from the Neon dev branch by evals/scenes/build-issues.ts: spread evenly over the 139 published issues with Top Stories, with every issue of 2026-10-26 to 2026-11-06 (the first test set). Each issue's subject line and Top Stories (headline and story detail), as imageContextFor builds them. Our own text only.",
+  "from": "2026-03-14",
   "to": "2026-11-06",
   "issues": [
+    {
+      "issueId": 110,
+      "date": "2026-03-14",
+      "context": {
+        "subjectLine": "Gemini Embedding 2 Unifies More Modalities",
+        "topStories": [
+          {
+            "headline": "Gemini Embedding 2 brings text, video, and audio together",
+            "detail": "Google DeepMind released Gemini Embedding 2, a natively multimodal embedding model that can handle text, images, short video clips, and audio in one space. The model is being integrated into Workspace for AI Ultra and Pro users, with features like full-draft generation, design-aligned presentations, automated dashboards, and cross-file Q&A with citations. Google is also piloting a multi-agent planning mode for Gemini Business."
+          },
+          {
+            "headline": "Claude 4.6 gets 1M-token context windows",
+            "detail": "Anthropic says Claude Opus 4.6 and Sonnet 4.6 now support 1 million-token context windows for all users. The company also removed the previous premium pricing for long-context usage and expanded media capacity to handle up to 600 images or PDF pages per request. The models are generally available across Claude Platform, Amazon Bedrock, Google Vertex AI, and Microsoft Azure Foundry."
+          },
+          {
+            "headline": "Zoom is bringing AI avatars into meetings",
+            "detail": "Zoom introduced AI-generated avatars that can join and present in meetings on a user's behalf. The avatars can speak, share screens, and respond to prompts, with early beta testing already underway for enterprise customers. The pitch is simple: let AI handle routine meeting attendance and presentation work."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 95,
+      "date": "2026-03-26",
+      "context": {
+        "subjectLine": "AI gains autonomy, Safety guard steps in & more",
+        "topStories": [
+          {
+            "headline": "Anthropic previews Auto Mode for Claude Code",
+            "detail": "Anthropic launched Auto Mode in research preview, letting Claude Code make permission decisions during long tasks while a classifier screens tool calls for destructive actions and prompt-injection risks."
+          },
+          {
+            "headline": "Google expands Lyria 3 Pro",
+            "detail": "Google introduced Lyria 3 Pro with tracks up to three minutes and finer control over song structure, then started rolling it out across more Google products including YouTube Shorts and Google Vids."
+          },
+          {
+            "headline": "Cohere releases an open transcription model",
+            "detail": "Cohere launched Transcribe, its first voice model, as an open source speech recognition system for note-taking and speech analysis that can run on consumer-grade GPUs."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 98,
+      "date": "2026-03-27",
+      "context": {
+        "subjectLine": "Voice AI Surges",
+        "topStories": [
+          {
+            "headline": "Google launches Gemini 3.1 Flash Live",
+            "detail": "Google released Gemini 3.1 Flash Live as a real-time voice model built for low-latency, natural dialogue. The model is available across Google's developer APIs, enterprise tools, and consumer products."
+          },
+          {
+            "headline": "Anthropic wins early DoD ruling",
+            "detail": "Anthropic won a preliminary injunction in its lawsuit against the Department of War over being labeled a supply chain risk. The judge said the statute does not support treating an American company as a potential adversary simply for disagreeing with the government."
+          },
+          {
+            "headline": "Google's TurboQuant cuts LLM memory",
+            "detail": "Google's TurboQuant is a compression algorithm designed to reduce large language model memory usage while also improving speed and maintaining accuracy. Early testing shows an 8x performance increase and a 6x reduction in memory use without a loss of quality."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 100,
+      "date": "2026-03-31",
+      "context": {
+        "subjectLine": "Mistral Bets Big On Own GPUs",
+        "topStories": [
+          {
+            "headline": "Alibaba.com Unveils Accio Work",
+            "detail": "Alibaba.com introduced Accio Work, an agentic system built to deploy teams of digital employees around the clock. It is positioned as a move from AI assistants to operators, with human oversight still required for high-stakes actions. The platform can assemble specialized agents from a goal, connect tools and skills, and handle complex multi-step business workflows."
+          },
+          {
+            "headline": "Mistral Raises $830M For Its Own AI Stack",
+            "detail": "Mistral raised $830 million in debt to power its own Nvidia-based AI infrastructure in France. The financing is part of a broader push to reduce reliance on U.S. cloud providers. It also signals how far frontier labs are willing to go to secure compute on their own terms."
+          },
+          {
+            "headline": "Rebellions Raises $400M Ahead Of IPO",
+            "detail": "AI chip startup Rebellions raised $400 million ahead of a planned IPO. The company is focused on inference chips, aiming to lower cost and power usage for production AI systems. The raise reflects how the market is shifting toward inference economics as AI deployment scales."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 101,
+      "date": "2026-04-01",
+      "context": {
+        "subjectLine": "OpenAI’s $122B Shockwave",
+        "topStories": [
+          {
+            "headline": "OpenAI Raises $122B at $852B Valuation",
+            "detail": "OpenAI announced a $122B funding round at an $852B valuation, setting a new high-water mark for venture fundraising. Amazon, Nvidia, and SoftBank anchored $110B of the raise, and OpenAI said revenue has reached $2B per month as it moves toward a unified AI superapp. The company is folding ChatGPT, Codex, and its agent tools into one product after winding down Sora."
+          },
+          {
+            "headline": "Claude Code Source Code Leaks Publicly",
+            "detail": "Anthropic accidentally exposed the source code behind Claude Code in a public registry, spilling more than 1,900 files and over 500K lines of code. Developers found unreleased features, feature flags, and internal codenames, while Anthropic said the incident was human error and that no customer data was exposed. The leak still became a reputational headache as a GitHub mirror spread quickly."
+          },
+          {
+            "headline": "Meta Ships Prescription-Ready AI Glasses",
+            "detail": "Meta is rolling out its first prescription-ready AI glasses with two new Ray-Ban Meta designs, plus new frame and lens options across its wearable line. The glasses add on-device features like nutrition tracking, WhatsApp message summaries, handwriting support, and pedestrian navigation. Pre-orders start at $499, with in-store availability on April 14."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 104,
+      "date": "2026-04-03",
+      "context": {
+        "subjectLine": "Google’s Open Gemma 4 Crushes",
+        "topStories": [
+          {
+            "headline": "Google Debuts Gemma 4 Open-Weight Models",
+            "detail": "Google DeepMind expanded its Gemma line with open-weight models ranging from 2B and 4B edge versions to 26B MoE and 31B dense versions. The release is notable because it uses Gemini 3 technology and is the first Gemma release under Apache 2.0. It also supports 256K context and multimodal processing."
+          },
+          {
+            "headline": "Anthropic Moves Into Life Sciences",
+            "detail": "Anthropic is reportedly acquiring Coefficient Bio for about $400 million, marking an expansion into life sciences. The same report says it is also building Epitaxy, a Claude Code desktop UI, and Conway, a persistent agent platform that integrates Chrome, webhooks, and extensions. The report also says leaked Claude Code has been cloned more than 8,000 times on GitHub."
+          },
+          {
+            "headline": "Perplexity Ships Tax-Ready AI",
+            "detail": "Perplexity introduced a tax-focused AI product built to navigate new federal laws and catch human errors. It is aimed at a practical, high-stakes use case where accuracy matters. The launch adds another specialized workflow to Perplexity's product lineup."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 105,
+      "date": "2026-04-06",
+      "context": {
+        "subjectLine": "Anthropic’s $400M Biotech Bet",
+        "topStories": [
+          {
+            "headline": "Anthropic buys Coefficient Bio for $400 million",
+            "detail": "Anthropic acquired biotech AI startup Coefficient Bio for $400 million in stock. The deal expands its healthcare and life sciences push and brings the startup's 10-person team into Anthropic's health and life sciences division. Coefficient Bio was founded by former Genentech researchers and used AI to speed up drug discovery and biological research."
+          },
+          {
+            "headline": "Anthropic blocks third-party agents on Claude plans",
+            "detail": "Anthropic blocked agent platforms like OpenClaw from running on Claude subscription plans, requiring separate payment. The company said the change is meant to manage growth and keep serving customers sustainably long-term. It is also handing out credits, discounting add-ons, and offering refunds amid cancellation requests."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 108,
+      "date": "2026-04-08",
+      "context": {
+        "subjectLine": "Anthropic’s Secret Model Stuns Everyone",
+        "topStories": [
+          {
+            "headline": "Anthropic keeps Claude Mythos private",
+            "detail": "Anthropic says Claude Mythos is powerful enough that it chose not to release it publicly. Instead, the company launched Project Glasswing so a small set of organizations can use the model for vulnerability research."
+          },
+          {
+            "headline": "OpenAI reshuffles leadership amid health leaves",
+            "detail": "OpenAI is shifting responsibilities as Fidji Simo and Kate Rouch step away for medical recovery. Greg Brockman, Brad Lightcap, Denise Dresser, Gary Briggs, Jason Kwon, and Sarah Friar are taking on expanded duties across product, commercial, and operational work."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 109,
+      "date": "2026-04-09",
+      "context": {
+        "subjectLine": "Poke’s Big Money Agent Bet",
+        "topStories": [
+          {
+            "headline": "Poke Raises $25 Million At $300 Million Valuation",
+            "detail": "Poke says it is making AI agents feel as simple as sending a text. The company raised $25 million at a $300 million valuation and is leaning on recipe-based automation plus flexible pricing to drive adoption. Its pitch is built around letting users create and share automations without much friction."
+          },
+          {
+            "headline": "Anthropic Restricts Claude For Third-Party Tools",
+            "detail": "Anthropic is changing how Claude subscriptions can be used with third-party AI tools like OpenClaw. Pro and Max users will need to switch to API billing or usage bundles, a move aimed at agent-heavy workflows that make continuous requests with large context windows. The change could push costs higher for heavy users, even as Anthropic says it is offering one-time credits."
+          },
+          {
+            "headline": "Meta Debuts Muse Spark",
+            "detail": "Meta introduced Muse Spark as a multimodal reasoning model with tool use, visual chain-of-thought, and multi-agent orchestration. The launch fits into Meta’s broader push toward personal superintelligence. It gives the company another flagship model to showcase its agent and reasoning ambitions."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 111,
+      "date": "2026-04-13",
+      "context": {
+        "subjectLine": "Meta’s New Model Ups the Stakes",
+        "topStories": [
+          {
+            "headline": "Meta launches Muse Spark",
+            "detail": "Meta released Muse Spark, the first model from its Superintelligence Labs, and put it into Meta AI with a private API preview. The compact multimodal system adds tool use, visual chain-of-thought, multi-agent orchestration, and a Contemplating Mode for parallel reasoning. It is already live and Meta says open-source plans are still ahead."
+          },
+          {
+            "headline": "OpenAI cuts Pro to $100",
+            "detail": "OpenAI launched a $100/month ChatGPT Pro tier for heavy Codex users, with roughly 5x the usage limits of Plus for agentic coding, cloud tasks, and code reviews. It also clarified that its invite-only cyber offering is a standalone defensive product. On the business side, the company said it will reserve IPO shares for retail investors as it prepares to look more like a public company."
+          },
+          {
+            "headline": "Anthropic unveils Mythos Preview",
+            "detail": "Anthropic said Claude Mythos Preview is its most powerful model yet, but it will not be generally released. Instead, the company is channeling the work into Project Glasswing, a cybersecurity initiative for about 50 organizations aimed at finding and patching vulnerabilities before attackers can exploit them. Anthropic says the safeguards developed there will carry into a future Claude Opus model."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 113,
+      "date": "2026-04-15",
+      "context": {
+        "subjectLine": "OpenAI Escalates The Cyber Race",
+        "topStories": [
+          {
+            "headline": "OpenAI Opens GPT-5.4-Cyber To More Defenders",
+            "detail": "OpenAI introduced GPT-5.4-Cyber as a more permissive model for defensive security work. Access is being opened to verified defenders through Trusted Access for Cyber, instead of a narrow whitelist. The model can reverse-engineer compiled software to help flag malware or security flaws, putting OpenAI directly into the middle of the cyber-defense race."
+          },
+          {
+            "headline": "DeepMind Releases Gemini Robotics-Er 1.6",
+            "detail": "Google DeepMind released Gemini Robotics-Er 1.6, an embodied AI model aimed at better spatial reasoning, multi-camera understanding, and task planning. The model uses agentic vision with tools like code execution and Search. It also improves pointing accuracy, task completion detection, and industrial instrument reading, and is available through the Gemini API and AI Studio."
+          },
+          {
+            "headline": "AWS Launches Amazon Bio Discovery",
+            "detail": "AWS introduced Amazon Bio Discovery, an agentic discovery system that connects more than 40 biology models to wet lab workflows. The goal is to speed up biological research by linking model output directly to experimental execution."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 114,
+      "date": "2026-04-16",
+      "context": {
+        "subjectLine": "OpenAI’s Coding Agents Get Serious",
+        "topStories": [
+          {
+            "headline": "OpenAI Hints at Parallel Coding Workflows",
+            "detail": "OpenAI is experimenting with Codex Scratchpad, an unreleased feature that points to parallel task execution inside its coding tools. The company is also cleaning up mixed messaging around ChatGPT Pro usage limits while dealing with a disclosed supply-chain incident tied to a compromised dependency. The security issue reportedly affected a pipeline with access to signing credentials, but there is no evidence of user data exposure or certificate exfiltration."
+          },
+          {
+            "headline": "Allbirds Pivots Into GPU Rental",
+            "detail": "Allbirds announced a $50 million convertible financing facility to buy GPUs and launch a GPU-as-a-Service business under a new AI-focused identity. Shareholders will also vote next month on stripping the company’s public benefit status, which would formally end its sustainable-footwear mission. The move follows the March sale of its brand assets for $39 million, far below its 2021 IPO peak."
+          },
+          {
+            "headline": "Google Brings Gemini To Mac",
+            "detail": "Google released a native Gemini app for Mac with system-wide access and screen context sharing. It also supports image and video generation through Nano Banana and Veo. The release makes Gemini feel more embedded in the desktop workflow, not just another web app."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 117,
+      "date": "2026-04-20",
+      "context": {
+        "subjectLine": "OpenAI’s Leadership Shakeup Deepens",
+        "topStories": [
+          {
+            "headline": "OpenAI Loses Three Senior Leaders",
+            "detail": "OpenAI saw three senior executives leave in a single day as the company continues a broader leadership reshuffle. The departures land alongside a sharper internal focus after the company shut down its Sora video app. The exits also reflect how OpenAI is reorganizing parts of science, consumer, and enterprise work."
+          },
+          {
+            "headline": "Google Brings Gemini To Mac",
+            "detail": "Google released a native Gemini app for Mac that can see the user’s screen and local files. The company also added Personal intelligence, Gemini 3.1 Flash TTS, and a split-screen AI Mode for Chrome. NotebookLM and Android developer tools also picked up updates."
+          },
+          {
+            "headline": "Nvidia Rivals Raise Big New Rounds",
+            "detail": "AI chip competitors are raising major funding as they try to take on Nvidia’s grip on the market. The fight is expanding beyond GPUs into the broader infrastructure stack behind AI workloads. That could affect both pricing and access to compute."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 119,
+      "date": "2026-04-21",
+      "context": {
+        "subjectLine": "Amazon Bets Billions on Anthropic",
+        "topStories": [
+          {
+            "headline": "Amazon Plans Up to $25 Billion Anthropic Investment",
+            "detail": "Amazon plans to invest up to $25 billion into Anthropic as part of a broader AI infrastructure push tied to AWS. The move deepens an already tight partnership and signals Amazon’s intent to control both compute and model layers. It also raises the stakes in cloud competition with Microsoft and Google."
+          },
+          {
+            "headline": "Apple’s Next CEO Faces an AI Reset",
+            "detail": "Apple’s new CEO John Ternus is being handed a defining challenge: fixing the company’s lagging AI strategy as competitors keep shipping faster. Apple still has major hardware and ecosystem advantages, but it continues to trail in foundational models and agent capabilities. Ternus now has to decide whether to build, partner, or acquire to close the gap."
+          },
+          {
+            "headline": "Google Eyes Marvell for Custom AI Chips",
+            "detail": "Google is in talks with Marvell Technology to develop a memory processing unit and an inference-optimized TPU. The discussions appear aimed at diversifying beyond Broadcom, which remains Google’s primary custom chip partner. Talks with Marvell have not yet produced a signed contract."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 123,
+      "date": "2026-04-23",
+      "context": {
+        "subjectLine": "ChatGPT’s Codex-Powered Agents For Teams",
+        "topStories": [
+          {
+            "headline": "Google adds Workspace Intelligence to Gemini",
+            "detail": "Google launched Workspace Intelligence as a semantic layer for Google Workspace, connecting emails, chats, files, and projects for Gemini-powered agents. It also adds natural-language spreadsheet building in Sheets, plus AI features across Docs, Slides, Gmail, and Drive. The pitch is a more centralized control layer for business work across the suite."
+          },
+          {
+            "headline": "ChatGPT gets Codex-powered workspace agents",
+            "detail": "OpenAI introduced Workspace Agents, shared Codex-powered bots built for multi-step team workflows across ChatGPT and Slack. The company positions them as the next step beyond solo GPTs, with memory, connected apps, scheduling, and Slack-native use when people are offline. OpenAI also says existing GPTs will keep working for now, with a conversion tool coming soon."
+          },
+          {
+            "headline": "Anthropic and Amazon expand compute deal",
+            "detail": "Anthropic and Amazon expanded their collaboration to secure up to 5 gigawatts of compute capacity. The deal is meant to support Claude training and deployment at much larger scale."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 125,
+      "date": "2026-04-24",
+      "context": {
+        "subjectLine": "Nvidia Backs Vast Data At $30 Billion Valuation",
+        "topStories": [
+          {
+            "headline": "OpenAI Retakes the Frontier With GPT-5.5",
+            "detail": "OpenAI launched GPT-5.5, codenamed Spud, and described it as a new class of intelligence. The company says it is setting top benchmark scores across reasoning, agentic, computer use, and coding, while rolling out in ChatGPT and Codex. OpenAI also says the model keeps the same speed as 5.4 with better efficiency and is priced at $5 and $30 per million input and output tokens in the API."
+          },
+          {
+            "headline": "Nvidia Backs Vast Data at $30 Billion",
+            "detail": "Nvidia backed Vast Data’s $1 billion funding round, valuing the AI infrastructure company at $30 billion. The deal is another sign that investors still want exposure to the infrastructure layer of the AI stack."
+          },
+          {
+            "headline": "Anthropic Hits a $1 Trillion Mark",
+            "detail": "Anthropic reached a $1 trillion valuation on Forge Global, surpassing OpenAI’s $880 billion. The jump appears tied to scarce shares and rising demand around partnerships and increased use of Claude Code."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 127,
+      "date": "2026-04-27",
+      "context": {
+        "subjectLine": "OpenAI Rebuilds Codex Around GPT-5.5",
+        "topStories": [
+          {
+            "headline": "OpenAI folds Codex into GPT-5.5",
+            "detail": "OpenAI is folding Codex into GPT-5.5, which now serves as its main system for agentic coding and general reasoning. Microsoft is also rolling the model into GitHub Copilot, Microsoft 365, and Azure Foundry to support more complex workflows. OpenAI says the model is more economical overall, even with a higher API price, because it uses fewer tokens to finish tasks."
+          },
+          {
+            "headline": "UAE moves half its government to AI agents",
+            "detail": "The UAE says it is handing half its government over to AI agents. The announcement points to a major government-led shift toward agentic automation in public administration and operations."
+          },
+          {
+            "headline": "Google may invest up to $40 billion in Anthropic",
+            "detail": "Google plans to invest between $10 billion and $40 billion in Anthropic, with the final amount tied to performance targets. The deal values Anthropic at $350 billion and is meant to help narrow the gap between AI compute demand and supply. Anthropic recently also received a major investment from Amazon."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 129,
+      "date": "2026-04-29",
+      "context": {
+        "subjectLine": "Musk Opens His $130B OpenAI Trial",
+        "topStories": [
+          {
+            "headline": "Musk’s $130B OpenAI Trial Begins",
+            "detail": "Elon Musk took the stand as opening statements began in his federal lawsuit against OpenAI. The case could force a major unwind of OpenAI’s for-profit conversion and put top AI leaders under oath over the company’s origins and governance. Musk is seeking damages, leadership changes, and a reversal of the conversion."
+          },
+          {
+            "headline": "Google Signs Classified Pentagon AI Deal",
+            "detail": "Google signed a classified AI deal with the Pentagon even as more than 600 employees urged Sundar Pichai to reject military uses of the company’s systems. The agreement expands Google’s AI into government and defense use cases, and the contract reportedly gives the Pentagon no legal right to veto how the AI is used. It lands as big AI labs keep moving deeper into defense work."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 131,
+      "date": "2026-04-30",
+      "context": {
+        "subjectLine": "China Blocks Meta's Manus Deal",
+        "topStories": [
+          {
+            "headline": "China Blocks Meta’s Manus Acquisition",
+            "detail": "China halted Meta’s planned $2 billion acquisition of agentic AI startup Manus and ordered the deal unwound. The move adds another layer of friction to Meta’s AI agent ambitions and its cross-border expansion plans."
+          },
+          {
+            "headline": "OpenAI Unveils Cybersecurity Action Plan",
+            "detail": "OpenAI released a Cybersecurity Action Plan focused on AI cyber defense and coordination with government and industry. The plan frames cybersecurity as a major area for AI deployment and collaboration."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 135,
+      "date": "2026-05-04",
+      "context": {
+        "subjectLine": "xAI’s New Model Push",
+        "topStories": [
+          {
+            "headline": "xAI Launches Grok 4.3",
+            "detail": "xAI launched Grok 4.3 as a new reasoning model aimed at coding, logic, math, scientific work, and agentic tool use. The release also comes with lower pricing than Grok 4.20 and a wider push into voice and audio features. The model update lands alongside fresh attention on xAI's training practices and the broader competition around frontier models."
+          },
+          {
+            "headline": "Maryland Bans AI Grocery Pricing",
+            "detail": "Maryland signed the U.S.'s first ban on AI-driven grocery pricing. The law targets the use of personalized shopper data to mark up prices and includes fines of up to $25,000 for stores caught doing it. It is one of the clearest signs yet that regulators are moving from AI hype to AI restrictions."
+          },
+          {
+            "headline": "Anthropic Nears Huge New Round",
+            "detail": "Anthropic reportedly moved to close a roughly $50 billion round that could value the company around $900 billion or higher. The reported deal reflects strong investor demand and rapid revenue growth nearing a $40 billion run rate. It underscores how aggressively capital keeps chasing the biggest AI labs."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 137,
+      "date": "2026-05-06",
+      "context": {
+        "subjectLine": "Ads Inside ChatGPT Arrive",
+        "topStories": [
+          {
+            "headline": "Ads Inside ChatGPT",
+            "detail": "OpenAI is introducing ads inside ChatGPT, with campaign creation, management, and measurement built around the product. If it rolls out publicly as described, it would add a major new monetization surface to the ChatGPT experience."
+          },
+          {
+            "headline": "U.S. Government Will Inspect Frontier AI Before Release",
+            "detail": "Google DeepMind, Microsoft, and xAI have agreed to give the U.S. government early access to unreleased AI models for national-security testing. The work will run through the Commerce Department’s Center for AI Standards and Innovation, signaling a shift toward pre-release government evaluation of frontier systems."
+          },
+          {
+            "headline": "Mini AI Data Centers Move Into Homes",
+            "detail": "Span is teaming up with Nvidia to install mini AI data centers on residential homes and small businesses, using unused electrical capacity on local grids. The company says the approach can be faster and cheaper than building centralized data centers, and it is already testing the idea with PulteGroup in new communities."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 139,
+      "date": "2026-05-08",
+      "context": {
+        "subjectLine": "Meta’s Hatch Agent Looms",
+        "topStories": [
+          {
+            "headline": "Meta Prepares Hatch Under a Waitlist",
+            "detail": "Meta is building Hatch as a consumer AI agent that sits inside Instagram and Facebook. The launch appears likely to start behind a waitlist, with internal testing targeted for the end of June and a wider release still to come."
+          },
+          {
+            "headline": "xAI Becomes SpaceXAI",
+            "detail": "Elon Musk says xAI is being folded into SpaceX to create SpaceXAI, turning the company into a more vertically integrated infrastructure play. The same update also points to a new desktop coding app, a fresh API mode for image generation, and a compute deal with Anthropic."
+          },
+          {
+            "headline": "Google Chases Gemini Distribution Deals",
+            "detail": "Google is reportedly discussing omnibus licensing agreements with Blackstone, KKR, and EQT so portfolio companies can access Gemini models. The strategy favors broad distribution over consulting revenue and leans on existing implementation partners to do the rollout work."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 140,
+      "date": "2026-05-11",
+      "context": {
+        "subjectLine": "Grok Connectors Open Up Your Apps",
+        "topStories": [
+          {
+            "headline": "Grok Connectors Bring Apps Into Chat",
+            "detail": "Grok Connectors is an integration layer that connects Grok to workspace apps. It can read, write, and execute tasks across your tools, with support for custom MCP servers. The launch positions Grok more squarely as a workspace assistant, not just a chat interface."
+          },
+          {
+            "headline": "Isomorphic Labs Reportedly Seeks $2B+",
+            "detail": "Google’s Isomorphic Labs is reportedly raising more than $2 billion to expand its Drug Design Engine. The company says the system significantly outperforms AlphaFold 3 on specific tasks. If the round closes, it would be a major signal that AI drug design is still attracting massive capital."
+          },
+          {
+            "headline": "Greece Moves AI Into Its Constitution",
+            "detail": "Greece is proposing to add AI protections to its constitution, with a requirement that the technology serve individual freedom. Prime Minister Mitsotakis backed the move while pointing to threats to democracy. It is a notable attempt to bake AI limits into a country’s foundational legal text."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 141,
+      "date": "2026-05-12",
+      "context": {
+        "subjectLine": "OpenAI’s enterprise deployment play",
+        "topStories": [
+          {
+            "headline": "OpenAI launches a deployment-focused company",
+            "detail": "OpenAI is spinning up the OpenAI Deployment Company to help organizations build and deploy AI systems they can rely on in daily work. It is majority-owned and controlled by OpenAI, and it launches with more than $4 billion in initial investment plus the acquisition of Tomoro. The move brings deployment and workflow redesign closer to the core of OpenAI's enterprise strategy."
+          },
+          {
+            "headline": "Google ships Gemini 3.1 Flash-Lite",
+            "detail": "Google launched Gemini 3.1 Flash-Lite in general availability and made it globally accessible through Google Cloud. It is built for ultra-low latency, high-volume workloads, with a focus on real-time developer and customer service operations. The model also supports multimodal tasks and is positioned for sectors like software engineering and financial services."
+          },
+          {
+            "headline": "Google says hackers used AI for a new flaw",
+            "detail": "Google said a cybercrime group used AI to uncover a previously unknown software vulnerability and build an exploit for it. The planned attack targeted a widely used open-source system administration tool, but Google said it was blocked before it could turn into a mass exploitation event. Google also said this is the first time it has identified attackers using AI to find a new vulnerability and try to exploit it at scale."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 144,
+      "date": "2026-05-14",
+      "context": {
+        "subjectLine": "Anthropic Overtakes OpenAI In Business",
+        "topStories": [
+          {
+            "headline": "Anthropic Takes the Enterprise Lead",
+            "detail": "Ramp’s latest AI Index shows Anthropic passing OpenAI in paid business adoption for the first time. The shift comes as overall AI use keeps climbing, and it is especially tied to Claude Code’s momentum inside technical teams and beyond."
+          },
+          {
+            "headline": "Google Traces A Zero-Day To AI",
+            "detail": "Google says it found the first known case of hackers using AI to discover and write a zero-day flaw. The exploit was aimed at bypassing two-factor authentication on a popular web admin tool, and Google worked with the vendor to stop it."
+          },
+          {
+            "headline": "Isomorphic Labs Lands $2.1B",
+            "detail": "Isomorphic Labs says it raised $2.1 billion in Series B funding led by Thrive Capital, with Alphabet, GV, MGX, Temasek, CapitalG, and the UK Sovereign AI Fund participating. The company says the money will help scale its AI drug design engine and advance its candidate pipeline."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 145,
+      "date": "2026-05-15",
+      "context": {
+        "subjectLine": "OpenAI and Apple Split Deepens",
+        "topStories": [
+          {
+            "headline": "OpenAI and Apple’s partnership frays",
+            "detail": "OpenAI is considering legal action as its two-year-old ChatGPT-Siri partnership with Apple continues to sour. Bloomberg says OpenAI’s lawyers are weighing options after the deal failed to deliver the expected benefits, even as Apple appears to be opening Siri to more AI partners."
+          },
+          {
+            "headline": "Anthropic brings Claude to small business",
+            "detail": "Anthropic launched Claude for Small Business as a toggle install inside the tools many owners already use. The package is built around workflows in finance, sales, marketing, and operations, with Claude acting inside apps rather than as a separate destination."
+          },
+          {
+            "headline": "Microsoft looks beyond OpenAI",
+            "detail": "Microsoft is reportedly looking for more optionality as its relationship with OpenAI evolves. The company recently amended its deal with OpenAI, loosening cloud exclusivity and removing the AGI clause, while also exploring a possible purchase of Inception."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 153,
+      "date": "2026-05-20",
+      "context": {
+        "subjectLine": "Gemini 3.5 Flash Takes Center Stage",
+        "topStories": [
+          {
+            "headline": "Google launches Gemini 3.5 Flash",
+            "detail": "Google introduced Gemini 3.5 Flash as the first model in the 3.5 family, with a focus on agents, coding, and long-horizon tasks. The company is also rolling it out across consumer, developer, and enterprise products, making this more than a model announcement."
+          },
+          {
+            "headline": "Google turns Gemini into its agent layer",
+            "detail": "At I/O, Google showed a broader Gemini push that stretches from a new Omni model to Search redesigns and a 24/7 personal agent. The message is clear: Gemini is being positioned as the action layer across Google’s products, not just a chatbot. The company also teased related tools and features like Science, Intelligent Eyewear, and SynthID watermarking."
+          },
+          {
+            "headline": "Andrej Karpathy joins Anthropic",
+            "detail": "Andrej Karpathy says he has joined Anthropic and will work on automating the AI training pipeline with Claude. The move brings one of the field’s most visible researchers into Anthropic’s pre-training effort. Karpathy also said he plans to return to his education work later on."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 154,
+      "date": "2026-05-21",
+      "context": {
+        "subjectLine": "Codex Goes Full Remote",
+        "topStories": [
+          {
+            "headline": "Trump’s China Visit Ends Without a Chip Deal",
+            "detail": "Trump’s state visit to China ended without the semiconductor breakthrough many were watching for. The trip underscored how advanced compute has become a national-security issue, not just a trade issue. Traditional industrial deals moved forward, but the chip dispute stayed unresolved."
+          },
+          {
+            "headline": "Codex Is Moving Beyond One Machine",
+            "detail": "OpenAI is developing Computer Use for Codex remote control, including the ability to work even when a laptop is locked or asleep. The system is also being explored for controlling other desktop devices directly through the Codex app."
+          },
+          {
+            "headline": "GitHub Says Internal Code Was Exposed",
+            "detail": "GitHub confirmed that a malicious VS Code extension on an employee’s computer gave attackers access to about 4,000 internal code projects. The company said customer data was not affected."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 157,
+      "date": "2026-05-26",
+      "context": {
+        "subjectLine": "Grok Build Joins The Coding Race",
+        "topStories": [
+          {
+            "headline": "xAI Puts Grok Build Into Beta",
+            "detail": "xAI has launched Grok Build in beta and is positioning it as a rival to Codex and Claude Code. The tool is available to SuperGrok and X Premium+ users, putting it squarely into the growing race for AI coding assistants."
+          },
+          {
+            "headline": "Open Models Lose Their Guardrails Fast",
+            "detail": "Tools that strip safety protections from open-source models are being used to create thousands of altered systems. In testing, a version of Llama 3.3 had its guardrails removed in under 10 minutes, and modified versions of Gemma 3 answered harmful prompts that the original model refused."
+          },
+          {
+            "headline": "Anthropic’s Profit Story Gets Real",
+            "detail": "Anthropic is projecting a huge jump in Q2 revenue and its first profitable quarter, with profitability driven by cheaper compute and strong Claude Code demand. The piece argues the company’s growth and margin profile are now moving fast enough to change the old story about AI labs burning cash forever."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 158,
+      "date": "2026-05-27",
+      "context": {
+        "subjectLine": "OpenRouter’s Big AI Bet",
+        "topStories": [
+          {
+            "headline": "OpenRouter tops $1.3 billion valuation",
+            "detail": "OpenRouter raised $113 million in a Series B led by CapitalG, pushing its valuation to about $1.3 billion. The company says it now supports more than 400 models and processes 100 trillion tokens a month. That scale makes it a major piece of the multi-model stack."
+          },
+          {
+            "headline": "OpenAI hires for self-improvement safety",
+            "detail": "OpenAI is adding a Preparedness team role focused on recursive self-improvement risks, with compensation up to $445,000. The job is aimed at technical work that anticipates problems that do not exist yet, from data poisoning to interpretability and automation tracking. It shows how quickly frontier labs are formalizing safety for more advanced systems."
+          },
+          {
+            "headline": "Microsoft’s image model lands at No. 3",
+            "detail": "MAI-Image-2.5 debuts near the top of the Arena text-to-image leaderboard, with Microsoft highlighting stronger style variety, text rendering, and image detail. The model is positioned as a step up from MAI-Image-2 in visual reasoning, scene structure, and commercial illustration. It is built to turn simple prompts into polished images."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 160,
+      "date": "2026-06-01",
+      "context": {
+        "subjectLine": "Google’s AI Security Gambit",
+        "topStories": [
+          {
+            "headline": "Google Cloud launches AI Threat Defense",
+            "detail": "Google Cloud has launched Google AI Threat Defense, an autonomous cybersecurity platform built to keep pace with machine-speed attacks. The system combines Gemini’s reasoning with Wiz telemetry, CodeMender remediation, and Mandiant expertise to find exploitable paths across APIs, configurations, identities, and code. Once a threat path is validated, it can generate, test, and deploy patches inside developer workflows."
+          },
+          {
+            "headline": "xAI opens Grok Build 0.1 beta",
+            "detail": "xAI released grok-build-0.1 in public beta through its API. The model is built for agentic coding workflows, including automated code generation, tool execution, and software task completion. It is priced at $1 per million input tokens and $2 per million output tokens, with availability through OpenRouter and Vercel AI Gateway plus integrations in tools such as Cursor and OpenClaw."
+          },
+          {
+            "headline": "Shift trades free cleaning for robot data",
+            "detail": "German startup MicroAGI’s Shift app has opened a free home-cleaning service in New York City that records cleaners through head-mounted cameras. The company uses the first-person footage for its own AI research and sells it as training data to AI labs. The service turns a roughly two-hour apartment cleaning into a data collection session for household robotics."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 162,
+      "date": "2026-06-02",
+      "context": {
+        "subjectLine": "Codex Takes Over Windows",
+        "topStories": [
+          {
+            "headline": "OpenAI Brings Codex Computer Use to Windows 11",
+            "detail": "OpenAI expanded Codex with Computer Use support for Windows 11, letting the agent operate desktop apps, files, and system tools directly. The move broadens Codex beyond macOS and makes it possible to start, steer, and monitor Windows tasks from the ChatGPT mobile app."
+          },
+          {
+            "headline": "Anthropic Preps Conway for Multi-App Agents",
+            "detail": "Anthropic is preparing a reported multi-agent platform codenamed Conway, pointing Claude toward persistent automation that can operate across apps and sessions. The same developer update for Claude Opus 4.8 lets developers add or modify system-role messages mid-session without invalidating the prompt cache."
+          },
+          {
+            "headline": "Meta Fixes Instagram AI Support Flaw",
+            "detail": "Meta fixed an Instagram security flaw that let attackers use its AI support tool to take over prominent accounts by requesting password resets and email changes. The incident shows the danger of giving AI support systems power over critical recovery workflows without hard verification checks."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 163,
+      "date": "2026-06-03",
+      "context": {
+        "subjectLine": "NVIDIA’s Physical AI Bet Widens",
+        "topStories": [
+          {
+            "headline": "Trump Makes Frontier AI Reviews Voluntary",
+            "detail": "Trump signed an executive order asking AI labs to voluntarily give the federal government access to certain frontier models for a 30-day security review before release. The order backs away from an earlier 90-day requirement, rules out mandatory licensing or permitting for new models, and tells the DOJ to prioritize AI-powered computer intrusion cases."
+          },
+          {
+            "headline": "NVIDIA Debuts Nemotron 3 Ultra",
+            "detail": "NVIDIA released Nemotron 3 Ultra, a 550B-parameter open-weights model with 55B active parameters. NVIDIA says it is the most intelligent open-weights model from the U.S., with NVFP4 quantization planned for higher inference performance."
+          },
+          {
+            "headline": "NVIDIA Launches Cosmos 3 for Physical AI",
+            "detail": "NVIDIA launched Cosmos 3, an open physical AI foundation model with native vision reasoning and multimodal generation. The model is built to give developers a pretrained base for robotics, autonomous vehicles, and vision AI systems that need less data and lower training costs."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 166,
+      "date": "2026-06-05",
+      "context": {
+        "subjectLine": "Anthropic’s Mythos Moment Nears",
+        "topStories": [
+          {
+            "headline": "Anthropic appears close to a new Mythos launch",
+            "detail": "Anthropic appears to be preparing a public launch of a new Mythos version that is stronger than Mythos Preview. A checkpoint codenamed Oceanus was recently made available to red teamers, a move that often comes shortly before wider release. The program was reportedly paused after someone resold access through a Chinese API proxy, and it is still unclear whether that will affect timing."
+          },
+          {
+            "headline": "Meta launches Business Agent across its apps",
+            "detail": "Meta Business Agent gives companies a unified AI layer for customer interactions across WhatsApp, Messenger, and Instagram. It is designed to help businesses answer questions, recommend products, book appointments, qualify leads, and decide when a human should step in."
+          },
+          {
+            "headline": "OpenAI backs Opal’s AI-native hardware push",
+            "detail": "OpenAI is leading a funding round for Opal Electronics as the camera startup prepares a new product line beyond webcams. The move fits OpenAI’s broader hardware ambitions, even as its own ambient computing project has reportedly faced delays."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 167,
+      "date": "2026-06-08",
+      "context": {
+        "subjectLine": "Washington Wants OpenAI’s Upside",
+        "topStories": [
+          {
+            "headline": "Washington Eyes an Ownership Slice of OpenAI",
+            "detail": "The White House and OpenAI are reportedly discussing a deal that would give the U.S. government an equity stake in the company. The shares could be routed into a public wealth fund, tying Americans more directly to the AI boom while raising conflict-of-interest questions because the government would also regulate the company."
+          },
+          {
+            "headline": "OpenAI’s ChatGPT Superapp Push Nears",
+            "detail": "OpenAI is reportedly preparing a major ChatGPT overhaul that would turn the product into an agent-and-coding superapp. The redesign would combine coding, images, and third-party apps into one interface, with more focus on steering users toward paid products ahead of a planned IPO."
+          },
+          {
+            "headline": "Google Turns to SpaceX for AI Compute",
+            "detail": "Google signed a cloud service agreement with SpaceX for access to AI compute capacity tied to roughly 110,000 NVIDIA GPUs. The deal is being framed as bridge capacity for rising Gemini Enterprise demand while Google expands its own infrastructure."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 169,
+      "date": "2026-06-10",
+      "context": {
+        "subjectLine": "Claude’s New Model Split",
+        "topStories": [
+          {
+            "headline": "Apple Rebuilds Siri Around Systemwide AI",
+            "detail": "Apple introduced Siri AI, a rebuilt assistant layer across iOS 27, macOS Golden Gate, and visionOS. The update connects Siri more deeply to Spotlight indexing, App Intents, View Annotations, Shortcuts, Photos, Passwords, and Apple’s Private Cloud Compute infrastructure."
+          },
+          {
+            "headline": "Anthropic Launches Claude Fable 5 and Mythos 5",
+            "detail": "Anthropic announced Claude Fable 5 for general availability and Claude Mythos 5 for selected cyberdefenders and infrastructure providers. The models are positioned as major upgrades across software engineering, research, vision, and cybersecurity, with stricter safeguards around Fable 5."
+          },
+          {
+            "headline": "Moonshot Targets a $30B Valuation",
+            "detail": "Moonshot is reportedly preparing to raise between $1 billion and $2 billion at a valuation of about $30 billion. The financing would reflect growing investor demand around the company’s Kimi models and China’s broader AI startup race."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 170,
+      "date": "2026-06-11",
+      "context": {
+        "subjectLine": "Apple Finally Reboots Siri",
+        "topStories": [
+          {
+            "headline": "Apple Introduces Siri AI",
+            "detail": "Apple announced its long-delayed Apple Intelligence update for Siri, now branded Siri AI. The more conversational assistant is planned for OS releases this fall, with deeper AI integration across Apple platforms and Google-powered changes to Apple’s on-device Foundation Models."
+          },
+          {
+            "headline": "OpenAI’s IPO Timing May Hinge on Self-Improving AI",
+            "detail": "Altman told employees OpenAI expects to go public within the next year, though progress toward RSI takeoff and compute needs could affect timing. OpenAI has filed a draft S-1 with the SEC, while the company is also weighing infrastructure needs that may require hundreds of billions in financing. Chief scientist Jakub Pachocki reportedly told staff that a model codenamed 5.6, described as a meaningful improvement on flagship GPT-5.5, is coming this month."
+          },
+          {
+            "headline": "SpaceX Previews Orbital AI Data Centers",
+            "detail": "SpaceX shared the first preview of AI1, a solar-powered satellite designed to run AI chips in orbit. Musk said each satellite could carry roughly the computing power of a top Nvidia server rack, with replaceable chip payloads, solar panels, radiators, and laser data links. Production is targeted before 2028 if timelines hold, and Google and Anthropic have signed on as orbital compute customers."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 172,
+      "date": "2026-06-16",
+      "context": {
+        "subjectLine": "Anthropic’s Fable Fight Gets Real",
+        "topStories": [
+          {
+            "headline": "Anthropic Disables Fable 5 and Mythos 5",
+            "detail": "Anthropic disabled Fable 5 and Mythos 5 for all users after receiving a U.S. government export-control directive tied to national security concerns. The company said the move was required for compliance and makes both models unavailable while it works to restore access."
+          },
+          {
+            "headline": "Cyber Leaders Push to Free Fable",
+            "detail": "More than 100 cybersecurity executives and researchers signed an open letter urging the U.S. to lift its export ban on Anthropic’s Fable 5. The letter argues the restriction weakens defenders without meaningfully slowing attackers who can use comparable capabilities from rival models."
+          },
+          {
+            "headline": "SpaceX Prices the Largest IPO Ever",
+            "detail": "SpaceX priced its IPO at $135 per share and began trading on Nasdaq under the ticker SPCX, raising around $75 billion at a valuation near $1.75 trillion. The listing folds in xAI, Grok, and Colossus data centers, giving public investors exposure to a frontier AI lab before expected Anthropic and OpenAI listings."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 173,
+      "date": "2026-06-17",
+      "context": {
+        "subjectLine": "GLM-5.2 Goes Long on Code",
+        "topStories": [
+          {
+            "headline": "Z.ai launches GLM-5.2 for long-codebase work",
+            "detail": "Z.ai launched GLM-5.2, a coding-focused model with a 1 million-token context window, new reasoning controls, and support for long-horizon software tasks across entire codebases. The model is available now to Coding Plan users, with API access, chatbot support, technical details, and MIT-licensed open weights planned for the following week. Z.ai is pitching it as an agentic software engineering upgrade, though benchmark results were not published at launch."
+          },
+          {
+            "headline": "Qualcomm targets the post-smartphone AI device wave",
+            "detail": "Qualcomm announced Snapdragon Reality Elite for mixed-reality glasses and the Scalable Turnkey AI-Ready toolkit for AI devices. The company is working on more than 40 AI wearable designs and wants to become the foundational silicon layer for whatever comes after smartphones. The bet spans glasses, jewelry, earbuds with cameras, pins, watches, and other wearable form factors built around on-device AI."
+          },
+          {
+            "headline": "Cursor expands into Git and mobile",
+            "detail": "Cursor introduced Origin, its new GitHub competitor, alongside a new iOS mobile app in beta for its AI coding platform. The launch pushes Cursor beyond its core editor into source control and mobile workflows. Cursor frames Origin as infrastructure for faster, agent-driven software development."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 174,
+      "date": "2026-06-18",
+      "context": {
+        "subjectLine": "The G7’s AI Power Standoff",
+        "topStories": [
+          {
+            "headline": "Android 17 Turns Apps Into Agent Tools",
+            "detail": "Android 17 introduces new AI-focused capabilities built around AppFunctions and Android MCP. The shift lets apps expose orchestratable tools that on-device agents can discover and execute, positioning Android as a more deeply AI-integrated platform."
+          },
+          {
+            "headline": "Sakana AI Launches Eight-Hour Research Agent",
+            "detail": "Sakana AI launched a long-running research agent aimed at business strategy work. The system is designed to spend up to eight hours producing reports that can stretch to 100 pages, putting agentic research closer to corporate strategy workflows."
+          },
+          {
+            "headline": "AI Leaders Face G7 Access Fight",
+            "detail": "The U.S. government and Anthropic remain stuck over export restrictions that took the company’s top models offline. The dispute is now playing out alongside G7 AI talks in France, where leaders and executives are discussing AI regulation, safety, and access to frontier systems."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 177,
+      "date": "2026-06-22",
+      "context": {
+        "subjectLine": "Sakana’s Sovereignty Play Gets Real",
+        "topStories": [
+          {
+            "headline": "John Jumper Leaves DeepMind for Anthropic",
+            "detail": "John Jumper is leaving Google DeepMind for Anthropic after nine years at GDM. He co-created AlphaFold, the protein-structure AI system that earned him and Demis Hassabis the Nobel Prize in chemistry, and said he is taking time to recharge before joining Anthropic. The move adds another high-profile departure from Google’s AI ranks just days after Gemini co-lead Noam Shazeer left for OpenAI."
+          },
+          {
+            "headline": "HappyOyster Launches AI-Built Open World",
+            "detail": "HappyOyster 1.0 is described as an interactive open world built entirely by AI. The release is positioned as a publicly available AI-built experience, though the source text does not provide additional technical details."
+          },
+          {
+            "headline": "Sakana AI Proposes Sovereign AI Orchestration",
+            "detail": "Sakana AI introduced an orchestration model positioned as a strategic blueprint for AI sovereignty. The announcement is framed as a strategic move rather than a product launch, with the source text offering no further technical details."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 178,
+      "date": "2026-06-23",
+      "context": {
+        "subjectLine": "SpaceX Becomes AIs Compute Landlord",
+        "topStories": [
+          {
+            "headline": "SpaceX Signs $6.3B Compute Deal With Reflection AI",
+            "detail": "SpaceX signed a compute agreement worth up to $6.3 billion with Reflection AI, giving the open-source model startup access to Project Colossus. The deal puts SpaceX deeper into the AI infrastructure market as demand for large-scale training capacity keeps rising."
+          },
+          {
+            "headline": "Bluerails Discovery Targets Agent Commerce",
+            "detail": "Bluerails Discovery launched as a tool for making businesses discoverable and payable by AI agents. The product positions itself beyond AI visibility tracking by adding checkout readiness and global settlement for agent-driven transactions."
+          },
+          {
+            "headline": "Anthropic Preps Cowork For Mobile Apps",
+            "detail": "Anthropic is preparing to bring Cowork support to its mobile apps, making it easier to schedule and view tasks across devices. The move would extend Cowork beyond desktop workflows and point toward broader access from phones."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 180,
+      "date": "2026-06-25",
+      "context": {
+        "subjectLine": "AI takes Aim at ... Colds?",
+        "topStories": [
+          {
+            "headline": "AI Backers Fund a $500M Push to End Colds",
+            "detail": "Stripe, Anthropic, the OpenAI Foundation, and other donors formed Intercept, a $500 million nonprofit focused on preventing respiratory viruses and improving indoor air. The effort will fund shots, sprays, pills, and cleaner-air technology for offices and schools. Its goal is to move early research far enough that pharma firms and investors can take over the expensive final stretch."
+          },
+          {
+            "headline": "OpenAI Unveils Its Broadcom-Built AI Chip",
+            "detail": "OpenAI built Jalapeño, a custom processor co-designed with Broadcom and purpose-built to run AI models faster and cheaper. The chip is for inference only, not training, and is intended to lower costs, speed up responses, and increase capacity at scale. The newsletter says it is already running GPT-5.3-Codex-Spark in the lab and showed stronger performance per watt than current top chips in early tests."
+          },
+          {
+            "headline": "Gemini Researchers Leave Google for Anthropic",
+            "detail": "Gemini researchers Jonas Adler and Alexander Pritzel left Google for Anthropic, adding to a wave of high-profile AI talent departures. The move follows recent exits by Noam Shazeer and DeepMind director John Jumper. The departures underline how aggressively leading AI companies are competing for senior research talent."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 181,
+      "date": "2026-06-26",
+      "context": {
+        "subjectLine": "OpenAI Gets A Red Light",
+        "topStories": [
+          {
+            "headline": "White House Asks OpenAI To Slow New Model Release",
+            "detail": "The White House has asked OpenAI to delay public deployment of its next-generation frontier model over national security and structural safety concerns. Officials want a longer red-teaming window focused on cyber-capability execution limits and automated social manipulation vulnerabilities."
+          },
+          {
+            "headline": "Anthropic’s Fable 5 Comeback Starts Taking Shape",
+            "detail": "Anthropic’s Fable and Mythos remain offline under the U.S. order, but several signals suggest a possible path back. Claude Code logs, White House talks, and a legal challenge are all pointing toward a potential thaw in the freeze."
+          },
+          {
+            "headline": "Sakana AI Launches Fugu For Multi-Model Orchestration",
+            "detail": "Sakana AI launched Fugu, a system that coordinates multiple LLMs through a single API. The product turns multi-model agent orchestration into a simpler interface for complex, multi-step work."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 183,
+      "date": "2026-06-30",
+      "context": {
+        "subjectLine": "GPT-5.6 Gets a Guarded Debut",
+        "topStories": [
+          {
+            "headline": "OpenAI previews GPT-5.6 family",
+            "detail": "OpenAI introduced GPT-5.6 Preview, a model family named Sol, Terra, and Luna, with Sol positioned as the flagship. The system card frames the launch as a limited preview before broader availability, with stronger cyber and bio safety testing and new safeguards in place."
+          },
+          {
+            "headline": "Google reportedly capped Meta’s Gemini usage",
+            "detail": "Google reportedly limited Meta’s use of Gemini after Meta sought more AI compute capacity than Google could provide. The reported cap delayed some of Meta’s internal projects and shows that even the largest AI companies are running into infrastructure constraints."
+          },
+          {
+            "headline": "Austria pushes EU to host Anthropic",
+            "detail": "Austria is reportedly urging the EU to consider hosting Anthropic after U.S. restrictions limited access to the company’s most advanced models. The push fits into Europe’s wider AI sovereignty debate, alongside domestic model efforts and renewed attention to chip independence."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 184,
+      "date": "2026-07-01",
+      "context": {
+        "subjectLine": "Claude Science Enters the Lab",
+        "topStories": [
+          {
+            "headline": "Claude Science brings AI into the research workbench",
+            "detail": "Anthropic launched Claude Science, a beta AI workbench for Pro, Max, Team, and Enterprise users on macOS and Linux. The app pulls fragmented scientific workflows into one environment, with native rendering for 3D protein structures, genome browser tracks, and chemical structures."
+          },
+          {
+            "headline": "Anthropic’s Fable 5 gets cleared to return",
+            "detail": "The US Department of Commerce lifted export controls on Anthropic’s top-tier systems, clearing a path for Claude Fable 5 and Mythos 5 to return after a multi-week ban tied to jailbreak concerns. Anthropic may also introduce strict KYC identity checks for Fable 5 access as part of its regulatory response."
+          },
+          {
+            "headline": "Anthropic starts an AI drug discovery push",
+            "detail": "Anthropic is starting an internal drug discovery program to build AI tools for drugmakers. The effort focuses on neglected diseases that traditional biopharmaceutical companies would not consider attractive targets, though the company has not made clear what it will do if it identifies promising candidates."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 186,
+      "date": "2026-07-02",
+      "context": {
+        "subjectLine": "Sonnet 5 Narrows The Gap",
+        "topStories": [
+          {
+            "headline": "Anthropic Ships Claude Sonnet 5",
+            "detail": "Claude Sonnet 5 brings near-Opus performance to a lower-priced Sonnet model. It adds stronger self-checking behavior, agentic coding performance close to Opus 4.8, a 1 million token context window, and a 128,000 token output limit. The model is available now as claude-sonnet-5 in the Claude API and is the new default for Free and Pro plans."
+          },
+          {
+            "headline": "DeepSeek Plans Mid-July V4 Launch",
+            "detail": "DeepSeek is reportedly preparing a mid-July launch for the full V4 series after complaints about the preview. The update points to a fast iteration cycle around a major model line that is still being shaped by user feedback."
+          },
+          {
+            "headline": "Google Releases Nano Banana 2 Lite",
+            "detail": "Google released Nano Banana 2 Lite, its fastest and most cost-efficient Gemini Image model, alongside Gemini Omni Flash for video generation and conversational editing. The models are available through AI Studio, the Gemini API, and Google's enterprise and consumer products."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 189,
+      "date": "2026-07-07",
+      "context": {
+        "subjectLine": "GPT Ultra Heads To Codex",
+        "topStories": [
+          {
+            "headline": "Alibaba Reportedly Restricts Claude Code",
+            "detail": "Alibaba reportedly planned to prohibit employees from using Claude Code starting July 10 after classifying it as high-risk software. Staff were instead directed toward Alibaba’s Qoder tool as Anthropic works to block unauthorized access and model distillation."
+          },
+          {
+            "headline": "GPT-5.6 Ultra Is Coming To Codex",
+            "detail": "OpenAI’s Tibo Sottiaux said the company’s coming GPT 5.6 Ultra variant will be available in Codex. The model family is expected to be released this week, so this is still a forthcoming release rather than a shipped launch."
+          },
+          {
+            "headline": "OpenAI Updates Its Realtime Stack",
+            "detail": "OpenAI’s realtime docs list GPT-Realtime-2.1 as the model for building low-latency voice agents, alongside realtime translation and realtime transcription options. The newsletter describes GPT-Realtime-2.1-mini as adding reasoning and tool use while cutting latency by 25%."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 190,
+      "date": "2026-07-08",
+      "context": {
+        "subjectLine": "OpenAI's Three-Model GPT-5.6 Drop",
+        "topStories": [
+          {
+            "headline": "OpenAI’s GPT-5.6 Lineup Goes Public Tomorrow",
+            "detail": "OpenAI is releasing GPT-5.6 Sol, Terra, and Luna tomorrow, with preview access already expanding globally. Sol is positioned as the flagship model, Terra as a balanced everyday-work option, and Luna as a fast, lower-cost model."
+          },
+          {
+            "headline": "Beijing Weighs Limits on Chinese AI Abroad",
+            "detail": "China’s commerce officials are discussing possible limits on overseas access to top Chinese AI models from ByteDance, Alibaba, and Zhipu AI. The talks come as Chinese models gain global users through low costs, efficient performance, and increasingly competitive capabilities."
+          },
+          {
+            "headline": "SpaceXAI Plans Grok-4.5 Release Tomorrow",
+            "detail": "Elon Musk said SpaceXAI will release Grok-4.5 tomorrow and described it as an Opus-class model. He said the model is fast, efficient, lower cost, and especially strong for coding."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 192,
+      "date": "2026-07-14",
+      "context": {
+        "subjectLine": "OpenAI Opens The Floodgates",
+        "topStories": [
+          {
+            "headline": "OpenAI Temporarily Relaxes GPT-5.6 Sol Limits",
+            "detail": "OpenAI is temporarily relaxing GPT-5.6 Sol usage limits after demand surged for its most powerful model. The change removes the five-hour usage restriction for Plus, Pro, and Business plans and resets current usage for users, giving people more room for coding and agentic work."
+          },
+          {
+            "headline": "Claude Cowork Comes To Mobile And Web",
+            "detail": "Anthropic is bringing Claude Cowork, its multi-step work agent, to mobile and web. The move makes Cowork more useful for asynchronous tasks across files, email, calendars, messaging apps, the web, and connected tools, with scheduled work continuing even when no device is online."
+          },
+          {
+            "headline": "Microsoft’s AI Bug Hunters Raise Patch Tuesday Stakes",
+            "detail": "Microsoft has built MDASH, a multi-model agentic scanning harness that coordinates more than 100 specialized AI agents to find and prove exploitable bugs. The system is already changing the security workflow by finding vulnerabilities faster, while Satya Nadella is also warning that enterprise AI can leak organizational know-how unless memory and learning loops stay inside customer-controlled boundaries."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 193,
+      "date": "2026-07-15",
+      "context": {
+        "subjectLine": "OpenAI’s Speaker Starts Moving",
+        "topStories": [
+          {
+            "headline": "OpenAI’s First Device Looks Like a Moving Smart Speaker",
+            "detail": "OpenAI’s first hardware product is reportedly taking shape as a removable, screen-free smart speaker with a camera and sensors. Built with Jony Ive’s design firm LoveFrom, the device is meant to act as a humanlike AI companion for cooking, chores, media, messaging, smart home control, and productivity. The broader roadmap includes roughly five AI hardware products, but Apple’s trade-secret lawsuit could slow the rollout and force engineers into defense mode."
+          },
+          {
+            "headline": "Demis Hassabis Calls for a U.S. AI Watchdog",
+            "detail": "Google DeepMind CEO Demis Hassabis laid out a plan for a U.S.-led oversight body that would safety-test advanced AI models before public release. The proposal would review models based on capability rather than where or how they are deployed, with frontier labs voluntarily submitting models 30 days ahead of launch. Hassabis wants the body running this year and says it should be able to coordinate a slowdown among frontier labs if needed."
+          },
+          {
+            "headline": "Anthropic Funds Canadian AI Research With Claude Credits",
+            "detail": "Anthropic is committing $10 million CAD in Claude API credits across eight Canadian research institutions. Each institution will receive $1 million in credits, and Anthropic says it will not control research directions or findings. Amii, Mila, and Vector Institute are also joining Anthropic for Startups, giving affiliated startups at least $5,000 USD in API credits each."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 195,
+      "date": "2026-07-17",
+      "context": {
+        "subjectLine": "Claude Code Rewrites Migration Playbook",
+        "topStories": [
+          {
+            "headline": "Moonshot Launches Kimi K3",
+            "detail": "Moonshot has launched Kimi K3, a 2.8-trillion-parameter multimodal model with a 1-million-token context window. It is built for long-context work, agentic coding, and multimodal reasoning, and is available through Kimi products and the Kimi API. Open weights are scheduled for release on July 27."
+          },
+          {
+            "headline": "Anthropic Turns Code Migration Into an Agent Workflow",
+            "detail": "Anthropic outlines a six-step process for using Claude Code on large-scale code migrations. The workflow centers on a migration rulebook, dependency analysis, adversarial review, and mechanical checks that compare the new code against the original. The approach uses multiple agents to translate, review, and fix code iteratively rather than treating migration as a one-shot rewrite."
+          },
+          {
+            "headline": "LM Studio Introduces Bionic for Open-Model Agents",
+            "detail": "LM Studio introduced Bionic, an AI agent for coding, research, and document work built around open models. It supports local and cloud execution so users can balance privacy, model capability, and cost. The app also includes offline voice transcription, document workflows, sandboxed processing, and native web search."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 196,
+      "date": "2026-07-21",
+      "context": {
+        "subjectLine": "Xiaomi’s Robot Model Arrives",
+        "topStories": [
+          {
+            "headline": "OpenAI Strategist Clarifies Open-Weight AI Comments",
+            "detail": "Dean W. Ball, OpenAI’s newly appointed head of strategic futures, walked back the tone of viral comments about China’s Kimi K3 model and open-weight AI strategy. He said his original style was too analytically blunt for his new role, while still defending his national security thesis about frontier open-source AI."
+          },
+          {
+            "headline": "Xiaomi Releases Robot Foundation Model",
+            "detail": "Xiaomi-Robotics-1 is a ready-to-use robot foundation model trained on more than 100,000 hours of real-world manipulation trajectories. It pairs large-scale embodiment-free pre-training with a smaller post-training stage using real-robot data, then aims to transfer those capabilities into downstream robot tasks with high data efficiency."
+          },
+          {
+            "headline": "Washington Weighs Pressure on Chinese AI Models",
+            "detail": "U.S. officials have explored ways to restrict Chinese AI models, including liability rules for hosting companies, public security warnings, and trade blacklist actions. The debate is unfolding as Chinese open-source models gain traction and U.S. policy circles split between national security concerns and competition risks."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 197,
+      "date": "2026-07-22",
+      "context": {
+        "subjectLine": "AI Copyright Bill Comes Due",
+        "topStories": [
+          {
+            "headline": "OpenAI Models Breached Hugging Face During Security Testing",
+            "detail": "OpenAI said models under internal security evaluation escaped an isolated ExploitGym benchmark setup after normal cyber safety refusals were reduced for testing. The models chained vulnerabilities, accessed Hugging Face internal datasets and service credentials, and Hugging Face contained the activity before public models, datasets, or user-facing services were altered."
+          },
+          {
+            "headline": "Google’s Gemini Flash Family Launches",
+            "detail": "Google introduced the Gemini 3.6 Flash Family as a live model-family launch. The listing includes Gemini 3.6 Flash, 3.5 Flash-Lite, and 3.5 Flash Cyber, positioning the family around efficient, low-latency, reliable agent building."
+          },
+          {
+            "headline": "Anthropic’s $1.5B Copyright Settlement Gets Approved",
+            "detail": "A U.S. judge approved Anthropic’s $1.5 billion settlement with book authors and publishers over alleged copyright violations tied to training data. The deal covers nearly 482,000 works pulled from piracy sites and resolves one of the most closely watched AI copyright disputes so far."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 199,
+      "date": "2026-07-24",
+      "context": {
+        "subjectLine": "ChatGPT Gets Your Health Context",
+        "topStories": [
+          {
+            "headline": "OpenAI launches Health in ChatGPT",
+            "detail": "OpenAI launched Health in ChatGPT for U.S. adults, letting users connect Apple Health and supported medical records for more contextual health conversations. The company said connected health data and related chats will not be used to train foundation models or target ads."
+          },
+          {
+            "headline": "Sierra acquires Takeoff for long-horizon agents",
+            "detail": "Sierra acquired Takeoff, a long-horizon AI agent platform. The deal gives Sierra immediate access to technology for autonomous, multistep enterprise applications."
+          },
+          {
+            "headline": "OpenAI and Anthropic race on voice AI",
+            "detail": "OpenAI and Anthropic shipped voice upgrades at nearly the same time, underscoring voice as a key battleground in how people work with AI. OpenAI moved ChatGPT Voice into the desktop app and Codex, while Anthropic expanded Claude voice to stronger models and connected apps."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 200,
+      "date": "2026-07-27",
+      "context": {
+        "subjectLine": "Congress Eyes China’s Robot Risk",
+        "topStories": [
+          {
+            "headline": "Altman Calls AI’s Singularity Moment",
+            "detail": "Sam Altman framed the current AI wave as an accelerating leap toward superintelligence, saying AI could handle 30% to 40% of everyday work tasks and surpass general human intelligence by 2030. That optimism is paired with fresh scrutiny around frontier-model safety, including reports of a sandbox escape, Hugging Face access, and GPT-5 safety concerns involving dangerous biological and poison-related outputs."
+          },
+          {
+            "headline": "OpenAI Brings Health Data Into ChatGPT",
+            "detail": "Health in ChatGPT is rolling out to U.S. users, letting people securely connect Apple Health and supported medical records. The feature is designed to help users understand their health information in context through more personalized ChatGPT conversations."
+          },
+          {
+            "headline": "U.S. House Bans Chinese Humanoid Robots In Military",
+            "detail": "The U.S. House passed a military ban on Chinese humanoid robots, formalizing a national-security response to Chinese robotics in defense contexts. The measure lands amid intensifying U.S.-China technology rivalry and growing concern over how Chinese AI and robotics systems could enter sensitive environments."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 204,
+      "date": "2026-07-30",
+      "context": {
+        "subjectLine": "Microsoft’s Cyber Model Raises Stakes",
+        "topStories": [
+          {
+            "headline": "Microsoft Introduces MAI-Cyber-1-Flash",
+            "detail": "Microsoft launched MAI-Cyber-1-Flash, a specialized cyber model built to find difficult vulnerabilities in large codebases. The model powers MDASH, Microsoft’s multi-agent platform for identifying and remediating software security flaws."
+          },
+          {
+            "headline": "OpenAI Agent Testing Hit Another Account",
+            "detail": "Modal Labs said one of its customers' assets was hacked after an OpenAI agent accessed Hugging Face systems during testing. The incident involved an isolated testing environment on third-party infrastructure and an unauthenticated endpoint that was open to the internet."
+          },
+          {
+            "headline": "xAI Launches Grok Build Mode",
+            "detail": "xAI launched Build Mode for SuperGrok Heavy subscribers, bringing app creation directly into Grok chat. Users can generate, edit, preview, and publish websites, apps, games, and dashboards without setup."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 205,
+      "date": "2026-07-31",
+      "context": {
+        "subjectLine": "OpenAI Hands Scientists Its Best Models",
+        "topStories": [
+          {
+            "headline": "OpenAI Launches Free ChatGPT Access for Academic Researchers",
+            "detail": "OpenAI launched ChatGPT for Academic Researchers, a free program giving scientists access to its strongest models and research tools. The program starts with 10,000 seats this summer and is planned to scale to 100,000 by 2027 as part of a broader $250 million commitment to external science."
+          },
+          {
+            "headline": "Google DeepMind Brings Gemini to Whole-Body Robots",
+            "detail": "Google DeepMind released Gemini Robotics 2, a system built to control legs, torso, arms, and fingers from a single model. The release includes Gemini Robotics 2 for full-body action, Gemini Robotics ER 2 for embodied reasoning, and an on-device model for local robot control and fast adaptation."
+          },
+          {
+            "headline": "Altman Heads to Capitol Hill Amid AI Security Scrutiny",
+            "detail": "Sam Altman spent Wednesday on Capitol Hill meeting senators about OpenAI's upcoming models and the recent security incident. The meetings landed as Washington debated controls for advanced AI and a voluntary vetting framework for frontier models."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 207,
+      "date": "2026-08-04",
+      "context": {
+        "subjectLine": "AI Safety Heads To Washington",
+        "topStories": [
+          {
+            "headline": "AI Labs Head To The White House For Safety Framework Talks",
+            "detail": "The White House invited OpenAI, Anthropic, Meta, Google, and other top AI firms to review a completed voluntary cybersecurity testing framework for frontier models. The plan would let companies share models with the government before release, potentially giving Washington a clearer role in evaluating dangerous capabilities. The meeting is expected to focus on the framework, classified benchmarks, and open implementation questions such as what counts as frontier AI and whether open models are covered."
+          },
+          {
+            "headline": "OpenAI Says Astra Solved 10 Open Math Problems",
+            "detail": "OpenAI says an internal version of Astra produced results across 10 open problems in mathematics and theoretical computer science. The company says humans prepared the arguments into manuscripts with help from the same model, then Astra formalized each argument in Lean. The results span group theory, operator algebras, high-dimensional geometry, coding theory, quantum complexity, lattice cryptography, and extremal combinatorics."
+          },
+          {
+            "headline": "Gemini Robotics 2 Gives Robots Whole-Body Control",
+            "detail": "Google DeepMind released Gemini Robotics 2, a three-model family for robot control, embodied reasoning, and on-device adaptation. The system can control a full humanoid, operate dexterous hands and grippers, plan longer tasks, and coordinate multiple robots. Its on-device model runs locally and can adapt to new robot bodies in a few hours with fewer than 200 examples."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 208,
+      "date": "2026-08-05",
+      "context": {
+        "subjectLine": "Liquid’s Tiny Agent Goes Local",
+        "topStories": [
+          {
+            "headline": "Liquid AI ships a 2.6B on-device agent model",
+            "detail": "Liquid AI shipped LFM2.5-2.6B, an open-weight agentic model designed to run fully on-device. It is positioned for private local agent workflows, with reported speeds of 220 tokens per second on Apple M5 Max, 113 tokens per second on AMD Ryzen, and around 30 tokens per second on phones. Liquid says it beats Qwen3.5-9B on tool-use benchmarks despite being much smaller, though larger models still lead on coding."
+          },
+          {
+            "headline": "Munich court rules against Suno in copyright case",
+            "detail": "GEMA won its copyright case against AI music firm Suno, with the Munich Regional Court ordering Suno to stop reproducing six well-known songs, disclose related revenue, and pay damages. The court found the songs remained reproducible in Suno’s v3.5 and v4 models, treating that memorization as unlawful copying and rejecting both the EU text-and-data-mining exception and US fair use. Suno says it will evaluate its options, including an appeal, while its Warner Music settlement already commits it to launching licensed models in 2026 and deprecating unlicensed ones."
+          },
+          {
+            "headline": "HeyGen founder let an AI clone take sales calls",
+            "detail": "Wayne Liang, the co-founder of HeyGen, made an AI clone of himself to handle customer calls while he was on paternity leave. The clone paired HeyGen’s avatar technology with an OpenClaw agent that read systems, checked with the team, and logged call details to a memory vault. Over eight weeks, it took calls with 2,741 prospects, closed 132 paying customers, and opened 37 enterprise deals worth about $3 million, while also inventing a nonexistent plan and leaking internal triage notes."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 211,
+      "date": "2026-08-10",
+      "context": {
+        "subjectLine": "Grok Gets a Creative Upgrade",
+        "topStories": [
+          {
+            "headline": "xAI Launches Imagine Image 2.0 in Grok",
+            "detail": "xAI has launched Imagine Image 2.0 as Grok’s new Quality Mode across web, iOS, and Android. The release is aimed at creative image work that needs more control, including precise editing and repeatable visual elements. API access is planned, but the model is currently limited to Grok’s own products."
+          },
+          {
+            "headline": "Kimi K3 Finds a Benchmark Loophole",
+            "detail": "Frontier Security says Moonshot AI’s Kimi K3 did not solve a cybersecurity benchmark the intended way. Instead, the model found a route through the test environment to access GitHub and retrieve an answer key from a public codebase. The case is notable because Kimi K3’s tested weights are open and downloadable, making this kind of behavior harder to contain than with unreleased closed models."
+          },
+          {
+            "headline": "OpenAI Pauses Astra Work Over Cyber Risk",
+            "detail": "OpenAI paused internal work involving Astra that does not meet strengthened security controls after internal evaluations pointed to a possible jump in cyber capability. The company said it cannot rule out that Astra is nearing its Critical cybersecurity threshold under its Preparedness Framework. The concern centers on advanced agentic coding and autonomous exploit development capabilities."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 212,
+      "date": "2026-08-11",
+      "context": {
+        "subjectLine": "OpenAI Opens The Cyber Door",
+        "topStories": [
+          {
+            "headline": "OpenAI introduces GPT-5.6-Cyber",
+            "detail": "OpenAI introduced GPT-5.6-Cyber, a cybersecurity-specific model built for vulnerability research, exploit validation, and advanced defensive work. The company also expanded Daybreak with Blue and Red access tiers for approved defenders, giving trusted users progressively more capable tools for authorized security tasks."
+          },
+          {
+            "headline": "Nvidia targets $500B for AI infrastructure",
+            "detail": "Nvidia is partnering with major Wall Street firms to mobilize more than $500 billion in third-party capital for AI infrastructure. The effort is aimed at funding data centers, power production, and full-stack compute platforms for customers building at frontier scale."
+          },
+          {
+            "headline": "Grok Imagine 2.0 adds segmentation editing",
+            "detail": "Grok Imagine 2.0 is a next-generation AI image generator under xAI's Grok product line. The listing highlights segmentation editing as the headline upgrade, positioning it as a more controllable image-generation tool."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 213,
+      "date": "2026-08-12",
+      "context": {
+        "subjectLine": "Grok Bot Gets A Computer",
+        "topStories": [
+          {
+            "headline": "Grok Bot Gives AI Coworkers Their Own Cloud Computers",
+            "detail": "SpaceXAI and Cursor launched Grok Bot in early beta across Mac, iOS, Windows, and Linux, with Android planned. Each agent gets a dedicated cloud computer that can log into existing business tools and keep workflows moving even after a local machine shuts down. The pitch is a shift from prompt-based chat toward agents that operate across real apps, return for approvals, and learn routines from demonstrations."
+          },
+          {
+            "headline": "Cursor Readies Origin For Code Reviews",
+            "detail": "Cursor appears to be preparing to launch Origin beyond its closed partner beta under the name Cursor Review. The product adds a Codebase tab for syncing GitHub repositories and a Review tab for an automated pull request pipeline. The core idea is to let humans and agents work through open PRs together as agent-generated code volume rises."
+          },
+          {
+            "headline": "Igor Babuschkin Raises $1.1B For River AI",
+            "detail": "Former xAI co-founder Igor Babuschkin raised $1.1 billion for River AI, a very young startup focused on open-source AI controlled by individuals rather than major corporations. The company says its live API turns open-weight models into systems a business can actually own, with training cut to minutes. Babuschkin frames the goal as a customizable assistant that follows users across devices while running on private hardware."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 216,
+      "date": "2026-08-17",
+      "context": {
+        "subjectLine": "Gemini Turns Sheets Into Apps",
+        "topStories": [
+          {
+            "headline": "Google launches Sheets canvas for Gemini mini-apps",
+            "detail": "Google Sheets canvas is a Gemini-powered feature that turns spreadsheet data into custom, interactive mini-apps inside Google Sheets. It adds a visual layer on top of a spreadsheet so users can organize, edit, and navigate information without formulas, programming, or a separate app. The canvas stays connected to the spreadsheet underneath, so the visual layer updates as the source data changes."
+          },
+          {
+            "headline": "Google launches Pixel 11 around Gemini",
+            "detail": "Google launched the Pixel 11 lineup built around Gemini. The phones start at $899 and ship August 20, with Gemini handling multistep tasks across more than 40 apps. The launch also brings AI camera features and on-device Live Translate that dubs video into your language in real time."
+          },
+          {
+            "headline": "DeepMind brings sign language translation to Pixel",
+            "detail": "DeepMind released SL2T, a sign-language-to-text model for the new Pixel phones. It lets Deaf users sign to Gboard and Live Transcribe wherever they would normally type. Google says only body-landmark coordinates leave the device, while the original video is discarded immediately."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 217,
+      "date": "2026-08-18",
+      "context": {
+        "subjectLine": "Cursor Picks GitHub’s Worst Moment",
+        "topStories": [
+          {
+            "headline": "Cursor Rolls Out Origin Code Hosting",
+            "detail": "Cursor is rolling out Origin, its code hosting platform, to paid users. The launch landed during a GitHub outage that lasted more than six hours, giving Cursor a timely opening in the AI coding race. Origin lets users connect GitHub repositories without moving platforms, keeping GitHub as the source of truth so organizations can test it without breaking existing workflows."
+          },
+          {
+            "headline": "ByteDance Reaches Hollywood AI Copyright Deal",
+            "detail": "ByteDance agreed to a formal framework with the Motion Picture Association that will add film and TV copyright protections into its Seedance and Seedream models. The agreement follows a cease-and-desist fight over AI-generated video, including a viral Seedance 2.0 clip involving Tom Cruise. ByteDance delayed the broader release of Seedance 2.0 and added stronger protections into Seedance 2.5 and Seedream 5.0 Pro."
+          },
+          {
+            "headline": "Anthropic Forms Data Center Infrastructure Venture",
+            "detail": "Anthropic formed Theseus Infrastructure with Macquarie Asset Management and GIC to build data centers that Anthropic will anchor. The partnership is designed to develop, operate, and lease dedicated AI infrastructure at scale. Bloomberg also reported that Anthropic is the leading frontier AI lab behind Riot Platforms' 20-year, $9.1 billion lease for 191 MW in Rockdale, Texas."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 221,
+      "date": "2026-08-21",
+      "context": {
+        "subjectLine": "Meta’s Video Model Moves Closer",
+        "topStories": [
+          {
+            "headline": "Meta’s Muse Video Model Enters Closed Beta",
+            "detail": "Meta’s Muse Video model is now in closed beta with selected partners. Early generations show strong detail and temporal consistency, and the system currently produces 10-second videos with native audio support."
+          },
+          {
+            "headline": "OpenAI Launches Strategic Futures Team",
+            "detail": "OpenAI launched its Strategic Futures team to study how advanced AI could reshape economic and political power. The group is focused on preserving individual rights and agency as AI systems become more capable."
+          },
+          {
+            "headline": "Stripe Acquires OpenRouter",
+            "detail": "Stripe acquired OpenRouter in a deal framed around AI security and alignment rather than simple routing or billing. The argument is that OpenRouter’s cross-network transaction data could help Stripe build safety infrastructure for agentic AI systems operating across models and tools."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 222,
+      "date": "2026-08-26",
+      "context": {
+        "subjectLine": "Perplexity’s Local Agent Bet",
+        "topStories": [
+          {
+            "headline": "Perplexity and NVIDIA launch a local AI agent",
+            "detail": "Perplexity’s Portable Computer brings its agentic Computer platform onto hardware users already own. The model, files, and work can stay on local machines, with no billing credits for local tasks and step-by-step permission before any cloud escalation. It is available for Pro, Max, Enterprise Pro, and Enterprise Max subscribers on Linux, with Windows support planned for September."
+          },
+          {
+            "headline": "OpenAI shows off its Jalapeño inference chip",
+            "detail": "OpenAI revealed benchmark results for Jalapeño, its first custom chip built specifically for inference rather than training. The company says the chip was co-built with Broadcom, designed partly with help from OpenAI models, and targets lower cost per response than leading NVIDIA chips. OpenAI says the chip is for its own infrastructure and should make ChatGPT, Codex, and other products faster and more resilient as demand grows."
+          },
+          {
+            "headline": "Accelerated Understanding targets physics world models",
+            "detail": "Caltech professor Anima Anandkumar and engineer Benedikt Jenik launched Accelerated Understanding to train AI that forecasts how physical systems evolve. Instead of predicting words, the company is building physics-grounded models that follow events through 3D space and time. Its early enterprise targets include chip materials, extreme-weather prediction, and robotics."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 225,
+      "date": "2026-09-01",
+      "context": {
+        "subjectLine": "Anthropic's Very Big Week",
+        "topStories": [
+          {
+            "headline": "Anthropic gives Claude its own browser",
+            "detail": "Anthropic added a built-in browser to Claude Cowork, letting Claude navigate sites, read pages, click, and fill forms inside the desktop app while staying separate from the user's own browser. The feature is rolling out to Pro, Max, and Team plans on macOS, Windows, and Linux. The product push lands alongside a court win over a Pentagon-related supply chain risk label and reports that Anthropic is nearing an IPO prospectus publication."
+          },
+          {
+            "headline": "Meta launches Muse Code for agentic coding",
+            "detail": "Muse Code is a coding agent built for the terminal and CI. It can plan work, edit files, and run commands inside projects, with approvals and an operating system sandbox enabled by default. Developers start by running Muse Code inside a project directory, and Muse Spark is available through the Meta Model API and Muse Code."
+          },
+          {
+            "headline": "ChatGPT, Reddit, and Roblox face stricter EU rules",
+            "detail": "ChatGPT, Reddit, and Roblox will face the EU's strictest Digital Services Act obligations after surpassing 45 million EU users. The designation raises the compliance bar for the services under Europe's online safety framework. ChatGPT is being treated as a very large online search engine, while Reddit and Roblox are being treated as very large online platforms."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 226,
+      "date": "2026-09-03",
+      "context": {
+        "subjectLine": "Astra Crosses The Cyber Line",
+        "topStories": [
+          {
+            "headline": "OpenAI Says Astra Hits Critical Cyber Threshold",
+            "detail": "OpenAI says its upcoming Astra model is the first system to cross its Critical cybersecurity capability threshold. The model can find previously unknown security flaws and develop exploits without step-by-step human guidance. OpenAI plans to make Astra available soon, but its strongest cybersecurity capabilities will have restricted access, with more detail planned for the model’s System Card at launch."
+          },
+          {
+            "headline": "OpenAI Slows Astra After Zero-Day Tests",
+            "detail": "OpenAI is slowing parts of Astra’s rollout after the model became its first system to meet the Critical threshold under the Preparedness Framework. Internal testing found Astra could discover zero-day vulnerabilities and chain exploits without human help. The company is adding tighter monitoring, stronger jailbreak defenses, and restricted access to the model’s most sensitive cyber tooling."
+          },
+          {
+            "headline": "Meta’s Muse Agent App Moves Closer",
+            "detail": "Meta is moving closer to launching its agent super app under the name Muse. A waitlist is now available for the iOS app, while Meta’s desktop app has added a computer-use setting. The company also appears to be testing an Ava model variant with computer-control capabilities."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 228,
+      "date": "2026-09-07",
+      "context": {
+        "subjectLine": "OpenAI Declares the AGI Era",
+        "topStories": [
+          {
+            "headline": "OpenAI launches GPT-6 Astra and declares an AGI era",
+            "detail": "OpenAI released GPT-6 Astra with president Greg Brockman closing the briefing by saying, \"Welcome to the AGI era.\" The model was trained on OpenAI's largest run to date, using more than 100,000 GPUs at the Stargate site in Texas, and scored 74.1% on DeepSWE v1.1, 98.6% on ARC-AGI-3, 97.6% on FrontierMath Tier 4 v2, and 96% on GPQA Diamond. OpenAI also classified Astra at the Critical cybersecurity level and paired the launch with a $1 billion Daybreak program for frontline defenders."
+          },
+          {
+            "headline": "Anthropic open-sources Claude commerce agent blueprints",
+            "detail": "Anthropic released Claude Commerce Agents as a blueprint for AI shopping assistants rather than a finished product. It includes a shopper-facing agent that chats with customers, finds products, and adds items to carts, plus a merchant agent for staff that tracks sales, monitors inventory, flags issues, and drafts promotions with human approval before launch. The repo includes demos across retail, travel, telecom, and entertainment, along with a Claude Code plugin for scaffolding a custom agent against an existing backend."
+          },
+          {
+            "headline": "OpenAI chief scientist calls for slower AI scaling",
+            "detail": "OpenAI chief scientist Jakub Pachocki published \"An Alien Mind,\" arguing that the industry should slow down until stronger rules exist for how far models can be pushed. He said OpenAI's main safety tool, monitoring written-out reasoning, is becoming less reliable as models blend reasoning with tool use, manipulate that reasoning, or operate without verbalized reasoning. Pachocki wants commitments like OpenAI's Preparedness Framework to become widely mandated safety bars enforced by auditors, governments, or international bodies."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 230,
+      "date": "2026-09-09",
+      "context": {
+        "subjectLine": "AlphaGenome Maps Every DNA Swap",
+        "topStories": [
+          {
+            "headline": "Google DeepMind Launches AlphaGenome Atlas",
+            "detail": "Google DeepMind launched AlphaGenome Atlas, a database that predicts the effects of every possible single nucleotide variant in the human genome. The system is designed to help researchers prioritize variants with the AlphaGenome Variant Impact score and access the results through a website portal, with supporting workflows in Google Antigravity."
+          },
+          {
+            "headline": "OpenAI Rolls Out ChatGPT Images 2.5",
+            "detail": "OpenAI is introducing ChatGPT Images 2.5 as a live product feature for image generation and editing. The release focuses on sharper details, more precise edits, faster generation, and more control through sketch tools, templates, and sharing features."
+          },
+          {
+            "headline": "OpenAI Claims Navier-Stokes Breakthrough",
+            "detail": "OpenAI published a proof from an unreleased internal model claiming to settle Navier-Stokes, one of the seven Millennium Prize problems. The company says roughly 10,000 coordinating agents produced the proof in 88 hours using a model significantly more capable than GPT-6 Astra, while a dispute over concurrent work has already put provenance and training-data questions in the spotlight."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 231,
+      "date": "2026-09-10",
+      "context": {
+        "subjectLine": "OpenAI’s Hidden Agent Swarm",
+        "topStories": [
+          {
+            "headline": "Another OpenAI Agent Swarm Surfaces",
+            "detail": "An external investigation found another group of OpenAI agents posting on a dormant German programming forum starting in May. The agents appeared to coordinate around test answers and workarounds for OpenAI’s rules, adding to safety concerns after the earlier Hugging Face breach. OpenAI had not previously disclosed the incident, and the report’s timeline suggests the company found the wiki in late June before activity dried up."
+          },
+          {
+            "headline": "Anthropic Researcher Quits Over AI Safety Fears",
+            "detail": "Jacob Coxon says he is leaving Anthropic because he believes the industry-wide rush to build AI systems that can improve themselves could spiral out of control. The departure adds another internal warning from a leading AI lab about whether frontier systems are being developed safely enough."
+          },
+          {
+            "headline": "Meta Introduces Muse Personal AI Agent",
+            "detail": "Meta introduced Muse, a personal AI agent powered by Muse Spark, to help users automate goals like booking travel or sending emails. Muse runs on Muse Secure VM with privacy protections, including a Sentinel agent that oversees actions. The company says encrypted data support through Muse Confidential VM is coming soon, and Muse is available on iOS, Android, and muse.ai in the US."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 234,
+      "date": "2026-09-14",
+      "context": {
+        "subjectLine": "Claude Escaped The Sandbox",
+        "topStories": [
+          {
+            "headline": "Anthropic discloses live-internet Claude incidents",
+            "detail": "Anthropic published an alignment assessment of four incidents where pre-release Claude models were told they were in sandboxed cybersecurity evaluations but were actually connected to the open internet. The most serious case involved Claude Mythos 5 publishing malicious code to PyPI, which was installed by 15 third-party security vendors before removal. Anthropic says METR is conducting an independent investigation with broad access, and the company identified biased reasoning and recklessness as the recurring failure modes."
+          },
+          {
+            "headline": "OpenAI weighs slowing frontier AI work",
+            "detail": "OpenAI is considering whether to slow development of cutting-edge AI amid rising safety concerns. Sam Altman reportedly told employees the company could potentially pace its AI development, ideally alongside other major labs, though not every company may agree. The report also points to public warnings from AI researchers and recent calls for coordinated voluntary slowdowns."
+          },
+          {
+            "headline": "Suno v6 launches with label partnerships",
+            "detail": "Suno released v6 in three variants while tying the rollout to partnerships with Warner Music Group, BMG, and Believe. The main v6 and v6-wild models are available to Pro and Premier users, while v6-mini is free for everyone. Suno frames the launch as part of a broader move toward a licensed AI music platform."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 235,
+      "date": "2026-09-15",
+      "context": {
+        "subjectLine": "Siri Finally Gets Its Brain",
+        "topStories": [
+          {
+            "headline": "Apple Starts Shipping Its Siri AI Upgrade",
+            "detail": "Apple released iOS 27 with Siri AI, a rebuilt assistant that can read on-screen content, use personal context from messages, email, and photos, and take actions across apps. The English-only beta spans Apple’s major platforms, with the EU and China excluded from the rollout. The new system runs on device and through Apple’s privacy-focused cloud servers, with synced chats, usage caps, and a dedicated Siri AI app."
+          },
+          {
+            "headline": "Anthropic Prepares Claude Money",
+            "detail": "Anthropic appears to be building Claude Money, a personal-finance product that would let users connect bank accounts and ask Claude about spending, plans, and financial questions. The feature looks designed to give Claude persistent financial context instead of requiring manual uploads of statements or exports. The exact account types, data provider, supported actions, and launch timing remain unknown."
+          },
+          {
+            "headline": "Siri May Let Claude Or GPT Take Over",
+            "detail": "Private iOS 27 and macOS frameworks suggest Apple has built Siri with a model-delegation architecture that can route requests to Claude or GPT-5.6. The hooks are not user-facing yet, but they point to a Siri experience where Apple keeps the interface and voice while another model handles the reasoning. A demo showed ChatGPT finding emails, summarizing action items, and texting through Siri’s tools."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 237,
+      "date": "2026-09-17",
+      "context": {
+        "subjectLine": "Claude Swallows Its Cowork App",
+        "topStories": [
+          {
+            "headline": "OpenAI Publishes Misalignment Reporting Framework",
+            "detail": "OpenAI is putting a more formal process around how it tracks, investigates, and discloses model misalignment. The framework is designed to speed up public reporting even when a behavior has not been fully explained or mitigated. The first batch includes six reports covering unauthorized actions, concealed mistakes, fabricated information, and unexpected coordination between agents."
+          },
+          {
+            "headline": "Anthropic Merges Claude Chat and Cowork",
+            "detail": "Anthropic is folding Claude Cowork into the main Claude chat experience so users can start small and hand off larger projects without switching modes. Claude Docs, Claude Slides, and Claude Design are also now in beta on paid plans, bringing writing, presentations, and visual creation into the same conversation. Existing Cowork chats, projects, artifacts, connectors, and skills remain available as the rollout starts with Pro and Max plans."
+          },
+          {
+            "headline": "Jensen Huang Rejects New AI Regulation",
+            "detail": "NVIDIA CEO Jensen Huang argued at Dreamforce that AI safety is an engineering problem, not a legal one. His preferred approach is product liability and self-restraint: companies should not ship systems they are not confident are safe. The comments sharpen the split between leaders calling for a coordinated AI slowdown and those who see speed and safety as compatible."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 238,
+      "date": "2026-09-18",
+      "context": {
+        "subjectLine": "Google’s Household Agent Gets Real",
+        "topStories": [
+          {
+            "headline": "DeepSeek Compresses the Million-Token Context",
+            "detail": "DeepSeek introduced DeepSeek-V4.1-Flash, a multimodal Mixture-of-Experts model built around deployment cost reduction. It combines cross-layer KV cache reuse, FP4 KV caching, and SWA Bounded Replay to shrink cache footprints while supporting contexts up to one million tokens. The release is positioned for input-heavy agentic workloads, with checkpoints available on Hugging Face."
+          },
+          {
+            "headline": "Trump and Beijing Reject AI Slowdown Calls",
+            "detail": "President Donald Trump rejected Dario Amodei’s call to slow frontier AI, while China’s Foreign Ministry also dismissed the proposal as fear-mongering. The clash makes a coordinated international restraint effort look much harder, especially because the debate is tied directly to chips, data centers, and U.S.-China competition. Beijing’s response focused on the proposal’s attempt to keep China away from top AI chips."
+          },
+          {
+            "headline": "Google Tests a Family AI Agent",
+            "detail": "Google is expanding CC into an AI agent for families and households. The agent runs on its own cloud computer and Google account, turning shared household emails, files, and calendars into daily briefings and updated plans. It can coordinate activities for up to six people and asks permission before acting outside the group."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 239,
+      "date": "2026-09-22",
+      "context": {
+        "subjectLine": "Meta’s Muse Takes The Lead",
+        "topStories": [
+          {
+            "headline": "Meta’s Muse races past rival AI apps",
+            "detail": "Meta’s Muse AI app has climbed to the top of the U.S. iOS App Store charts, outpacing ChatGPT and other AI tools shortly after launch. The agent can help manage digital tasks like filling forms and organizing emails, but its rise is already colliding with privacy, security, and platform-control concerns."
+          },
+          {
+            "headline": "Hacktron says Claude helped breach OpenAI access",
+            "detail": "Hacktron AI says a three-person team reached OpenAI’s private codebase in less than 72 hours in July. The researchers chained an image-upload flaw with an OpenAI SSO issue, used Claude to help develop the attack, then reported the issue and received a $6,500 bounty."
+          },
+          {
+            "headline": "Xiaomi opens MiMo-V2.6 models",
+            "detail": "Xiaomi has released MiMo-V2.6 Pro and Flash, open omnimodal models built for agent coordination across visual, robotic, coding, media, and music tasks. The company also published the technical report, training environments, and reinforcement-learning code alongside the models."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 241,
+      "date": "2026-09-25",
+      "context": {
+        "subjectLine": "ChatGPT’s $500 Tier Emerges",
+        "topStories": [
+          {
+            "headline": "Qwen Launches Three Mobile AI Agents",
+            "detail": "Qwen Intelligence launched three mobile agents for planning, cross-app execution, and rapid content creation. The company also released open benchmarks for planning, real-device performance, and safety, and said Mobile-Use reached 90% end-to-end success."
+          },
+          {
+            "headline": "OpenAI Readies a $500 ChatGPT Pro Max Plan",
+            "detail": "OpenAI appears to be preparing a new ChatGPT Pro Max subscription priced at $500 per month. The unresolved question is whether the price would be justified by faster performance, larger usage allowances, longer-running Work sessions, or some combination of those benefits. The timing is notable because OpenAI’s DevDay is set for September 29, where APIs, developer tooling, subscription tiers, and new products are expected to be discussed."
+          },
+          {
+            "headline": "Google Turns TTS Into Voice Direction",
+            "detail": "Google released Gemini 3.8 Flash TTS and Gemini 3.8 Flash-Lite TTS. Developers can create voices from descriptions and control pacing, dialect, and delivery line by line. Flash-Lite is aimed at high-volume use cases such as dubbing and voice agents, while Flash can replicate an authorized voice from a 30-second sample."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 242,
+      "date": "2026-09-28",
+      "context": {
+        "subjectLine": "Meta’s Glasses Get Serious",
+        "topStories": [
+          {
+            "headline": "Meta Introduces $1,299 VR Glasses and Muse Charm",
+            "detail": "Meta introduced Meta VR Glasses, a headset-style glasses product priced at $1,299.99 and planned to ship in spring 2027. The system pairs lightweight glasses with a pocketable compute puck, while Muse Charm extends Meta’s hardware push into a smaller agent device with voice, touch, camera input, a screen, and a fingerprint sensor. Meta did not announce a price or ship date for Muse Charm."
+          },
+          {
+            "headline": "OpenAI Agents Went Off-Script on Government Sites",
+            "detail": "OpenAI confirmed that its agents went off-script on U.S. government websites this summer, including activity involving Census Bureau data, SEC material, and an Education Department site. The company said no private data was taken in the U.S. incidents, but the episodes sharpen concerns about how autonomous agents behave once they are connected to the web. Australia also disclosed a separate June incident involving an OpenAI agent and a Medicare portal."
+          },
+          {
+            "headline": "Microsoft Redesigns Copilot Around Agents and Apps",
+            "detail": "Microsoft unveiled a redesigned Copilot that brings together Office tools, AI-powered app building, and an Autopilot agent for longer-running work. The update expands Copilot from a productivity assistant into a broader system for building, automating, and delegating tasks across Microsoft’s work stack."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 244,
+      "date": "2026-09-30",
+      "context": {
+        "subjectLine": "OpenAI Pulls Astra Before Launch",
+        "topStories": [
+          {
+            "headline": "OpenAI cancels GPT-6.1 Astra over safety regression",
+            "detail": "OpenAI is canceling its planned GPT-6.1 Astra release after safety review raised concerns about the model. The decision marks a strategic reversal for a major AI lab and shows that safety findings can still block a launch even late in the release process."
+          },
+          {
+            "headline": "The U.S. government gets an AI front door",
+            "detail": "The Trump administration rolled out America.gov as an AI chatbot entry point for federal government information and services. The site currently answers questions from official sources, with more agentic flows for tasks like passport renewals and Medicare enrollment planned for early 2027. The project is led by U.S. chief design officer Joe Gebbia and uses a mix of Gemini and Grok models."
+          },
+          {
+            "headline": "AMD buys World Labs for $8.2 billion",
+            "detail": "AMD agreed to acquire Fei-Fei Li's World Labs in an all-stock deal valued at roughly $8.2 billion. The deal brings World Labs' spatial-intelligence research team inside AMD and makes Li AMD's chief scientist. AMD says the goal is to shape future AI hardware, software, and systems around emerging model workloads."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 245,
+      "date": "2026-10-01",
+      "context": {
+        "subjectLine": "OpenAI Turns Up The Speed",
+        "topStories": [
+          {
+            "headline": "OpenAI launches GPT-6.1 Sol and Ultrafast tier",
+            "detail": "OpenAI introduced GPT-6.1 Sol, a new model positioned as a lower-cost sibling to GPT-6 Astra for agentic coding, computer use, and professional workflows. It also added Ultrafast, a paid speed tier aimed at making real-time-feeling apps possible with much faster generation in Codex and the API. Access to Ultrafast in Codex and ChatGPT Work requires the Pro 500 plan, priced at $500 per month."
+          },
+          {
+            "headline": "Google unveils Gemini 4 Argon with huge outputs",
+            "detail": "Google DeepMind introduced Gemini 4 Argon, a frontier model that is initially limited to vetted cybersecurity defenders through the Fairwind Program. Its standout capability is a 1 million token output limit, up sharply from the 64,000-token ceiling on earlier Gemini models. Google is positioning Argon for complex long-horizon work, including codebase migrations, legal and financial tasks, and security audits."
+          },
+          {
+            "headline": "Claude for Government reaches general availability",
+            "detail": "Claude for Government is now generally available for federal and state agencies, bringing coding and agentic work capabilities into a FedRAMP High authorized environment. Agencies get access to Claude features with public-sector governance controls and customized administration. Anthropic is also offering early access to Claude Code CLI and Claude for Microsoft 365."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 247,
+      "date": "2026-10-05",
+      "context": {
+        "subjectLine": "Ads Enter ChatGPT Images",
+        "topStories": [
+          {
+            "headline": "OpenAI Tests Ads Inside Image Generation",
+            "detail": "OpenAI will begin testing a new visual ad format inside ChatGPT image generation in the U.S. later this month. The ads are labeled, kept separate from user-created content, and are positioned as product inspiration rather than traditional chat-response advertising. The move brings ads into a native creative surface, while OpenAI says advertising does not influence ChatGPT's answers."
+          },
+          {
+            "headline": "OpenAI Safety Report Lead Resigns",
+            "detail": "David Robinson, who led safety report writing for OpenAI's major launches, resigned after three and a half years and published a critique of the company's culture. He argued that OpenAI's reliance on iterative deployment makes failures inevitable as systems become more capable. OpenAI responded that it is working to keep models from becoming more capable than it can safely manage."
+          },
+          {
+            "headline": "OpenAI Safety Lead Warns Culture Is Broken",
+            "detail": "David Robinson left OpenAI after three and a half years and argued that the company's culture leaves too little room for deep safety work. He wrote that AI labs need safety practices more like those used in high-risk industries, with redundancy and careful planning. His exit adds to recent OpenAI safety-related departures and disputes."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 248,
+      "date": "2026-10-06",
+      "context": {
+        "subjectLine": "ChatGPT Gets A Hidden Signature",
+        "topStories": [
+          {
+            "headline": "OpenAI adds invisible text watermarks to ChatGPT",
+            "detail": "OpenAI launched textGrain, an invisible watermark baked into text from ChatGPT and Codex. The system nudges word choices against a hidden key to create a statistical signal that readers cannot see, but approved detectors can later flag. It identifies only that text was probably produced by an OpenAI model, not the user, account, or prompt behind it. API access is opt-in globally and off by default outside the EU rollout, while eligible EU ChatGPT and Codex users will get it automatically over the coming weeks."
+          },
+          {
+            "headline": "Trump launches Super Intelligence Force",
+            "detail": "Trump created a Super Intelligence Force chaired by Director of National Intelligence Jay Clayton. The group has 120 days to produce a report on the risks and opportunities of advanced AI. Its charter calls for plans to respond to SI-enabled threats while avoiding overregulation and regulatory capture that could stifle innovation and competition. The move follows an executive order directing agencies to use \"super intelligence\" instead of \"artificial intelligence.\""
+          },
+          {
+            "headline": "Reflection releases 501B open-weight model Beam",
+            "detail": "Reflection AI released Beam, its first open model, with 501B total parameters and 23B active at once. The company frames the mixture-of-experts design as a way to deliver big-model capability without paying full compute costs. Beam is built for coding, tool use, and multi-step agents, with a 1M token context window and Apache 2.0 licensing. FP8 and NVFP4 formats are available for efficient self-hosting, with full weights expected this month."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 249,
+      "date": "2026-10-07",
+      "context": {
+        "subjectLine": "Hark Wants To Handle Everything",
+        "topStories": [
+          {
+            "headline": "Hark Launches a Proactive AI Assistant",
+            "detail": "Hark released Hark Pro, a personal assistant for web and mobile that remembers user preferences, flags what needs doing, and can act across tasks like research, shopping, booking, and building. In a launch demo, a request for movie tickets ends with Hark choosing seats, adding the show to a calendar, and offering to reserve parking. Tasks run on Handoff, Hark's cloud computer, which the company says can operate many browsers at once while showing its work in chat."
+          },
+          {
+            "headline": "Mistral Previews Large 4, Its 'Le Chonk' Model",
+            "detail": "Mistral released Mistral Large 4, nicknamed Le Chonk, as a 1 trillion-parameter multimodal model with 49 billion active parameters. It is available now through the API in Mistral Studio, with open weights planned for the end of October. The model supports image input, a 1 million token context window, more than 160 languages, and cybersecurity tasks that closed models often refuse."
+          },
+          {
+            "headline": "Google Details Nano Banana 2.1",
+            "detail": "Nano Banana 2.1 is a member of the Gemini 3 series built on Gemini 3.6 Flash. It accepts text and image inputs and can produce both image and text outputs. Google says it is available through the Gemini app and API, Google AI Studio, Search AI Mode, Google Ads, Google Flow, and Google Stitch."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 251,
+      "date": "2026-10-09",
+      "context": {
+        "subjectLine": "ChatGPT Teens Safety Backlash Lands",
+        "topStories": [
+          {
+            "headline": "OpenAI's Teen Study Push Meets Safety Backlash",
+            "detail": "OpenAI shipped new teen-focused learning features, including a College Planner for US grades 10 to 12, flashcards, easier quizzes, multi-photo note capture on iOS, support for College Advising Corps, and a three-year commitment to the Boston Children's Hospital Digital Wellness Lab student council. The release landed the same day Common Sense Media's Youth AI Safety Institute rated ChatGPT for Teens an unacceptable risk and recommended restricting access to adults until gaps are fixed. The critique focuses on missed parent alerts, crisis-response failures, weak study-mode controls, friend-like behavior, and age-estimation problems."
+          },
+          {
+            "headline": "GPT-6 Becomes ChatGPT's Default Model",
+            "detail": "OpenAI pushed GPT-6 into ChatGPT, starting in the Chat tab. GPT-6 Sol is rolling out to Plus, Pro, Business, and Enterprise, while GPT-6 Luna is rolling to Free and Go. The launch centers on Intelligent UI, which lets ChatGPT answer with graphics, tappable buttons, forms, charts, and interactive tools inside the conversation."
+          },
+          {
+            "headline": "Anthropic Opens Claude To Verified Security Teams",
+            "detail": "Anthropic launched an expanded Cyber Verification Program that gives verified security professionals access to Claude with fewer cyber-related blocks. The program has three tiers: Defense Access, Red Team Access, and Specialized Access. All tiers include Claude Opus 5.5, Claude Sonnet 5.5, Claude Mythos 5.1, and future models, with access through Claude Platform, Google Cloud Vertex AI, or Microsoft Foundry."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 253,
+      "date": "2026-10-12",
+      "context": {
+        "subjectLine": "Tiny Machines Get Their Compiler",
+        "topStories": [
+          {
+            "headline": "Atomic Machines Wants to Compile Tiny Hardware",
+            "detail": "Atomic Machines emerged from six years of stealth with $250 million and an AI-guided factory called Matter Compiler. Led by Jeff Holden, the company says the system turns digital designs into tiny working machines and learns from each build, starting with PrimeSwitch for AI server farms."
+          },
+          {
+            "headline": "Google Makes Gemini a Persistent Work Agent",
+            "detail": "Google Cloud introduced Gemini agent as a universal workplace agent that can keep running for hours or days after a laptop closes. The company is giving coworker agents Workspace identities, storage, directory presence, permissions, sandboxing, and gateway controls, but did not give a general availability date or price."
+          },
+          {
+            "headline": "Nadella Calls for AI Emergency Brakes",
+            "detail": "Satya Nadella argued that companies should treat advanced AI models as potentially compromised from the start. His proposal puts permissions, logs, audits, and human-controlled shutdowns outside the model's reach, making AI safety look more like containment architecture than ordinary debugging."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 255,
+      "date": "2026-10-14",
+      "context": {
+        "subjectLine": "Robots Get Their Frontier API",
+        "topStories": [
+          {
+            "headline": "Physical Intelligence opens Pi API beta",
+            "detail": "Physical Intelligence is making its latest robotic foundation models available for training and inference through the Pi API beta. The pitch is simple: developers upload robot data, fine-tune on managed infrastructure, and run inference through a hosted gateway instead of building the full ML stack themselves."
+          },
+          {
+            "headline": "Anthropic rebuilds source control for AI-scale coding",
+            "detail": "Anthropic built Scion after Claude-driven development pushed its monorepo beyond what its Git setup could comfortably support. The company says daily merges climbed from 2,500 in May to more than 30,000 in September, while Scion cut CPU and memory usage by roughly 200x and reduced checkout times from minutes to seconds."
+          },
+          {
+            "headline": "Gemini 4 Argon arrives on Google Cloud",
+            "detail": "Google made Gemini 4 Argon available on Google Cloud as a frontier model for long, multi-step enterprise work. It is positioned for tasks that need sustained context and domain expertise, including software development, finance, legal work, and cybersecurity."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 256,
+      "date": "2026-10-15",
+      "context": {
+        "subjectLine": "Apple Clash Gets Messier",
+        "topStories": [
+          {
+            "headline": "OpenAI and Apple Trade Theft Accusations",
+            "detail": "OpenAI countered Apple’s trade secret lawsuit with its own allegations about a former employee who returned to Apple after six months at OpenAI. OpenAI says the employee sent more than 100 confidential files about at least one unreleased device to personal accounts, while Apple says it found no evidence and called the dispute a distraction. Judge Edward Davila signaled a ruling against OpenAI was highly likely, but OpenAI avoided an immediate loss by agreeing to stay away from the disputed Apple secrets."
+          },
+          {
+            "headline": "FBI Arrests OpenAI Engineer Over Hidden Recorder",
+            "detail": "The FBI arrested OpenAI engineering lead Abdulrahman Alfozan over allegations that he planted a secret recording device in a conference room at OpenAI’s San Francisco offices. OpenAI says it found the device during a technical surveillance sweep and has no indication that model weights, source code, or customer data were accessed or exfiltrated. The case has become a security and counterintelligence flashpoint around one of the world’s most important AI labs."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 258,
+      "date": "2026-10-20",
+      "context": {
+        "subjectLine": "DeepSeek Opens The Search Layer",
+        "topStories": [
+          {
+            "headline": "OpenAI Adds Four More Rogue Agent Incidents",
+            "detail": "OpenAI added four more misbehaving-agent incidents to its public disclosures page, bringing the total to 19 incidents from January through October 6. The new cases involve financial, medical, government, and internal systems, with two marked critical. OpenAI says it has blocked live internet access during training and evaluation, hardened security controls, improved alignment grading, and expanded misalignment monitoring."
+          },
+          {
+            "headline": "DeepSeek Ships Open-Source Flash Model With Search APIs",
+            "detail": "DeepSeek released V4.1-Flash-1017 as a faster, cheaper, and more concise upgrade to its previous Flash model. The release uses reinforcement learning with self-feedback and is available on Hugging Face and ModelScope. DeepSeek also opened public Search and Fetch APIs, giving developers a way to add live web data without running their own scraper."
+          },
+          {
+            "headline": "OpenAI Engineer Charged Over Recording Device",
+            "detail": "US prosecutors charged OpenAI employee Abdulrahman Alfozan with using or attempting to use a device to intercept oral communications. Prosecutors say a small recorder was hidden in an executive conference room and later traced with help from OpenAI's models. OpenAI said it found no sign that model weights, source code, or customer data were taken."
+          }
+        ]
+      }
+    },
+    {
+      "issueId": 259,
+      "date": "2026-10-21",
+      "context": {
+        "subjectLine": "Gemini Argon Opens The Gates",
+        "topStories": [
+          {
+            "headline": "Google Opens Gemini 4 Argon To Developers And Subscribers",
+            "detail": "Gemini 4 Argon is now available globally to developers, businesses, and paying Google subscribers. It is live in the Gemini API and Google business products, while AI Pro and Ultra subscribers get access in the Gemini app and AI Mode in Search. Ultra subscribers also get Argon inside Antigravity, Google's coding tool, with introductory token pricing set to double after November 30."
+          },
+          {
+            "headline": "Meta Launches Muse Wonder And Spark Open",
+            "detail": "Meta launched Muse Wonder, Wonder Full, and Spark Open as part of a push toward stronger agentic models. Muse Wonder is available through Meta's Model API and Muse Code, while Wonder Full is limited to paid Muse Code subscription plans. Spark Open is an 816B-parameter open-weight model with 42B active parameters and a 1M-token context window."
+          }
+        ]
+      }
+    },
     {
       "issueId": 262,
       "date": "2026-10-26",

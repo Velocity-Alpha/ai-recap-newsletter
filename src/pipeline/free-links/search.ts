@@ -54,13 +54,29 @@ export interface SearchDeps extends ModelOverrides {
   log?: (message: string) => void;
 }
 
+/*
+ * The parts of the search prompt that say what a free link is (GLOSSARY: Free link). They are exported so the
+ * free-links eval (evals/free-links/) uses the same words in its judge and golden work list, never a copy.
+ */
+
+/** The ask: what to find. */
+export const FREE_ARTICLES_ASK = "find up to 3 free-to-read articles that report this same news";
+/** Examples of a primary source of a news event. */
+export const PRIMARY_SOURCE_EXAMPLES = "a company post, a filing, a court document";
+/** The paywalled sites the prompt names. The full lists are in ingest/paywall.ts and the learned paywalled sites. */
+export const PAYWALLED_SITE_NAMES = ["WSJ", "FT", "Bloomberg", "NYT", "The Information", "Reuters", "CNBC Pro"] as const;
+/** What to prefer. */
+export const FREE_LINK_PREFERENCE = `Prefer original reporting, large news sites, and primary sources (${PRIMARY_SOURCE_EXAMPLES}).`;
+/** What never counts. */
+export const FREE_LINK_EXCLUSIONS = `Do not return paywalled sites (${PAYWALLED_SITE_NAMES.join(", ")}), social media posts, aggregators, or short rewrites.`;
+
 export function buildSearchPrompt(story: SearchStory): string {
   return `A newsletter wants to link to this news story, but its link (${siteOf(story.url) ?? "unknown site"}) is paywalled.
 
 Headline: ${story.headline ?? ""}
 Summary: ${story.summary ?? ""}
 
-Search the web and find up to 3 free-to-read articles that report this same news. Prefer original reporting, large news sites, and primary sources (a company post, a filing, a court document). Do not return paywalled sites (WSJ, FT, Bloomberg, NYT, The Information, Reuters, CNBC Pro), social media posts, aggregators, or short rewrites. Answer with JSON only: {"links":[{"url":"...","title":"...","site":"..."}]}. Use an empty list when you find none.`;
+Search the web and ${FREE_ARTICLES_ASK}. ${FREE_LINK_PREFERENCE} ${FREE_LINK_EXCLUSIONS} Answer with JSON only: {"links":[{"url":"...","title":"...","site":"..."}]}. Use an empty list when you find none.`;
 }
 
 /**

@@ -1,10 +1,13 @@
+import native from "@/evals/lead-pick/native-boards.json";
 import archive from "@/src/features/newsletter/__fixtures__/archived-boards.json";
 import { buildApprovalOutline, type ProcessedStory } from "@/src/features/newsletter/curation.service";
 import { LEAD_SHORTLIST_SIZE, leadShortlist, type LeadShortlistEntry } from "@/src/features/newsletter/lead-story";
 
 /**
- * The 10 archived boards (src/features/newsletter/__fixtures__/archived-boards.json) as the lead pick sees them.
- * `curation.service` imports Prisma, so a test or eval that imports this file mocks `@/src/server/prisma`.
+ * The boards with an owner's committed lead, as the lead pick sees them: the 10 reviewer commits of the n8n archive
+ * (src/features/newsletter/__fixtures__/archived-boards.json), then the native commits of the Neon dev branch in the
+ * same format (evals/lead-pick/native-boards.json, from build-native-boards.ts). `curation.service` imports Prisma,
+ * so a test or eval that imports this file mocks `@/src/server/prisma`.
  */
 
 export type ArchivedBoard = (typeof archive.boards)[number];
@@ -21,7 +24,8 @@ export interface LeadPickCase {
   outline: ReturnType<typeof buildApprovalOutline>;
 }
 
-export const ARCHIVED_BOARDS: ArchivedBoard[] = archive.boards;
+/** Every board, in date order. */
+export const ARCHIVED_BOARDS: ArchivedBoard[] = [...archive.boards, ...native.boards].sort((a, b) => a.date.localeCompare(b.date));
 
 export function headlineById(): Map<number, string> {
   return new Map(ARCHIVED_BOARDS.flatMap((board) => board.ranked_pool.map((entry) => [entry.id, entry.headline] as const)));

@@ -29,6 +29,8 @@ const IDEA_GRADE: IdeaGrade = {
   logo_rule: true,
   visible_only: true,
   no_extra_elements: false,
+  identifier_shown: true,
+  misread: false,
   thumbnail_readability: 2,
   lead_relevance: 3,
 };
@@ -74,7 +76,7 @@ describe("scoreSceneIdeas", () => {
       scoreSceneIdeas([
         outcome({ ideas: [GOOD, GOOD, GOOD], rawIdeaCount: 3 }, 10_000, {
           lead_story: 1,
-          ideas: [IDEA_GRADE, IDEA_GRADE, { ...IDEA_GRADE, depicted_story: 2 }],
+          ideas: [IDEA_GRADE, { ...IDEA_GRADE, misread: true }, { ...IDEA_GRADE, depicted_story: 2 }],
           clearly_different: false,
           note: "",
         }),
@@ -105,6 +107,22 @@ describe("scoreSceneIdeas", () => {
 
   it("counts the judged 'an idea shows the lead' over the graded runs", () => {
     expect(metrics().get("J: an idea shows the lead")).toEqual({ name: "J: an idea shows the lead", hits: 1, n: 1 });
+  });
+
+  it("counts a lead identifier only in an idea of the golden lead", () => {
+    const [run] = scoreSceneIdeas([
+      outcome({ ideas: [GOOD], rawIdeaCount: 1 }, 1, {
+        lead_story: 1,
+        ideas: [{ ...IDEA_GRADE, depicted_story: 2 }],
+        clearly_different: true,
+        note: "",
+      }),
+    ]).filter((metric) => metric.name === "J: an idea shows a lead identifier");
+    expect(run).toEqual({ name: "J: an idea shows a lead identifier", hits: 0, n: 1 });
+  });
+
+  it("counts the ideas that show none of the golden misreads, over 3 ideas per graded run", () => {
+    expect(metrics().get("J: no misread")).toEqual({ name: "J: no misread", hits: 2, n: 3 });
   });
 
   it("counts the judged 'clearly different' over the graded runs", () => {

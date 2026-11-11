@@ -3,26 +3,34 @@ import { mean } from "@/evals/lib/stats";
 import { countGraded, countHits, gradedOutcomes, type Outcome } from "@/evals/lib/sweep";
 import { countWords } from "@/evals/lib/text";
 import { checkSceneText, GRADE_RULES, INTERPRETIVE_SCENE_IDEAS, type SceneGrade, type SceneTextChecks } from "@/evals/scenes/rules";
-import { SCENE_IDEAS_COUNT, SCENE_IDEAS_TIMEOUT_MS, type SceneIdea } from "@/src/pipeline/draft/image/scene-ideas";
+import {
+  SCENE_IDEA_LABEL_WORDS,
+  SCENE_IDEA_WORDS,
+  SCENE_IDEAS_COUNT,
+  SCENE_IDEAS_TIMEOUT_MS,
+  type SceneIdea,
+} from "@/src/pipeline/draft/image/scene-ideas";
 
-/** Scoring of the scene ideas (src/pipeline/draft/image/scene-ideas.ts): its prompt's hard rules and the judge. */
-
-export const IDEA_WORDS = { min: 120, max: 200 };
-export const LABEL_WORDS = { min: 2, max: 6 };
+/**
+ * Scoring of the scene ideas (src/pipeline/draft/image/scene-ideas.ts): its prompt's hard rules, and the judge's
+ * grade against the golden lead story.
+ */
 
 /** The judge's grade of one idea: the scene rules, and which top story it shows. */
-export interface IdeaGrade extends SceneGrade {
-  /** 1-based index of the top story the idea shows; 0 when none. */
-  depicted_story: number;
-}
+export type IdeaGrade = SceneGrade;
 
-export interface SceneIdeasGrade {
-  /** 1-based index of the top story the subject line is about; 0 when none fits. */
-  lead_story: number;
+/** The judge's answer for one run's ideas. */
+export interface SceneIdeasJudgeAnswer {
   ideas: IdeaGrade[];
   /** "Make the three scenes clearly different": a different story, dominant subject, or visual idea. */
   clearly_different: boolean;
   note: string;
+}
+
+/** The grade of one run: the judge's answer, and the golden lead story it was graded against. */
+export interface SceneIdeasGrade extends SceneIdeasJudgeAnswer {
+  /** 1-based number of the lead story, from the golden value (not the judge). */
+  lead_story: number;
 }
 
 export interface SceneIdeasOutput {
@@ -52,10 +60,10 @@ export function checkIdea(idea: SceneIdea): IdeaChecks {
 
 export function passesIdeaRules(checks: IdeaChecks): boolean {
   return (
-    checks.words >= IDEA_WORDS.min &&
-    checks.words <= IDEA_WORDS.max &&
-    checks.labelWords >= LABEL_WORDS.min &&
-    checks.labelWords <= LABEL_WORDS.max &&
+    checks.words >= SCENE_IDEA_WORDS.min &&
+    checks.words <= SCENE_IDEA_WORDS.max &&
+    checks.labelWords >= SCENE_IDEA_LABEL_WORDS.min &&
+    checks.labelWords <= SCENE_IDEA_LABEL_WORDS.max &&
     checks.layers &&
     checks.camera &&
     checks.lighting &&
@@ -91,8 +99,8 @@ export function scoreSceneIdeas<I>(outcomes: Outcome<I, SceneIdeasOutput, SceneI
     runHits(`Exactly ${SCENE_IDEAS_COUNT} ideas`, (run) => run.rawIdeaCount === SCENE_IDEAS_COUNT),
     runHits("All ideas pass hard rules", (run) => run.ideas.length === SCENE_IDEAS_COUNT && run.ideas.every((idea) => passesIdeaRules(checkIdea(idea)))),
     ideaCheck("Idea: all hard rules", passesIdeaRules),
-    ideaCheck("Idea: 120–200 words", (checks) => checks.words >= IDEA_WORDS.min && checks.words <= IDEA_WORDS.max),
-    ideaCheck("Idea: label 2–6 words", (checks) => checks.labelWords >= LABEL_WORDS.min && checks.labelWords <= LABEL_WORDS.max),
+    ideaCheck(`Idea: ${SCENE_IDEA_WORDS.min}–${SCENE_IDEA_WORDS.max} words`, (checks) => checks.words >= SCENE_IDEA_WORDS.min && checks.words <= SCENE_IDEA_WORDS.max),
+    ideaCheck(`Idea: label ${SCENE_IDEA_LABEL_WORDS.min}–${SCENE_IDEA_LABEL_WORDS.max} words`, (checks) => checks.labelWords >= SCENE_IDEA_LABEL_WORDS.min && checks.labelWords <= SCENE_IDEA_LABEL_WORDS.max),
     ideaCheck("Idea: fg/mid/bg, camera, light", (checks) => checks.layers && checks.camera && checks.lighting),
     ideaCheck("Idea: no interpretive or style words", (checks) => checks.interpretiveWords.length === 0 && checks.styleWords.length === 0),
     { name: "Idea words mean", value: Math.round(mean(ideaChecks.map((checks) => checks.words))) },
@@ -100,10 +108,13 @@ export function scoreSceneIdeas<I>(outcomes: Outcome<I, SceneIdeasOutput, SceneI
     { name: "J: relevance mean (0–3)", value: mean(ideaGrades.map((grade) => grade.lead_relevance)) },
     { name: "J: thumbnail mean (1–3)", value: mean(ideaGrades.map((grade) => grade.thumbnail_readability)) },
     countGraded("J: clearly different", outcomes, (outcome) => outcome.grade.clearly_different),
-    countGraded("J: an idea shows the lead", outcomes, (outcome) => {
-      const lead = outcome.grade.lead_story;
-      return lead > 0 && outcome.grade.ideas.some((idea) => idea.depicted_story === lead);
-    }),
+    countGraded("J: an idea shows the lead", outcomes, (outcome) =>
+      outcome.grade.ideas.some((idea) => idea.depicted_story === outcome.grade.lead_story)
+    ),
+    countGraded("J: an idea shows a lead identifier", outcomes, (outcome) =>
+      outcome.grade.ideas.some((idea) => idea.depicted_story === outcome.grade.lead_story && idea.identifier_shown)
+    ),
+    judgedIdeas("J: no misread", (grade) => !grade.misread),
     countHits(`Done in ${SCENE_IDEAS_TIMEOUT_MS / 1000} s`, outcomes, (outcome) => outcome.latencyMs < SCENE_IDEAS_TIMEOUT_MS),
   ];
 }

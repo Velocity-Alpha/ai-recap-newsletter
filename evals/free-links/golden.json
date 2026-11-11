@@ -1,0 +1,5 @@
+{
+  "about": "Free-links golden values: per paywalled story of evals/free-links/stories.json, whether a free, same-news article exists, and up to 3 such article URLs that Claude Opus found by web search and read (evals/free-links/golden-todo.md). Story ids and public URLs only.",
+  "producer": "claude-opus-5-5",
+  "entries": {}
+}

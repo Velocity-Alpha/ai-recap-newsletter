@@ -51,6 +51,18 @@ export function readDataset(): ExtractionCase[] {
   return JSON.parse(readFileSync(DATASET_PATH, "utf8")) as ExtractionCase[];
 }
 
+/**
+ * `count` items spread evenly over `candidates` (sorted by date), keeping every `kept` one: the kept items
+ * count toward `count`, and the rest are taken at even steps from the candidates that are not kept.
+ */
+export function spreadPick<T extends { date: string }>(candidates: T[], kept: T[], count: number, key: (item: T) => string): T[] {
+  const keptKeys = new Set(kept.map(key));
+  const rest = [...candidates].filter((item) => !keptKeys.has(key(item))).sort((a, b) => a.date.localeCompare(b.date));
+  const wanted = Math.max(0, Math.min(rest.length, count - kept.length));
+  const picked = Array.from({ length: wanted }, (_, index) => rest[Math.floor(((index + 0.5) * rest.length) / wanted)]);
+  return [...kept, ...picked].sort((a, b) => a.date.localeCompare(b.date));
+}
+
 function textOf(html: string, selector: string, what: string): string {
   const element = parse(html, { comment: false }).querySelector(selector);
   if (!element) throw new Error(`${what} page has no ${selector} element.`);

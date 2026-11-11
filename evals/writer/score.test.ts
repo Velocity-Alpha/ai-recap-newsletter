@@ -3,11 +3,22 @@ import { describe, expect, it } from "vitest";
 import type { Metric } from "@/evals/lib/results";
 import { outcomeOf } from "@/evals/lib/testing";
 import type { IssueGrade, StoryGrade } from "@/evals/writer/rubric";
-import { bulletOverlap, pairMetrics, scoreWriter, stringFields, writerColumns, type WriterOutcome, type WriterRun } from "@/evals/writer/score";
+import {
+  bulletOverlap,
+  draftCheckFailures,
+  pairResult,
+  scoreWriter,
+  stringFields,
+  writerColumns,
+  type PairResult,
+  type WriterGrade,
+  type WriterOutcome,
+  type WriterRun,
+} from "@/evals/writer/score";
 import { bullet, CASE, GOOD } from "@/evals/writer/testing";
 import type { WrittenIssueContent } from "@/src/pipeline/draft/content";
 
-const GRADE: IssueGrade = {
+const ISSUE_GRADE: IssueGrade = {
   stories: [1, 2, 3].map((id): StoryGrade => ({
     story_id: id,
     unsupported_claims: id === 2 ? 1 : 0,
@@ -23,6 +34,8 @@ const GRADE: IssueGrade = {
   quality_reason: "Crisp.",
 };
 
+const GRADE: WriterGrade = { issue: ISSUE_GRADE, vsGolden: { result: "win", draftFirst: true } };
+
 const run = (overrides: Partial<WriterRun> = {}): WriterRun => ({
   first: GOOD,
   firstProblems: [],
@@ -30,7 +43,7 @@ const run = (overrides: Partial<WriterRun> = {}): WriterRun => ({
   ...overrides,
 });
 
-const outcome = (output: WriterRun | null, repeat = 0, grade: IssueGrade | null = output ? GRADE : null): WriterOutcome =>
+const outcome = (output: WriterRun | null, repeat = 0, grade: WriterGrade | null = output ? GRADE : null): WriterOutcome =>
   outcomeOf({
     item: CASE,
     id: CASE.date,
@@ -152,38 +165,74 @@ describe("scoreWriter on the judge's grades", () => {
   });
 });
 
-describe("pairMetrics", () => {
-  it("gives nothing when no pair was judged", () => {
-    expect(pairMetrics([], "high")).toEqual([]);
-  });
+describe("scoreWriter against the golden issue", () => {
+  const judged = (result: PairResult | null): WriterOutcome =>
+    outcome(run(), 0, { issue: ISSUE_GRADE, vsGolden: result ? { result, draftFirst: false } : null });
+  const metrics = (outcomes: WriterOutcome[]) => byName(scoreWriter(outcomes));
 
-  it("counts wins against the baseline", () => {
-    expect(byName(pairMetrics(["win", "tie", "loss"], "high"))["Wins vs high (pairwise)"]).toMatchObject({ hits: 1, n: 3 });
-  });
-
-  it("counts ties against the baseline", () => {
-    expect(byName(pairMetrics(["win", "tie", "loss"], "high"))["Ties vs high (pairwise)"]).toMatchObject({ hits: 1, n: 3 });
+  it("counts wins, ties and losses over the runs the pairwise judge compared", () => {
+    const scored = metrics([judged("win"), judged("tie"), judged("loss"), judged(null)]);
+    expect(scored["Wins vs golden (pairwise)"]).toMatchObject({ hits: 1, n: 3 });
+    expect(scored["Ties vs golden (pairwise)"]).toMatchObject({ hits: 1, n: 3 });
+    expect(scored["Losses vs golden (pairwise)"]).toMatchObject({ hits: 1, n: 3 });
   });
 
   it("scores the preference as a win plus half a tie", () => {
-    expect(byName(pairMetrics(["win", "tie", "loss"], "high"))["Preference vs high (win + tie/2)"]).toEqual({
-      name: "Preference vs high (win + tie/2)",
-      value: 0.5,
-    });
+    expect(metrics([judged("win"), judged("tie"), judged("loss")])["Preference vs golden (win + tie/2)"]).toMatchObject({ value: 0.5 });
+  });
+
+  it("counts a run that errored as a loss", () => {
+    expect(metrics([judged("win"), outcome(null, 1)])["Losses vs golden (pairwise)"]).toMatchObject({ hits: 1, n: 2 });
+  });
+
+  it("gives no golden metrics when no run was compared", () => {
+    expect(metrics([judged(null), outcome(null, 1)])["Wins vs golden (pairwise)"]).toBeUndefined();
+  });
+});
+
+describe("pairResult", () => {
+  it("is a win when the judge picks the run's side", () => {
+    expect(pairResult("A", true)).toBe("win");
+    expect(pairResult("B", false)).toBe("win");
+  });
+
+  it("is a loss when the judge picks the golden side", () => {
+    expect(pairResult("B", true)).toBe("loss");
+    expect(pairResult("A", false)).toBe("loss");
+  });
+
+  it("keeps a tie", () => {
+    expect(pairResult("tie", true)).toBe("tie");
+  });
+});
+
+describe("draftCheckFailures", () => {
+  it("is empty for a draft that passes every code check", () => {
+    expect(draftCheckFailures(CASE, GOOD)).toEqual([]);
+  });
+
+  it("names an eval note the draft does not follow", () => {
+    const plain = { ...GOOD, research_and_analysis: [{ ...GOOD.research_and_analysis[0], headline: "Small models learn cheaply" }] };
+    expect(draftCheckFailures(CASE, plain)).toEqual(['Notes followed (code): story 3 ("Write the headline as a question.")']);
+  });
+
+  it("names a failed issue check and a failed story check", () => {
+    const long = { ...GOOD, title: "A very long subject line that keeps on going past eight words", headlines: [{ ...GOOD.headlines[0], bullets: [] }, GOOD.headlines[1]] };
+    expect(draftCheckFailures(CASE, long)).toEqual(expect.arrayContaining(["Title 4-8 words", "Feature items with 3 bullets: story 1"]));
   });
 });
 
 describe("writerColumns", () => {
-  it("names the pairwise columns for the baseline", () => {
-    expect(writerColumns("high")).toEqual(expect.arrayContaining(["Wins vs high (pairwise)"]));
+  it("shows the wins against the golden issue", () => {
+    expect(writerColumns()).toEqual(expect.arrayContaining(["Wins vs golden (pairwise)", "Preference vs golden (win + tie/2)"]));
   });
 
   it("keeps the old rows' comparison with low", () => {
-    expect(writerColumns("high")).toEqual(expect.arrayContaining(["Preference vs low (win + tie/2)"]));
+    expect(writerColumns()).toEqual(expect.arrayContaining(["Preference vs low (win + tie/2)"]));
   });
 
-  it("lists the comparison with low once when low is the baseline", () => {
-    expect(writerColumns("low").filter((name) => name === "Preference vs low (win + tie/2)")).toHaveLength(1);
+  it("names the code checks with the writer's own limits", () => {
+    expect(writerColumns()).toEqual(expect.arrayContaining(["Story detail 2-4 sentences", "Overview 45-80 words"]));
   });
 });
 

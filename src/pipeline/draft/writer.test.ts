@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import { describe, expect, it, vi } from "vitest";
 
 import { WRITTEN_ISSUE_SCHEMA } from "@/src/pipeline/draft/content";
@@ -5,6 +7,7 @@ import { SAMPLE_APPROVED, SAMPLE_CONTENT } from "@/src/pipeline/draft/draft.fixt
 import {
   MAX_ARTICLE_CHARS,
   WRITER_EFFORT,
+  WRITER_INSTRUCTIONS,
   WRITER_MODEL,
   buildWriterPrompt,
   createOpenAIIssueWriter,
@@ -76,7 +79,15 @@ describe("createOpenAIIssueWriter", () => {
   it("sends the writer prompt under the editorial instructions", async () => {
     const request = await sentRequest();
     expect(request.input).toBe(buildWriterPrompt(INPUT));
+    expect(request.instructions).toBe(WRITER_INSTRUCTIONS);
     expect(request.instructions).toContain("You are the editorial structuring engine for an AI newsletter.");
+  });
+
+  it("sends the same instructions and prompt bytes as before the prompt was split into named parts", async () => {
+    const request = await sentRequest();
+    const sha = (text: string) => createHash("sha256").update(text).digest("hex");
+    expect(sha(request.instructions)).toBe("66f1427ddc9e72ca77bf3b00c74bccc5db0f20737cbfcd474cd3ee0db6d3e9df");
+    expect(sha(request.input)).toBe("fe6389a2605aa13882ddc80b41e9e7d22951673d9109d3de5d29a1b4e4dd6c2d");
   });
 
   it("uses the model and effort it is given (for evals)", async () => {

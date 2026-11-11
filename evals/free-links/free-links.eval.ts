@@ -1,33 +1,51 @@
-// The web search for free links (src/pipeline/free-links/search.ts) on the 10 stories of its test set, with the
-// repo's own check of each link (check-links.ts: site rules, then the article reader). evals/README.md.
+// The web search for free links (src/pipeline/free-links/search.ts) on the paywalled stories of
+// evals/free-links/stories.json that have a golden value, with the repo's own check of each link (check-links.ts:
+// site rules, then the article reader), scored against the golden values. evals/README.md.
 // It replaces the old opt-in live test, and writes nothing: no free links are saved and no paywalled site is recorded.
 import { expect, it, vi } from "vitest";
 
 vi.mock("@/src/server/prisma", () => ({ prisma: {} }));
 
 import { readOnlyQuery } from "@/evals/lib/dev-db";
-import { API_DEFAULT, evalSettings } from "@/evals/lib/settings";
+import { evalSettings } from "@/evals/lib/settings";
 import { runSweep, type GradeContext, type RunContext } from "@/evals/lib/sweep";
 import { WEB_SEARCH_USD_PER_CALL } from "@/evals/lib/usage";
+import { GOLDEN_PATH } from "@/evals/free-links/golden";
 import { ARTICLE_WORDS_FOR_JUDGE, sameNewsInput, SAME_NEWS_INSTRUCTIONS, SAME_NEWS_SCHEMA } from "@/evals/free-links/rubric";
 import {
   OWNER_REPLACED_STORY_IDS,
   scoreFreeLinks,
   type CheckedFoundLink,
+  type FreeLinksGolden,
   type FreeLinksGrade,
   type FreeLinksOutput,
   type SameNews,
 } from "@/evals/free-links/score";
+import { goldenInput, readStories, STORIES_PATH, type PaywalledStory } from "@/evals/free-links/stories";
+import { goldenFor, loadGolden, missingGolden } from "@/evals/lib/golden";
 import { readerOptionsFromEnv } from "@/src/pipeline/draft/articles/draft-reader";
 import { readArticles } from "@/src/pipeline/draft/articles/read-articles";
-import answers from "@/src/pipeline/free-links/__fixtures__/search-answers.json";
 import { checkLinks, countWords, READ_DEADLINE_MS, type LinkRead } from "@/src/pipeline/free-links/check-links";
 import { isLearned } from "@/src/pipeline/free-links/paywall-sites";
-import { parseSearchAnswer, SEARCH_MODEL, searchFreeLinks } from "@/src/pipeline/free-links/search";
+import { parseSearchAnswer, SEARCH_EFFORT, SEARCH_MODEL, searchFreeLinks } from "@/src/pipeline/free-links/search";
 import { MIN_WORDS, siteOf } from "@/src/pipeline/free-links/sites";
 import { checkSiteList } from "@/src/pipeline/ingest/paywall";
 
-type Item = (typeof answers)[number];
+interface Item {
+  story: PaywalledStory;
+  golden: FreeLinksGolden;
+}
+
+/** The stories with a golden value. One whose input changed since its value was made stops the run (goldenFor). */
+function goldenItems(): { items: Item[]; missing: string[] } {
+  const golden = loadGolden<FreeLinksGolden>(GOLDEN_PATH);
+  const stories = readStories();
+  const missing = missingGolden(golden, stories.map((story) => ({ id: String(story.id), input: goldenInput(story) })));
+  const items = stories
+    .filter((story) => golden.entries[String(story.id)])
+    .map((story) => ({ story, golden: goldenFor(golden, String(story.id), goldenInput(story)) }));
+  return { items, missing };
+}
 
 /** The learned paywalled sites on the Neon dev branch (read-only), as the job would use them. */
 async function loadLearnedSites(): Promise<{ sites: string[]; source: string }> {
@@ -108,16 +126,27 @@ function makeGrade(learnedSites: string[]) {
 }
 
 it("free links: usable links found by the web search, at each effort", async () => {
-  const settings = evalSettings({ model: SEARCH_MODEL, efforts: ["none", "low", "medium", "high", API_DEFAULT], repeats: 1 });
+  const settings = evalSettings({
+    model: SEARCH_MODEL,
+    efforts: ["low", "medium"],
+    repeats: 1,
+    baseline: SEARCH_EFFORT,
+  });
   const learned = await loadLearnedSites();
+  const { items, missing } = goldenItems();
+  if (items.length === 0) throw new Error(`No story of ${STORIES_PATH} has a golden value yet: see evals/free-links/golden-todo.md.`);
+  const withFree = items.filter((item) => item.golden.free_source_exists).length;
 
   const { rows, path } = await runSweep({
     task: "free-links",
     title: "Free links eval",
     notes: [
-      "The web search for free links on the 10 paywalled stories of `src/pipeline/free-links/__fixtures__/search-answers.json` " +
-        "(published 2026-10-13 to 2026-11-09), live: the real search, then the repo's `checkLinks` (site rules, then " +
+      `The web search for free links on the ${items.length} paywalled stories of \`${STORIES_PATH}\` with a golden value ` +
+        `(${missing.length} without one are left out), live: the real search, then the repo's \`checkLinks\` (site rules, then ` +
         `the article reader, ${MIN_WORDS} words or more). Nothing is saved. Learned paywalled sites: ${learned.source}.`,
+      `Golden (\`evals/free-links/golden.json\`, Claude Opus with web search, golden-todo.md): ${withFree} stories have a ` +
+        "free source. Recall is over those stories; precision is over the kept links the judge graded; the stories with " +
+        "no free source are counted apart, and 'Kept links among golden URLs' needs no judge.",
       `Usable link: kept by \`checkLinks\`, and the judge (rubric.ts, first ${ARTICLE_WORDS_FOR_JUDGE} words of the article) ` +
         "says it reports the same news. Each link is read once and judged once for the whole sweep, so efforts share " +
         "reads and verdicts; their cost is the shared-work line under the table.",
@@ -131,7 +160,7 @@ it("free links: usable links found by the web search, at each effort", async () 
         "reads and the judge (the search alone is 'Search p50 s'), and the judge cost is of the config that first found a link.",
     ],
     settings,
-    items: answers,
+    items,
     id: (item) => String(item.story.id),
     run: search,
     grade: makeGrade(learned.sites),

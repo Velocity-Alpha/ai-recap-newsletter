@@ -1,4 +1,5 @@
 import { countSentences, countWords } from "@/evals/lib/text";
+import type { WriterCase } from "@/evals/writer/dataset";
 import type { ApprovedSections, WrittenIssueContent } from "@/src/pipeline/draft/content";
 import type { WriterInput } from "@/src/pipeline/draft/writer";
 
@@ -15,7 +16,6 @@ export interface EvalNote {
   /** Did the written item follow the note? Gets the item of the story in the written content. */
   followed: (content: WrittenIssueContent, storyId: number) => boolean;
 }
-
 
 function feature(content: WrittenIssueContent, storyId: number) {
   return [...content.headlines, ...content.research_and_analysis].find((item) => item.story_id === storyId);
@@ -61,4 +61,9 @@ export function withEvalNotes(input: WriterInput): { input: WriterInput; noted: 
     noted.push({ storyId: story.id, note });
   }
   return { input: { ...input, sections }, noted };
+}
+
+/** The writer's input for one case: its input with the eval's notes. Every run and the golden issue start from it. */
+export function writerInputOf(item: WriterCase): WriterInput {
+  return withEvalNotes(item.input).input;
 }

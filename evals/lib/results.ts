@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
+import type { PairedDiff } from "@/evals/lib/stats";
 import { REASONING_EFFORTS } from "@/src/lib/reasoning-effort";
 
 /** The lowest and highest per-repeat value of a metric: a share (0 to 1) for a count, the value for a number. */
@@ -10,14 +11,22 @@ export interface Spread {
   max: number;
 }
 
-/** A count (`hits` of `n`) or a plain number. `spread` is set when two or more repeats gave the metric. */
-export type Metric = ({ name: string; hits: number; n: number } | { name: string; value: number }) & { spread?: Spread };
+/**
+ * A count (`hits` of `n`) or a plain number. `spread` is set when two or more repeats gave the metric.
+ * `vsBaseline` (counts of a row that is not the baseline): the difference in share against the baseline row of the
+ * same run, with its 95% paired bootstrap interval over items.
+ */
+export type Metric = ({ name: string; hits: number; n: number; vsBaseline?: PairedDiff } | { name: string; value: number }) & {
+  spread?: Spread;
+};
 
 /** One (model, effort) of a results file. Metrics, ids and our own headlines only: never third-party text. */
 export interface ResultRow {
   model: string;
   /** `null` is the API default (no `reasoning` field); "n/a" is a call that takes no effort. */
   effort: string | null;
+  /** The row of the call site's production effort, which the other rows of its run are compared to. */
+  baseline?: boolean;
   /** Item runs: items x repeats. */
   n: number;
   errors: number;
@@ -76,11 +85,23 @@ const percent = (share: number) => Math.round(100 * share);
 /** The spread is shown when the repeats differ; when they agree, the total says it all. */
 const differs = (spread: Spread | undefined): spread is Spread => spread !== undefined && spread.min !== spread.max;
 
+/** Points with their sign: "+6", "−2" (a minus sign), "0". */
+function signedPoints(share: number): string {
+  const points = percent(share);
+  return points > 0 ? `+${points}` : points < 0 ? `−${-points}` : "0";
+}
+
+/** "+6 pts (−2 to +14)": the difference against the baseline and its 95% interval. */
+function formatDiff(diff: PairedDiff): string {
+  return `${signedPoints(diff.diff)} pts (${signedPoints(diff.low)} to ${signedPoints(diff.high)})`;
+}
+
 function formatMetric(metric: Metric | undefined): string {
   if (!metric) return "–";
   if ("hits" in metric) {
     const total = `${metric.hits}/${metric.n} (${metric.n ? percent(metric.hits / metric.n) : 0}%`;
-    return differs(metric.spread) ? `${total}; ${percent(metric.spread.min)}–${percent(metric.spread.max)}%)` : `${total})`;
+    const count = differs(metric.spread) ? `${total}; ${percent(metric.spread.min)}–${percent(metric.spread.max)}%)` : `${total})`;
+    return metric.vsBaseline ? `${count}, ${formatDiff(metric.vsBaseline)}` : count;
   }
   const value = roundValue(metric.value);
   return differs(metric.spread) ? `${value} (${roundValue(metric.spread.min)}–${roundValue(metric.spread.max)})` : value;
@@ -127,7 +148,7 @@ function tableColumns(file: ResultsFile): Column[] {
   });
   const columns: Column[] = [
     { header: "Model", cell: (row) => row.model },
-    { header: "Effort", cell: (row) => row.effort ?? "api default" },
+    { header: "Effort", cell: (row) => `${row.effort ?? "api default"}${row.baseline ? " (baseline)" : ""}` },
     ...metricNames.map(metric),
     { header: "Errors", cell: (row) => String(row.errors) },
     { header: "Graded", cell: (row) => (row.graded ? `${row.graded.hits}/${row.graded.n}` : null) },
@@ -167,7 +188,8 @@ export function renderResults(file: ResultsFile): string {
     "",
     `Written by \`npm run eval -- evals/${file.task}\`; \`npm run eval:rerender -- ${file.task}\` rebuilds it from the`,
     "rows stored below. Do not edit by hand. A run replaces the rows of the model and effort it ran; other rows stay.",
-    "Latency and cost are for one item run; a range in brackets is the lowest and highest repeat. See evals/README.md.",
+    "Latency and cost are for one item run; a range in brackets is the lowest and highest repeat; pts are the",
+    "difference against the baseline row of the same run, with its 95% interval. See evals/README.md.",
     "",
     ...file.notes.flatMap((note) => [note, ""]),
     ...table,

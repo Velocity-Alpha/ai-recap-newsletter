@@ -11,13 +11,40 @@ describe("evalSettings", () => {
       model: "gpt-6-luna",
       efforts: ["low", "high"],
       effortApplies: true,
+      baseline: null,
       repeats: 3,
       limit: null,
-      concurrency: 4,
-      judgeModel: "gpt-6-sol",
-      judgeEffort: "high",
+      concurrency: 24,
+      judgeModel: "gpt-6.1-terra",
+      judgeEffort: "medium",
+      judgeTier: "flex",
+      judgeConcurrency: 24,
       judgeRepeats: null,
     });
+  });
+
+  it("keeps the baseline, the call site's production effort", () => {
+    expect(evalSettings({ model: "gpt-6-luna", efforts: ["low", "high"], baseline: "high" }, {}).baseline).toBe("high");
+  });
+
+  it("adds the baseline to a sweep without it, so every row has its comparison", () => {
+    expect(evalSettings({ ...DEFAULTS, baseline: "medium" }, { EVAL_EFFORTS: "low,high" }).efforts).toEqual(["medium", "low", "high"]);
+  });
+
+  it("has no baseline for a call that takes no effort", () => {
+    expect(evalSettings({ model: "m", efforts: null, baseline: "low" }, {}).baseline).toBeNull();
+  });
+
+  it("reads the judge's tier", () => {
+    expect(evalSettings(DEFAULTS, { EVAL_JUDGE_TIER: "standard" }).judgeTier).toBe("standard");
+  });
+
+  it("rejects a tier that is not flex or standard", () => {
+    expect(() => evalSettings(DEFAULTS, { EVAL_JUDGE_TIER: "batch" })).toThrow(/EVAL_JUDGE_TIER/);
+  });
+
+  it("reads EVAL_JUDGE_CONCURRENCY", () => {
+    expect(evalSettings(DEFAULTS, { EVAL_JUDGE_CONCURRENCY: "6" }).judgeConcurrency).toBe(6);
   });
 
   it("reads the model from EVAL_MODEL", () => {

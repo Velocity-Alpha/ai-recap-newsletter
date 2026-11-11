@@ -6,13 +6,13 @@ import { leadPickCases } from "@/evals/lead-pick/boards";
 
 describe("leadPickCases", () => {
   it("builds one case per archived board", () => {
-    expect(leadPickCases(new Map())).toHaveLength(10);
+    expect(leadPickCases(new Map())).toHaveLength(11);
   });
 
   it("gives each board the earlier boards' leads as recently published", () => {
     const cases = leadPickCases(new Map());
     expect(cases[0].recentlyPublished).toEqual([]);
-    expect(cases[9].recentlyPublished).toHaveLength(9);
+    expect(cases[10].recentlyPublished).toHaveLength(10);
   });
 
   it("gives each board a shortlist of 1 to 8 stories", () => {
