@@ -109,9 +109,9 @@ describe("proposeLeadStory", () => {
     expect(proposeLeadStory(board)?.id).toBe(1);
   });
 
-  it("never proposes a paywalled link, since the board has no free alternative yet", () => {
+  it("proposes a paywalled story when it has the highest score", () => {
     const board = sections({ headlines: [story(1, 5, { paywall_detected: "yes" }), story(2, 3)] });
-    expect(proposeLeadStory(board)?.id).toBe(2);
+    expect(proposeLeadStory(board)?.id).toBe(1);
   });
 
   it("proposes nothing when no story is eligible", () => {

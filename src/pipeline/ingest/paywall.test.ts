@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { checkPaywall } from "@/src/pipeline/ingest/paywall";
+import { checkPaywall, checkSiteList, isOnSiteList } from "@/src/pipeline/ingest/paywall";
 
 function page(html: string, status = 200) {
   return vi.fn(async () => new Response(html, { status }));
@@ -11,6 +11,14 @@ describe("checkPaywall", () => {
     const fetch = vi.fn();
     await expect(checkPaywall("https://www.wsj.com/tech/ai/story", { fetch })).resolves.toEqual({ status: "yes", error: "" });
     await expect(checkPaywall("https://ft.com/content/1", { fetch })).resolves.toEqual({ status: "yes", error: "" });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("answers yes for a learned paywalled site, with no fetch", async () => {
+    const fetch = vi.fn();
+    const learnedSites = ["paywalled.example"];
+    await expect(checkPaywall("https://paywalled.example/a", { fetch, learnedSites })).resolves.toEqual({ status: "yes", error: "" });
+    await expect(checkPaywall("https://www.paywalled.example/b", { fetch, learnedSites })).resolves.toEqual({ status: "yes", error: "" });
     expect(fetch).not.toHaveBeenCalled();
   });
 
@@ -74,5 +82,24 @@ describe("checkPaywall", () => {
 
   it("returns unknown for a link it cannot read", async () => {
     await expect(checkPaywall("", { fetch: vi.fn() })).resolves.toEqual({ status: "unknown", error: "" });
+  });
+});
+
+describe("checkSiteList", () => {
+  it("answers from the site lists alone, and null for a site on no list", () => {
+    expect(checkSiteList("https://www.wsj.com/tech/ai/story")).toBe("yes");
+    expect(checkSiteList("https://github.com/org/repo")).toBe("no");
+    expect(checkSiteList("https://news.example/a")).toBeNull();
+    expect(checkSiteList("https://news.example/a", ["news.example"])).toBe("yes");
+    expect(checkSiteList("not a link")).toBeNull();
+  });
+});
+
+describe("isOnSiteList", () => {
+  it("matches the site itself and its subdomains, not a site that only ends with the same letters", () => {
+    expect(isOnSiteList("ft.com", ["ft.com"])).toBe(true);
+    expect(isOnSiteList("www.ft.com", ["ft.com"])).toBe(true);
+    expect(isOnSiteList("markets.ft.com", ["ft.com"])).toBe(true);
+    expect(isOnSiteList("swift.com", ["ft.com"])).toBe(false);
   });
 });

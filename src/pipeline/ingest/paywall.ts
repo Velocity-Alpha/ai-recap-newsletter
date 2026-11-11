@@ -5,6 +5,11 @@ import { BROWSER_USER_AGENT } from "@/src/pipeline/ingest/redirects";
  * of stories `unknown` or `error`. Changes: known free sites skip the fetch (Product Hunt always blocked
  * it), the publisher's own structured data decides first, and weak wording such as a footer
  * "Already a subscriber?" no longer counts.
+ *
+ * The check is staged (#59) and stops at the first step that answers. No AI call decides it.
+ * 1. Site list (`checkSiteList`): the lists below plus the learned paywalled sites. No network.
+ * 2. Page check: one fetch of the page, then its markup and wording.
+ * `checkPaywall` is steps 1 and 2.
  */
 
 export type PaywallStatus = "yes" | "no" | "unknown" | "error";
@@ -51,19 +56,34 @@ const LOCKED_WORDING = [
 const TIMEOUT_MS = 10_000;
 const MAX_BODY_CHARS = 1_500_000;
 
-function onList(hostname: string, domains: string[]): boolean {
-  return domains.some((domain) => hostname === domain || hostname.endsWith(`.${domain}`));
+/** True when the host is a site on the list or one of its subdomains. */
+export function isOnSiteList(hostname: string, sites: readonly string[]): boolean {
+  return sites.some((site) => hostname === site || hostname.endsWith(`.${site}`));
 }
 
-export async function checkPaywall(url: string, options: { fetch?: typeof fetch } = {}): Promise<PaywallResult> {
+/** Step 1, no network: "yes" or "no" when a site list knows the link's site, null when none does. */
+export function checkSiteList(url: string, learnedSites: readonly string[] = []): "yes" | "no" | null {
   let hostname: string;
   try {
     hostname = new URL(url).hostname.toLowerCase();
   } catch {
-    return { status: "unknown", error: "" };
+    return null;
   }
-  if (onList(hostname, PAYWALLED)) return { status: "yes", error: "" };
-  if (onList(hostname, FREE)) return { status: "no", error: "" };
+  if (isOnSiteList(hostname, PAYWALLED) || isOnSiteList(hostname, learnedSites)) return "yes";
+  if (isOnSiteList(hostname, FREE)) return "no";
+  return null;
+}
+
+export interface CheckPaywallOptions {
+  fetch?: typeof fetch;
+  /** The learned paywalled sites (src/pipeline/free-links/sites.ts). They count like the `PAYWALLED` list. */
+  learnedSites?: readonly string[];
+}
+
+export async function checkPaywall(url: string, options: CheckPaywallOptions = {}): Promise<PaywallResult> {
+  if (!URL.canParse(url)) return { status: "unknown", error: "" };
+  const listed = checkSiteList(url, options.learnedSites);
+  if (listed) return { status: listed, error: "" };
 
   const send = options.fetch ?? fetch;
   let body: string;

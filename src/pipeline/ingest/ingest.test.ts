@@ -66,6 +66,18 @@ function fakeFetch(routes: Record<string, () => Response> = {}) {
 const RUNDOWN: StorySource = { key: "rundown_ai", name: "The Rundown", kind: "gmail", sender: "news@daily.therundown.ai", body: "text", expectedOn: [] };
 
 describe("ingestStories: email sources", () => {
+  it("marks a story on a learned paywalled site as paywalled, without opening its page", async () => {
+    const { store, rows } = memoryStore();
+    const { gmail } = fakeGmail([mail("mon", new Date("2026-11-09T11:06:00Z"))]);
+    const fetch = fakeFetch();
+    const extract = vi.fn(async () => [story({ url: "https://www.learned.example/story" })]);
+
+    await ingestStories({ gmail, fetch, extract, store, now: NOW, sources: [RUNDOWN], learnedSites: ["learned.example"] });
+
+    expect([...rows.values()]).toEqual([expect.objectContaining({ url: "https://www.learned.example/story", paywallDetected: "yes" })]);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it("reads mail since the bookmark, saves cleaned stories, and moves the bookmark to the newest email", async () => {
     const { store, rows, marks } = memoryStore({ rundown_ai: new Date(NOW.getTime() - 48 * HOUR) });
     const sunday = mail("sun", new Date("2026-11-08T11:05:00Z"));

@@ -72,7 +72,6 @@ const HTTP_METHODS = ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"
 const SOURCE = "[cm]?[jt]sx?";
 
 function filesUnder(dir: string): string[] {
-  // app/api/admin has no routes today. When one is added, the checks below cover it.
   if (!existsSync(path.join(ROOT, dir))) return [];
   return readdirSync(path.join(ROOT, dir), { recursive: true, withFileTypes: true })
     .filter((entry) => entry.isFile())
@@ -225,6 +224,7 @@ describe("admin access (#54)", () => {
       expect.arrayContaining(["/admin", "/admin/runs", "/admin/runs/1", "/admin/incidents", "/admin/settings"]),
     );
     expect(LAYOUTS.map((layout) => layout.url)).toEqual(["/admin"]);
+    expect(ROUTES.map((route) => route.url)).toEqual(["/api/admin/paywall-sites/ignore"]);
   });
 
   it("allows only reviewed kinds of file under app/admin", () => {

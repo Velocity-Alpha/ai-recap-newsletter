@@ -13,7 +13,17 @@ const DATE = "2027-01-04";
 
 function story(id: number, data: Record<string, unknown> = {}) {
   return fakeDb.client.story.create({
-    data: { id, url: `https://example.test/${id}`, note: null, excludeFromCandidates: false, queuedForPublicationDate: null, ...data },
+    data: {
+      id,
+      url: `https://example.test/${id}`,
+      note: null,
+      excludeFromCandidates: false,
+      queuedForPublicationDate: null,
+      originalUrl: null,
+      paywallDetected: "yes",
+      error: "",
+      ...data,
+    },
   });
 }
 
@@ -37,6 +47,16 @@ const OUTLINE: ApprovalOutline = {
   excluded: [{ id: 4, section: "tools", reason: "off topic" }],
 };
 
+/** One story with a new link, as the board sends it. */
+function outlineWithLink(url: string): ApprovalOutline {
+  return { ...OUTLINE, stories: [{ id: 1, section: "headlines", url, note: "" }], excluded: [] };
+}
+
+/** The pages the paywall check opens: free unless the test gives another answer. No test opens a real page. */
+function fakePages(answer: () => Response = () => new Response('<meta property="article:content_tier" content="free">')) {
+  return { fetch: vi.fn<typeof fetch>(async () => answer()), learnedSites: vi.fn(async () => ["learned.example"]) };
+}
+
 beforeEach(async () => {
   fakeDb.reset();
   for (const id of [1, 2, 3, 4, 5]) await story(id);
@@ -44,7 +64,7 @@ beforeEach(async () => {
 
 describe("applyStoryChanges", () => {
   it("excludes the excluded stories and queues the approved ones for the date", async () => {
-    const changes = await applyStoryChanges(OUTLINE);
+    const changes = await applyStoryChanges(OUTLINE, fakePages());
 
     // excludedOn: the repeat check labels later look-alikes with this day (#90).
     expect(row(4)).toMatchObject({ excludeFromCandidates: true, excludedOn: new Date(`${DATE}T00:00:00.000Z`), queuedForPublicationDate: null });
@@ -56,7 +76,7 @@ describe("applyStoryChanges", () => {
   });
 
   it("saves the board's link and note edits, and only what changed", async () => {
-    const changes = await applyStoryChanges(OUTLINE);
+    const changes = await applyStoryChanges(OUTLINE, fakePages());
 
     expect(row(1)).toMatchObject({ url: "https://example.test/1-edited", note: "Lead with the price." });
     expect(row(2)).toMatchObject({ url: "https://example.test/2", note: null });
@@ -66,7 +86,7 @@ describe("applyStoryChanges", () => {
   it("never clears a saved note or link with an empty one", async () => {
     await fakeDb.client.story.update({ where: { id: 2 }, data: { note: "Saved earlier." } });
 
-    await applyStoryChanges(OUTLINE);
+    await applyStoryChanges(OUTLINE, fakePages());
 
     expect(row(2)).toMatchObject({ note: "Saved earlier." });
     expect(row(3)).toMatchObject({ url: "https://example.test/3" });
@@ -81,10 +101,74 @@ describe("applyStoryChanges", () => {
       return real(args);
     });
 
-    await expect(applyStoryChanges(OUTLINE)).rejects.toThrow("connection lost");
+    await expect(applyStoryChanges(OUTLINE, fakePages())).rejects.toThrow("connection lost");
     spy.mockRestore();
 
     expect(row(4)).toMatchObject({ excludeFromCandidates: false });
     expect(row(1)).toMatchObject({ queuedForPublicationDate: null, url: "https://example.test/1" });
+  });
+
+  it("keeps the first original link over two commits", async () => {
+    await applyStoryChanges(outlineWithLink("https://free.example/first"), fakePages());
+    await applyStoryChanges(outlineWithLink("https://free.example/second"), fakePages());
+
+    expect(row(1)).toMatchObject({ url: "https://free.example/second", originalUrl: "https://example.test/1" });
+  });
+
+  it("leaves the original link empty for a story whose link did not change", async () => {
+    await applyStoryChanges(OUTLINE, fakePages());
+
+    expect(row(2)).toMatchObject({ originalUrl: null, paywallDetected: "yes" });
+  });
+
+  it("marks a new link as free, with no check, when it is a free link of the story", async () => {
+    await fakeDb.client.storyFreeLink.create({
+      data: { storyId: 1, position: 0, url: "https://free.example/a", site: "free.example", words: 800, origin: "search" },
+    });
+    const deps = fakePages();
+
+    await applyStoryChanges(outlineWithLink("https://free.example/a"), deps);
+
+    expect(row(1)).toMatchObject({ url: "https://free.example/a", paywallDetected: "no", error: "" });
+    expect(deps.fetch).not.toHaveBeenCalled();
+  });
+
+  it("does not trust a free link of another story", async () => {
+    await fakeDb.client.storyFreeLink.create({
+      data: { storyId: 2, position: 0, url: "https://free.example/a", site: "free.example", words: 800, origin: "search" },
+    });
+    const deps = fakePages(() => new Response("Subscribe to continue reading."));
+
+    await applyStoryChanges(outlineWithLink("https://free.example/a"), deps);
+
+    expect(row(1)).toMatchObject({ paywallDetected: "yes" });
+    expect(deps.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("saves the paywall check's answer and error for a typed link", async () => {
+    await applyStoryChanges(outlineWithLink("https://typed.example/a"), fakePages(() => new Response("", { status: 403 })));
+    expect(row(1)).toMatchObject({ url: "https://typed.example/a", paywallDetected: "error", error: "HTTP 403" });
+
+    await applyStoryChanges(outlineWithLink("https://typed.example/b"), fakePages());
+    expect(row(1)).toMatchObject({ url: "https://typed.example/b", paywallDetected: "no", error: "" });
+  });
+
+  it("marks a typed link on a learned paywalled site as paywalled, without opening its page", async () => {
+    const deps = fakePages();
+
+    await applyStoryChanges(outlineWithLink("https://www.learned.example/a"), deps);
+
+    expect(row(1)).toMatchObject({ paywallDetected: "yes", error: "" });
+    expect(deps.fetch).not.toHaveBeenCalled();
+  });
+
+  it("runs no paywall check when no link changed", async () => {
+    const deps = fakePages();
+
+    await applyStoryChanges({ ...OUTLINE, stories: [{ id: 2, section: "headlines", url: "https://example.test/2", note: "A note." }] }, deps);
+
+    expect(deps.fetch).not.toHaveBeenCalled();
+    expect(deps.learnedSites).not.toHaveBeenCalled();
+    expect(row(2)).toMatchObject({ note: "A note.", paywallDetected: "yes" });
   });
 });

@@ -14,8 +14,7 @@
  *
  * Who can lead: any selected story, except
  * - research, unless 2+ newsletters covered it (the stand-in for "groundbreaking");
- * - a Hugging Face paper or Product Hunt launch that no newsletter picked up;
- * - a paywalled link (the board cannot yet offer a free alternative, #59).
+ * - a Hugging Face paper or Product Hunt launch that no newsletter picked up.
  * Ties keep board order, Top Stories first.
  */
 
@@ -60,7 +59,6 @@ export function leadScore(story: LeadCandidate): number {
 }
 
 function canLead(story: LeadCandidate, sectionKey: string): boolean {
-  if (story.paywall_detected === "yes") return false;
   const sources = storySources(story);
   const covered = sources.length >= 2;
   if (!covered && sources.every((source) => FEED_SOURCES.has(source))) return false;

@@ -74,6 +74,20 @@ The step that compares each new story with its nearest stories of the window and
 a **Check** (those are scheduled tests of outcomes).
 _Avoid_: dedup, duplicate check
 
+**Original link**:
+The link a story had when it was ingested. It is kept when a commit changes the story's link.
+_Avoid_: old link, source link
+
+**Free link**:
+A link to an article that reports the same news as a story, that the app could read, and that has 300 words or
+more. It replaces a paywalled link.
+_Avoid_: alternative link, mirror
+
+**Learned paywalled site**:
+A site the article reader found paywalled on two different stories. The paywall check then treats it as
+paywalled, unless the owner ignores it.
+_Avoid_: blocked site, blacklist
+
 **Outline**:
 The owner's chosen stories for one date: sections, lead story, and any note or link edits.
 _Avoid_: selection, payload
