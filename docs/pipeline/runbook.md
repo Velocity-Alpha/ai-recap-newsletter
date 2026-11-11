@@ -193,6 +193,10 @@ Some ingest errors are not incidents. They show on the source's line in the `ing
   `matched_at` null. The next ingest run tries them again (it looks back 3 days).
 - **Do (wait, then tell the developer if it stays):** Nothing, unless it repeats. If it repeats, look at the
   OpenAI status page.
+- **On the board:** the board also checks, itself, every candidate that ingestion did not check. If the board
+  shows "The repeat check did not finish for some stories.", look at the OpenAI status page, then click
+  "Check again" on that line (it builds the board again and drops unsaved board edits). Until then, some
+  repeats can still be on the board.
 
 ## A run that fails to report
 

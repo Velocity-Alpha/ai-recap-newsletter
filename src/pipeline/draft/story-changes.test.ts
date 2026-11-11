@@ -46,7 +46,8 @@ describe("applyStoryChanges", () => {
   it("excludes the excluded stories and queues the approved ones for the date", async () => {
     const changes = await applyStoryChanges(OUTLINE);
 
-    expect(row(4)).toMatchObject({ excludeFromCandidates: true, queuedForPublicationDate: null });
+    // excludedOn: the repeat check labels later look-alikes with this day (#90).
+    expect(row(4)).toMatchObject({ excludeFromCandidates: true, excludedOn: new Date(`${DATE}T00:00:00.000Z`), queuedForPublicationDate: null });
     for (const id of [1, 2, 3]) {
       expect(row(id)).toMatchObject({ excludeFromCandidates: false, queuedForPublicationDate: new Date(`${DATE}T00:00:00.000Z`) });
     }

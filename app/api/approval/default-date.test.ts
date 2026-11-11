@@ -5,26 +5,21 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const authFns = vi.hoisted(() => ({ hasValidApprovalSession: vi.fn() }));
 const curationFns = vi.hoisted(() => ({
   createOutlineCandidateStories: vi.fn(),
-  createDedupedOutline: vi.fn(),
   createApprovalOutlineData: vi.fn(),
 }));
-const dedupFns = vi.hoisted(() => ({
-  submitDeduplication: vi.fn(),
-  checkDeduplicationStatus: vi.fn(),
-}));
+const leadPickFns = vi.hoisted(() => ({ submitLeadPick: vi.fn() }));
 const repositoryFns = vi.hoisted(() => ({ fetchLastPublishedIssueDateOnOrBefore: vi.fn() }));
 
 vi.mock("@/src/server/approval-auth", () => authFns);
 vi.mock("@/src/features/newsletter/curation.service", () => curationFns);
-vi.mock("@/src/features/newsletter/openai-dedup", () => dedupFns);
+vi.mock("@/src/features/newsletter/openai-lead-pick", () => leadPickFns);
 vi.mock("@/src/features/newsletter/repository", () => repositoryFns);
 
 import { GET as getOutline } from "@/app/api/approval/outline/route";
-import { GET as getOutlineStatus } from "@/app/api/approval/outline/status/route";
 import { GET as getLegacyOutline } from "@/app/api/newsletters/outline/route";
 import { GET as getPublishStatus } from "@/app/api/newsletters/publish-status/route";
 
-const OUTLINE = { reference_stories: [], candidate_sections: [], candidate_map: {}, selected_story_ids: [] };
+const OUTLINE = { reference_stories: [], candidate_sections: [], candidate_map: {}, selected_story_ids: [], repeats_removed: [] };
 // Sunday 2026-11-08 23:30 in New York; UTC is already Monday.
 const SUNDAY_NIGHT_NEW_YORK = new Date("2026-11-09T04:30:00.000Z");
 const SUNDAY = new Date("2026-11-08");
@@ -40,13 +35,7 @@ describe("approval routes without a date", () => {
       referencedStories: [],
       rankedCandidates: [],
     });
-    curationFns.createDedupedOutline.mockResolvedValue(OUTLINE);
     curationFns.createApprovalOutlineData.mockResolvedValue(OUTLINE);
-    dedupFns.submitDeduplication.mockResolvedValue(null);
-    dedupFns.checkDeduplicationStatus.mockResolvedValue({
-      status: "completed",
-      result: { kept_story_ids: [] },
-    });
     repositoryFns.fetchLastPublishedIssueDateOnOrBefore.mockResolvedValue({
       target_date: "2026-11-08",
       has_exact_match: false,
@@ -66,16 +55,6 @@ describe("approval routes without a date", () => {
       reuseDraftDates: [],
     });
     expect(curationFns.createOutlineCandidateStories).toHaveBeenNthCalledWith(2, SUNDAY, {
-      reuseDraftDates: [],
-    });
-  });
-
-  it("rebuilds the deduplicated outline for today in New York", async () => {
-    await getOutlineStatus(
-      new Request("http://localhost/api/approval/outline/status?response_id=resp_1")
-    );
-
-    expect(curationFns.createDedupedOutline).toHaveBeenCalledWith(SUNDAY, [], {
       reuseDraftDates: [],
     });
   });

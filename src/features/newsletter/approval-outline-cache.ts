@@ -1,8 +1,11 @@
+import type { AlsoFrom, RestorableRepeat } from "@/src/features/newsletter/board-repeats";
 import { CANDIDATE_SECTION_CONFIGS } from "@/src/features/newsletter/section-config";
+import type { SimilarStory } from "@/src/pipeline/repeats/repeat-rules";
 
 export const APPROVAL_OUTLINE_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
-const CACHE_KEY_PREFIX = "approval_outline_";
+// v2: boards built by the repeat check (#90). Boards cached before it are not read.
+const CACHE_KEY_PREFIX = "approval_outline_v2_";
 
 export type ApprovalOutlineData = {
   reference_stories: {
@@ -34,6 +37,10 @@ export type ApprovalOutlineData = {
       source: string | null;
       // Every newsletter that covered the story (#58). Missing on older cached boards.
       sources?: string[];
+      // Duplicates merged into this story by the repeat check.
+      also_from?: AlsoFrom[];
+      // Similar stories already published, held, or excluded. The board shows them as a label.
+      similar_to?: SimilarStory[];
       url: string | null;
       importance_score: number | null;
       paywall_detected?: "yes" | "no" | "unknown" | "error";
@@ -43,6 +50,10 @@ export type ApprovalOutlineData = {
     }
   >;
   selected_story_ids: number[];
+  // Candidates the repeat check removed. Their full stories are in candidate_map, so the owner can restore them.
+  repeats_removed: RestorableRepeat<{ id: number; headline: string | null }>[];
+  // True when the repeat check did not finish for some candidates.
+  repeat_check_incomplete?: boolean;
   // The lead the board pre-sets (#58). Missing on boards cached before it.
   proposed_lead_id?: number | null;
   // Why the AI lead pick chose that lead. Null while the board shows the scored lead.

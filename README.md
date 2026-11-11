@@ -89,9 +89,9 @@ Read routes:
 - `GET /api/newsletters/[id]`
 - `GET /api/issues/[slug]`
 - `GET /api/ticker`
-- `GET /api/approval/outline?date=` for the password-protected approval board outline
+- `GET /api/approval/outline?date=&reuse=` the approval board in one request, after the repeat check; starts the AI lead pick and returns its `lead_response_id` (approval session)
 - `GET /api/approval/outline/marker?date=` the highest story id in the board's candidate window; the board reads it to spot stories newer than its cached copy (approval session)
-- `GET /api/approval/outline/lead?response_id=` polls the AI lead pick that the dedup status check started; returns the picked lead and its reason (approval session)
+- `GET /api/approval/outline/lead?response_id=` polls the AI lead pick that `/api/approval/outline` started; returns the picked lead and its reason (approval session)
 - `GET /api/newsletters/outline?date=` for the authenticated newsletter outline API
 - `GET /api/approval/issues/[id]/publish` previews what "Mark as published" would publish (approval session)
 - `GET /api/approval/skipped-dates?date=` says whether a date is a skipped date (approval session)
@@ -151,7 +151,7 @@ Required:
 - `APP_ENV` — `development`, `preview`, or `production`. Set per deploy context in `netlify.toml` (`production` for production, `preview` for deploy previews and branch deploys). `next build` fails without it.
 - `DATABASE_URL` — production in the production context; the Neon `dev` branch for deploy previews and branch deploys
 - `SESSION_SECRET` — signs subscriber sessions and, through derived keys, the job tokens (cache refresh, ingest start) and approval board sessions
-- `OPENAI_API_KEY` — story extraction, dedup, the lead pick, and drafting
+- `OPENAI_API_KEY` — story extraction, the repeat check (embeddings and the Decisions API), the lead pick, and drafting
 - `GMAIL_OAUTH_CLIENT_ID`, `GMAIL_OAUTH_CLIENT_SECRET`, `GMAIL_OAUTH_REFRESH_TOKEN` — read-only access to the seed inbox, for the ingest and publish jobs
 - `PUBLISH_SEED_RECIPIENTS` — the one monitor seed address. Each send also reaches the owner's `+` alias in the same inbox; without this filter the publish job reads every send twice
 - `TELEGRAM_REVIEW_BOT_TOKEN` — production only; the ingest job's "stories are ready" message and the draft job's "draft is ready for review" message

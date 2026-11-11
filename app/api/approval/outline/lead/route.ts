@@ -4,7 +4,7 @@ import { checkLeadPickStatus } from "@/src/features/newsletter/openai-lead-pick"
 import { hasValidApprovalSession } from "@/src/server/approval-auth";
 import { logServerError } from "@/src/server/observability";
 
-/** Polls the AI lead pick (#58) that /api/approval/outline/status started. The board applies the result itself. */
+/** Polls the AI lead pick (#58) that /api/approval/outline started. The board applies the result itself. */
 export async function GET(request: Request) {
   if (!(await hasValidApprovalSession(request))) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });

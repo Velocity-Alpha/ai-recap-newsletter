@@ -3,6 +3,9 @@
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { hasBoardEdits } from "@/components/approval/board-edits";
+import { repeatOfText, restoreRepeat, similarLabel, similarTooltip } from "@/components/approval/repeat-labels";
+import type { AlsoFrom, RestorableRepeat } from "@/src/features/newsletter/board-repeats";
+import type { SimilarStory } from "@/src/pipeline/repeats/repeat-rules";
 import { storySources } from "@/src/features/newsletter/lead-story";
 import {
   ChevronDown,
@@ -59,6 +62,10 @@ type CandidateMapEntry = {
   source: string | null;
   /** Every newsletter that covered the story (#58). */
   sources?: string[];
+  /** Duplicates the repeat check merged into this story. */
+  also_from?: AlsoFrom[];
+  /** Earlier stories this one looks like. The board shows the first as a label. */
+  similar_to?: SimilarStory[];
   url: string | null;
   importance_score: number | null;
   paywall_detected?: "yes" | "no" | "unknown" | "error";
@@ -99,7 +106,12 @@ type ApprovalBoardProps = {
   proposedLeadId?: number | null;
   /** The AI lead pick's one-line reason for the proposed lead. Null while the board shows the scored lead. */
   proposedLeadReason?: string | null;
-  dedupFailureReason: string | null;
+  /** Candidates the repeat check removed. The owner can restore each one for this session. */
+  repeatsRemoved?: RestorableRepeat<{ id: number; headline: string | null }>[];
+  /** True when the repeat check did not finish for some candidates. */
+  repeatCheckIncomplete?: boolean;
+  /** Builds the board again, so the repeat check runs again. */
+  onRebuild?: () => void;
   publishStatus: {
     target_date: string;
     has_exact_match: boolean;
@@ -228,7 +240,9 @@ export default function ApprovalBoard({
   candidateMap,
   proposedLeadId = null,
   proposedLeadReason = null,
-  dedupFailureReason,
+  repeatsRemoved = [],
+  repeatCheckIncomplete = false,
+  onRebuild,
   publishStatus,
   drafting = null,
 }: ApprovalBoardProps) {
@@ -249,11 +263,21 @@ export default function ApprovalBoard({
   const [notesOverrides, setNotesOverrides] = useState<Record<number, string>>({});
   const dragStory = useRef<{ storyId: number; fromSectionKey: string } | null>(null);
   const [dragOverSection, setDragOverSection] = useState<string | null>(null);
+  const [restoredIds, setRestoredIds] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     setSections(initSections(candidateSections));
     setHeadlineStoryId(proposedLeadId);
+    setRestoredIds(new Set());
   }, [candidateSections, proposedLeadId]);
+
+  const shownRepeats = repeatsRemoved.filter((entry) => !restoredIds.has(entry.story.id));
+  const restore = (entry: (typeof repeatsRemoved)[number]) => {
+    const full = candidateMap[String(entry.story.id)];
+    const option = { id: entry.story.id, headline: full?.headline ?? entry.story.headline ?? "", summary: full?.summary ?? "" };
+    setSections((prev) => restoreRepeat(prev, option, entry.section));
+    setRestoredIds((prev) => new Set(prev).add(entry.story.id));
+  };
 
   const edited = hasBoardEdits({
     candidateSections,
@@ -748,12 +772,15 @@ export default function ApprovalBoard({
           </div>
         ))}
         {drafting ? <DateState date={dateKey} view={drafting} /> : null}
-        {dedupFailureReason ? (
-          <div className="border-t border-red-300 bg-red-50 px-4 py-3 sm:px-6">
-            <p className="text-sm font-semibold text-red-700">
-              Deduplication failed. Using original candidate set. Reason: {dedupFailureReason}
-            </p>
-          </div>
+        {repeatCheckIncomplete ? (
+          <p className="border-t border-[var(--border-light)] px-4 py-1.5 text-xs text-[var(--text-muted)] sm:px-6">
+            The repeat check did not finish for some stories.
+            {onRebuild ? (
+              <button type="button" onClick={onRebuild} className="ml-2 underline hover:text-[var(--accent-primary)]">
+                Check again
+              </button>
+            ) : null}
+          </p>
         ) : null}
         {headerNotice}
       </header>
@@ -855,6 +882,31 @@ export default function ApprovalBoard({
             </button>
           )}
 
+          {shownRepeats.length > 0 ? (
+            <details className="mb-8 rounded-xl border border-[var(--border-light)] bg-white">
+              <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-[var(--text-secondary)]">
+                Repeats removed ({shownRepeats.length})
+              </summary>
+              <ul className="divide-y divide-[var(--border-light)] border-t border-[var(--border-light)]">
+                {shownRepeats.map((entry) => (
+                  <li key={entry.story.id} className="flex items-center gap-3 px-4 py-2.5">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm text-[var(--text-primary)]">{entry.story.headline}</p>
+                      <p className="truncate text-xs text-[var(--text-muted)]">{repeatOfText(entry.repeat_of)}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => restore(entry)}
+                      className="shrink-0 rounded-full border border-[var(--border-light)] bg-white px-2.5 py-0.5 text-[11px] text-[var(--text-secondary)] transition hover:border-[var(--accent-primary)] hover:text-[var(--accent-primary)]"
+                    >
+                      Restore
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          ) : null}
+
           <div className="space-y-10">
             {sections.map((section) => {
               const selectedCount = section.stories.filter((s) => s.status === "selected").length;
@@ -904,6 +956,8 @@ export default function ApprovalBoard({
                         const isHeadline = headlineStoryId === story.id;
                         const hasHeadlineValidationError = isHeadline && (isExcluded || status === "fill-in");
                         const sourceCount = full ? storySources(full).length : 0;
+                        const alsoFrom = full?.also_from ?? [];
+                        const similar = full?.similar_to ?? [];
 
                         return (
                           <div
@@ -960,12 +1014,23 @@ export default function ApprovalBoard({
                                 }`}>
                                   {renderPaywallIcon(candidateMap[String(story.id)]?.paywall_detected, candidateMap[String(story.id)]?.error)}
                                   <span className="truncate">{story.headline}</span>
-                                  {sourceCount > 1 ? (
+                                  {sourceCount > 1 || alsoFrom.length > 0 ? (
                                     <span
-                                      title={`Covered by ${storySources(full!).join(", ")}`}
+                                      title={[
+                                        `Covered by ${storySources(full!).join(", ")}`,
+                                        ...alsoFrom.map((entry) => `${entry.source ?? "Unknown source"}: ${entry.headline ?? ""}`),
+                                      ].join("\n")}
                                       className="shrink-0 rounded-full border border-[rgba(107,155,184,0.24)] bg-[rgba(232,242,248,0.8)] px-1.5 text-[10px] font-medium text-[var(--watercolor-ink)]"
                                     >
-                                      {sourceCount} sources
+                                      {sourceCount > 1 ? `${sourceCount} sources` : `${alsoFrom.length + 1} stories`}
+                                    </span>
+                                  ) : null}
+                                  {similar.length > 0 ? (
+                                    <span
+                                      title={similarTooltip(similar)}
+                                      className="max-w-[16rem] shrink truncate rounded-full border border-[rgba(184,133,110,0.28)] bg-[rgba(255,244,236,0.92)] px-1.5 text-[10px] font-medium text-[var(--accent-warm)]"
+                                    >
+                                      {similarLabel(similar[0])}
                                     </span>
                                   ) : null}
                                 </p>
@@ -1058,6 +1123,24 @@ export default function ApprovalBoard({
 
                                 {story.summary ? (
                                   <p className="text-xs leading-5 text-[var(--text-secondary)]">{story.summary}</p>
+                                ) : null}
+
+                                {alsoFrom.length > 0 ? (
+                                  <ul className="space-y-1 text-xs text-[var(--text-secondary)]">
+                                    {alsoFrom.map((entry) => (
+                                      <li key={entry.id} className="flex items-center gap-1.5">
+                                        {renderPaywallIcon(entry.paywall_detected)}
+                                        <span className="shrink-0 text-[var(--text-muted)]">Also from {entry.source ?? "an unknown source"}:</span>
+                                        {entry.url ? (
+                                          <a href={entry.url} target="_blank" rel="noreferrer" className="truncate underline hover:text-[var(--accent-primary)]">
+                                            {entry.headline ?? entry.url}
+                                          </a>
+                                        ) : (
+                                          <span className="truncate">{entry.headline}</span>
+                                        )}
+                                      </li>
+                                    ))}
+                                  </ul>
                                 ) : null}
 
                                 <div className="flex flex-wrap items-center gap-3">

@@ -22,6 +22,10 @@ vi.mock("@/src/server/observability", () => ({
 }));
 
 const findUnsentDraftsMock = vi.hoisted(() => vi.fn());
+const applyBoardRepeatsMock = vi.hoisted(() => vi.fn());
+
+// The repeat check has its own tests (board-repeats.test.ts). Here it keeps every candidate unless a test says so.
+vi.mock("@/src/features/newsletter/board-repeats", () => ({ applyBoardRepeats: applyBoardRepeatsMock }));
 
 vi.mock("@/src/features/newsletter/unsent-drafts", () => ({
   findUnsentDrafts: findUnsentDraftsMock,
@@ -29,9 +33,10 @@ vi.mock("@/src/features/newsletter/unsent-drafts", () => ({
 
 import {
   cleanText,
-  createDedupedOutline,
   createOutlineCandidateStories,
   getCandidateMarker,
+  type ApprovalOutlineData,
+  type OutlineOptions,
 } from "@/src/features/newsletter/curation.service";
 
 const OUTLINE_DATE = new Date("2026-06-09T00:00:00.000Z");
@@ -64,10 +69,24 @@ const POOL_ROWS = [
   ...range(21, 27).map((id) => candidateRow(id, "research")),
   ...range(31, 36).map((id) => candidateRow(id, "tools")),
 ];
-const POOL_IDS = POOL_ROWS.map((row) => row.id);
+
+async function outlineFor(options: OutlineOptions = {}): Promise<ApprovalOutlineData> {
+  return (await createOutlineCandidateStories(OUTLINE_DATE, options)).outline;
+}
+
+const REPEAT_OF = { id: 900, headline: "Published earlier", date: "2026-06-05", kind: "published" as const };
+
+/** The repeat check removes these candidates. */
+function removeByRepeatCheck(ids: number[], incomplete = false) {
+  applyBoardRepeatsMock.mockImplementationOnce(async ({ candidates }: { candidates: { id: number }[] }) => ({
+    heads: candidates.filter((story) => !ids.includes(story.id)),
+    removed: candidates.filter((story) => ids.includes(story.id)).map((story) => ({ story, repeat_of: REPEAT_OF })),
+    incomplete,
+  }));
+}
 
 function selectedIds(
-  outline: Awaited<ReturnType<typeof createDedupedOutline>>,
+  outline: ApprovalOutlineData,
   key: string
 ): number[] {
   const section = outline.candidate_sections.find((s) => s.key === key);
@@ -88,12 +107,18 @@ describe("newsletter curation", () => {
     storySourcesMock.mockResolvedValue([]);
     findUnsentDraftsMock.mockReset();
     findUnsentDraftsMock.mockResolvedValue([]);
+    applyBoardRepeatsMock.mockReset();
+    applyBoardRepeatsMock.mockImplementation(async ({ candidates }: { candidates: unknown[] }) => ({
+      heads: candidates,
+      removed: [],
+      incomplete: false,
+    }));
   });
 
   describe("stories in an unsent draft", () => {
     const UNSENT = { date: "2026-06-08", storyIds: [1, 2] };
 
-    function shownIds(outline: Awaited<ReturnType<typeof createDedupedOutline>>): number[] {
+    function shownIds(outline: ApprovalOutlineData): number[] {
       return outline.candidate_sections.flatMap((section) =>
         [...section.selected, ...section.fill_ins].map((story) => story.id)
       );
@@ -110,8 +135,13 @@ describe("newsletter curation", () => {
       expect(rankedCandidates.map((story) => story.id)).not.toContain(1);
       expect(rankedCandidates.map((story) => story.id)).not.toContain(2);
       expect(shownIds(outline)).not.toContain(1);
-      // The AI duplicate check treats them as already covered.
+      // The repeat check treats them as already covered.
       expect(referencedStories.map((story) => story.id)).toEqual([1, 2]);
+      expect(applyBoardRepeatsMock).toHaveBeenCalledWith({
+        date: "2026-06-09",
+        candidates: expect.any(Array),
+        held: [expect.objectContaining({ id: 1, held_for_date: "2026-06-08" }), expect.objectContaining({ id: 2, held_for_date: "2026-06-08" })],
+      });
       expect(outline.reference_stories).toEqual([
         expect.objectContaining({ id: 1, heldForDate: "2026-06-08", usedInPublicationDate: null }),
         expect.objectContaining({ id: 2, heldForDate: "2026-06-08", usedInPublicationDate: null }),
@@ -147,21 +177,6 @@ describe("newsletter curation", () => {
       const result = await createOutlineCandidateStories(OUTLINE_DATE);
 
       expect(rankedIds(result)).toEqual([3]);
-    });
-
-    it("keeps holding them on the final board after the AI check", async () => {
-      findUnsentDraftsMock.mockResolvedValue([UNSENT]);
-      findManyMock.mockResolvedValueOnce([]).mockResolvedValueOnce(POOL_ROWS);
-
-      const held = await createDedupedOutline(OUTLINE_DATE, POOL_IDS);
-      expect(shownIds(held)).not.toContain(1);
-      expect(held.unsent_drafts).toEqual([{ date: "2026-06-08", story_count: 2, reused: false }]);
-
-      findManyMock.mockResolvedValueOnce([]).mockResolvedValueOnce(POOL_ROWS);
-      const reused = await createDedupedOutline(OUTLINE_DATE, POOL_IDS, {
-        reuseDraftDates: ["2026-06-08"],
-      });
-      expect(selectedIds(reused, "headlines")).toEqual([1, 2, 3]);
     });
 
     it("counts only draft stories that this board could show", async () => {
@@ -231,14 +246,15 @@ describe("newsletter curation", () => {
       expect(rankedIds(result)).toEqual([1, 2, 3, 4]);
     });
 
-    it("leaves same-URL copies off the board after the AI duplicate check too", async () => {
+    it("gives the repeat check only the stories left after the URL check", async () => {
       findManyMock.mockResolvedValueOnce([]).mockResolvedValueOnce([
         candidateRow(1, "general"),
         { ...candidateRow(2, "general"), url: "https://example.com/1" },
       ]);
 
-      const outline = await createDedupedOutline(OUTLINE_DATE, [1, 2]);
+      const outline = await outlineFor();
 
+      expect(applyBoardRepeatsMock.mock.calls[0][0].candidates.map((story: { id: number }) => story.id)).toEqual([1]);
       expect(outline.selected_story_ids).toEqual([1]);
     });
   });
@@ -284,7 +300,7 @@ describe("newsletter curation", () => {
         { storyId: 3, source: "ai_breakfast" },
       ]);
 
-      const outline = await createDedupedOutline(OUTLINE_DATE, POOL_IDS);
+      const outline = await outlineFor();
 
       expect(selectedIds(outline, "headlines")).toEqual([1, 2, 3]);
       expect(outline.proposed_lead_id).toBe(3);
@@ -306,7 +322,7 @@ describe("newsletter curation", () => {
         .mockResolvedValue([]);
       storySourcesMock.mockResolvedValueOnce([{ storyId: 31, source: "alphasignal" }]);
 
-      const outline = await createDedupedOutline(OUTLINE_DATE, POOL_IDS);
+      const outline = await outlineFor();
 
       expect(outline.proposed_lead_id).toBe(31);
       expect(selectedIds(outline, "headlines")).toEqual([31, 1, 2]);
@@ -321,7 +337,7 @@ describe("newsletter curation", () => {
       findManyMock.mockResolvedValueOnce([]).mockResolvedValueOnce(POOL_ROWS);
       storySourcesMock.mockRejectedValueOnce(new Error('relation "story_sources" does not exist'));
 
-      const outline = await createDedupedOutline(OUTLINE_DATE, POOL_IDS);
+      const outline = await outlineFor();
 
       expect(selectedIds(outline, "headlines")).toEqual([1, 2, 3]);
       expect(outline.candidate_map["1"].sources).toEqual(["source"]);
@@ -405,15 +421,12 @@ describe("newsletter curation", () => {
     });
   });
 
-  describe("createDedupedOutline", () => {
-    it("refills slots the duplicate check empties with the next-ranked kept stories", async () => {
+  describe("the repeat check", () => {
+    it("refills slots the repeat check empties with the next-ranked kept stories", async () => {
       findManyMock.mockResolvedValueOnce([]).mockResolvedValueOnce(POOL_ROWS);
-      const removed = new Set([1, 2, 21, 31]);
+      removeByRepeatCheck([1, 2, 21, 31]);
 
-      const outline = await createDedupedOutline(
-        OUTLINE_DATE,
-        POOL_IDS.filter((id) => !removed.has(id))
-      );
+      const outline = await outlineFor();
 
       expect(selectedIds(outline, "headlines")).toEqual([3, 4, 5]);
       expect(selectedIds(outline, "research")).toEqual([22, 23, 24, 25]);
@@ -422,34 +435,66 @@ describe("newsletter curation", () => {
       expect(outline.selected_story_ids).toHaveLength(16);
     });
 
-    it("never shows a story the duplicate check removed", async () => {
+    it("never shows a removed repeat, but lists it with its full story so it can be restored", async () => {
       findManyMock.mockResolvedValueOnce([]).mockResolvedValueOnce(POOL_ROWS);
       const removed = [1, 2, 21, 31];
+      removeByRepeatCheck(removed);
 
-      const outline = await createDedupedOutline(
-        OUTLINE_DATE,
-        POOL_IDS.filter((id) => !removed.includes(id))
-      );
+      const outline = await outlineFor();
 
       const shownIds = outline.candidate_sections.flatMap((section) =>
         [...section.selected, ...section.fill_ins].map((story) => story.id)
       );
       for (const id of removed) {
         expect(shownIds).not.toContain(id);
-        expect(outline.candidate_map).not.toHaveProperty(String(id));
         expect(outline.selected_story_ids).not.toContain(id);
+        expect(outline.candidate_map[String(id)]).toMatchObject({ id, headline: `Item ${id}` });
       }
+      // Each entry names the section a restored story goes to.
+      expect(outline.repeats_removed.map((entry) => [entry.story.id, entry.repeat_of.id, entry.section])).toEqual([
+        [1, 900, "headlines"],
+        [2, 900, "headlines"],
+        [21, 900, "research"],
+        [31, 900, "tools"],
+      ]);
+      expect(outline).not.toHaveProperty("repeat_check_incomplete");
+    });
+
+    it("says so when the repeat check did not finish", async () => {
+      findManyMock.mockResolvedValueOnce([]).mockResolvedValueOnce(POOL_ROWS);
+      removeByRepeatCheck([], true);
+
+      const outline = await outlineFor();
+
+      expect(outline.repeat_check_incomplete).toBe(true);
+      expect(outline.repeats_removed).toEqual([]);
+    });
+
+    it("slots the merged story with its merged sources and also_from list", async () => {
+      findManyMock.mockResolvedValueOnce([]).mockResolvedValueOnce(POOL_ROWS);
+      applyBoardRepeatsMock.mockImplementationOnce(async ({ candidates }: { candidates: { id: number }[] }) => ({
+        heads: candidates
+          .filter((story) => story.id !== 2)
+          .map((story) =>
+            story.id === 1
+              ? { ...story, sources: ["source", "tldr"], also_from: [{ id: 2, source: "tldr", headline: "Item 2", url: "u", paywall_detected: "no" }] }
+              : story
+          ),
+        removed: [],
+        incomplete: false,
+      }));
+
+      const outline = await outlineFor();
+
+      expect(selectedIds(outline, "headlines")).toEqual([1, 3, 4]);
+      expect(outline.candidate_map["1"]).toMatchObject({ sources: ["source", "tldr"], also_from: [expect.objectContaining({ id: 2 })] });
     });
 
     it("fills Quick Hits before Top Story fill-ins when general stories run short", async () => {
       findManyMock.mockResolvedValueOnce([]).mockResolvedValueOnce(POOL_ROWS);
-      const keptGeneral = range(1, 10);
+      removeByRepeatCheck(range(11, 14));
 
-      const outline = await createDedupedOutline(OUTLINE_DATE, [
-        ...keptGeneral,
-        ...range(21, 27),
-        ...range(31, 36),
-      ]);
+      const outline = await outlineFor();
       const headlines = outline.candidate_sections.find((s) => s.key === "headlines")!;
 
       expect(selectedIds(outline, "headlines")).toEqual([1, 2, 3]);
@@ -460,7 +505,7 @@ describe("newsletter curation", () => {
     it("keeps today's layout when there are enough general stories", async () => {
       findManyMock.mockResolvedValueOnce([]).mockResolvedValueOnce(POOL_ROWS);
 
-      const outline = await createDedupedOutline(OUTLINE_DATE, POOL_IDS);
+      const outline = await outlineFor();
       const headlines = outline.candidate_sections.find((s) => s.key === "headlines")!;
       const quickHits = outline.candidate_sections.find((s) => s.key === "quickHits")!;
 
@@ -472,12 +517,9 @@ describe("newsletter curation", () => {
 
     it("leaves a section short only when its kept pool runs out", async () => {
       findManyMock.mockResolvedValueOnce([]).mockResolvedValueOnce(POOL_ROWS);
-      const removedResearch = [21, 22, 23, 24, 25];
+      removeByRepeatCheck([21, 22, 23, 24, 25]);
 
-      const outline = await createDedupedOutline(
-        OUTLINE_DATE,
-        POOL_IDS.filter((id) => !removedResearch.includes(id))
-      );
+      const outline = await outlineFor();
 
       expect(selectedIds(outline, "research")).toEqual([26, 27]);
       expect(selectedIds(outline, "headlines")).toEqual([1, 2, 3]);
@@ -494,14 +536,12 @@ describe("newsletter curation", () => {
     });
 
     it("counts stories the board does not show, so they never look new", async () => {
-      // Story 36 is held for an unsent draft and story 35 is removed by the duplicate check.
+      // Story 36 is held for an unsent draft and story 35 is removed by the repeat check.
       findUnsentDraftsMock.mockResolvedValue([{ date: "2026-06-08", storyIds: [36] }]);
       findManyMock.mockResolvedValueOnce([]).mockResolvedValueOnce(POOL_ROWS);
+      removeByRepeatCheck([35]);
 
-      const outline = await createDedupedOutline(
-        OUTLINE_DATE,
-        POOL_IDS.filter((id) => id !== 35)
-      );
+      const outline = await outlineFor();
 
       expect(outline.candidate_marker).toBe(36);
     });

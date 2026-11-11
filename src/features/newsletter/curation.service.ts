@@ -4,6 +4,13 @@ import { CANDIDATE_SECTION_CONFIGS, type SectionKey } from "@/src/features/newsl
 import { storyUrlKey } from "@/src/features/newsletter/story-url";
 import { findUnsentDrafts } from "@/src/features/newsletter/unsent-drafts";
 import { moveLeadToTopStories, proposeLeadStory, storySources } from "@/src/features/newsletter/lead-story";
+import {
+  applyBoardRepeats,
+  type AlsoFrom,
+  type BoardRepeats,
+  type RestorableRepeat,
+} from "@/src/features/newsletter/board-repeats";
+import type { SimilarStory } from "@/src/pipeline/repeats/repeat-rules";
 
 export interface StoryRecord {
   id: number;
@@ -26,6 +33,10 @@ export interface StoryRecord {
   used_in_publication_date?: Date | string | null;
   /** Set while the story waits in an unsent draft for this issue date. */
   held_for_date?: string | null;
+  /** Duplicates merged into this story by the repeat check (#90). */
+  also_from?: AlsoFrom[];
+  /** Earlier or excluded stories this one looks like, at most 3 (#90). */
+  similar_to?: SimilarStory[];
 }
 
 export interface ProcessedStory extends StoryRecord {
@@ -74,6 +85,23 @@ export interface ApprovalOutlineData {
    * The board compares it with `getCandidateMarker` to spot stories that arrived later.
    */
   candidate_marker: number | null;
+  /**
+   * Candidates the repeat check removed, with the story each repeats and the section a restored copy goes to.
+   * They are in `candidate_map` too.
+   */
+  repeats_removed: RestorableRepeat<ProcessedStory>[];
+  /** True when the repeat check did not finish for some candidates. */
+  repeat_check_incomplete?: boolean;
+}
+
+/** What the repeat check took off the board. */
+type BoardRepeatResult = Omit<BoardRepeats<ProcessedStory>, "heads">;
+
+/** The parts of a board that do not come from the ranked stories. */
+export interface OutlineExtras {
+  unsentDrafts?: UnsentDraftNotice[];
+  candidateMarker?: number | null;
+  repeats?: BoardRepeatResult;
 }
 
 export interface UnsentDraftNotice {
@@ -189,8 +217,8 @@ const RESEARCH_KEYWORDS = [
  * Normalizes scraped newsletter text before scoring, comparing, and displaying it.
  *
  * Source feeds often include sponsor blurbs, markdown syntax, links, and
- * newsletter-specific boilerplate. Cleaning here keeps ranking and AI
- * deduplication focused on the actual story content.
+ * newsletter-specific boilerplate. Cleaning here keeps ranking focused on the
+ * actual story content.
  */
 export function cleanText(value: string | null | undefined): string {
   if (!value) return "";
@@ -244,6 +272,12 @@ export function normalizeCategory(category: string | null | undefined): string {
   return "general";
 }
 
+/** The first section a story of this category can fill: general stories go to Top Stories. */
+function sectionForCategory(category: string | null): SectionKey {
+  const bucket = normalizeCategory(category);
+  return bucket === "research" || bucket === "tools" ? bucket : "headlines";
+}
+
 /**
  * Converts a full story row into the compact option shape shown in a section.
  */
@@ -257,7 +291,7 @@ function toOption(story: StoryRecord & { keyword_score: number }) {
 
 /**
  * Converts previously published stories into the reference format returned to
- * the approval screen and supplied to AI deduplication.
+ * the approval screen and supplied to the AI lead pick.
  */
 function toReferenceStory(story: StoryRecord): ReferenceStory {
   const raw = story.used_in_publication_date;
@@ -307,9 +341,8 @@ function dedupeStoriesByGuid(stories: StoryRecord[]): StoryRecord[] {
 /**
  * Loads recently used stories for the requested publication date.
  *
- * These are not candidates. They are reference material for semantic
- * deduplication so the outline does not repeat stories that appeared in the
- * last few issues.
+ * These are not candidates. The sidebar lists them and the AI lead pick reads
+ * their headlines. The repeat check uses its own, longer window.
  */
 async function getReferencedStories(date: Date): Promise<StoryRecord[]> {
   const dateOnly = toDateOnlyIso(date);
@@ -666,14 +699,13 @@ function createSectionBlueprints(
  * Builds the approval board from stories that are already ranked.
  *
  * Slots are filled in rank order from whatever is passed in. Pass only the
- * stories the duplicate check kept, so each slot it empties is refilled with
+ * stories the repeat check kept, so each slot it empties is refilled with
  * the next-ranked kept story instead of staying empty.
  */
 export function buildApprovalOutline(
   rankedStories: ProcessedStory[],
   referencedStories: StoryRecord[],
-  unsentDrafts: UnsentDraftNotice[] = [],
-  candidateMarker: number | null = null
+  { unsentDrafts = [], candidateMarker = null, repeats = { removed: [], incomplete: false } }: OutlineExtras = {}
 ): ApprovalOutlineData {
   const grouped = groupStoriesByCategory(rankedStories);
 
@@ -720,6 +752,9 @@ export function buildApprovalOutline(
     }
   }
 
+  // Removed repeats can be restored on the board, so it needs their full story.
+  for (const { story } of repeats.removed) candidate_map[String(story.id)] = story;
+
   logServerInfo("approval.outline.final", {
     sectionCount: candidate_sections.length,
     selectedStoryCount: selected_story_ids.size,
@@ -734,6 +769,8 @@ export function buildApprovalOutline(
     proposed_lead_id,
     unsent_drafts: unsentDrafts,
     candidate_marker: candidateMarker,
+    repeats_removed: repeats.removed.map((entry) => ({ ...entry, section: sectionForCategory(entry.story.category) })),
+    ...(repeats.incomplete ? { repeat_check_incomplete: true } : {}),
   };
 }
 
@@ -778,7 +815,7 @@ async function getPublishedUrlKeys(
 /**
  * Removes candidates that repeat a URL: a copy of a higher-ranked candidate,
  * or a URL that already ran in a published issue. Pages that hold many
- * stories (homepages, index pages) are left to the AI duplicate check.
+ * stories (homepages, index pages) are left to the repeat check.
  */
 function removeUrlDuplicates(
   rankedCandidates: ProcessedStory[],
@@ -818,7 +855,7 @@ function removeUrlDuplicates(
  *
  * Stories in an earlier, unsent draft are held for that draft unless the
  * caller reuses it. Held stories leave the pool and count as references, so
- * the duplicate checks also keep their repeats off this board.
+ * the URL check and the repeat check also keep their repeats off this board.
  */
 async function loadRankedCandidates(
   date: Date,
@@ -828,6 +865,7 @@ async function loadRankedCandidates(
   rankedCandidates: ProcessedStory[];
   unsentDrafts: UnsentDraftNotice[];
   candidateMarker: number | null;
+  repeats: BoardRepeatResult;
 }> {
   logServerInfo("approval.outline.create.start", { date: date.toISOString() });
 
@@ -871,29 +909,38 @@ async function loadRankedCandidates(
     const key = storyUrlKey(story.url);
     if (key) publishedUrlKeys.add(key);
   }
-  const { kept: rankedCandidates, sameUrlCount, publishedUrlCount } = removeUrlDuplicates(
+  const { kept: urlKept, sameUrlCount, publishedUrlCount } = removeUrlDuplicates(
     ranked,
     publishedUrlKeys
   );
+  const { heads: rankedCandidates, ...repeats } = await applyBoardRepeats({
+    date: toDateOnlyIso(date),
+    candidates: urlKept,
+    held: heldStories,
+  });
 
   logServerInfo("approval.outline.rank.result", {
     rankedCount: rankedCandidates.length,
     sameUrlCount,
     publishedUrlCount,
+    repeatCount: repeats.removed.length,
   });
 
   // Taken before holds and duplicate checks, so stories the board does not show never look new.
   const candidateMarker = highestStoryId(candidateStories);
 
-  return { referencedStories, rankedCandidates, unsentDrafts, candidateMarker };
+  return {
+    referencedStories,
+    rankedCandidates,
+    unsentDrafts,
+    candidateMarker,
+    repeats,
+  };
 }
 
 /**
- * Creates the approval board WITHOUT AI deduplication, for the fast first load.
- *
- * The caller submits the AI duplicate check in the background (OpenAI
- * Responses API) and then polls for it; `createDedupedOutline` builds the
- * final board once the check is done.
+ * Creates the approval board for a date: candidates ranked, with URL copies and
+ * repeats removed and duplicates merged, then slotted into sections.
  */
 export async function createOutlineCandidateStories(
   date: Date,
@@ -903,44 +950,17 @@ export async function createOutlineCandidateStories(
   referencedStories: StoryRecord[];
   rankedCandidates: ProcessedStory[];
 }> {
-  const { referencedStories, rankedCandidates, unsentDrafts, candidateMarker } =
+  const { referencedStories, rankedCandidates, unsentDrafts, candidateMarker, repeats } =
     await loadRankedCandidates(date, options);
 
   return {
-    outline: buildApprovalOutline(rankedCandidates, referencedStories, unsentDrafts, candidateMarker),
+    outline: buildApprovalOutline(rankedCandidates, referencedStories, { unsentDrafts, candidateMarker, repeats }),
     referencedStories,
     rankedCandidates,
   };
 }
 
-/**
- * Builds the final approval board after the AI duplicate check.
- *
- * The duplicate check covers the whole ranked pool, so removing its rejects
- * before slotting lets the next-ranked kept story fill each emptied slot.
- */
-export async function createDedupedOutline(
-  date: Date,
-  keptStoryIds: Iterable<number>,
-  options: OutlineOptions = {}
-): Promise<ApprovalOutlineData> {
-  const { referencedStories, rankedCandidates, unsentDrafts, candidateMarker } =
-    await loadRankedCandidates(date, options);
-  const kept = new Set(keptStoryIds);
-  const keptCandidates = rankedCandidates.filter((story) => kept.has(story.id));
-
-  logServerInfo("approval.outline.dedup.applied", {
-    rankedCount: rankedCandidates.length,
-    keptCount: keptCandidates.length,
-  });
-
-  return buildApprovalOutline(keptCandidates, referencedStories, unsentDrafts, candidateMarker);
-}
-
-/**
- * Legacy function — kept for backwards compatibility.
- * Now calls createOutlineCandidateStories (skips blocking AI dedup).
- */
+/** The approval board for a date. Used by `/api/newsletters/outline`. */
 export async function createApprovalOutlineData(
   date: Date
 ): Promise<ApprovalOutlineData> {
