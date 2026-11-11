@@ -18,21 +18,21 @@ export {
   type ReadContext,
 } from "@/src/pipeline/draft/articles/draft-reader";
 export { guardHtml, READABILITY_LIMITS, type HtmlLimits } from "@/src/pipeline/draft/articles/html-guard";
-export type { ParseJob } from "@/src/pipeline/draft/articles/html-text";
+export type { ParseJob } from "@/src/pipeline/draft/articles/text-job";
 export {
   createWorkerParser,
-  defaultHtmlParser,
+  defaultTextParser,
   parseInThisThread,
   WORKER_HEAP_MB,
-  type HtmlParser,
-} from "@/src/pipeline/draft/articles/html-worker";
+  type TextParser,
+} from "@/src/pipeline/draft/articles/text-worker";
 export {
-  DEFAULT_TIMEOUTS,
+  DEFAULT_LIMITS,
   MAX_TEXT_CHARS,
   readArticle,
   type ArticleAttempt,
   type ArticleRead,
-  type MethodTimeouts,
+  type ReadLimits,
   type ReadArticleOptions,
 } from "@/src/pipeline/draft/articles/read-article";
 export {

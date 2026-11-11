@@ -16,9 +16,9 @@ import { prisma } from "@/src/server/prisma";
 export const STORIES_AT_ONCE = 3;
 /**
  * The background function has 15 minutes. One story can take a web search (2 minutes, tried twice) and two
- * reads (45 s each), so no new story starts after this.
+ * reads (2 minutes each), so no new story starts after this.
  */
-export const TIME_LIMIT_MS = 9 * 60_000;
+export const TIME_LIMIT_MS = 6 * 60_000;
 /** A claim lasts as long as the background function can run. After that another run can take the story. */
 export const CLAIM_MS = 15 * 60_000;
 

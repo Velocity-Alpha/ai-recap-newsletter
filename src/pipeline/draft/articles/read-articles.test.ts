@@ -88,6 +88,19 @@ describe("readArticles", () => {
     expect(web.calls).not.toContain(jinaUrl("https://slow.example.com/b"));
   });
 
+  it("returns at the deadline a story still waiting for its host slot, unread with the deadline reason", async () => {
+    const web = fakeWeb({ "https://busy.example.com/a": hang, "https://busy.example.com/b": hang, "https://busy.example.com/c": htmlPage(prose("queued")) });
+
+    const { articles, reads } = await readArticles(
+      [story(1, "https://busy.example.com/a"), story(2, "https://busy.example.com/b"), story(3, "https://busy.example.com/c")],
+      { fetch: web.fetch, deadlineMs: 40, limits: { fetch: 10_000 } },
+    );
+
+    expect(web.calls).not.toContain("https://busy.example.com/c");
+    expect(articles[2]).toEqual({ storyId: 3, unread: true });
+    expect(reads[2]).toMatchObject({ status: "failed", error: "fetch: Stopped at the 0.04 s deadline for reading articles." });
+  });
+
   it("reads nothing for no stories", async () => {
     const web = fakeWeb({});
     await expect(readArticles([], { fetch: web.fetch })).resolves.toEqual({ articles: [], reads: [] });

@@ -1,6 +1,6 @@
-import type { HtmlParser } from "@/src/pipeline/draft/articles/html-worker";
 import type { FetchLike, HostLimiter } from "@/src/pipeline/draft/articles/http";
 import type { NotReadStatus } from "@/src/pipeline/draft/articles/quality";
+import type { ParseJob } from "@/src/pipeline/draft/articles/text-job";
 
 export type { ArticleStatus, NotReadStatus } from "@/src/pipeline/draft/articles/quality";
 
@@ -24,13 +24,13 @@ export interface MethodContext {
   fetch: FetchLike;
   /** Aborts at the method's timeout or the step's deadline. */
   signal: AbortSignal;
-  /** Does the text work (HTML, Readability, Markdown): in a worker in the Netlify function. */
-  parse: HtmlParser;
+  /** Does one text job (HTML, Readability, Markdown, PDF): in a worker in the Netlify function. */
+  parse: (job: ParseJob, signal: AbortSignal) => Promise<string>;
   limiter?: HostLimiter;
-  /** Called when a request gets its host slot. The method's timeout starts at the first call. */
+  /** Called when a request starts to wait for its host slot. The method's network limit pauses until `onStart`. */
+  onWait?: () => void;
+  /** Called when a request gets its host slot. The method's network limit runs from here. */
   onStart?: () => void;
-  /** The method found it reads the link another way (the page method got a PDF): its attempt is stored under that method. */
-  readingAs?: (method: ArticleMethod) => void;
   jinaApiKey?: string;
   githubToken?: string;
 }
@@ -41,6 +41,8 @@ export interface MethodText {
   /** The article's HTTP status (for Jina, the status Jina saw). */
   httpStatus: number;
   finalUrl: string;
+  /** Set when the method read the link another way (the page method got a PDF): the attempt is stored under it. */
+  method?: ArticleMethod;
 }
 
 /** A method that could not produce text at all, with how to count it. */
@@ -48,6 +50,8 @@ export class MethodError extends Error {
   constructor(
     readonly status: NotReadStatus,
     message: string,
+    /** Set when the method was reading the link another way (a PDF over its cap): the attempt is stored under it. */
+    readonly method?: ArticleMethod,
   ) {
     super(message);
     this.name = "MethodError";

@@ -1,4 +1,4 @@
-import { fetchText } from "@/src/pipeline/draft/articles/http";
+import { fetchBody } from "@/src/pipeline/draft/articles/http";
 import { MethodError, PAGE_MAX_BYTES, READER_USER_AGENT, type MethodContext, type MethodText } from "@/src/pipeline/draft/articles/types";
 
 /**
@@ -22,10 +22,10 @@ export async function readWithJina(url: string, context: MethodContext): Promise
   const headers: Record<string, string> = { Accept: "application/json", "X-Retain-Images": "none", "User-Agent": READER_USER_AGENT };
   if (context.jinaApiKey) headers.Authorization = `Bearer ${context.jinaApiKey}`;
 
-  const answer = await fetchText(`${JINA_READER}${url}`, { ...context, headers, maxBytes: PAGE_MAX_BYTES });
+  const answer = await fetchBody(`${JINA_READER}${url}`, { ...context, headers, maxBytes: PAGE_MAX_BYTES });
   let body: JinaAnswer;
   try {
-    body = JSON.parse(answer.body) as JinaAnswer;
+    body = JSON.parse(answer.text) as JinaAnswer;
   } catch {
     throw new MethodError("failed", answer.status >= 400 ? `Jina returned HTTP ${answer.status}.` : "Jina returned something other than JSON.");
   }

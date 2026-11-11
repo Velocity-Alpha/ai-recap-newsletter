@@ -97,13 +97,13 @@
             (draft.commit.board_actions_failed) and does not fail the commit
          -> new issue_drafts row (version n+1) -> starts draft-issue-background (job token)
 
-find-free-links-background (15 min limit; 3 stories at once; starts no new story after 9 min)
+find-free-links-background (15 min limit; 3 stories at once; starts no new story after 6 min)
          for each story with paywall_detected = "yes" and free_links_checked_at null, that the run can claim
          (stories.free_links_started_at; a claim lasts 15 min, so two runs never search one story):
          -> our own stories first: sure pairs in story_matches, 14 days around the story, link not paywalled
          -> if none is a free link: one OpenAI request with the web search tool (gpt-6-luna), up to 3 links
          -> each link is checked: not the original site, not a social or aggregator site, not on a paywalled
-            site list; then the article reader must read 300 words or more (45 s for all links of a story).
+            site list; then the article reader must read 300 words or more (120 s for all links of a story).
             A link the reader finds paywalled adds the story to its site's paywall_sites row
          -> story_free_links rows (at most 3) and stories.free_links_checked_at, also with no free link.
             A story with an error stays not searched; the next board load tries it again
@@ -145,15 +145,15 @@ If the issue is missing after a send: /approval/issues -> "Mark as published"
 </pre>
 
 <h3 id="article-reader">The article reader</h3>
-<p>The draft job reads each feature-section story's article for the writer; the free link check uses the same reader with the same options. Code: <code>src/pipeline/draft/articles/</code>. No paid service: <code>JINA_API_KEY</code> is not set, so Jina Reader is asked anonymously.</p>
+<p>The draft job reads each feature-section story's article for the writer; the free link job uses the same reader with the same options. Code: <code>src/pipeline/draft/articles/</code>. No paid service: <code>JINA_API_KEY</code> is not set, so Jina Reader is asked anonymously.</p>
 <ul>
   <li><strong>Methods, in order:</strong> a site adapter when the host has one (<code>arxiv</code> HTML, <code>github</code> README API, <code>huggingface</code> README), then the page itself (<code>fetch</code>, Readability), then Jina Reader (<code>jina</code>). The first text that passes the quality check wins. A page that answers with a PDF is read from the same download with <code>unpdf</code> and stored as <code>pdf</code>; a Markdown or plain-text page is read as text. A story nobody reads is unread with the strongest reason: paywalled, then blocked, then failed. The draft goes on without it.</li>
   <li><strong>Requests:</strong> the page method sends the headers of a desktop Chrome visit (<code>src/pipeline/browser-headers.ts</code>; ingestion's paywall check and redirect follower use its user agent). The site adapters and Jina send the reader's own name. One retry on a network error, 2 requests at once per host, and the address guard refuses private and local addresses at every hop.</li>
-  <li><strong>Caps:</strong> HTML pages 5 MB, site adapters 10 MB, PDFs 20 MB; past the cap the method fails as too large. Text is cut to 50,000 characters.</li>
-  <li><strong>Limits:</strong> each method has a network part (first request gets its host slot until the body is in: adapters 20 s, page 20 s, Jina 30 s) and a text part (the job gets a text worker until the text is back: 20 s). Waiting for a slot counts toward neither. The read step has a 120 s deadline for all stories of a draft; a story still waiting then is unread with the deadline reason.</li>
-  <li><strong>Text workers:</strong> HTML, Markdown and PDF text is made in worker threads, 3 at once (<code>MAX_WORKERS</code>), each with a 256 MB heap, so a hostile page fails alone.</li>
-  <li><strong>Jina Reader:</strong> free, 20 requests a minute per server address (Netlify shares addresses). A 402, 429 or other refusal leaves that story unread with Jina's reason (403 and 451 count as blocked). No alert asks for a key.</li>
-  <li><strong>Timings:</strong> each attempt in <code>story_articles.attempts</code> records its total time, the time it waited for host and worker slots (<code>waitMs</code>), and the time of its text part (<code>textMs</code>).</li>
+  <li><strong>Caps:</strong> HTML pages 5 MB, site adapters 10 MB, PDFs 20 MB; past the cap the method fails as too large (an over-cap PDF as a <code>pdf</code> attempt). Text is cut to 50,000 characters.</li>
+  <li><strong>Limits:</strong> each method has a network part (first request gets its host slot until the body is in: adapters 20 s, page 20 s, Jina 30 s) and a text part (the job gets a text worker until the text is back: 20 s). Waiting for a slot counts toward neither: the network limit pauses whenever a request (a redirect or a retry too) waits for its host slot. Limits are <code>ReadLimits</code> in <code>read-article.ts</code>. The read step has a 120 s deadline for all stories of a draft, and the free link job gives each story's links the same 120 s; a story still waiting then is unread with the deadline reason.</li>
+  <li><strong>Text workers:</strong> HTML, Markdown and PDF text is made in worker threads (<code>text-worker.ts</code>, jobs in <code>text-job.ts</code>), 3 at once (<code>MAX_WORKERS</code>), each with a 256 MB heap, so a hostile page fails alone.</li>
+  <li><strong>Jina Reader:</strong> free, 20 requests a minute per server address (Netlify shares addresses). A 402, 429 or other refusal leaves that story unread with Jina's reason (403 and 451 count as blocked). Jina refusals raise no alert.</li>
+  <li><strong>Timings:</strong> each attempt in <code>story_articles.attempts</code> records its total time, the time it waited for host and worker slots, every wait counted (<code>waitMs</code>), and the time of its text part (<code>textMs</code>).</li>
 </ul>
 
 <h2 id="jobs">3. Jobs (Netlify functions)</h2>

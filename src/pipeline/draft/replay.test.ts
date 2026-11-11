@@ -180,8 +180,7 @@ describe("replayArticleReader", () => {
       [laundry.id, "blocked", null, false],
     ]);
     expect(JSON.stringify(reader.reads())).not.toContain("planner pretend lab");
-    const jinaCall = web.fetch.mock.calls.find(([url]) => url === jinaUrl(laundry.url)) as [string, { headers: Record<string, string> }];
-    expect(jinaCall[1].headers).not.toHaveProperty("Authorization");
+    expect(web.sentAuthorization(jinaUrl(laundry.url))).toBe(false);
   });
 
   it("reads nothing with --no-read", async () => {

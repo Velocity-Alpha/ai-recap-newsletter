@@ -1,10 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { hostileHtml } from "@/src/pipeline/draft/articles/fake-web.fixture";
-import { parseInThisThread, type HtmlParser } from "@/src/pipeline/draft/articles/html-worker";
+import { hostileHtml, parseHere } from "@/src/pipeline/draft/articles/fake-web.fixture";
 import { FetchFailure, type FetchLike } from "@/src/pipeline/draft/articles/http";
 import { readWithReadability } from "@/src/pipeline/draft/articles/readability";
-import { MethodError, READER_USER_AGENT } from "@/src/pipeline/draft/articles/types";
+import { MethodError, READER_USER_AGENT, type MethodContext } from "@/src/pipeline/draft/articles/types";
 
 const PARAGRAPHS = [
   "The pretend robotics lab said on Monday that its toy arm can now fold synthetic towels in under ten seconds, a made-up record.",
@@ -27,7 +26,7 @@ function respond(body: string | Uint8Array<ArrayBuffer>, contentType = "text/htm
   return vi.fn<FetchLike>(async () => new Response(body, { status, headers: { "content-type": contentType } }));
 }
 
-const context = (fetch: FetchLike) => ({ fetch, signal: new AbortController().signal, parse: parseInThisThread });
+const context = (fetch: FetchLike) => ({ fetch, signal: new AbortController().signal, parse: parseHere });
 
 describe("readWithReadability", () => {
   it("returns the page's main text without menus, related links or the footer", async () => {
@@ -93,7 +92,7 @@ describe("readWithReadability", () => {
     ["tags nested 4,000 deep", hostileHtml.deep(4_000), "The page nests HTML tags over 400 deep."],
     ["600,000 tiny elements", hostileHtml.tiny(600_000), "The page has over 30,000 HTML elements."],
   ])("refuses a hostile page (%s) without parsing it, in well under the fetch timeout", async (_kind, html, reason) => {
-    const parse = vi.fn<HtmlParser>(parseInThisThread);
+    const parse = vi.fn<MethodContext["parse"]>(parseHere);
     const started = performance.now();
 
     const error = await readWithReadability("https://news.example.com/x", { ...context(respond(html)), parse }).catch((reason: unknown) => reason);
@@ -105,7 +104,7 @@ describe("readWithReadability", () => {
   });
 
   it("parses the page with scripts and comments already dropped", async () => {
-    const parse = vi.fn<HtmlParser>(parseInThisThread);
+    const parse = vi.fn<MethodContext["parse"]>(parseHere);
 
     await readWithReadability("https://news.example.com/x", { ...context(respond(ARTICLE_PAGE.replace("<main>", "<script>var pretend = '<p>';</script><!-- x --><main>"))), parse });
 

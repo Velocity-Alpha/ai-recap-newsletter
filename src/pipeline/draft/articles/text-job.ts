@@ -8,7 +8,7 @@ import { htmlToText, markdownToText, normalizeText, type TextNodeLike } from "@/
 /**
  * The text work on downloaded pages: parsing HTML, Readability, Markdown clean-up, and PDF text. It cannot be
  * interrupted from outside, and a hostile page or PDF can make it take minutes or gigabytes, so the reader runs it
- * in a worker thread (html-worker.ts) that is stopped at the method's text limit.
+ * in a worker thread (text-worker.ts) that is stopped at the method's text limit.
  */
 
 export type ParseJob =
@@ -60,6 +60,11 @@ export async function pdfText(bytes: Uint8Array): Promise<string> {
   } finally {
     await document.destroy();
   }
+}
+
+/** What moves to the worker instead of being copied: a PDF's bytes (up to 20 MB). */
+export function transferList(job: ParseJob): ArrayBuffer[] {
+  return job.kind === "pdf" ? [job.bytes.buffer as ArrayBuffer] : [];
 }
 
 export async function parseJobText(job: ParseJob): Promise<string> {

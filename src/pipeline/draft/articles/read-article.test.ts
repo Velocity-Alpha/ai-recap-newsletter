@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { fakeWeb, hang, hostileHtml, htmlPage, jinaAnswer, jinaError, jinaUrl, pdfDocument, pdfResponse, prose, rawHtml } from "@/src/pipeline/draft/articles/fake-web.fixture";
-import { parseInThisThread, type HtmlParser } from "@/src/pipeline/draft/articles/html-worker";
+import { parseInThisThread, type TextParser } from "@/src/pipeline/draft/articles/text-worker";
 import { HostLimiter } from "@/src/pipeline/draft/articles/http";
-import { DEFAULT_TIMEOUTS, MAX_TEXT_CHARS, readArticle } from "@/src/pipeline/draft/articles/read-article";
+import { DEFAULT_LIMITS, MAX_TEXT_CHARS, readArticle } from "@/src/pipeline/draft/articles/read-article";
 
 const STORY = "https://news.example.com/toy-arm";
 const PAPER_ABS = "https://arxiv.org/abs/2401.01234";
@@ -18,7 +18,7 @@ function paperPage(text: string) {
 
 describe("readArticle", () => {
   it("gives each method's network part a limit (site adapter 20 s, fetch 20 s, Jina 30 s) and every text part 20 s", () => {
-    expect(DEFAULT_TIMEOUTS).toEqual({ adapter: 20_000, fetch: 20_000, jina: 30_000, text: 20_000 });
+    expect(DEFAULT_LIMITS).toEqual({ adapter: 20_000, fetch: 20_000, jina: 30_000, text: 20_000 });
   });
 
   it("reads a paper with its site adapter first", async () => {
@@ -85,8 +85,7 @@ describe("readArticle", () => {
     const read = await readArticle(STORY, { fetch: web.fetch });
 
     expect(read).toMatchObject({ status: "read", method: "jina" });
-    const [, init] = web.fetch.mock.calls.find(([url]) => url === jinaUrl(STORY))!;
-    expect(Object.keys(init.headers ?? {}).map((name) => name.toLowerCase())).not.toContain("authorization");
+    expect(web.sentAuthorization(jinaUrl(STORY))).toBe(false);
   });
 
   it.each([
@@ -104,7 +103,7 @@ describe("readArticle", () => {
   it("cuts a method off at its network limit, even if it ignores the abort, and moves on", async () => {
     const web = fakeWeb({ [STORY]: hang, [jinaUrl(STORY)]: jinaAnswer(STORY, prose("rescued")) });
 
-    const read = await readArticle(STORY, { fetch: web.fetch, timeouts: { fetch: 20 } });
+    const read = await readArticle(STORY, { fetch: web.fetch, limits: { fetch: 20 } });
 
     expect(read).toMatchObject({ status: "read", method: "jina" });
     expect(read.attempts[0]).toMatchObject({ method: "fetch", outcome: "failed", error: "Network part timed out after 0.02 s." });
@@ -146,7 +145,7 @@ describe("readArticle", () => {
     ["600,000 tiny elements", hostileHtml.tiny(600_000), "The page has over 30,000 HTML elements."],
   ])("refuses a hostile page (%s) before parsing it, well within the fetch timeout, and lets Jina try", async (_kind, html, reason) => {
     const web = fakeWeb({ [STORY]: rawHtml(html), [jinaUrl(STORY)]: jinaAnswer(STORY, prose("rescued")) });
-    const parse = vi.fn<HtmlParser>(parseInThisThread);
+    const parse = vi.fn<TextParser>(parseInThisThread);
     const started = performance.now();
 
     const read = await readArticle(STORY, { fetch: web.fetch, parse });
@@ -161,31 +160,47 @@ describe("readArticle", () => {
     const web = fakeWeb({ [STORY]: htmlPage(prose("slow")), [jinaUrl(STORY)]: jinaAnswer(STORY, prose("rescued")) });
     const stopped: unknown[] = [];
     // Stands in for the worker: it gets its slot at once, then ends only when its signal aborts.
-    const slowParse: HtmlParser = (job, signal, onStart) =>
+    const slowParse: TextParser = (job, signal, onStart) =>
       job.kind !== "readable"
         ? parseInThisThread(job, signal, onStart)
         : new Promise((_resolve, reject) => {
-            onStart?.();
+            onStart();
             signal.addEventListener("abort", () => {
               stopped.push(signal.reason);
               reject(signal.reason);
             });
           });
 
-    const read = await readArticle(STORY, { fetch: web.fetch, parse: slowParse, timeouts: { text: 30 } });
+    const read = await readArticle(STORY, { fetch: web.fetch, parse: slowParse, limits: { text: 30 } });
 
     expect(stopped).toEqual([expect.objectContaining({ message: "Text part timed out after 0.03 s." })]);
     expect(read).toMatchObject({ status: "read", method: "jina" });
     expect(read.attempts[0]).toMatchObject({ method: "fetch", outcome: "failed", error: "Text part timed out after 0.03 s." });
   });
 
+  it("stores a PDF whose text job is stopped at the text limit as a pdf attempt", async () => {
+    const web = fakeWeb({ [STORY]: pdfResponse(pdfDocument(prose("slow"))), [jinaUrl(STORY)]: jinaAnswer(STORY, prose("rescued")) });
+    const slowParse: TextParser = (job, signal, onStart) =>
+      job.kind !== "pdf"
+        ? parseInThisThread(job, signal, onStart)
+        : new Promise((_resolve, reject) => {
+            onStart();
+            signal.addEventListener("abort", () => reject(signal.reason));
+          });
+
+    const read = await readArticle(STORY, { fetch: web.fetch, parse: slowParse, limits: { text: 30 } });
+
+    expect(read).toMatchObject({ status: "read", method: "jina" });
+    expect(read.attempts[0]).toMatchObject({ method: "pdf", outcome: "failed", error: "Text part timed out after 0.03 s." });
+  });
+
   it("reads a page whose text job waits for a worker slot longer than the page's network limit", async () => {
     const web = fakeWeb({ [STORY]: htmlPage(prose("queued")) });
     // Stands in for a busy worker pool: the slot comes after 80 ms, past the 30 ms network limit.
-    const queuedParse: HtmlParser = (job, signal, onStart) =>
+    const queuedParse: TextParser = (job, signal, onStart) =>
       new Promise((resolve) => setTimeout(resolve, 80)).then(() => parseInThisThread(job, signal, onStart));
 
-    const read = await readArticle(STORY, { fetch: web.fetch, parse: queuedParse, timeouts: { fetch: 30, text: 1_000 } });
+    const read = await readArticle(STORY, { fetch: web.fetch, parse: queuedParse, limits: { fetch: 30, text: 1_000 } });
 
     expect(read).toMatchObject({ status: "read", method: "fetch" });
     expect(read.text).toContain("queued pretend lab");
@@ -206,10 +221,10 @@ describe("readArticle", () => {
       },
     });
     // 300 ms in the worker queue, then 200 ms of text work.
-    const parse: HtmlParser = async (job, signal, onStart) => {
+    const parse: TextParser = async (job, signal, onStart) => {
       clock += 300;
-      onStart?.();
-      const text = await parseInThisThread(job, signal);
+      onStart();
+      const text = await parseInThisThread(job, signal, () => undefined);
       clock += 200;
       return text;
     };
@@ -226,10 +241,27 @@ describe("readArticle", () => {
     const web = fakeWeb({ [STORY]: htmlPage(prose("patient")) });
     const busy = limiter.run("news.example.com", new AbortController().signal, () => new Promise((resolve) => setTimeout(resolve, 80)));
 
-    const read = await readArticle(STORY, { fetch: web.fetch, limiter, timeouts: { fetch: 40 } });
+    const read = await readArticle(STORY, { fetch: web.fetch, limiter, limits: { fetch: 40 } });
     await busy;
 
     expect(read).toMatchObject({ status: "read", method: "fetch" });
+  });
+
+  it("pauses a method's network limit while a redirect waits for its new host's slot, and counts every wait", async () => {
+    const limiter = new HostLimiter(1);
+    const moved = "https://other.example.com/toy-arm";
+    const web = fakeWeb({
+      [STORY]: () => new Response(null, { status: 302, headers: { location: moved } }),
+      [moved]: htmlPage(prose("moved")),
+    });
+    // Another read holds the new host's slot for 80 ms, past the 40 ms network limit.
+    const busy = limiter.run("other.example.com", new AbortController().signal, () => new Promise((resolve) => setTimeout(resolve, 80)));
+
+    const read = await readArticle(STORY, { fetch: web.fetch, limiter, limits: { fetch: 40 } });
+    await busy;
+
+    expect(read).toMatchObject({ status: "read", method: "fetch", finalUrl: moved });
+    expect(read.attempts[0].waitMs).toBeGreaterThanOrEqual(70);
   });
 
   it("reads a page served as Markdown", async () => {
@@ -273,7 +305,7 @@ describe("readArticle", () => {
 
     expect(read).toMatchObject({ status: "failed", method: null });
     expect(read.attempts.map(({ method, outcome, error }) => ({ method, outcome, error }))).toEqual([
-      { method: "fetch", outcome: "failed", error: "The response is over the 20 MB cap." },
+      { method: "pdf", outcome: "failed", error: "The response is over the 20 MB cap." },
       { method: "jina", outcome: "failed", error: "Jina returned HTTP 422: No content." },
     ]);
   });

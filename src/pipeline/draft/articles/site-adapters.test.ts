@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { parseInThisThread } from "@/src/pipeline/draft/articles/html-worker";
+import { parseHere } from "@/src/pipeline/draft/articles/fake-web.fixture";
 import type { FetchLike } from "@/src/pipeline/draft/articles/http";
 import { matchSiteAdapter } from "@/src/pipeline/draft/articles/site-adapters";
 import { READER_USER_AGENT } from "@/src/pipeline/draft/articles/types";
@@ -64,7 +64,7 @@ describe("arXiv adapter", () => {
   it("reads the arXiv HTML paper without references, appendices or the contents list, and keeps math as TeX", async () => {
     const fetch = respond(PAPER);
 
-    const result = await matchSiteAdapter("https://huggingface.co/papers/2511.04567")!.read({ fetch, signal, parse: parseInThisThread });
+    const result = await matchSiteAdapter("https://huggingface.co/papers/2511.04567")!.read({ fetch, signal, parse: parseHere });
 
     expect(fetch.mock.calls[0][0]).toBe("https://arxiv.org/html/2511.04567");
     expect(fetch.mock.calls[0][1].headers).toMatchObject({ "User-Agent": READER_USER_AGENT });
@@ -75,7 +75,7 @@ describe("arXiv adapter", () => {
   });
 
   it("passes a missing HTML version on as its status", async () => {
-    const result = await matchSiteAdapter("https://arxiv.org/abs/2401.01234")!.read({ fetch: respond("No HTML for this paper", 404), signal, parse: parseInThisThread });
+    const result = await matchSiteAdapter("https://arxiv.org/abs/2401.01234")!.read({ fetch: respond("No HTML for this paper", 404), signal, parse: parseHere });
     expect(result).toMatchObject({ text: "", httpStatus: 404 });
   });
 });
@@ -86,7 +86,7 @@ describe("GitHub adapter", () => {
   it("reads the README from the GitHub API as raw Markdown, with no token by default", async () => {
     const fetch = respond(README, 200, "text/plain; charset=utf-8");
 
-    const result = await matchSiteAdapter("https://github.com/toy-org/toy-repo")!.read({ fetch, signal, parse: parseInThisThread });
+    const result = await matchSiteAdapter("https://github.com/toy-org/toy-repo")!.read({ fetch, signal, parse: parseHere });
 
     expect(fetch.mock.calls[0][1].headers).toEqual({
       Accept: "application/vnd.github.raw+json",
@@ -98,12 +98,12 @@ describe("GitHub adapter", () => {
 
   it("sends GITHUB_TOKEN when there is one", async () => {
     const fetch = respond(README, 200, "text/plain");
-    await matchSiteAdapter("https://github.com/toy-org/toy-repo")!.read({ fetch, signal, parse: parseInThisThread, githubToken: "gh-test-token" });
+    await matchSiteAdapter("https://github.com/toy-org/toy-repo")!.read({ fetch, signal, parse: parseHere, githubToken: "gh-test-token" });
     expect(fetch.mock.calls[0][1].headers).toMatchObject({ Authorization: "Bearer gh-test-token" });
   });
 
   it("passes a repo without a README on as its status", async () => {
-    const result = await matchSiteAdapter("https://github.com/toy-org/toy-repo")!.read({ fetch: respond('{"message":"Not Found"}', 404), signal, parse: parseInThisThread });
+    const result = await matchSiteAdapter("https://github.com/toy-org/toy-repo")!.read({ fetch: respond('{"message":"Not Found"}', 404), signal, parse: parseHere });
     expect(result).toMatchObject({ text: "", httpStatus: 404 });
   });
 });
@@ -112,7 +112,7 @@ describe("Hugging Face model adapter", () => {
   it("reads the model card without its YAML header", async () => {
     const fetch = respond("---\nlicense: mit\n---\n# Toy Model 7B\n\nAn invented model card.", 200, "text/plain");
 
-    const result = await matchSiteAdapter("https://huggingface.co/toy-org/toy-model-7b")!.read({ fetch, signal, parse: parseInThisThread });
+    const result = await matchSiteAdapter("https://huggingface.co/toy-org/toy-model-7b")!.read({ fetch, signal, parse: parseHere });
 
     expect(fetch.mock.calls[0][0]).toBe("https://huggingface.co/toy-org/toy-model-7b/resolve/main/README.md");
     expect(result).toEqual({ text: "Toy Model 7B\n\nAn invented model card.", httpStatus: 200, finalUrl: "https://huggingface.co/toy-org/toy-model-7b" });

@@ -4,7 +4,7 @@ import { Agent, fetch as undiciFetch } from "undici";
 
 import { assertPublicUrl, createGuardedLookup, RefusedUrlError, type ResolveAll } from "@/src/pipeline/draft/articles/address-guard";
 
-/** The part of `fetch` the reader uses, so tests can pass a fake. Redirects are followed by `fetchText`. */
+/** The part of `fetch` the reader uses, so tests can pass a fake. Redirects are followed by `fetchBody`. */
 export interface FetchInit {
   method: "GET";
   headers: Record<string, string>;
@@ -28,22 +28,26 @@ export class FetchFailure extends Error {
   constructor(
     readonly kind: FetchFailureKind,
     message: string,
+    /** The answer's media type, when the failure came after the answer's headers (too large, wrong type). */
+    readonly mediaType?: string,
   ) {
     super(message);
     this.name = "FetchFailure";
   }
 }
 
-export interface FetchedText {
+interface FetchedHead {
   status: number;
   /** After redirects. */
   url: string;
   contentType: string;
-  /** The decoded text. "" when the body was kept as bytes. */
-  body: string;
-  /** The raw body, for a successful answer of a `binary` type (a PDF). */
-  bytes?: Uint8Array;
 }
+
+/** A body decoded as text. */
+export type FetchedText = FetchedHead & { kind: "text"; text: string };
+/** A body kept as bytes: a successful answer of a `binary` type (a PDF). */
+export type FetchedBytes = FetchedHead & { kind: "bytes"; bytes: Uint8Array };
+export type FetchedBody = FetchedText | FetchedBytes;
 
 /** Media types whose body is kept as bytes, not decoded, with their own size cap. */
 export interface BinaryBodies {
@@ -51,13 +55,15 @@ export interface BinaryBodies {
   maxBytes: number;
 }
 
-export interface FetchTextOptions {
+export interface FetchBodyOptions {
   fetch: FetchLike;
   /** Aborts the request; its reason is rethrown. */
   signal: AbortSignal;
   headers?: Record<string, string>;
   maxBytes: number;
   limiter?: HostLimiter;
+  /** Called as each request starts to wait for its host slot (only with a limiter). */
+  onWait?: () => void;
   /** Called as each request gets its host slot (at once without a limiter). */
   onStart?: () => void;
   /** Checks a successful answer's media type before its body is read: a reason refuses it, null reads it. */
@@ -133,9 +139,9 @@ function decoderFor(contentType: string): TextDecoder {
   }
 }
 
-async function readBody(response: FetchResponse, maxBytes: number): Promise<Uint8Array> {
+async function readBody(response: FetchResponse, maxBytes: number, type: string): Promise<Uint8Array> {
   const declared = Number(response.headers.get("content-length"));
-  const tooLarge = () => new FetchFailure("too_large", `The response is over the ${formatBytes(maxBytes)} cap.`);
+  const tooLarge = () => new FetchFailure("too_large", `The response is over the ${formatBytes(maxBytes)} cap.`, type);
   if (Number.isFinite(declared) && declared > maxBytes) {
     await response.body?.getReader().cancel().catch(() => undefined);
     throw tooLarge();
@@ -179,29 +185,40 @@ function finalError(error: unknown): unknown {
   return cause instanceof RefusedUrlError ? cause : null;
 }
 
-type Body = { text: string } | { bytes: Uint8Array };
+type Body = { kind: "text"; text: string } | { kind: "bytes"; bytes: Uint8Array };
 
-async function requestOnce(url: URL, headers: Record<string, string>, options: FetchTextOptions): Promise<{ response: FetchResponse; body: Body | null }> {
-  const send = async () => {
+interface Answer {
+  response: FetchResponse;
+  contentType: string;
+  /** Null for a redirect. */
+  body: Body | null;
+}
+
+async function requestOnce(url: URL, headers: Record<string, string>, options: FetchBodyOptions): Promise<Answer> {
+  const send = async (): Promise<Answer> => {
     options.onStart?.();
     const response = await options.fetch(url.href, { method: "GET", headers, redirect: "manual", signal: options.signal });
+    const contentType = response.headers.get("content-type") ?? "";
     if (REDIRECT_STATUSES.has(response.status) && response.headers.get("location")) {
       await response.body?.getReader().cancel().catch(() => undefined);
-      return { response, body: null };
+      return { response, contentType, body: null };
     }
-    const contentType = response.headers.get("content-type") ?? "";
     const type = mediaType(contentType);
     const refused = response.status < 400 ? options.rejectType?.(type) : null;
     if (refused) {
       await response.body?.getReader().cancel().catch(() => undefined);
-      throw new FetchFailure("wrong_type", refused);
+      throw new FetchFailure("wrong_type", refused, type);
     }
     if (response.status < 400 && options.binary?.types.has(type)) {
-      return { response, body: { bytes: await readBody(response, options.binary.maxBytes) } };
+      return { response, contentType, body: { kind: "bytes", bytes: await readBody(response, options.binary.maxBytes, type) } };
     }
-    return { response, body: { text: decoderFor(contentType).decode(await readBody(response, options.maxBytes)) } };
+    return { response, contentType, body: { kind: "text", text: decoderFor(contentType).decode(await readBody(response, options.maxBytes, type)) } };
   };
-  const run = () => (options.limiter ? options.limiter.run(url.host, options.signal, send) : send());
+  const run = () => {
+    if (!options.limiter) return send();
+    options.onWait?.();
+    return options.limiter.run(url.host, options.signal, send);
+  };
 
   try {
     return await run();
@@ -224,12 +241,14 @@ async function requestOnce(url: URL, headers: Record<string, string>, options: F
  * `assertPublicUrl`, at most 5 redirects are followed, the body stops at its cap, and an Authorization header is
  * dropped when a redirect leaves the origin.
  */
-export async function fetchText(link: string, options: FetchTextOptions): Promise<FetchedText> {
+export async function fetchBody(link: string, options: FetchBodyOptions & { binary: BinaryBodies }): Promise<FetchedBody>;
+export async function fetchBody(link: string, options: FetchBodyOptions & { binary?: undefined }): Promise<FetchedText>;
+export async function fetchBody(link: string, options: FetchBodyOptions): Promise<FetchedBody> {
   let url = assertPublicUrl(link);
   let headers = { ...(options.headers ?? {}) };
   for (let hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
     if (options.signal.aborted) throw options.signal.reason;
-    const { response, body } = await requestOnce(url, headers, options);
+    const { response, contentType, body } = await requestOnce(url, headers, options);
     if (body === null) {
       const next = assertPublicUrl(new URL(response.headers.get("location") ?? "", url).href);
       if (next.origin !== url.origin) {
@@ -238,10 +257,7 @@ export async function fetchText(link: string, options: FetchTextOptions): Promis
       url = next;
       continue;
     }
-    const contentType = response.headers.get("content-type") ?? "";
-    return "bytes" in body
-      ? { status: response.status, url: url.href, contentType, body: "", bytes: body.bytes }
-      : { status: response.status, url: url.href, contentType, body: body.text };
+    return { status: response.status, url: url.href, contentType, ...body };
   }
   throw new FetchFailure("redirects", `Too many redirects (over ${MAX_REDIRECTS}).`);
 }

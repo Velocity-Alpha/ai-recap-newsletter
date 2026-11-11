@@ -4,6 +4,17 @@
 import { vi } from "vitest";
 
 import type { FetchInit, FetchLike } from "@/src/pipeline/draft/articles/http";
+import { parseJobText } from "@/src/pipeline/draft/articles/text-job";
+import type { MethodContext } from "@/src/pipeline/draft/articles/types";
+
+/**
+ * A method's text jobs, in this thread, for tests that call a method directly. It does not import text-worker.ts,
+ * which imports http.ts: tests that mock http.ts load this fixture inside the mock.
+ */
+export const parseHere: MethodContext["parse"] = async (job, signal) => {
+  if (signal.aborted) throw signal.reason;
+  return parseJobText(job);
+};
 
 /** A response, or `hang` for a request that never answers and ignores its abort signal. */
 export type Route = (() => Response | Promise<Response>) | "hang";
@@ -93,5 +104,11 @@ export function fakeWeb(routes: Record<string, Route>) {
     void init;
     return Promise.resolve(route());
   });
-  return { fetch, calls };
+  /** Whether the first request to `url` sent an Authorization header (in any case). */
+  const sentAuthorization = (url: string): boolean => {
+    const call = fetch.mock.calls.find(([called]) => called === url);
+    if (!call) throw new Error(`No request to ${url}.`);
+    return Object.keys(call[1].headers).some((name) => name.toLowerCase() === "authorization");
+  };
+  return { fetch, calls, sentAuthorization };
 }

@@ -8,7 +8,7 @@ import { build } from "esbuild";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { pdfDocument, prose } from "@/src/pipeline/draft/articles/fake-web.fixture";
-import { canStartWorker, defaultHtmlParser, parseInThisThread } from "@/src/pipeline/draft/articles/html-worker";
+import { canStartWorker, defaultTextParser, parseInThisThread } from "@/src/pipeline/draft/articles/text-worker";
 
 const root = path.resolve(__dirname, "../../../..");
 
@@ -29,14 +29,14 @@ const elapsed = (started) => Math.round(performance.now() - started);
 async function parse(parser, html, timeoutMs) {
   const started = performance.now();
   try {
-    const text = await parser({ kind: "readable", html }, AbortSignal.timeout(timeoutMs));
+    const text = await parser({ kind: "readable", html }, AbortSignal.timeout(timeoutMs), () => undefined);
     return { ms: elapsed(started), text: text.slice(0, 120) };
   } catch (error) {
     return { ms: elapsed(started), error: \`\${error.name}: \${error.message}\` };
   }
 }
 
-const parser = bundle.defaultHtmlParser();
+const parser = bundle.defaultTextParser();
 const out = { canStartWorker: bundle.canStartWorker(), slowPassesGuard: bundle.guardHtml(slow).ok };
 out.page = await parse(parser, page, 10000);
 out.slow = await parse(parser, slow, 500);
@@ -67,7 +67,7 @@ const fetch = async (url) =>
     ? new Response(JSON.stringify({ code: 200, status: 20000, data: { url, content: sentence.repeat(20), httpStatus: 200 } }), { headers: { "content-type": "application/json" } })
     : new Response(slow, { headers: { "content-type": "text/html" } });
 const started = performance.now();
-const read = await bundle.readArticle("https://news.example.com/slow", { fetch, timeouts: { text: 500 } });
+const read = await bundle.readArticle("https://news.example.com/slow", { fetch, limits: { text: 500 } });
 out.read = { ms: elapsed(started), status: read.status, method: read.method, attempts: read.attempts.map(({ method, outcome, error }) => ({ method, outcome, error })) };
 
 console.log(JSON.stringify(out));
@@ -101,7 +101,7 @@ describe.each(["draft-issue-background", "find-free-links-background"])("the tex
   beforeAll(async () => {
     // Inside the repo, so the bundle's external packages resolve from node_modules.
     mkdirSync(path.join(root, "node_modules/.cache"), { recursive: true });
-    dir = mkdtempSync(path.join(root, "node_modules/.cache/html-worker-bundle-"));
+    dir = mkdtempSync(path.join(root, "node_modules/.cache/text-worker-bundle-"));
     const entry = path.join(dir, "entry.ts");
     const outfile = path.join(dir, `${functionName}.mjs`);
     writeFileSync(
@@ -109,7 +109,7 @@ describe.each(["draft-issue-background", "find-free-links-background"])("the tex
       [
         `export { default } from ${JSON.stringify(path.join(root, `netlify/functions/${functionName}.mts`))};`,
         `export { guardHtml, readArticle } from ${JSON.stringify(path.join(root, "src/pipeline/draft/articles/index.ts"))};`,
-        `export { canStartWorker, createWorkerParser, defaultHtmlParser } from ${JSON.stringify(path.join(root, "src/pipeline/draft/articles/html-worker.ts"))};`,
+        `export { canStartWorker, createWorkerParser, defaultTextParser } from ${JSON.stringify(path.join(root, "src/pipeline/draft/articles/text-worker.ts"))};`,
       ].join("\n"),
     );
     await build({
@@ -154,13 +154,13 @@ describe.each(["draft-issue-background", "find-free-links-background"])("the tex
   });
 
   it("stops a page that needs more memory than the worker's heap, without taking the function down", () => {
-    expect(result.tiny.error).toBe("HtmlParseError: The page needed over 64 MB to read.");
+    expect(result.tiny.error).toBe("TextJobError: The page needed over 64 MB to read.");
   });
 
   it("reads a PDF in a worker started from the bundled file, so unpdf works inside the bundle", () => {
     expect(result.pdf).toMatchObject({ slot: true, sentBytes: 0 });
     expect(result.pdf.text).toContain("The filing pretend lab shared made-up results");
-    expect(result.brokenPdf).toMatchObject({ slot: true, error: expect.stringMatching(/^HtmlParseError: Could not take the text: Not a readable PDF: /) });
+    expect(result.brokenPdf).toMatchObject({ slot: true, error: expect.stringMatching(/^TextJobError: Could not take the text: Not a readable PDF: /) });
     expect(result.pdfRead).toMatchObject({ status: "read", method: "pdf", text: expect.stringContaining("The filing pretend lab") });
     expect(result.pdfRead.textMs).toBeGreaterThanOrEqual(0);
   });
@@ -178,6 +178,6 @@ describe("the text worker from TypeScript source", () => {
   it("parses in this thread, as there is no built file to start a worker from", () => {
     expect(canStartWorker()).toBe(false);
     expect(canStartWorker("file:///var/task/draft-issue-background.mjs")).toBe(true);
-    expect(defaultHtmlParser()).toBe(parseInThisThread);
+    expect(defaultTextParser()).toBe(parseInThisThread);
   });
 });
