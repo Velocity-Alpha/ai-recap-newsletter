@@ -17,6 +17,13 @@ vi.mock("@/src/pipeline/runs", () => ({
   }),
 }));
 
+// The tests that do not pass `checkRepeats` find no unchecked story.
+vi.mock("@/src/pipeline/repeats/repeats-store", () => ({
+  findUnmatchedStoryIds: vi.fn(async () => []),
+  readRepeatWindowDays: vi.fn(async () => 14),
+  createPrismaRepeatsStore: vi.fn(() => ({})),
+}));
+
 import type { IngestResult } from "@/src/pipeline/ingest/ingest";
 import { describeIngestRun, runIngest } from "@/src/pipeline/ingest/run-ingest";
 
@@ -59,17 +66,47 @@ describe("runIngest", () => {
     expect(result).toEqual({ status: "not_configured", reason: "Missing setting: OPENAI_API_KEY." });
   });
 
-  it("logs each source, sends the Telegram message in production, and records the run", async () => {
+  it("logs each source, checks repeats, sends the Telegram message in production, and records the run", async () => {
     const sendTelegram = vi.fn(async () => undefined);
-    const result = await runIngest("netlify", { env: ENV, ingest: vi.fn(async () => ingestResult()), sendTelegram });
+    const counts = { checked: 4, embedded: 4, judged: 3, pairs: 9, refused: 1 };
+    const checkRepeats = vi.fn(async () => counts);
+    const result = await runIngest("netlify", { env: ENV, ingest: vi.fn(async () => ingestResult()), sendTelegram, checkRepeats });
 
     expect(result).toMatchObject({ status: "ran", runId: "7", telegram: "sent" });
+    expect(checkRepeats).toHaveBeenCalledWith("2026-11-06");
     expect(sendTelegram).toHaveBeenCalledWith(expect.stringContaining("Today's stories are in: 5 new."));
     expect(events.map((event) => `${event.level} ${event.step}: ${event.message}`)).toEqual([
       "info source: The Rundown: ok, 1 document(s), 5 stories, 1 without a link.",
+      "info repeats: Checked 4 stories: 9 pairs judged, 1 refused.",
       "info telegram: Sent the ready message.",
     ]);
-    expect(runs).toEqual([{ status: "succeeded", stats: expect.objectContaining({ storiesSaved: 5 }) }]);
+    expect(events[1].data).toEqual(counts);
+    expect(runs).toEqual([{ status: "succeeded", stats: expect.objectContaining({ storiesSaved: 5, repeats: counts }) }]);
+  });
+
+  it("warns when some judge requests failed", async () => {
+    const counts = { checked: 4, embedded: 0, judged: 2, pairs: 5, refused: 0, failed: { count: 1, firstError: "HTTP 500" } };
+    await runIngest("netlify", { env: ENV, ingest: vi.fn(async () => ingestResult()), sendTelegram: vi.fn(), checkRepeats: vi.fn(async () => counts) });
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        level: "warn",
+        step: "repeats",
+        message: "Checked 4 stories: 5 pairs judged, 0 refused. 1 request(s) failed and will be tried again: HTTP 500",
+      }),
+    );
+  });
+
+  it("logs a failed repeat check, and still sends the message and succeeds", async () => {
+    const sendTelegram = vi.fn(async () => undefined);
+    const checkRepeats = vi.fn(async () => {
+      throw new Error("Embeddings: HTTP 500");
+    });
+    const result = await runIngest("netlify", { env: ENV, ingest: vi.fn(async () => ingestResult()), sendTelegram, checkRepeats });
+
+    expect(result).toMatchObject({ status: "ran", telegram: "sent" });
+    expect(events).toContainEqual(expect.objectContaining({ level: "error", step: "repeats", message: "Repeat check failed: Embeddings: HTTP 500" }));
+    expect(sendTelegram).toHaveBeenCalled();
+    expect(runs).toEqual([{ status: "succeeded", stats: expect.objectContaining({ repeats: { error: "Embeddings: HTTP 500" } }) }]);
   });
 
   it("records the message instead of sending it outside production", async () => {

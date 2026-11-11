@@ -47,6 +47,23 @@ _Avoid_: default headline
 The number of different sources that sent the same story.
 _Avoid_: mentions, overlap
 
+**Repeat**:
+A candidate that reports the same news as a story of an earlier issue (in the repeat window, 14 days by
+default) or of an unsent draft.
+_Avoid_: dupe, already published
+
+**Duplicate**:
+A candidate that reports the same news as another candidate on the same board.
+_Avoid_: repeat (that is against earlier issues)
+
+**Similar story**:
+A candidate that looks like an earlier story, but the check is not sure. It stays on the board with a label.
+_Avoid_: possible repeat, near-duplicate
+
+**Story match**:
+One stored comparison of two stories: how alike they are, and the two answers of the judge (`same`, `news`).
+_Avoid_: pair score, dedup result
+
 **Outline**:
 The owner's chosen stories for one date: sections, lead story, and any note or link edits.
 _Avoid_: selection, payload
