@@ -13,7 +13,11 @@ const leadPickFns = vi.hoisted(() => ({
 vi.mock("@/src/features/newsletter/curation.service", () => curationFns);
 vi.mock("@/src/features/newsletter/openai-lead-pick", () => leadPickFns);
 
+const settingFns = vi.hoisted(() => ({ readSetting: vi.fn() }));
+vi.mock("@/src/pipeline/settings", () => settingFns);
+
 import { GET } from "@/app/api/approval/outline/route";
+import { DEFAULT_REASON_CODES } from "@/src/pipeline/feedback/reason-codes";
 
 const BASE_OUTLINE = {
   reference_stories: [],
@@ -52,6 +56,7 @@ describe("GET /api/approval/outline", () => {
     process.env.APPROVAL_PASSWORD = "approval-secret";
     process.env.SESSION_SECRET = "test-session-secret";
     leadPickFns.submitLeadPick.mockResolvedValue("resp_lead");
+    settingFns.readSetting.mockResolvedValue(null);
   });
 
   it("rejects requests without an approval session", async () => {
@@ -71,7 +76,20 @@ describe("GET /api/approval/outline", () => {
 
     expect(curationFns.createOutlineCandidateStories).toHaveBeenCalledWith(new Date("2026-04-30"), { reuseDraftDates: [] });
     expect(response.status).toBe(200);
-    expect(json).toEqual({ status: "ready", outline: BASE_OUTLINE, lead_response_id: null });
+    expect(json).toEqual({ status: "ready", outline: BASE_OUTLINE, lead_response_id: null, reason_codes: DEFAULT_REASON_CODES });
+  });
+
+  it("answers with the reason codes of the feedback.reason_codes setting, read on each load", async () => {
+    curationFns.createOutlineCandidateStories.mockResolvedValue(outlineResult(BASE_OUTLINE));
+    const codes = { exclude: ["off topic"], lead: ["more reach"], move: [] };
+    settingFns.readSetting.mockResolvedValueOnce(codes);
+
+    const first = await (await get("http://localhost/api/approval/outline?date=2026-04-30")).json();
+    const second = await (await get("http://localhost/api/approval/outline?date=2026-04-30")).json();
+
+    expect(settingFns.readSetting).toHaveBeenCalledWith("feedback.reason_codes");
+    expect(first.reason_codes).toEqual(codes);
+    expect(second.reason_codes).toEqual(DEFAULT_REASON_CODES);
   });
 
   it("passes the unsent drafts to reuse from the reuse parameter", async () => {
