@@ -16,6 +16,8 @@ on its own. One source can fail without stopping the others. For each source it 
 3. Calls the extractor (`Extractor` in `extract.ts`), once per email, feed snapshot or beehiiv post.
 4. Turns the stories into rows (`toRows`): cleans the URL (`cleanStoryUrl`), builds the `guid`
    (`storyGuid`), drops stories with no usable link, and checks each URL for a paywall (`checkPaywall`).
+   The `guid` is only the ingestion key: it stops the same link from being inserted twice on one day. The key
+   of a story everywhere else is its id (`stories.id`, ADR 0007).
 5. Saves the rows (`IngestStore.upsertStories`) and moves the bookmark (`writeBookmark`).
 
 The result is a `SourceResult` with a `documents` count (emails, feed snapshots or posts read) and a `SourceStatus`: `ok`, `no_new`, `partial` or `failed`.

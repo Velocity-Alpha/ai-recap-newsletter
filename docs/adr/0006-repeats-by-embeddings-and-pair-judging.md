@@ -38,5 +38,6 @@ The thresholds come from the measured test set. Do not change them without runni
 
 - About 40 new stories a day: one embedding request and about 40 Decisions requests, under one cent a day.
 - A failure of the check never fails ingestion. A story with `matched_at` null is tried again.
-- The `story_matches` rows are raw material for a stable story key later (#118).
+- Whether two story rows report the same news is answered by `story_matches`, not by a key. The stable key of a
+  story is its id ([ADR 0007](./0007-story-id-is-the-stable-key.md)).
 - The installed `openai` package (6.x) has no Decisions method, so the endpoint is called with `fetch`.
