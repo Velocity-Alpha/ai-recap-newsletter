@@ -5,6 +5,7 @@ import type {
   PublishedIssueContent,
   PublishedQuickHit,
   PublishedToolItem,
+  StorySectionKey,
 } from "@/src/pipeline/publish/sent-email-parser";
 
 /**
@@ -35,9 +36,9 @@ export const CONTENT_SECTION_KEYS = {
   research: "research_and_analysis",
   tools: "tools",
   quickHits: "quick_hits",
-} as const satisfies Record<SectionKey, string>;
+} as const satisfies Record<SectionKey, StorySectionKey>;
 
-export type ContentSectionKey = (typeof CONTENT_SECTION_KEYS)[SectionKey];
+export type ContentSectionKey = StorySectionKey;
 
 /** Top Stories and Research & Analysis: each story gets a write-up with three bullets. */
 export const FEATURE_SECTIONS = ["headlines", "research"] as const satisfies readonly SectionKey[];

@@ -1,7 +1,9 @@
 import type { Prisma, PrismaClient } from "@/src/generated/prisma";
 import { ISSUE_DRAFT } from "@/src/features/newsletter/issue-status";
 import { sentVersionIssueFields } from "@/src/pipeline/distribution/staged-version-store";
+import { outlineLeadStoryId } from "@/src/pipeline/draft/outline";
 import type { PublishEventInput, PublishStore } from "@/src/pipeline/publish/detect-publish";
+import { issueStoryRows } from "@/src/pipeline/publish/issue-stories";
 import type { PublishMode } from "@/src/pipeline/publish/publish-decision";
 import { prisma } from "@/src/server/prisma";
 
@@ -46,6 +48,19 @@ function utcDay(value: Date): Date {
 
 function toDraft(row: { id: bigint; title: string; issueDate: Date | null; publishedAt: Date | null; html: string | null }) {
   return { ...row, id: Number(row.id) };
+}
+
+/**
+ * The lead story of the outline the sent draft was written from: null when that outline has no lead story,
+ * undefined when the sent draft is not known (the email names no draft, the draft is not this issue's, or its
+ * outline is gone).
+ */
+async function sentLeadStoryId(tx: Prisma.TransactionClient, issueId: number, draftId: number | null): Promise<number | null | undefined> {
+  if (draftId === null) return undefined;
+  const draft = await tx.issueDraft.findFirst({ where: { id: BigInt(draftId), issueId: BigInt(issueId) }, select: { outlineId: true } });
+  if (!draft) return undefined;
+  const outline = await tx.approvalOutline.findUnique({ where: { id: draft.outlineId }, select: { payload: true } });
+  return outline ? outlineLeadStoryId(outline.payload) : undefined;
 }
 
 export function createPrismaPublishStore(client: PrismaClient = prisma): PrismaPublishStore {
@@ -95,6 +110,12 @@ export function createPrismaPublishStore(client: PrismaClient = prisma): PrismaP
             where: { id: { in: storyIds } },
             data: { usedInPublicationDate: utcDay(publishedAt) },
           });
+        }
+        if (outcome === "published") {
+          // What readers got (ADR 0007): one row for each story of the sent email. A second copy writes nothing.
+          const leadStoryId = await sentLeadStoryId(tx, issueId, event.draftId);
+          const rows = issueStoryRows(content, leadStoryId).map((row) => ({ issueId: BigInt(issueId), ...row }));
+          await tx.issueStory.createMany({ data: rows, skipDuplicates: true });
         }
         // The event keeps the staged version that was found, not an id the email only claims.
         const versionId = sentVersion?.stagedVersionId ?? null;

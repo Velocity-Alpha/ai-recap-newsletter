@@ -15,7 +15,8 @@ one. Each publication has its own source key.
 _Avoid_: beehiiv (as a source name), subscriber provider (that is the subscriber list)
 
 **Story**:
-One news item taken from a source for one day, with a headline, summary, and link.
+One news item taken from a source for one day, with a headline, summary, and link. Its id never changes and is
+the key other records use.
 _Avoid_: item, post
 
 **Article**:
