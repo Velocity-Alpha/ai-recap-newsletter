@@ -7,7 +7,8 @@ import { join } from "node:path";
 import { DATA_DIR, DATASET_PATH, issueText, readManifest, type ExtractionCase, type ManifestIssue } from "@/evals/extraction/dataset";
 import { readOnlyQuery } from "@/evals/lib/dev-db";
 import { readPostMeta } from "@/src/pipeline/ingest/beehiiv-site";
-import { BROWSER_USER_AGENT, resolveTrackingLinks } from "@/src/pipeline/ingest/redirects";
+import { BROWSER_USER_AGENT } from "@/src/pipeline/browser-headers";
+import { resolveTrackingLinks } from "@/src/pipeline/ingest/redirects";
 import { STORY_SOURCES } from "@/src/pipeline/ingest/sources";
 import { cleanStoryUrl } from "@/src/pipeline/ingest/url";
 

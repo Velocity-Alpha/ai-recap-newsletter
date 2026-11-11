@@ -44,13 +44,22 @@ describe("readWithReadability", () => {
     expect(result.text).not.toContain("Newsletter sign-up");
   });
 
-  it("asks for HTML with the reader's user agent", async () => {
+  it("asks for the page like a desktop Chrome visit, HTML first, also Markdown and PDF", async () => {
     const fetch = respond(ARTICLE_PAGE);
     await readWithReadability("https://news.example.com/toy-arm", context(fetch));
-    expect(fetch.mock.calls[0][1].headers).toMatchObject({
-      "User-Agent": READER_USER_AGENT,
-      Accept: expect.stringContaining("text/html"),
-      "Accept-Language": expect.stringContaining("en"),
+    const headers = fetch.mock.calls[0][1].headers;
+    expect(headers["User-Agent"]).toMatch(/^Mozilla\/5\.0 \(Macintosh; .+\) AppleWebKit\/537\.36 \(KHTML, like Gecko\) Chrome\/\d+\.0\.0\.0 Safari\/537\.36$/);
+    expect(headers["User-Agent"]).not.toBe(READER_USER_AGENT);
+    expect(headers.Accept).toMatch(/^text\/html,/);
+    expect(headers.Accept).toContain("text/markdown");
+    expect(headers.Accept).toContain("application/pdf");
+    expect(headers).toMatchObject({
+      "Accept-Language": expect.stringContaining("en-US"),
+      "Sec-Fetch-Dest": "document",
+      "Sec-Fetch-Mode": "navigate",
+      "Sec-Fetch-Site": "none",
+      "Sec-Fetch-User": "?1",
+      "Upgrade-Insecure-Requests": "1",
     });
   });
 

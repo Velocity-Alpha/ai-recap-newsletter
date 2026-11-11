@@ -9,7 +9,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { MANIFEST_PATH, readManifest, spreadPick, type IssueFormat, type ManifestIssue } from "@/evals/extraction/dataset";
 import { readOnlyQuery } from "@/evals/lib/dev-db";
 import { listSitemapPosts, readPostMeta } from "@/src/pipeline/ingest/beehiiv-site";
-import { BROWSER_USER_AGENT } from "@/src/pipeline/ingest/redirects";
+import { BROWSER_USER_AGENT } from "@/src/pipeline/browser-headers";
 
 const FROM = "2026-09-14";
 const TO = "2026-11-10";
