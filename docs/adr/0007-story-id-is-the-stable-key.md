@@ -5,9 +5,10 @@
 
 ## Context
 
-Nothing recorded which stories ran in which issue. The only trace was two date columns on the story
-(`used_in_publication_date`, `queued_for_publication_date`) and the `content_json` of the issue. Before adding a
-record, the key that names a story in it had to be decided.
+A record of which stories ran in which issue needs a key that names a story. A story row has two candidates, its
+id and its `guid`, and the same news can be in more than one row. The two date columns on the story
+(`used_in_publication_date`, `queued_for_publication_date`) say when a story ran, but not in which issue, in
+which section, or with which link.
 
 ## Decision
 
@@ -29,12 +30,12 @@ place in the section (from 1), the link that was sent, and whether it was the le
 - A story removed in the distribution service before the send is not in the email, so it gets no row.
 - A story added by hand in the distribution service has no `data-story-id`, so it gets no row.
 - `is_lead` comes from the outline of the draft that the email names. It is null when the sent draft is not
-  known: an email that names no draft, and the rows the migration made for past issues.
+  known: an email that names no draft, and every issue published before this table existed.
 - A second copy of the email finds the issue published and writes nothing.
 - The table has no foreign keys, like the other pipeline tables.
 
-The migration filled the table for past issues from the four section arrays of `content_json`. Issues older than
-2026-03-14 hold no story ids and have no rows.
+The rows of an issue published before this table existed come from the four section arrays of its `content_json`
+(the backfill in the migration). An issue older than 2026-03-14 holds no story ids there and has no rows.
 
 ## Rejected options
 
