@@ -8,7 +8,8 @@ import {
   PRODUCT_HUNT_FEED_URL,
 } from "@/src/pipeline/ingest/feeds";
 import { checkPaywall } from "@/src/pipeline/ingest/paywall";
-import { BROWSER_USER_AGENT, resolveTrackingLinks } from "@/src/pipeline/ingest/redirects";
+import { BROWSER_USER_AGENT } from "@/src/pipeline/browser-headers";
+import { resolveTrackingLinks } from "@/src/pipeline/ingest/redirects";
 import {
   STORY_SOURCES,
   type BeehiivSiteSource,

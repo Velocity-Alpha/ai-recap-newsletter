@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { ExtractedStory, ExtractionInput, Extractor } from "@/src/pipeline/ingest/extract";
 import { BEEHIIV_PAGE_LIMIT, ingestStories, type IngestStore, type StoryRow } from "@/src/pipeline/ingest/ingest";
-import { BROWSER_USER_AGENT } from "@/src/pipeline/ingest/redirects";
+import { BROWSER_USER_AGENT } from "@/src/pipeline/browser-headers";
 import type { StorySource } from "@/src/pipeline/ingest/sources";
 import { storyGuid } from "@/src/pipeline/ingest/url";
 import type { GmailMessage, GmailReader } from "@/src/pipeline/publish/gmail-client";

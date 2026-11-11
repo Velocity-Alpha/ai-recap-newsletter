@@ -4,8 +4,7 @@
  * hop only and put the page body in place of a link that did not redirect.
  */
 
-export const BROWSER_USER_AGENT =
-  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36";
+import { BROWSER_USER_AGENT } from "@/src/pipeline/browser-headers";
 
 const MAX_HOPS = 5;
 const TIMEOUT_MS = 10_000;

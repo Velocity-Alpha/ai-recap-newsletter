@@ -1,6 +1,6 @@
 import { createNodeFetch } from "@/src/pipeline/draft/articles/http";
 import { siteOf } from "@/src/pipeline/free-links/sites";
-import { BROWSER_USER_AGENT } from "@/src/pipeline/ingest/redirects";
+import { BROWSER_USER_AGENT } from "@/src/pipeline/browser-headers";
 
 /**
  * Tags a story link as paywalled or not, for the icon on the approval board. n8n's check marked about 90%
