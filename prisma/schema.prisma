@@ -237,16 +237,46 @@ model RateLimit {
   @@schema("newsletter")
 }
 
-/// One row per board commit (#75): the normalised outline and its sha256.
+/// One row per board commit (#75): the normalised outline and its sha256 (of payload only).
+/// proposed is the proposed board (#150): { sections: { key, storyIds }[], leadStoryId, repeatsRemoved }. NULL for
+/// commits before #150.
 model ApprovalOutline {
   id          BigInt    @id @default(autoincrement())
   issueDate   DateTime  @map("issue_date") @db.Date
   payload     Json
   payloadHash String    @map("payload_hash")
   committedAt DateTime  @default(now()) @map("committed_at") @db.Timestamptz(6)
+  proposed    Json?
 
   @@index([issueDate, committedAt(sort: Desc)])
   @@map("approval_outlines")
+  @@schema("newsletter")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// A board action (#150): one difference between the proposed board and the committed outline, written at commit
+/// (board-diff.ts). action is exclude, add, restore_repeat, move, reorder, lead, or link (CHECK constraint in the
+/// migration). story_id is null for reorder, and for lead when the lead was cleared. reason_code and reason_text
+/// are the owner's optional reason. detail holds the reorder's before/after, the lead's from, or the link's
+/// from/to. No foreign keys, like the other pipeline tables.
+model BoardAction {
+  id           BigInt   @id @default(autoincrement())
+  outlineId    BigInt   @map("outline_id")
+  issueDate    DateTime @map("issue_date") @db.Date
+  storyId      Int?     @map("story_id")
+  action       String
+  fromSection  String?  @map("from_section")
+  toSection    String?  @map("to_section")
+  fromPosition Int?     @map("from_position")
+  toPosition   Int?     @map("to_position")
+  reasonCode   String?  @map("reason_code")
+  reasonText   String?  @map("reason_text")
+  detail       Json?
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([outlineId])
+  @@index([issueDate, action])
+  @@map("board_actions")
   @@schema("newsletter")
 }
 

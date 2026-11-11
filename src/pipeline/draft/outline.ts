@@ -11,7 +11,29 @@ export interface ApprovalOutline {
   leadStoryId: number | null;
   /** Every visible story with its final link and note (board edits included). */
   stories: { id: number; section: string; url: string | null; note: string }[];
-  excluded: { id: number; section: string; reason: string }[];
+  /** `reasonCode` is the reason chip the owner tapped, or "". `reason` is the free text. */
+  excluded: { id: number; section: string; reason: string; reasonCode: string }[];
+}
+
+/**
+ * The **proposed board** (GLOSSARY.md, #150): what the board showed before the owner's first change. Saved next
+ * to the outline (`approval_outlines.proposed`), so each commit's board actions can be worked out.
+ */
+export interface ProposedBoard {
+  /** The selected story ids of each section, in board order. */
+  sections: { key: string; storyIds: number[] }[];
+  leadStoryId: number | null;
+  /** The ids of the candidates the repeat check removed ("Repeats removed" on the board). */
+  repeatsRemoved: number[];
+}
+
+/** An optional reason the owner gave on the board for a lead change or a move (#150). */
+export interface BoardFeedback {
+  /** The new lead, or the moved story. Null for a lead the owner cleared. */
+  storyId: number | null;
+  action: "lead" | "move";
+  code: string;
+  text: string;
 }
 
 type Json = Record<string, unknown>;
@@ -72,7 +94,7 @@ export function normalizeOutline(body: Json, date: string): ApprovalOutline {
   const excluded = listOf(body.excluded_stories).flatMap((story) => {
     const id = parseStoryId(story.id);
     if (id === null) return [];
-    return [{ id, section: text(story.newsletter_category), reason: text(story.reason) }];
+    return [{ id, section: text(story.newsletter_category), reason: text(story.reason), reasonCode: text(story.reason_code) }];
   });
 
   return {
@@ -82,6 +104,39 @@ export function normalizeOutline(body: Json, date: string): ApprovalOutline {
     stories,
     excluded,
   };
+}
+
+function storyIds(value: unknown): number[] {
+  return Array.isArray(value) ? value.flatMap((id) => parseStoryId(id) ?? []) : [];
+}
+
+/**
+ * The `proposed` field of a commit body. Lenient, like the informational lists: a bad entry is skipped, a missing
+ * field gives null or an empty list, and it never throws. Null when the body has no proposed board.
+ */
+export function normalizeProposed(body: Json): ProposedBoard | null {
+  const proposed = body.proposed;
+  if (!isObject(proposed)) return null;
+  return {
+    sections: listOf(proposed.sections).flatMap((section) =>
+      typeof section.key === "string" ? [{ key: section.key, storyIds: storyIds(section.story_ids) }] : [],
+    ),
+    leadStoryId: parseStoryId(proposed.lead_story_id),
+    repeatsRemoved: storyIds(proposed.repeats_removed),
+  };
+}
+
+/** The `feedback` field of a commit body: the reasons for a lead change or a move. Lenient; never throws. */
+export function normalizeFeedback(body: Json): BoardFeedback[] {
+  return listOf(body.feedback).flatMap((entry) => {
+    const action = entry.action;
+    if (action !== "lead" && action !== "move") return [];
+    const id = parseStoryId(entry.story_id);
+    const noId = entry.story_id === null || entry.story_id === undefined;
+    // A move always names its story. A lead names the new lead, or none when the owner cleared it.
+    if (id === null && (action === "move" || !noId)) return [];
+    return [{ storyId: id, action, code: text(entry.code), text: text(entry.text) }];
+  });
 }
 
 /**

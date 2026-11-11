@@ -51,7 +51,7 @@ describe.skipIf(!enabled)("story changes on a real database", () => {
         { id: ids.lead, section: "top_stories", url: `https://example.test/${tag}/edited`, note },
         { id: ids.second, section: "top_stories", url: null, note: "" },
       ],
-      excluded: [{ id: ids.dropped, section: "top_stories", reason: "duplicate" }],
+      excluded: [{ id: ids.dropped, section: "top_stories", reason: "duplicate", reasonCode: "" }],
     };
   }
 
