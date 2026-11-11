@@ -55,7 +55,7 @@ describe.skipIf(!enabled)("publish store on a real database", () => {
     return Number(issue.id);
   }
 
-  /** The sent email of an issue that holds the two test stories: one top story, one quick hit. */
+  /** The sent email of an issue that holds the two test stories: one story in Top Stories, one in Quick Hits. */
   function sentEmail(id: number) {
     const issue: FixtureIssue = {
       ...PLACEHOLDER_ISSUE,

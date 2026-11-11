@@ -63,7 +63,12 @@ export interface SentEmailParseResult {
   draftId: number | null;
 }
 
-type SectionKey = "overview" | "headlines" | "research_and_analysis" | "tools" | "quick_hits";
+/** The sections of an issue that hold stories, in the order of the email. Also the keys of `content_json`. */
+export const STORY_SECTION_KEYS = ["headlines", "research_and_analysis", "tools", "quick_hits"] as const;
+
+export type StorySectionKey = (typeof STORY_SECTION_KEYS)[number];
+
+type SectionKey = "overview" | StorySectionKey;
 
 const SECTION_LABELS: Record<string, SectionKey> = {
   "today's overview": "overview",

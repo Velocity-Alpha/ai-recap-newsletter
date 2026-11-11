@@ -1,6 +1,7 @@
 import type { Prisma, PrismaClient } from "@/src/generated/prisma";
 import { ISSUE_DRAFT } from "@/src/features/newsletter/issue-status";
 import { sentVersionIssueFields } from "@/src/pipeline/distribution/staged-version-store";
+import { outlineLeadStoryId } from "@/src/pipeline/draft/outline";
 import type { PublishEventInput, PublishStore } from "@/src/pipeline/publish/detect-publish";
 import { issueStoryRows } from "@/src/pipeline/publish/issue-stories";
 import type { PublishMode } from "@/src/pipeline/publish/publish-decision";
@@ -59,10 +60,7 @@ async function sentLeadStoryId(tx: Prisma.TransactionClient, issueId: number, dr
   const draft = await tx.issueDraft.findFirst({ where: { id: BigInt(draftId), issueId: BigInt(issueId) }, select: { outlineId: true } });
   if (!draft) return undefined;
   const outline = await tx.approvalOutline.findUnique({ where: { id: draft.outlineId }, select: { payload: true } });
-  if (!outline) return undefined;
-  const lead = (outline.payload as { leadStoryId?: unknown } | null)?.leadStoryId;
-  if (lead === null) return null;
-  return typeof lead === "number" ? lead : undefined;
+  return outline ? outlineLeadStoryId(outline.payload) : undefined;
 }
 
 export function createPrismaPublishStore(client: PrismaClient = prisma): PrismaPublishStore {
@@ -115,8 +113,8 @@ export function createPrismaPublishStore(client: PrismaClient = prisma): PrismaP
         }
         if (outcome === "published") {
           // What readers got (ADR 0007): one row for each story of the sent email. A second copy writes nothing.
-          const lead = await sentLeadStoryId(tx, issueId, event.draftId);
-          const rows = issueStoryRows(content, lead).map((row) => ({ issueId: BigInt(issueId), ...row }));
+          const leadStoryId = await sentLeadStoryId(tx, issueId, event.draftId);
+          const rows = issueStoryRows(content, leadStoryId).map((row) => ({ issueId: BigInt(issueId), ...row }));
           await tx.issueStory.createMany({ data: rows, skipDuplicates: true });
         }
         // The event keeps the staged version that was found, not an id the email only claims.

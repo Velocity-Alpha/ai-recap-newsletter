@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import { issueStoryRows } from "@/src/pipeline/publish/issue-stories";
-import type { PublishedIssueContent } from "@/src/pipeline/publish/sent-email-parser";
+import type { PublishedIssueContent, StorySectionKey } from "@/src/pipeline/publish/sent-email-parser";
 
 type Item = { story_id: number; url: string };
 
-function content(sections: Partial<Record<"headlines" | "research_and_analysis" | "tools" | "quick_hits", Item[]>>) {
+function content(sections: Partial<Record<StorySectionKey, Item[]>>) {
   return { headlines: [], research_and_analysis: [], tools: [], quick_hits: [], ...sections } as unknown as PublishedIssueContent;
 }
 
