@@ -95,22 +95,25 @@ export function applyRepeatRules<T extends { id: number }>(input: {
   const pairs = pairsByStory(input.matches);
   const pairsOf = (id: number) => pairs.get(id) ?? [];
 
-  /** The reference a story is a sure pair to, with the highest `same`. Only a direct pair counts. */
-  function sureReference(id: number): { id: number; same: number } | null {
-    let best: { id: number; same: number } | null = null;
-    for (const pair of pairsOf(id)) {
-      if (pair.level !== "sure" || !references.has(pair.other)) continue;
-      if (!best || pair.same > best.same) best = { id: pair.other, same: pair.same };
-    }
-    return best;
+  /** The references a story is a sure pair to, highest `same` first. Only a direct pair counts. */
+  function sureReferences(id: number): number[] {
+    return pairsOf(id)
+      .filter((pair) => pair.level === "sure" && references.has(pair.other))
+      .sort((a, b) => b.same - a.same)
+      .map((pair) => pair.other);
   }
+  const sureReference = (id: number): number | null => sureReferences(id)[0] ?? null;
+  const referenceLabel = (id: number): SimilarStory => {
+    const reference = references.get(id)!;
+    return { kind: reference.kind, id, headline: reference.headline, date: reference.date };
+  };
 
   // 1. Remove repeats.
   const removed: { story: T; repeatOf: { id: number } & RepeatReference }[] = [];
   const remaining: T[] = [];
   for (const candidate of candidates) {
     const reference = sureReference(candidate.id);
-    if (reference) removed.push({ story: candidate, repeatOf: { id: reference.id, ...references.get(reference.id)! } });
+    if (reference !== null) removed.push({ story: candidate, repeatOf: { id: reference, ...references.get(reference)! } });
     else remaining.push(candidate);
   }
 
@@ -140,20 +143,15 @@ export function applyRepeatRules<T extends { id: number }>(input: {
     };
     for (const member of members.get(head.id)!) {
       for (const pair of pairsOf(member.id)) {
-        const reference = references.get(pair.other);
-        if (reference && pair.level !== null) {
-          note({ kind: reference.kind, id: pair.other, headline: reference.headline, date: reference.date }, pair.same);
-        }
+        if (pair.level !== null && references.has(pair.other)) note(referenceLabel(pair.other), pair.same);
         const excludedStory = excluded.get(pair.other);
-        if (excludedStory && pair.level !== null) {
+        if (pair.level !== null && excludedStory) {
           note({ kind: "excluded", id: pair.other, headline: excludedStory.headline, date: excludedStory.excludedOn }, pair.same);
         }
-        // A chain: the member looks like X, and X is a sure repeat of a reference.
-        if (pair.same >= SIMILAR_SAME && !reference) {
-          const chained = sureReference(pair.other);
-          if (chained && chained.id !== member.id) {
-            const chainedReference = references.get(chained.id)!;
-            note({ kind: chainedReference.kind, id: chained.id, headline: chainedReference.headline, date: chainedReference.date }, pair.same);
+        // A chain: the member looks like X, and X is a sure repeat of a reference P. The label is P.
+        if (pair.same >= SIMILAR_SAME) {
+          for (const chained of sureReferences(pair.other)) {
+            if (chained !== member.id) note(referenceLabel(chained), pair.same);
           }
         }
       }

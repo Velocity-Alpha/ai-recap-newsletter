@@ -365,7 +365,7 @@ model StoryEmbedding {
 
 /// A story match (#90): one judged pair of stories. newer_story_id is the story with the later day (same day: the
 /// higher id). similarity is the cosine similarity of their embeddings; same and news are the judge's two answers
-/// (probabilities). The board turns these rows into repeats, duplicates and labels (src/pipeline/repeats/).
+/// (probabilities). repeat-rules.ts (src/pipeline/repeats/) turns these rows into repeats, duplicates and labels.
 model StoryMatch {
   id           BigInt   @id @default(autoincrement())
   newerStoryId Int      @map("newer_story_id")

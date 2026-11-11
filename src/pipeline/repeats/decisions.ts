@@ -18,16 +18,19 @@ export const SAME_QUESTION =
 export const NEWS_QUESTION =
   "Does Story A report a materially new development that Story B does not report: a next step, a result, a ruling, a completed deal, changed numbers, a response by another party, or a reversal? Answer no when Story A repeats the news of Story B with different wording, a different source, or small extra details.";
 
-export interface PairQuestion {
-  older: { id: number; headline: string; summary: string };
+/** The text of a story the judge reads. */
+export interface JudgedStory {
+  id: number;
+  headline: string;
+  summary: string;
 }
 export interface PairAnswer {
   olderId: number;
   same: number;
   news: number;
 }
-/** Answers for the pairs that were not refused. A refused pair is left out. */
-export type JudgePairs = (newer: { id: number; headline: string; summary: string }, olders: PairQuestion["older"][]) => Promise<PairAnswer[]>;
+/** One request: the newer story, and each older story it pairs with. Answers only for the pairs not refused. */
+export type JudgePairs = (newer: JudgedStory, olders: JudgedStory[]) => Promise<PairAnswer[]>;
 
 interface DecisionAnswer {
   type: string;

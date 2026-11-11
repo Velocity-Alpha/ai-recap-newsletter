@@ -10,8 +10,8 @@ export interface EmbeddingsClient {
   embeddings: { create(request: never): Promise<{ data: { index: number; embedding: number[] }[] }> };
 }
 
-export function createEmbeddingsClient(options: { apiKey?: string } = {}): EmbeddingsClient {
-  return new OpenAI({ apiKey: options.apiKey ?? process.env.OPENAI_API_KEY, timeout: 60_000, maxRetries: 2 }) as unknown as EmbeddingsClient;
+export function createEmbeddingsClient(options: { apiKey: string }): EmbeddingsClient {
+  return new OpenAI({ apiKey: options.apiKey, timeout: 60_000, maxRetries: 2 }) as unknown as EmbeddingsClient;
 }
 
 /** The text that is embedded for a story, or null when it has no headline or no summary (then it gets no pairs). */

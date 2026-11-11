@@ -1,11 +1,7 @@
+import { unitVector as at } from "@/src/pipeline/repeats/__fixtures__/unit-vector";
 import { describe, expect, it } from "vitest";
 import { nearestStories } from "@/src/pipeline/repeats/nearest";
 
-/** A unit vector at `degrees` from [1, 0]: its similarity to [1, 0] is cos(degrees). */
-function at(degrees: number): number[] {
-  const radians = (degrees * Math.PI) / 180;
-  return [Math.cos(radians), Math.sin(radians)];
-}
 
 describe("nearestStories", () => {
   it("returns at most 5, highest first, and nothing under 0.55", () => {

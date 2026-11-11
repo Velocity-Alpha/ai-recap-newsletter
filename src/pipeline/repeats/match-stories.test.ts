@@ -1,13 +1,9 @@
+import { unitVector as at } from "@/src/pipeline/repeats/__fixtures__/unit-vector";
 import { describe, expect, it, vi } from "vitest";
 import type { JudgePairs } from "@/src/pipeline/repeats/decisions";
 import { matchStories, type MatchStory, type RepeatsStore } from "@/src/pipeline/repeats/match-stories";
 import type { StoryMatchRow } from "@/src/pipeline/repeats/repeat-rules";
 
-/** A unit vector at `degrees` from [1, 0]. */
-function at(degrees: number): number[] {
-  const radians = (degrees * Math.PI) / 180;
-  return [Math.cos(radians), Math.sin(radians)];
-}
 
 function story(id: number, day: string, angle: number | null): MatchStory & { angle: number | null } {
   return { id, day, headline: angle === null ? null : `H${id}`, summary: `S${id}`, angle };

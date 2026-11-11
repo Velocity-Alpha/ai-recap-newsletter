@@ -83,6 +83,21 @@ describe("applyRepeatRules", () => {
     expect(result.similarTo.get(1)).toEqual([{ kind: "published", id: 100, headline: "Old story", date: "2026-11-02" }]);
   });
 
+  it("labels every reference a chain reaches, also through a reference", () => {
+    // 1 looks like published 100; 100 is a sure repeat of held 101, and so is 50 of published 102.
+    const result = applyRepeatRules({
+      candidates: [{ id: 1 }],
+      matches: [match(1, 100, SIMILAR), match(101, 100, SURE), match(1, 50, 0.7), match(50, 102, SURE)],
+      references: refs([
+        [100, { headline: "A", date: "2026-11-02", kind: "published" }],
+        [101, { headline: "B", date: "2026-11-04", kind: "held" }],
+        [102, { headline: "C", date: "2026-11-03", kind: "published" }],
+      ]),
+      excluded: new Map(),
+    });
+    expect(result.similarTo.get(1)?.map((entry) => entry.id)).toEqual([102, 100, 101]);
+  });
+
   it("does not label a chain whose first pair is under the similar level", () => {
     const result = applyRepeatRules({
       candidates: [{ id: 1 }],

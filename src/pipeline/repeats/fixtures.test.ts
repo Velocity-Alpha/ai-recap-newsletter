@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { shiftDay } from "@/src/pipeline/repeats/match-stories";
 import { applyRepeatRules, pairLevel, type RepeatReference, type StoryMatchRow } from "@/src/pipeline/repeats/repeat-rules";
 
 /** Recorded answers on real stories (__fixtures__/README.md). No network. The numbers are exact. */
@@ -86,17 +87,14 @@ describe("blocks", () => {
 });
 
 describe("board replay", () => {
-  const DAY = 86_400_000;
-  const shift = (date: string, days: number) => new Date(Date.parse(`${date}T00:00:00Z`) + days * DAY).toISOString().slice(0, 10);
-
   function replay(boardDate: string) {
-    const earliest = shift(boardDate, -3);
+    const earliest = shiftDay(boardDate, -3);
     const candidates = stories
       .filter((story) => story.day >= earliest && story.day <= boardDate)
       .filter((story) => story.importance >= 2)
       .filter((story) => story.published_on === null || story.published_on >= boardDate)
       .sort((a, b) => b.importance - a.importance || b.id - a.id);
-    const windowStart = shift(boardDate, -14);
+    const windowStart = shiftDay(boardDate, -14);
     const references = new Map<number, RepeatReference>();
     for (const story of stories) {
       if (story.published_on && story.published_on >= windowStart && story.published_on < boardDate) {
