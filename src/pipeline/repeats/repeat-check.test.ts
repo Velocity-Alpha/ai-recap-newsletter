@@ -24,6 +24,11 @@ describe("createRepeatCheck", () => {
     expect(deps).toMatchObject({ store, windowDays: 10 });
   });
 
+  it("makes no OpenAI client when nothing needs an embedding, so it works without a key", async () => {
+    matchStoriesMock.mockResolvedValue({ embedded: 0, judged: 0, pairs: 0, refused: 0 });
+    await expect(createRepeatCheck({ apiKey: "" })([1])).resolves.toMatchObject({ checked: 1 });
+  });
+
   it("counts failed judge requests and keeps the first error", async () => {
     matchStoriesMock.mockImplementation(async (_ids: number[], deps: { onJudgeError: (id: number, error: unknown) => void }) => {
       deps.onJudgeError(5, new Error("HTTP 500"));

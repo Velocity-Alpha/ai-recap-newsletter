@@ -10,7 +10,7 @@ export default function ApprovalLoading() {
             Getting stories…
           </h1>
           <p className="mt-4 text-base leading-7 text-[var(--text-secondary)]">
-            Fetching and deduplicating candidates. This can take up to 30 seconds.
+            Building the board from the latest stories.
           </p>
           <div className="mt-8 flex justify-center gap-1.5">
             <span className="h-2 w-2 animate-bounce rounded-full bg-[var(--accent-primary)] [animation-delay:0ms]" />

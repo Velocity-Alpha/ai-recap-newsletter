@@ -19,6 +19,7 @@ const rawOutlineData = {
   candidate_sections: [],
   candidate_map: {},
   selected_story_ids: [],
+  repeats_removed: [],
 };
 
 // What readApprovalOutlineCache should always return: raw stored data normalized to all four sections.
@@ -33,6 +34,7 @@ const normalizedOutlineData = {
   })),
   candidate_map: {},
   selected_story_ids: [],
+  repeats_removed: [],
   unsent_drafts: [],
 };
 
@@ -82,7 +84,7 @@ describe("approval outline cache", () => {
     expect(
       readApprovalOutlineCache("2026-04-30", storage, now + APPROVAL_OUTLINE_CACHE_TTL_MS + 1)
     ).toBeNull();
-    expect(storage.removeItem).toHaveBeenCalledWith("approval_outline_2026-04-30");
+    expect(storage.removeItem).toHaveBeenCalledWith("approval_outline_v2_2026-04-30");
   });
 });
 
@@ -179,6 +181,7 @@ describe("normalizeApprovalOutlineData", () => {
       candidate_sections: [],
       candidate_map: candidateMap,
       selected_story_ids: [1],
+      repeats_removed: [],
     });
 
     expect(result.reference_stories).toEqual(referenceStories);

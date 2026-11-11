@@ -39,12 +39,10 @@ export interface ExcludedStory {
   excludedOn: string | null;
 }
 
-export interface SimilarStory {
-  kind: ReferenceKind | "excluded";
-  id: number;
-  headline: string;
-  date: string | null;
-}
+/** A story a candidate looks like. Published and held stories have their issue date; an excluded one may not. */
+export type SimilarStory =
+  | { kind: ReferenceKind; id: number; headline: string; date: string }
+  | { kind: "excluded"; id: number; headline: string; date: string | null };
 
 export function pairLevel(match: { same: number; news: number }): PairLevel | null {
   if (match.same >= SURE_SAME && match.news <= SURE_MAX_NEWS) return "sure";

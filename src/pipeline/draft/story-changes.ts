@@ -25,15 +25,15 @@ function unique(ids: number[]): number[] {
 export async function applyStoryChanges(outline: ApprovalOutline): Promise<StoryChanges> {
   const excludedIds = unique(outline.excluded.map((story) => story.id));
   const approvedIds = unique(outlineStoryIds(outline));
-  const queuedFor = new Date(`${outline.date}T00:00:00.000Z`);
+  const boardDate = new Date(`${outline.date}T00:00:00.000Z`);
   const edits = new Map(outline.stories.map((story) => [story.id, story]));
 
   return prisma.$transaction(async (tx) => {
     const excluded = excludedIds.length
-      ? (await tx.story.updateMany({ where: { id: { in: excludedIds } }, data: { excludeFromCandidates: true } })).count
+      ? (await tx.story.updateMany({ where: { id: { in: excludedIds } }, data: { excludeFromCandidates: true, excludedOn: boardDate } })).count
       : 0;
     const queued = approvedIds.length
-      ? (await tx.story.updateMany({ where: { id: { in: approvedIds } }, data: { queuedForPublicationDate: queuedFor } })).count
+      ? (await tx.story.updateMany({ where: { id: { in: approvedIds } }, data: { queuedForPublicationDate: boardDate } })).count
       : 0;
 
     const rows = edits.size

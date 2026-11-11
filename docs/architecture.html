@@ -62,10 +62,16 @@
          -> pipeline_runs / pipeline_events rows -> Telegram "board ready" to the review group
 
 ~10:00 Owner opens /approval (defaults to today's New York date; shared password login, rate limited)
-         board proposal: src/features/newsletter/curation.service.ts + openai-dedup.ts (gpt-6-luna)
+         GET /api/approval/outline builds the board in one request:
+         board proposal: src/features/newsletter/curation.service.ts (rank, same-URL copies off)
+           + repeat check on the board (board-repeats.ts, ADR 0006): checks any candidate ingestion did not,
+             then reads story_matches. A sure repeat of a story published in the window or held for an
+             unsent draft goes to "Repeats removed" (the owner can restore it for the session); duplicates
+             merge into one story (sources + also_from); similar stories get a label. If the check fails,
+             the board still loads with the stored matches and says "The repeat check did not finish"
            + proposed lead story (lead-story.ts): importance + sources that covered it + editorial rubric,
              pre-set on the board and moved to the top of Top Stories; the owner can change it
-           + AI lead pick after dedup (openai-lead-pick.ts, gpt-6-luna): the lead score shortlists 8 stories,
+           + AI lead pick, started by the same request (openai-lead-pick.ts, gpt-6-luna): the lead score shortlists 8 stories,
              the model picks one with the owner's rubric and a one-line reason (never a recently published
              story). GET /api/approval/outline/lead polls it; the board swaps it in only if not yet edited.
              Best-effort: off with APPROVAL_LEAD_PICK=off, and on any failure the scored lead stays
@@ -130,7 +136,7 @@ If the issue is missing after a send: /approval/issues -> "Mark as published"
   <tr><td>Styling</td><td>Tailwind CSS 4, framer-motion</td></tr>
   <tr><td>Database</td><td>Neon Postgres (Free), Prisma 7 + <code>@prisma/adapter-pg</code>, client in <code>src/generated/prisma</code></td></tr>
   <tr><td>Hosting and jobs</td><td>Netlify (Free, credit-based). Netlify Functions v2 (<code>.mts</code>), chosen in <a href="./adr/0001-job-runner.md">ADR 0001</a>. Trigger.dev adapters stay dormant in <code>src/trigger/</code></td></tr>
-  <tr><td>LLM</td><td><code>openai</code> SDK: <code>gpt-6-luna</code> for extraction and dedup, the lead pick, the writer and the scene prompt. Vertex <code>gemini-3.1-flash-image</code> by <code>fetch</code>, no SDK.</td></tr>
+  <tr><td>LLM</td><td><code>openai</code> SDK: <code>gpt-6-luna</code> for extraction, the lead pick, the writer and the scene prompt. Vertex <code>gemini-3.1-flash-image</code> by <code>fetch</code>, no SDK.</td></tr>
   <tr><td>Tests and lint</td><td>Vitest 3 (unit tests next to source; <code>*.integration.test.ts</code> needs <code>PIPELINE_IT=1</code> and refuses the production DB), ESLint 9</td></tr>
   <tr><td>Checks</td><td><code>npm run verify</code> = lint + test + build. <code>.githooks/pre-push</code> runs it.</td></tr>
   <tr><td>Unused dependencies</td><td><code>@openrouter/sdk</code> (no use in <code>src</code>), <code>@trigger.dev/sdk</code> (dormant)</td></tr>
@@ -141,7 +147,7 @@ If the issue is missing after a send: /approval/issues -> "Mark as published"
   <tr><th>Service</th><th>Used for</th><th>Called by</th></tr>
   <tr><td>Netlify</td><td>Site hosting, functions, env vars, deploy previews</td><td>all</td></tr>
   <tr><td>Neon</td><td>Postgres: production branch and <code>dev</code> branch</td><td>app, jobs</td></tr>
-  <tr><td>OpenAI</td><td>Extraction, dedup, lead pick, drafting and image prompt; story embeddings and the Decisions API (<code>POST /v1/decisions</code> by <code>fetch</code>) for the repeat check</td><td>app, jobs</td></tr>
+  <tr><td>OpenAI</td><td>Extraction, lead pick, drafting and image prompt; story embeddings and the Decisions API (<code>POST /v1/decisions</code> by <code>fetch</code>) for the repeat check</td><td>app, jobs</td></tr>
   <tr><td>Gmail API (read-only)</td><td>Newsletter emails for ingestion; sent-campaign copies for publish detection</td><td>ingest and publish jobs</td></tr>
   <tr><td>Telegram</td><td>Review bot: "board ready" and "draft is ready for review" messages to the review group; ops alerts and the daily summary to the "AI Recap Ops" chat (<code>TELEGRAM_OPS_CHAT_ID</code>)</td><td>ingest, <code>run-checks</code>, draft job (production only)</td></tr>
   <tr><td>GoHighLevel (GHL)</td><td>Subscriber list, campaign emails, email templates; subscribe and unsubscribe webhooks</td><td>app (subscribe, unsubscribe webhook), "Stage for sending" (templates, <code>src/pipeline/distribution/</code>), owner (send). GHL cannot schedule a campaign through its API, so sending stays manual</td></tr>
@@ -158,10 +164,10 @@ If the issue is missing after a send: /approval/issues -> "Mark as published"
 <h2 id="data">6. Data (Postgres schema <code>newsletter</code>)</h2>
 <table>
   <tr><th>Table</th><th>Holds</th><th>Written by</th></tr>
-  <tr><td><code>stories</code></td><td>Extracted stories per day and source (snake_case columns, but <code>"createdAt"</code> is camelCase). <code>matched_at</code>: when the repeat check went through the story. <code>excluded_on</code>: the board date of the commit that excluded it (not written yet; null for older exclusions)</td><td>ingest job</td></tr>
+  <tr><td><code>stories</code></td><td>Extracted stories per day and source (snake_case columns, but <code>"createdAt"</code> is camelCase). <code>matched_at</code>: when the repeat check went through the story. <code>excluded_on</code>: the board date of the commit that excluded it (null for older exclusions)</td><td>ingest job</td></tr>
   <tr><td><code>story_sources</code></td><td>Which newsletters covered each story, one row per story and source key. <code>stories.source</code> keeps only the last writer, so the board reads coverage here. If the table is missing, ingestion and the board log and fall back to <code>stories.source</code>.</td><td>ingest job</td></tr>
-  <tr><td><code>story_embeddings</code></td><td>One embedding for each story (512 numbers, <code>real[]</code>, length 1), made once by the repeat check</td><td>ingest job</td></tr>
-  <tr><td><code>story_matches</code></td><td>Story matches: one row for each judged pair (<code>newer_story_id</code>, <code>older_story_id</code>, <code>similarity</code>, and the judge's <code>same</code> and <code>news</code>). <code>stories.matched_at</code> is set when a story went through the check; null means not checked yet</td><td>ingest job</td></tr>
+  <tr><td><code>story_embeddings</code></td><td>One embedding for each story (512 numbers, <code>real[]</code>, length 1), made once by the repeat check</td><td>ingest job; the board for candidates ingestion did not check</td></tr>
+  <tr><td><code>story_matches</code></td><td>Story matches: one row for each judged pair (<code>newer_story_id</code>, <code>older_story_id</code>, <code>similarity</code>, and the judge's <code>same</code> and <code>news</code>). <code>stories.matched_at</code> is set when a story went through the check; null means not checked yet</td><td>ingest job; the board for candidates ingestion did not check</td></tr>
   <tr><td><code>scraper_bookmarks</code></td><td>Last-read time per source (keys such as <code>the_signal</code>; <code>tldr_ai</code> and <code>aloa_ai</code> are unused)</td><td>ingest job</td></tr>
   <tr><td><code>issues</code></td><td>One row per date (<code>issue_date</code> is unique): <code>html</code>, <code>content_json</code>, <code>published_at</code>, <code>slug</code> (generated), and <code>status</code> (<code>draft</code> or <code>published</code>). The database computes <code>status</code> from <code>published_at</code>: read it to ask "is it published?", never write it</td><td>draft job (insert, update), title and image changes (update), publish job (update; the sent staged version is copied over), owner ("Mark as published", from the newest staged version)</td></tr>
   <tr><td><code>subscribers</code>, <code>auth_codes</code></td><td>Site subscriber records and one-time codes</td><td>app</td></tr>
@@ -188,11 +194,11 @@ app/                         Next.js routes
                              "Stage for sending")
   admin/                     overview, runs/ (+ [id]), incidents/, settings/ (read only); guard: src/server/admin-auth.ts
   api/newsletters/           list, [id], outline, commit (starts the draft job), publish-status
-  api/approval/              login, outline (+ status, marker), issues/[id]/publish, skipped-dates,
+  api/approval/              login, outline (+ lead, marker), issues/[id]/publish, skipped-dates,
                              drafts (+ [id], html, retry, image, image/ideas, image/generate)
   api/subscriber/            subscribe, request-code, verify-code, sign-out, unsubscribe (+ webhook from GHL)
   api/issues/[slug], api/ticker, api/for-brands, api/revalidate (job token)
-src/features/newsletter/     site and board logic: repository, cache, curation.service, openai-dedup, lead-story,
+src/features/newsletter/     site and board logic: repository, cache, curation.service, board-repeats, lead-story,
                              openai-lead-pick, issue-status, render/, parsers/
 src/features/subscriber/     subscriber sessions, provider switch (ghl | beehiiv), Resend email, GHL webhook
 src/features/admin/          admin page data

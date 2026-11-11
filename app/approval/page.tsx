@@ -51,7 +51,7 @@ function LoadingState() {
             Getting stories…
           </h1>
           <p className="mt-4 text-base leading-7 text-[var(--text-secondary)]">
-            Fetching and deduplicating candidates. This can take up to 30 seconds.
+            Building the board from the latest stories.
           </p>
           <div className="mt-8 flex justify-center gap-1.5">
             <span className="h-2 w-2 animate-bounce rounded-full bg-[var(--accent-primary)] [animation-delay:0ms]" />
@@ -107,8 +107,6 @@ function ApprovalPageForDate({ dateKey, reuseKey }: { dateKey: string; reuseKey:
     setBuildCount((count) => count + 1);
   }, [cacheId]);
   const handleBoardEdit = useCallback(() => markApprovalOutlineCacheEdited(cacheId), [cacheId]);
-  const [isDedupPending, setIsDedupPending] = useState(false);
-  const [dedupFailureReason, setDedupFailureReason] = useState<string | null>(null);
   const [publishStatus, setPublishStatus] = useState<{
     target_date: string;
     has_exact_match: boolean;
@@ -186,7 +184,6 @@ function ApprovalPageForDate({ dateKey, reuseKey }: { dateKey: string; reuseKey:
 
   useEffect(() => {
     let active = true;
-    let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
     const cached = readApprovalOutlineCache(cacheId);
     if (cached) {
@@ -227,30 +224,17 @@ function ApprovalPageForDate({ dateKey, reuseKey }: { dateKey: string; reuseKey:
       .then((outlineResponse) => {
         if (!outlineResponse.ok) throw new Error(`Server returned ${outlineResponse.status}`);
         return outlineResponse.json() as Promise<{
-          status: "pending" | "ready";
-          response_id: string | null;
+          status: "ready";
           outline: ApprovalOutlineData;
+          lead_response_id?: string | null;
         }>;
       })
       .then((outlinePayload) => {
         if (!active) return;
-        setDedupFailureReason(null);
-
-        const fallbackOutline = normalizeApprovalOutlineData(outlinePayload.outline);
-
-        // If dedup is still pending, start polling
-        if (outlinePayload.status === "pending" && outlinePayload.response_id) {
-          setIsDedupPending(true);
-          console.log("[approval:polling] starting response status polling", {
-            dateKey,
-            responseId: outlinePayload.response_id,
-          });
-          startPollingStatus(outlinePayload.response_id, dateKey, fallbackOutline);
-        } else {
-          // Dedup already complete, use the outline
-          setIsDedupPending(false);
-          writeApprovalOutlineCache(cacheId, outlinePayload.outline);
-          setOutlineData(fallbackOutline);
+        writeApprovalOutlineCache(cacheId, outlinePayload.outline);
+        setOutlineData(normalizeApprovalOutlineData(outlinePayload.outline));
+        if (outlinePayload.lead_response_id) {
+          applyLeadPickWhenReady(outlinePayload.lead_response_id, outlinePayload.outline);
         }
       })
       .catch((err: unknown) => {
@@ -259,134 +243,6 @@ function ApprovalPageForDate({ dateKey, reuseKey }: { dateKey: string; reuseKey:
         console.error("[approval:cache] outline fetch failed", { dateKey, message });
         setError(message);
       });
-
-    function startPollingStatus(
-      responseId: string,
-      date: string,
-      fallbackOutline: ApprovalOutlineData
-    ) {
-      const poll = async () => {
-        if (!active) return;
-
-        try {
-          const statusParams = new URLSearchParams({
-            response_id: responseId,
-            date: date,
-          });
-          if (reuseKey) statusParams.set("reuse", reuseKey);
-
-          console.log("[approval:polling] checking status", { 
-            responseId, 
-            date,
-            timestamp: new Date().toISOString(),
-          });
-
-          const statusResponse = await fetch(
-            `/api/approval/outline/status?${statusParams}`
-          );
-
-          if (!active) return;
-
-          const statusPayload = (await statusResponse
-            .json()
-            .catch(() => null)) as {
-            status: "processing" | "completed" | "error";
-            outline?: ApprovalOutlineData;
-            lead_response_id?: string | null;
-            error?: string;
-          } | null;
-
-          if (!statusResponse.ok) {
-            const failedReason =
-              statusPayload?.error || `Status check returned ${statusResponse.status}`;
-            console.error("[approval:polling] ❌ status check returned error", {
-              dateKey,
-              failedReason,
-              responseStatus: statusResponse.status,
-              timestamp: new Date().toISOString(),
-            });
-            setIsDedupPending(false);
-            setDedupFailureReason(failedReason);
-            setOutlineData(fallbackOutline);
-            return;
-          }
-
-          if (!statusPayload) {
-            setIsDedupPending(false);
-            setDedupFailureReason("Status check returned an empty response.");
-            setOutlineData(fallbackOutline);
-            return;
-          }
-
-          if (!active) return;
-
-          console.log("[approval:polling] status response", {
-            status: statusPayload.status,
-            hasOutline: Boolean(statusPayload.outline),
-            error: statusPayload.error,
-            timestamp: new Date().toISOString(),
-          });
-
-          if (statusPayload.status === "completed" && statusPayload.outline) {
-            console.log("[approval:polling] ✅ dedup completed, updating outline", {
-              dateKey,
-              timestamp: new Date().toISOString(),
-            });
-            setIsDedupPending(false);
-            // The deduplicated board only holds stories from the first build, so keep that build's marker.
-            const dedupedOutline = {
-              ...statusPayload.outline,
-              candidate_marker: fallbackOutline.candidate_marker,
-            };
-            writeApprovalOutlineCache(cacheId, dedupedOutline);
-            setOutlineData(normalizeApprovalOutlineData(statusPayload.outline));
-            setDedupFailureReason(null);
-            if (statusPayload.lead_response_id) {
-              applyLeadPickWhenReady(statusPayload.lead_response_id, dedupedOutline);
-            }
-            return;
-          }
-
-          if (statusPayload.status === "error") {
-            console.error("[approval:polling] ❌ dedup failed", {
-              dateKey,
-              error: statusPayload.error,
-              timestamp: new Date().toISOString(),
-            });
-            setIsDedupPending(false);
-            setDedupFailureReason(statusPayload.error || "Deduplication failed");
-            setOutlineData(fallbackOutline);
-            return;
-          }
-
-          // Still processing, schedule next poll in 2000ms
-          console.log("[approval:polling] ⏳ still processing, next check in 2s", {
-            dateKey,
-            timestamp: new Date().toISOString(),
-          });
-          timeoutId = setTimeout(poll, 2000);
-        } catch (err: unknown) {
-          if (!active) return;
-          const message = err instanceof Error ? err.message : "Unknown error";
-          console.error("[approval:polling] ❌ status check failed", {
-            dateKey,
-            message,
-            timestamp: new Date().toISOString(),
-          });
-          setIsDedupPending(false);
-          setDedupFailureReason(message);
-          setOutlineData(fallbackOutline);
-        }
-      };
-
-      // Start polling immediately
-      console.log("[approval:polling] 🚀 starting polling", {
-        responseId,
-        dateKey,
-        timestamp: new Date().toISOString(),
-      });
-      poll();
-    }
 
     // The board opens with the scored lead. The AI's pick replaces it only if the owner has not edited the board.
     function applyLeadPickWhenReady(leadResponseId: string, outline: ApprovalOutlineData) {
@@ -402,7 +258,6 @@ function ApprovalPageForDate({ dateKey, reuseKey }: { dateKey: string; reuseKey:
 
     return () => {
       active = false;
-      clearTimeout(timeoutId);
     };
   }, [dateKey, reuseKey, cacheId, buildCount, rebuildBoard]);
 
@@ -414,7 +269,7 @@ function ApprovalPageForDate({ dateKey, reuseKey }: { dateKey: string; reuseKey:
   };
 
   if (error) return <ErrorState message={error} />;
-  if (!outlineData || isDedupPending) return <LoadingState />;
+  if (!outlineData) return <LoadingState />;
 
   return (
     <ApprovalBoard
@@ -430,7 +285,9 @@ function ApprovalPageForDate({ dateKey, reuseKey }: { dateKey: string; reuseKey:
       proposedLeadId={outlineData.proposed_lead_id ?? null}
       proposedLeadReason={outlineData.proposed_lead_reason ?? null}
       publishStatus={publishStatus}
-      dedupFailureReason={dedupFailureReason}
+      repeatsRemoved={outlineData.repeats_removed}
+      repeatCheckIncomplete={outlineData.repeat_check_incomplete ?? false}
+      onRebuild={rebuildBoard}
       drafting={drafting}
     />
   );
