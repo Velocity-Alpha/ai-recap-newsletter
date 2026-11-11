@@ -84,6 +84,17 @@ export function normalizeOutline(body: Json, date: string): ApprovalOutline {
   };
 }
 
+/**
+ * The lead story id of a saved outline payload (`approval_outlines.payload`): null when the outline has no lead
+ * story, undefined when the payload does not say (no payload, no key, or a value that is not a story id).
+ */
+export function outlineLeadStoryId(payload: unknown): number | null | undefined {
+  if (!isObject(payload)) return undefined;
+  const lead = payload.leadStoryId;
+  if (lead === null) return null;
+  return typeof lead === "number" ? (parseStoryId(lead) ?? undefined) : undefined;
+}
+
 /** A copy with every object's keys sorted, at any depth. Array order is kept. */
 function sortKeys(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(sortKeys);
