@@ -1,0 +1,17 @@
+{
+  "about": "Public web versions of past issues. build-dataset.ts fetches them into evals/data/extraction/ (gitignored). reference: the Neon dev branch stories rows (source, day) that production or n8n extracted from the same issue.",
+  "issues": [
+    { "id": "tldr-2026-10-08", "source": "tldr", "date": "2026-10-08", "format": "tldr_web", "url": "https://tldr.tech/ai/2026-10-08", "reference": { "source": "tldr", "days": ["2026-10-08"] } },
+    { "id": "tldr-2026-10-21", "source": "tldr", "date": "2026-10-21", "format": "tldr_web", "url": "https://tldr.tech/ai/2026-10-21", "reference": { "source": "tldr", "days": ["2026-10-21"] } },
+    { "id": "tldr-2026-11-04", "source": "tldr", "date": "2026-11-04", "format": "tldr_web", "url": "https://tldr.tech/ai/2026-11-04", "reference": { "source": "tldr", "days": ["2026-11-04"] } },
+    { "id": "rundown-2026-10-14", "source": "rundown_ai", "date": "2026-10-14", "format": "rundown_web", "url": "https://www.therundown.ai/articles/openai-finds-a-bug-in-its-boardroom", "reference": { "source": "rundown_ai", "days": ["2026-10-14"] } },
+    { "id": "rundown-2026-10-22", "source": "rundown_ai", "date": "2026-10-22", "format": "rundown_web", "url": "https://www.therundown.ai/articles/ai-finds-a-security-hole-in-70-of-the-web", "reference": { "source": "rundown_ai", "days": ["2026-10-22"] } },
+    { "id": "rundown-2026-11-05", "source": "rundown_ai", "date": "2026-11-05", "format": "rundown_web", "url": "https://www.therundown.ai/articles/ai-agents-can-now-make-your-phone-calls", "reference": { "source": "rundown_ai", "days": ["2026-11-05"] } },
+    { "id": "ai-breakfast-2026-10-21", "source": "ai_breakfast", "date": "2026-10-21", "format": "beehiiv", "url": "https://aibreakfast.beehiiv.com/p/anthropic-prospectus-shows-80b-in-losses", "reference": { "source": "ai_breakfast", "days": ["2026-10-21"] } },
+    { "id": "ai-breakfast-2026-11-04", "source": "ai_breakfast", "date": "2026-11-04", "format": "beehiiv", "url": "https://aibreakfast.beehiiv.com/p/frontier-models-improving-open-weight-models", "reference": { "source": "ai_breakfast", "days": ["2026-11-04"] } },
+    { "id": "world-of-ai-2026-10-22", "source": "world_of_ai", "date": "2026-10-22", "format": "beehiiv", "url": "https://intheworldofai.com/p/anthropic-drops-claude-duet", "reference": null },
+    { "id": "world-of-ai-2026-11-09", "source": "world_of_ai", "date": "2026-11-09", "format": "beehiiv", "url": "https://intheworldofai.com/p/anthropic-claude-fable-5-2-launch", "reference": { "source": "world_of_ai", "days": ["2026-11-09"] } },
+    { "id": "the-signal-2026-10-25", "source": "the_signal", "date": "2026-10-25", "format": "substack", "url": "https://thesignal.substack.com/p/old-holes-new-helpers-and-ai-in-a", "reference": { "source": "tldr_ai", "days": ["2026-10-25", "2026-10-26"] } },
+    { "id": "the-signal-2026-11-08", "source": "the_signal", "date": "2026-11-08", "format": "substack", "url": "https://thesignal.substack.com/p/bug-hunters-cell-mysteries-and-kids", "reference": { "source": "the_signal", "days": ["2026-11-08"] } }
+  ]
+}
