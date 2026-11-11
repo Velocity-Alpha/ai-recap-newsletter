@@ -76,7 +76,7 @@ describe("watchFreeLinks", () => {
     const second = { 1: { done: true, links: [LINK] }, 2: { done: true, links: [] } };
     const { fetcher, wait, onUpdate, reads } = server([first, second]);
 
-    await watchFreeLinks([1, 2], { fetcher, wait, onUpdate });
+    await expect(watchFreeLinks([1, 2], { fetcher, wait, onUpdate })).resolves.toBe("done");
 
     expect(onUpdate.mock.calls).toEqual([[first], [second]]);
     expect(reads()).toBe(2);
@@ -84,24 +84,45 @@ describe("watchFreeLinks", () => {
     expect(wait).toHaveBeenCalledWith(3_000);
   });
 
-  it("gives up after 2 minutes, and reports the stories as done with the links found so far", async () => {
-    const { fetcher, wait, onUpdate, reads } = server([{ 1: { done: false, links: [LINK] } }]);
+  it("gives up after 2 minutes", async () => {
+    const { fetcher, wait, onUpdate, reads } = server([{ 1: { done: false, links: [] } }]);
 
-    await watchFreeLinks([1], { fetcher, wait, onUpdate });
+    await expect(watchFreeLinks([1], { fetcher, wait, onUpdate })).resolves.toBe("timed_out");
 
     expect(wait).toHaveBeenCalledTimes(40);
     expect(reads()).toBe(41);
-    expect(onUpdate).toHaveBeenLastCalledWith({ 1: { done: true, links: [LINK] } });
+  });
+
+  it("reports a story it gave up on as done and unfinished, and leaves a finished story as it is", async () => {
+    const finished = { done: true, links: [LINK] };
+    const { fetcher, wait, onUpdate } = server([{ 1: { done: false, links: [] }, 2: finished }]);
+
+    await watchFreeLinks([1, 2], { fetcher, wait, onUpdate });
+
+    expect(onUpdate).toHaveBeenLastCalledWith({ 1: { done: true, links: [], unfinished: true }, 2: finished });
   });
 
   it("reads once, with no wait, when the search did not start", async () => {
     const { fetcher, wait, onUpdate, reads } = server([{ 1: { done: false, links: [] } }], false);
 
-    await watchFreeLinks([1], { fetcher, wait, onUpdate });
+    await expect(watchFreeLinks([1], { fetcher, wait, onUpdate })).resolves.toBe("not_started");
 
     expect(reads()).toBe(1);
     expect(wait).not.toHaveBeenCalled();
-    expect(onUpdate.mock.calls).toEqual([[{ 1: { done: true, links: [] } }]]);
+    expect(onUpdate.mock.calls).toEqual([[{ 1: { done: true, links: [], unfinished: true } }]]);
+  });
+
+  it("stops, with no more reads or reports, once the board is gone", async () => {
+    const { fetcher, wait, onUpdate, reads } = server([{ 1: { done: false, links: [] } }]);
+    let open = true;
+    wait.mockImplementation(async () => {
+      open = false;
+    });
+
+    await expect(watchFreeLinks([1], { fetcher, wait, onUpdate, isActive: () => open })).resolves.toBe("stopped");
+
+    expect(reads()).toBe(1);
+    expect(onUpdate).toHaveBeenCalledTimes(1);
   });
 
   it("goes on after a read that failed", async () => {

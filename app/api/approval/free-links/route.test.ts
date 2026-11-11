@@ -49,7 +49,7 @@ describe("POST /api/approval/free-links", () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ started: 2 });
-    expect(job.storiesToSearch).toHaveBeenCalledWith([1, 2, 3]);
+    expect(job.storiesToSearch).toHaveBeenCalledWith([1, 2, 3], expect.any(Date));
     expect(job.startFreeLinksJob).toHaveBeenCalledWith([2, 3], { siteUrl: "http://localhost" });
   });
 
@@ -72,6 +72,17 @@ describe("POST /api/approval/free-links", () => {
 
     expect(response.status).toBe(400);
     expect(job.startFreeLinksJob).not.toHaveBeenCalled();
+  });
+
+  it("answers 500 when the stories cannot be read", async () => {
+    job.storiesToSearch.mockRejectedValue(new Error("database is down"));
+    const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    const response = await POST(post({ story_ids: [2] }, await createApprovalSessionToken()));
+
+    expect(response.status).toBe(500);
+    expect(job.startFreeLinksJob).not.toHaveBeenCalled();
+    logged.mockRestore();
   });
 
   it("answers 502 when the background function did not start", async () => {

@@ -1,4 +1,5 @@
 import { startBackgroundJob, type JobTarget, type StartJobOptions, type StartJobResult } from "@/src/pipeline/background-job";
+import { MAX_STORY_IDS } from "@/src/pipeline/free-links/sites";
 import { bearerToken, isValidJobToken } from "@/src/server/job-token";
 
 /**
@@ -8,8 +9,6 @@ import { bearerToken, isValidJobToken } from "@/src/server/job-token";
  */
 
 export const FREE_LINKS_BACKGROUND_PATH = "/.netlify/functions/find-free-links-background";
-/** Most stories in one request: more than a board shows. */
-export const MAX_STORY_IDS = 60;
 
 /** The story ids of a request: whole positive numbers, each once, at most MAX_STORY_IDS. Null for anything else. */
 export function readStoryIds(value: unknown): number[] | null {

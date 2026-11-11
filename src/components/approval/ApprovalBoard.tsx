@@ -8,10 +8,12 @@ import {
   freeLinkPill,
   linkChoiceOf,
   linksToAutoSelect,
+  otherLinkText,
   ownerLinkEdits,
   type LinkState,
   paywalledLinks,
   selectedLinkState,
+  statesOfLinkEdits,
 } from "@/components/approval/story-links";
 import { createTypedLinks } from "@/components/approval/typed-links";
 import type { AlsoFrom, RestorableRepeat } from "@/src/features/newsletter/board-repeats";
@@ -46,7 +48,7 @@ import NoIssueTodayButton from "@/components/approval/NoIssueTodayButton";
 import { Button } from "@/components/ui/button";
 import { nativeCommitTarget, secondCommitNotice } from "@/features/newsletter/draft-links";
 import { checkLink, watchFreeLinks, type FreeLinksByStory } from "@/features/newsletter/free-links-client";
-import { siteOf } from "@/src/pipeline/free-links/sites";
+import { MAX_STORY_IDS, siteOf } from "@/src/pipeline/free-links/sites";
 import type { DateDraftsView } from "@/src/pipeline/draft/draft-board";
 
 type StoryOption = {
@@ -312,12 +314,25 @@ export default function ApprovalBoard({
     createTypedLinks({
       checkLink,
       onStates: setLinkState,
+      // The owner emptied the field, or typed the story's own link: the story has no link of the owner now.
+      // It goes back to the free link the board selected, if there is one.
       onDropped: (id) => {
-        setUrlOverrides((prev) => withoutStory(prev, id));
+        const auto = latestAutoLinks.current[id];
+        ownerChangedLinks.current.delete(id);
         setOtherLinkIds((prev) => withoutId(prev, id));
+        setUrlOverrides((prev) => (auto ? { ...prev, [id]: auto } : withoutStory(prev, id)));
+        if (auto) typedLinks.select(id, "no");
       },
     })
   );
+  /** False once the board is gone, so a search that still runs reports nothing. */
+  const boardOpen = useRef(true);
+  useEffect(() => {
+    boardOpen.current = true;
+    return () => {
+      boardOpen.current = false;
+    };
+  }, []);
   // Free links (#59). `freeLinks` has an entry for each story the board asked about; the search runs until `done`.
   const [freeLinks, setFreeLinks] = useState<FreeLinksByStory>({});
   /** The free link the board selected by itself, by story id. It is not an edit of the owner. */
@@ -355,7 +370,8 @@ export default function ApprovalBoard({
     if (edited) onEdit?.();
   }, [edited, onEdit]);
 
-  // Ask for free links for each story on the board whose link is paywalled, once for each story.
+  // Ask for free links for each story on the board whose link is paywalled and that the owner did not change,
+  // once for each story.
   const paywalledStoryIds = useMemo(
     () =>
       sections
@@ -365,22 +381,28 @@ export default function ApprovalBoard({
   );
   const askedFreeLinks = useRef(new Set<number>());
   useEffect(() => {
-    const ids = paywalledStoryIds.filter((id) => !askedFreeLinks.current.has(id));
+    const ids = paywalledStoryIds.filter((id) => !askedFreeLinks.current.has(id) && !ownerChangedLinks.current.has(id));
     if (ids.length === 0) return;
     for (const id of ids) askedFreeLinks.current.add(id);
-    setFreeLinks((prev) => ({ ...Object.fromEntries(ids.map((id) => [id, { done: false, links: [] }])), ...prev }));
-    void watchFreeLinks(ids, {
-      onUpdate: (update) => {
-        setFreeLinks((prev) => ({ ...prev, ...update }));
-        // Select the first free link of a story, unless the owner already changed the story's link.
-        const selected = linksToAutoSelect(update, ownerChangedLinks.current, latestAutoLinks.current);
-        if (Object.keys(selected).length === 0) return;
-        latestAutoLinks.current = { ...latestAutoLinks.current, ...selected };
-        setAutoLinks(latestAutoLinks.current);
-        setUrlOverrides((prev) => ({ ...prev, ...selected }));
-        for (const id of Object.keys(selected)) typedLinks.select(Number(id), "no");
-      },
-    });
+    setFreeLinks((prev) => ({ ...prev, ...Object.fromEntries(ids.map((id) => [id, { done: false, links: [] }])) }));
+    const watch = (part: number[]) =>
+      watchFreeLinks(part, {
+        isActive: () => boardOpen.current,
+        onUpdate: (update) => {
+          setFreeLinks((prev) => ({ ...prev, ...update }));
+          // Select the first free link of a story, unless the owner already changed the story's link.
+          const selected = linksToAutoSelect(update, ownerChangedLinks.current, latestAutoLinks.current);
+          if (Object.keys(selected).length === 0) return;
+          latestAutoLinks.current = { ...latestAutoLinks.current, ...selected };
+          setAutoLinks(latestAutoLinks.current);
+          setUrlOverrides((prev) => ({ ...prev, ...selected }));
+          for (const id of Object.keys(selected)) typedLinks.select(Number(id), "no");
+        },
+      }).then((end) => {
+        // A search that did not start is asked again when the board's stories change.
+        if (end === "not_started") for (const id of part) askedFreeLinks.current.delete(id);
+      });
+    for (let first = 0; first < ids.length; first += MAX_STORY_IDS) void watch(ids.slice(first, first + MAX_STORY_IDS));
   }, [paywalledStoryIds, typedLinks]);
 
   const selectOriginalLink = (id: number) => {
@@ -397,13 +419,8 @@ export default function ApprovalBoard({
     typedLinks.select(id, "no");
   };
 
-  /** "Other link" starts with an empty field. Until the owner types a link, the story has its original link. */
-  const selectOtherLink = (id: number) => {
-    ownerChangedLinks.current.add(id);
-    setOtherLinkIds((prev) => new Set(prev).add(id));
-    setUrlOverrides((prev) => withoutStory(prev, id));
-    typedLinks.select(id, null);
-  };
+  /** "Other link" opens an empty field. The story keeps the link it has until the owner types one. */
+  const selectOtherLink = (id: number) => setOtherLinkIds((prev) => new Set(prev).add(id));
 
   const typeLink = (id: number, value: string) => {
     ownerChangedLinks.current.add(id);
@@ -416,7 +433,13 @@ export default function ApprovalBoard({
   const finishTypedLink = (id: number) => typedLinks.finish(id, candidateMap[String(id)]?.url);
 
   const closePreview = () => {
-    if (previewStoryId !== null) void finishTypedLink(previewStoryId);
+    if (previewStoryId !== null) {
+      void finishTypedLink(previewStoryId);
+      // "Other link" with an empty field selects nothing: the row of the link the story has is selected again.
+      if (otherLinkText(urlOverrides[previewStoryId], freeLinks[previewStoryId]?.links ?? []) === "") {
+        setOtherLinkIds((prev) => withoutId(prev, previewStoryId));
+      }
+    }
     setEditingPreviewId(null);
     setPreviewStoryId(null);
   };
@@ -776,7 +799,9 @@ export default function ApprovalBoard({
       setIsCheckingLinks(true);
       await typedLinks.settle();
       setIsCheckingLinks(false);
-      if (paywalledLinks({ sections, excludeState, urlOverrides, linkState: typedLinks.states(), candidateMap }).length > 0) {
+      // The commit sends the link edits of this click, so only their states count.
+      const linkStateNow = statesOfLinkEdits(typedLinks.states(), urlOverrides);
+      if (paywalledLinks({ sections, excludeState, urlOverrides, linkState: linkStateNow, candidateMap }).length > 0) {
         setPaywallWarningOpen(true);
         return;
       }
@@ -1581,7 +1606,7 @@ export default function ApprovalBoard({
                 <p className="mt-3 text-base leading-7 text-[var(--text-secondary)]">{previewStory.summary}</p>
               ) : null}
               {/* Editable link */}
-              {previewFreeLinks.length > 0 ? (
+              {freeLinks[previewStory.id] ? (
               <fieldset className="mt-5">
                 <legend className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--accent-primary)]">Story Link</legend>
                 <div className="mt-2 space-y-2">
@@ -1614,7 +1639,7 @@ export default function ApprovalBoard({
                       <span className="min-w-0 flex-1">
                         <span className="flex items-center gap-1.5 text-sm font-medium text-[var(--text-primary)]">
                           {renderPaywallIcon("no")}
-                          {link.site} · {link.words} words
+                          {link.site}, {link.words} words
                         </span>
                         <span className="block truncate text-xs text-[var(--text-secondary)]">{link.title ?? link.url}</span>
                       </span>
@@ -1638,7 +1663,8 @@ export default function ApprovalBoard({
                         <input
                           type="url"
                           autoFocus
-                          value={urlOverrides[previewStory.id] ?? ""}
+                          aria-label="Other link"
+                          value={otherLinkText(urlOverrides[previewStory.id], previewFreeLinks)}
                           onChange={(e) => typeLink(previewStory.id, e.target.value)}
                           onBlur={() => void finishTypedLink(previewStory.id)}
                           placeholder="https://…"
@@ -1647,6 +1673,9 @@ export default function ApprovalBoard({
                       ) : null}
                     </span>
                   </label>
+                  {freeLinks[previewStory.id].done ? null : (
+                    <p className="text-xs text-[var(--text-secondary)]">Finding free links…</p>
+                  )}
                 </div>
               </fieldset>
               ) : (

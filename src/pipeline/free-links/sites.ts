@@ -20,6 +20,8 @@ export const SKIPPED_SITES = [
 ];
 /** A free link has this many words or more. */
 export const MIN_WORDS = 300;
+/** Most stories in one request for free links: more than a board shows. The board sends more in parts. */
+export const MAX_STORY_IDS = 60;
 /** Most free links kept for one story. */
 export const MAX_LINKS = 3;
 

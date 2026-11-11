@@ -1,10 +1,16 @@
 import { describe, expect, it } from "vitest";
 
-import { freeLinkPill,
+import {
+  freeLinkPill,
   linkChoiceOf,
   linksToAutoSelect,
+  otherLinkText,
   ownerLinkEdits,
-  paywalledLinks, selectedLinkState, typedLinkOf } from "@/src/components/approval/story-links";
+  paywalledLinks,
+  selectedLinkState,
+  statesOfLinkEdits,
+  typedLinkOf,
+} from "@/src/components/approval/story-links";
 
 const slot = (id: number, status: "selected" | "fill-in" = "selected") => ({ story: { id, headline: `Story ${id}` }, status });
 
@@ -119,6 +125,10 @@ describe("freeLinkPill", () => {
     expect(freeLinkPill({ done: false, links: [] }, ORIGINAL, ORIGINAL)).toBe("finding free links…");
   });
 
+  it("says that the search did not finish", () => {
+    expect(freeLinkPill({ done: true, links: [], unfinished: true }, ORIGINAL, ORIGINAL)).toBe("free link search did not finish");
+  });
+
   it("says that no free link was found", () => {
     expect(freeLinkPill({ done: true, links: [] }, ORIGINAL, ORIGINAL)).toBe("no free link found");
   });
@@ -160,5 +170,29 @@ describe("ownerLinkEdits", () => {
 
   it("keeps the link of a story where the owner selected another link after the board", () => {
     expect(ownerLinkEdits({ 1: "https://other.example/b" }, { 1: "https://free.example/a" })).toEqual({ 1: "https://other.example/b" });
+  });
+});
+
+describe("otherLinkText", () => {
+  it("is the link the owner typed", () => {
+    expect(otherLinkText("https://typed.example/c", FREE_LINKS)).toBe("https://typed.example/c");
+  });
+
+  it("is empty while the story has its original link", () => {
+    expect(otherLinkText(undefined, FREE_LINKS)).toBe("");
+  });
+
+  it("is empty while the story has one of its free links", () => {
+    expect(otherLinkText("https://free.example/a", FREE_LINKS)).toBe("");
+  });
+});
+
+describe("statesOfLinkEdits", () => {
+  it("keeps the state of a story that has a link edit", () => {
+    expect(statesOfLinkEdits({ 1: "yes" }, { 1: "https://walled.example/a" })).toEqual({ 1: "yes" });
+  });
+
+  it("drops the state of a story with no link edit: its link was selected later", () => {
+    expect(statesOfLinkEdits({ 1: "yes", 2: "no" }, { 1: "https://walled.example/a" })).toEqual({ 1: "yes" });
   });
 });

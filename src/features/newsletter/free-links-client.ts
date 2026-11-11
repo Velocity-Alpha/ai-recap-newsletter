@@ -36,6 +36,8 @@ export interface FreeLink {
 export interface StoryFreeLinks {
   done: boolean;
   links: FreeLink[];
+  /** True when the board stopped asking before the search finished: it did not start, or it took over 2 minutes. */
+  unfinished?: boolean;
 }
 
 export type FreeLinksByStory = Record<number, StoryFreeLinks>;
@@ -48,17 +50,27 @@ export const POLL_LIMIT_MS = 120_000;
 interface WatchFreeLinksOptions {
   /** Gets the stories' free links each time they are read. The last call has every story done. */
   onUpdate: (stories: FreeLinksByStory) => void;
+  /** False once the board is gone: no more reads and no more reports. */
+  isActive?: () => boolean;
   fetcher?: (url: string, init?: RequestInit) => Promise<Response>;
   wait?: (ms: number) => Promise<void>;
 }
 
+/** How a watch ended: every story done, the 2 minutes passed, the search did not start, or the board is gone. */
+export type WatchEnd = "done" | "timed_out" | "not_started" | "stopped";
+
 /**
  * Starts the search for free links of the stories and reports what it finds, until every story is done or 2
- * minutes passed. Never throws: when the search did not start, it reports the links found before, once.
+ * minutes passed. Never throws: when the search did not start, it reports the links found before, once. A story
+ * the watch gave up on is reported as done and `unfinished`.
  */
-export async function watchFreeLinks(storyIds: number[], options: WatchFreeLinksOptions): Promise<void> {
-  if (storyIds.length === 0) return;
-  const { fetcher = (input, init) => fetch(input, init), wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms)) } = options;
+export async function watchFreeLinks(storyIds: number[], options: WatchFreeLinksOptions): Promise<WatchEnd> {
+  if (storyIds.length === 0) return "done";
+  const {
+    fetcher = (input, init) => fetch(input, init),
+    wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+    isActive = () => true,
+  } = options;
 
   const started = await fetcher("/api/approval/free-links", {
     method: "POST",
@@ -82,13 +94,21 @@ export async function watchFreeLinks(storyIds: number[], options: WatchFreeLinks
   let latest: FreeLinksByStory = {};
   for (let waited = 0; ; waited += POLL_MS) {
     const stories = await read();
+    if (!isActive()) return "stopped";
     if (stories) {
       latest = stories;
-      if (storyIds.every((id) => stories[id]?.done)) return options.onUpdate(stories);
+      if (storyIds.every((id) => stories[id]?.done)) {
+        options.onUpdate(stories);
+        return "done";
+      }
     }
     if (!started || waited >= POLL_LIMIT_MS) break;
     if (stories) options.onUpdate(stories);
     await wait(POLL_MS);
+    if (!isActive()) return "stopped";
   }
-  options.onUpdate(Object.fromEntries(storyIds.map((id) => [id, { done: true, links: latest[id]?.links ?? [] }])));
+  options.onUpdate(
+    Object.fromEntries(storyIds.map((id) => [id, latest[id]?.done ? latest[id] : { done: true, links: latest[id]?.links ?? [], unfinished: true }])),
+  );
+  return started ? "timed_out" : "not_started";
 }

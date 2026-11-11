@@ -25,9 +25,15 @@ export interface FoundLink {
   title: string;
 }
 
+export interface SearchRequest {
+  model: string;
+  tools: { type: "web_search" }[];
+  input: string;
+}
+
 /** The part of the OpenAI client the search uses, so tests can replace it. */
 export interface SearchClient {
-  responses: { create(request: never, options: never): Promise<{ output_text?: string }> };
+  responses: { create(request: SearchRequest, options: { timeout: number; maxRetries: number }): Promise<{ output_text?: string }> };
 }
 
 export interface SearchDeps {
@@ -71,8 +77,8 @@ export function parseSearchAnswer(text: string): FoundLink[] | null {
 /** Asks the web search for free articles that report the story's news. An answer that cannot be used is no links. */
 export async function searchFreeLinks(story: SearchStory, deps: SearchDeps = {}): Promise<FoundLink[]> {
   const client = deps.client ?? (new OpenAI({ apiKey: deps.apiKey ?? process.env.OPENAI_API_KEY }) as unknown as SearchClient);
-  const request = { model: SEARCH_MODEL, tools: [{ type: "web_search" }], input: buildSearchPrompt(story) };
-  const response = await client.responses.create(request as never, REQUEST_OPTIONS as never);
+  const request: SearchRequest = { model: SEARCH_MODEL, tools: [{ type: "web_search" }], input: buildSearchPrompt(story) };
+  const response = await client.responses.create(request, REQUEST_OPTIONS);
   const text = response.output_text ?? "";
   const links = parseSearchAnswer(text);
   if (links === null) {

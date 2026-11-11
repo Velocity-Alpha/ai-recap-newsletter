@@ -64,7 +64,7 @@ export function linkChoiceOf(override: string | undefined, links: { url: string 
 export function freeLinkPill(freeLinks: StoryFreeLinks | undefined, selectedUrl: string | null, originalUrl: string | null): string | null {
   if (!freeLinks) return null;
   if (!freeLinks.done) return "finding free links…";
-  if (freeLinks.links.length === 0) return "no free link found";
+  if (freeLinks.links.length === 0) return freeLinks.unfinished ? "free link search did not finish" : "no free link found";
   const selected = freeLinks.links.find((link) => link.url === selectedUrl);
   if (!selected) return freeLinks.links.length === 1 ? "1 free link found" : `${freeLinks.links.length} free links found`;
   return `free link: ${selected.site}, ${selected.words} words · original: ${siteOf(originalUrl ?? "") ?? "unknown site"}`;
@@ -90,4 +90,20 @@ export function linksToAutoSelect(update: FreeLinksByStory, ownerChanged: Readon
  */
 export function ownerLinkEdits(urlOverrides: Record<number, string>, autoLinks: Record<number, string>): Record<number, string> {
   return Object.fromEntries(Object.entries(urlOverrides).filter(([id, url]) => autoLinks[Number(id)] !== url));
+}
+
+/**
+ * The text of the "Other link" field: the link the owner typed. Empty while the story still has its original
+ * link or one of its free links.
+ */
+export function otherLinkText(override: string | undefined, links: { url: string }[]): string {
+  return override === undefined || links.some((link) => link.url === override) ? "" : override;
+}
+
+/**
+ * The states of the links in the given link edits only. A commit sends the link edits it was made with, so the
+ * state of a link that was selected after that (a free link the board just selected) must not count for it.
+ */
+export function statesOfLinkEdits(states: LinkState, urlOverrides: Record<number, string>): LinkState {
+  return Object.fromEntries(Object.entries(states).filter(([id]) => Number(id) in urlOverrides));
 }

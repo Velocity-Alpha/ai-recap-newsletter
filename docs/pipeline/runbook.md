@@ -202,8 +202,9 @@ Some ingest errors are not incidents. They show on the source's line in the `ing
 
 - **Raised by:** the board. It asks for free links for each story with a paywalled link, and polls for 2 minutes.
 - **Severity:** none. The owner can always select "Other link" and type a link, or commit the original link.
-- **Meaning:** The search did not finish for the story. After 2 minutes the card says "no free link found".
-  The search can still finish later (15 minutes at most); load the board again to see its links.
+- **Meaning:** The search did not finish for the story in 2 minutes, or it did not start. The card then says
+  "free link search did not finish". A search that runs can still finish later (15 minutes at most); load the
+  board again to see its links. Loading again starts no second search for a story a run works on.
 - **Do:** Look at the log of the `find-free-links-background` function on Netlify. One line for each run says
   how many stories it worked on and how many failed. A line `[free-links] Story <id>: …` gives the error of one
   story; that story stays not searched, and the next board load tries it again. For an OpenAI error, look at

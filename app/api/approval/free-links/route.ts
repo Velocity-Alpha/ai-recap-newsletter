@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 
 import { prismaFreeLinksStore } from "@/src/pipeline/free-links/find-free-links";
 import { readFreeLinks } from "@/src/pipeline/free-links/read-free-links";
-import { MAX_STORY_IDS, readStoryIds, startFreeLinksJob } from "@/src/pipeline/free-links/start-free-links";
+import { MAX_STORY_IDS } from "@/src/pipeline/free-links/sites";
+import { readStoryIds, startFreeLinksJob } from "@/src/pipeline/free-links/start-free-links";
 import { hasValidApprovalSession } from "@/src/server/approval-auth";
 import { logServerError } from "@/src/server/observability";
 
@@ -12,7 +13,8 @@ const BAD_IDS = `Give 1 to ${MAX_STORY_IDS} story ids.`;
 
 /**
  * Starts the search for free links (#59) for the board's stories with a paywalled link. Only the stories that
- * were not searched before go to the background function, so a second call for the same stories starts nothing.
+ * were not searched before, and that no run works on, go to the background function. So a second call for the
+ * same stories starts nothing.
  */
 export async function POST(request: Request) {
   if (!(await hasValidApprovalSession(request))) {
@@ -25,14 +27,21 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: BAD_IDS }, { status: 400 });
   }
 
+  let waiting: number[];
   try {
-    const waiting = (await prismaFreeLinksStore.storiesToSearch(storyIds)).map((story) => story.id);
-    if (waiting.length === 0) return NextResponse.json({ started: 0 });
+    waiting = (await prismaFreeLinksStore.storiesToSearch(storyIds, new Date())).map((story) => story.id);
+  } catch (error) {
+    logServerError("approval.free_links.read_failed", error, { stories: storyIds.length });
+    return NextResponse.json({ error: "The stories could not be read." }, { status: 500 });
+  }
+  if (waiting.length === 0) return NextResponse.json({ started: 0 });
+
+  try {
     const result = await startFreeLinksJob(waiting, { siteUrl: new URL(request.url).origin });
     if (result.status !== "started") throw new Error(result.reason);
     return NextResponse.json({ started: waiting.length });
   } catch (error) {
-    logServerError("approval.free_links.start_failed", error, { stories: storyIds.length });
+    logServerError("approval.free_links.start_failed", error, { stories: waiting.length });
     return NextResponse.json({ error: "The search for free links did not start." }, { status: 502 });
   }
 }

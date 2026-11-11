@@ -7,7 +7,16 @@ export interface StoryFreeLinks {
   links: { url: string; site: string; title: string | null; words: number }[];
 }
 
-/** The free links of the given stories, by story id. A story that does not exist is done, with no links. */
+/** What the board gets for one story. A story that does not exist, or whose link is not paywalled, is done, with no links. */
+export function storyFreeLinks(
+  story: { paywallDetected: string | null; freeLinksCheckedAt: Date | null } | undefined,
+  links: StoryFreeLinks["links"],
+): StoryFreeLinks {
+  if (story?.paywallDetected !== "yes") return { done: true, links: [] };
+  return { done: story.freeLinksCheckedAt !== null, links: links.map(({ url, site, title, words }) => ({ url, site, title, words })) };
+}
+
+/** The free links of the given stories, by story id. */
 export async function readFreeLinks(storyIds: number[]): Promise<Record<number, StoryFreeLinks>> {
   if (storyIds.length === 0) return {};
   const [stories, links] = await Promise.all([
@@ -18,14 +27,5 @@ export async function readFreeLinks(storyIds: number[]): Promise<Record<number, 
       select: { storyId: true, url: true, site: true, title: true, words: true },
     }),
   ]);
-  const waiting = new Set(stories.filter((story) => story.paywallDetected === "yes" && story.freeLinksCheckedAt === null).map((story) => story.id));
-  return Object.fromEntries(
-    storyIds.map((id) => [
-      id,
-      {
-        done: !waiting.has(id),
-        links: links.filter((link) => link.storyId === id).map(({ url, site, title, words }) => ({ url, site, title, words })),
-      },
-    ]),
-  );
+  return Object.fromEntries(storyIds.map((id) => [id, storyFreeLinks(stories.find((story) => story.id === id), links.filter((link) => link.storyId === id))]));
 }

@@ -67,11 +67,11 @@ interface ProbeResult {
 }
 
 /**
- * The text worker starts from its module's own file, so it only works once built. This builds the draft function
- * the way Netlify does (one esbuild ESM file, @prisma/client external, a require shim) and runs real parses through
- * the worker from that file.
+ * The text worker starts from its module's own file, so it only works once built. This builds each function that
+ * reads articles the way Netlify does (one esbuild ESM file, @prisma/client external, a require shim) and runs real
+ * parses through the worker from that file.
  */
-describe("the text worker in the bundled draft function", () => {
+describe.each(["draft-issue-background", "find-free-links-background"])("the text worker in the bundled %s function", (functionName) => {
   let dir: string;
   let result: ProbeResult;
 
@@ -80,11 +80,11 @@ describe("the text worker in the bundled draft function", () => {
     mkdirSync(path.join(root, "node_modules/.cache"), { recursive: true });
     dir = mkdtempSync(path.join(root, "node_modules/.cache/html-worker-bundle-"));
     const entry = path.join(dir, "entry.ts");
-    const outfile = path.join(dir, "draft-issue-background.mjs");
+    const outfile = path.join(dir, `${functionName}.mjs`);
     writeFileSync(
       entry,
       [
-        `export { default } from ${JSON.stringify(path.join(root, "netlify/functions/draft-issue-background.mts"))};`,
+        `export { default } from ${JSON.stringify(path.join(root, `netlify/functions/${functionName}.mts`))};`,
         `export { guardHtml, readArticle } from ${JSON.stringify(path.join(root, "src/pipeline/draft/articles/index.ts"))};`,
         `export { canStartWorker, createWorkerParser, defaultHtmlParser } from ${JSON.stringify(path.join(root, "src/pipeline/draft/articles/html-worker.ts"))};`,
       ].join("\n"),

@@ -2,19 +2,25 @@ import { readerOptionsFromEnv } from "@/src/pipeline/draft/articles/draft-reader
 import { checkLinks, type CheckedLink, type LinkCandidate } from "@/src/pipeline/free-links/check-links";
 import { learnedSitesOrNone } from "@/src/pipeline/free-links/paywall-sites";
 import { searchFreeLinks, type FoundLink } from "@/src/pipeline/free-links/search";
-import { DEFAULT_WINDOW_DAYS, pairLevel } from "@/src/pipeline/repeats/repeat-rules";
+import { DEFAULT_WINDOW_DAYS, pairLevel, type StoryMatchRow } from "@/src/pipeline/repeats/repeat-rules";
 import { prisma } from "@/src/server/prisma";
 
 /**
  * The search for free links (#59). For each story whose link is paywalled and that was not searched before:
  * first our own stories that report the same news, then one web search. Every link is checked (check-links.ts)
  * before it is saved. A story is marked as searched also when it has no free link, so it is searched only once.
+ * A run claims a story before it works on it, so two runs at the same time do not search the same story.
  */
 
-/** Stories worked on at once. One story can take a web search (up to 2 minutes) and a read (45 s). */
+/** Stories worked on at once. */
 export const STORIES_AT_ONCE = 3;
-/** The background function has 15 minutes. No new story starts after this. */
-export const TIME_LIMIT_MS = 11 * 60_000;
+/**
+ * The background function has 15 minutes. One story can take a web search (2 minutes, tried twice) and two
+ * reads (45 s each), so no new story starts after this.
+ */
+export const TIME_LIMIT_MS = 9 * 60_000;
+/** A claim lasts as long as the background function can run. After that another run can take the story. */
+export const CLAIM_MS = 15 * 60_000;
 
 export interface FreeLinkStory {
   id: number;
@@ -22,6 +28,7 @@ export interface FreeLinkStory {
   summary: string | null;
   /** The paywalled link. */
   url: string;
+  day: Date | null;
 }
 
 /** One of our own stories that reports the same news as a paywalled story. */
@@ -37,8 +44,12 @@ export interface SavedLink extends CheckedLink {
 }
 
 export interface FreeLinksStore {
-  /** Of the given stories, those with a paywalled link that were not searched before. */
-  storiesToSearch(ids: number[]): Promise<FreeLinkStory[]>;
+  /** Of the given stories, those with a paywalled link that were not searched before and that no run works on. */
+  storiesToSearch(ids: number[], now: Date): Promise<FreeLinkStory[]>;
+  /** Takes the story for this run. False when another run took it first, or the story was searched meanwhile. */
+  claim(storyId: number, now: Date): Promise<boolean>;
+  /** Gives the story back after an error, so the next run can search it. */
+  release(storyId: number): Promise<void>;
   /** Our own stories that are surely the same news, from the days near the story, with a link not known as paywalled. */
   ownStories(story: FreeLinkStory): Promise<OwnStory[]>;
   /** Replaces the story's free links, in order, and marks the story as searched. */
@@ -70,41 +81,69 @@ export interface FreeLinksRun {
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+/**
+ * The ids of the stories that are surely the same news as the story, the surest first. A story match can name
+ * the story as the newer or the older one of the pair.
+ */
+export function surePartners(storyId: number, matches: readonly Pick<StoryMatchRow, "newerStoryId" | "olderStoryId" | "same" | "news">[]): number[] {
+  return matches
+    .filter((match) => (match.newerStoryId === storyId || match.olderStoryId === storyId) && pairLevel(match) === "sure")
+    .map((match) => ({ id: match.newerStoryId === storyId ? match.olderStoryId : match.newerStoryId, same: match.same }))
+    .sort((a, b) => b.same - a.same || a.id - b.id)
+    .map((partner) => partner.id);
+}
+
+/** A story a run can take: paywalled, not searched, and not claimed in the last CLAIM_MS. */
+function waitingStory(now: Date) {
+  return {
+    paywallDetected: "yes",
+    freeLinksCheckedAt: null,
+    url: { not: null },
+    OR: [{ freeLinksStartedAt: null }, { freeLinksStartedAt: { lt: new Date(now.getTime() - CLAIM_MS) } }],
+  };
+}
+
 export const prismaFreeLinksStore: FreeLinksStore = {
-  async storiesToSearch(ids) {
+  async storiesToSearch(ids, now) {
     if (ids.length === 0) return [];
     const rows = await prisma.story.findMany({
-      where: { id: { in: ids }, paywallDetected: "yes", freeLinksCheckedAt: null, url: { not: null } },
+      where: { id: { in: ids }, ...waitingStory(now) },
       orderBy: { id: "asc" },
-      select: { id: true, headline: true, summary: true, url: true },
+      select: { id: true, headline: true, summary: true, url: true, day: true },
     });
     return rows.flatMap((row) => (row.url ? [{ ...row, url: row.url }] : []));
   },
 
-  async ownStories(story) {
-    const matches = await prisma.storyMatch.findMany({ where: { OR: [{ newerStoryId: story.id }, { olderStoryId: story.id }] } });
-    const sameByStory = new Map<number, number>();
-    for (const match of matches) {
-      if (pairLevel(match) !== "sure") continue;
-      sameByStory.set(match.newerStoryId === story.id ? match.olderStoryId : match.newerStoryId, match.same);
-    }
-    if (sameByStory.size === 0) return [];
+  async claim(storyId, now) {
+    // One statement: of two runs at the same time, only one changes the row.
+    const { count } = await prisma.story.updateMany({ where: { id: storyId, ...waitingStory(now) }, data: { freeLinksStartedAt: now } });
+    return count === 1;
+  },
 
-    const self = await prisma.story.findUnique({ where: { id: story.id }, select: { day: true } });
-    if (!self?.day) return [];
+  async release(storyId) {
+    await prisma.story.updateMany({ where: { id: storyId, freeLinksCheckedAt: null }, data: { freeLinksStartedAt: null } });
+  },
+
+  async ownStories(story) {
+    if (!story.day) return [];
+    const matches = await prisma.storyMatch.findMany({ where: { OR: [{ newerStoryId: story.id }, { olderStoryId: story.id }] } });
+    const partners = surePartners(story.id, matches);
+    if (partners.length === 0) return [];
+
     const window = DEFAULT_WINDOW_DAYS * DAY_MS;
     const rows = await prisma.story.findMany({
       where: {
-        id: { in: [...sameByStory.keys()] },
+        id: { in: partners },
         url: { not: null },
         paywallDetected: { in: ["no", "unknown"] },
-        day: { gte: new Date(self.day.getTime() - window), lte: new Date(self.day.getTime() + window) },
+        day: { gte: new Date(story.day.getTime() - window), lte: new Date(story.day.getTime() + window) },
       },
       select: { id: true, url: true, headline: true },
     });
-    return rows
-      .flatMap((row) => (row.url ? [{ ...row, url: row.url }] : []))
-      .sort((a, b) => (sameByStory.get(b.id) ?? 0) - (sameByStory.get(a.id) ?? 0) || a.id - b.id);
+    return partners.flatMap((id) => {
+      const row = rows.find((candidate) => candidate.id === id);
+      return row?.url ? [{ ...row, url: row.url }] : [];
+    });
   },
 
   async save(storyId, links, at) {
@@ -133,7 +172,7 @@ export async function findFreeLinks(storyIds: number[], deps: FindFreeLinksDeps 
   const now = deps.now ?? (() => new Date());
   const run: FreeLinksRun = { stories: 0, fromStories: 0, searched: 0, links: 0, failed: 0 };
 
-  const waiting = await store.storiesToSearch(storyIds);
+  const waiting = await store.storiesToSearch(storyIds, now());
   if (waiting.length === 0) return run;
   const check = deps.checkLinks ?? (await defaultCheckLinks());
   const stopAt = now().getTime() + (deps.timeLimitMs ?? TIME_LIMIT_MS);
@@ -160,12 +199,15 @@ export async function findFreeLinks(storyIds: number[], deps: FindFreeLinksDeps 
   async function worker(): Promise<void> {
     for (let story = waiting.shift(); story; story = waiting.shift()) {
       if (now().getTime() >= stopAt) return;
+      // Another run can have taken the story since the list was read.
+      if (!(await store.claim(story.id, now()))) continue;
       run.stories += 1;
       try {
         await findFor(story);
       } catch (error) {
         run.failed += 1;
         log(`[free-links] Story ${story.id}: ${describeError(error)}`);
+        await store.release(story.id).catch(() => undefined);
       }
     }
   }
