@@ -6,7 +6,9 @@ vi.mock("@/src/server/observability", () => ({ logServerInfo: vi.fn(), logServer
 
 import {
   checkLeadPickStatus,
+  LEAD_PICK_EFFORT,
   LEAD_PICK_INSTRUCTIONS,
+  LEAD_PICK_MODEL,
   leadPickUserMessage,
   submitLeadPick,
 } from "@/src/features/newsletter/openai-lead-pick";
@@ -28,7 +30,14 @@ describe("AI lead pick", () => {
     await expect(submitLeadPick(INPUT, "2026-10-27")).resolves.toBe("resp_lead");
 
     const request = clientMock.responses.create.mock.calls[0][0];
-    expect(request).toMatchObject({ model: "gpt-6-luna", background: true, instructions: LEAD_PICK_INSTRUCTIONS });
+    expect(LEAD_PICK_MODEL).toBe("gpt-6-luna");
+    expect(LEAD_PICK_EFFORT).toBe("low");
+    expect(request).toMatchObject({
+      model: "gpt-6-luna",
+      reasoning: { effort: "low" },
+      background: true,
+      instructions: LEAD_PICK_INSTRUCTIONS,
+    });
     // The repeats come first in the schema, so the model names them before it chooses.
     expect(request.text.format.schema.required).toEqual(["repeated_story_ids", "lead_story_id", "reason"]);
     expect(JSON.parse(request.input)).toEqual({
@@ -38,6 +47,21 @@ describe("AI lead pick", () => {
         { id: 9, headline: "OpenAI Ships GPT-6.1 Terra", summary: "S9", section: "tools", sources: 3 },
       ],
     });
+  });
+
+  it("uses the model, effort and client it is given (for evals)", async () => {
+    const other = { responses: { create: vi.fn(async () => ({ id: "resp_other" })), retrieve: vi.fn() } };
+
+    await expect(submitLeadPick(INPUT, "2026-10-27", { client: other, model: "gpt-6-sol", effort: "high" })).resolves.toBe(
+      "resp_other"
+    );
+
+    expect(clientMock.responses.create).not.toHaveBeenCalled();
+    expect((other.responses.create.mock.calls[0] as unknown[])[0]).toMatchObject({ model: "gpt-6-sol", reasoning: { effort: "high" } });
+
+    other.responses.retrieve.mockResolvedValue({ status: "in_progress" });
+    await expect(checkLeadPickStatus("resp_other", { client: other })).resolves.toEqual({ status: "pending" });
+    expect(clientMock.responses.retrieve).not.toHaveBeenCalled();
   });
 
   it("carries the owner's rules in the rubric", () => {

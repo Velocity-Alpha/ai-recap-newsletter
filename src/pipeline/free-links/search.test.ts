@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import answers from "@/src/pipeline/free-links/__fixtures__/search-answers.json";
-import { buildSearchPrompt, parseSearchAnswer, searchFreeLinks, type SearchClient } from "@/src/pipeline/free-links/search";
+import { buildSearchPrompt, parseSearchAnswer, SEARCH_EFFORT, searchFreeLinks, type SearchClient } from "@/src/pipeline/free-links/search";
 
 const STORY = {
   headline: "Pretend Lab Ships A Toy Model",
@@ -36,6 +36,17 @@ describe("searchFreeLinks", () => {
     expect(create).toHaveBeenCalledTimes(1);
     expect(create).toHaveBeenCalledWith(
       { model: "gpt-6-luna", tools: [{ type: "web_search" }], input: buildSearchPrompt(STORY) },
+      { timeout: 120_000, maxRetries: 1 },
+    );
+    // No effort is set, so the API default applies.
+    expect(SEARCH_EFFORT).toBeUndefined();
+  });
+
+  it("uses the model and effort it is given (for evals)", async () => {
+    const { client, create } = clientAnswering('{"links":[]}');
+    await searchFreeLinks(STORY, { client, model: "gpt-6-sol", effort: "high" });
+    expect(create).toHaveBeenCalledWith(
+      { model: "gpt-6-sol", reasoning: { effort: "high" }, tools: [{ type: "web_search" }], input: buildSearchPrompt(STORY) },
       { timeout: 120_000, maxRetries: 1 },
     );
   });

@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 
+import { API_DEFAULT_EFFORT, effortOrDefault, reasoningField, type EffortSetting } from "@/src/lib/reasoning-effort";
 import { withRetries } from "@/src/pipeline/draft/image/retry";
 
 /**
@@ -10,6 +11,8 @@ import { withRetries } from "@/src/pipeline/draft/image/retry";
  */
 
 export const SCENE_PROMPT_MODEL = "gpt-6-luna";
+/** No effort is sent: the API default. */
+export const SCENE_PROMPT_EFFORT: EffortSetting = API_DEFAULT_EFFORT;
 export const SCENE_PROMPT_TIMEOUT_MS = 120_000;
 export const SCENE_PROMPT_RETRIES = 2;
 
@@ -167,6 +170,9 @@ export interface WriteScenePromptOptions {
   apiKey?: string;
   /** Wait between attempts. n8n waits 5 s. */
   retryDelayMs?: number;
+  /** For evals. Production uses SCENE_PROMPT_MODEL and SCENE_PROMPT_EFFORT. */
+  model?: string;
+  effort?: EffortSetting;
 }
 
 /** Writes the scene prompt for an issue. Tries 3 times (2 retries), each with a 120 s timeout. */
@@ -181,7 +187,8 @@ export async function writeScenePrompt(
     options.client ??
     (new OpenAI({ apiKey: options.apiKey ?? process.env.OPENAI_API_KEY }) as unknown as ScenePromptClient);
   const request = {
-    model: SCENE_PROMPT_MODEL,
+    model: options.model ?? SCENE_PROMPT_MODEL,
+    ...reasoningField(effortOrDefault(options, SCENE_PROMPT_EFFORT)),
     instructions: SYSTEM_PROMPT,
     input: buildScenePromptInput(context),
     store: false,

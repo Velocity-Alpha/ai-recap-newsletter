@@ -52,6 +52,9 @@ APP_ENV=development npm run verify
 
 It runs lint, tests, and a production build. `npm install` turns on a git pre-push hook (`.githooks/pre-push`) that runs it and stops the push if it fails.
 
+`npm run eval` runs the evals of the app's model calls against OpenAI. They cost money and are not part of
+`verify`: see [evals/README.md](./evals/README.md).
+
 Netlify bills in credits (Free plan: 300 a month). Each merge to `main` starts a production deploy, which uses 15. Deploy previews and failed builds use none. Merge in batches, and put `[skip netlify]` in the squash subject of a docs-only merge. When the credits run out, Netlify pauses the site until the next billing cycle.
 
 ## Database changes

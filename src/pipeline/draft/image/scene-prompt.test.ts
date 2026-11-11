@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   buildSceneContext,
   buildScenePromptInput,
+  SCENE_PROMPT_EFFORT,
   SCENE_PROMPT_MODEL,
   SCENE_PROMPT_TIMEOUT_MS,
   writeScenePrompt,
@@ -75,6 +76,9 @@ describe("writeScenePrompt", () => {
     expect(request.input).toBe(buildScenePromptInput(CONTEXT));
     expect(request.store).toBe(false);
     expect(request.tools).toBeUndefined();
+    // No effort is set, so the API default applies.
+    expect(SCENE_PROMPT_EFFORT).toBeUndefined();
+    expect(request).not.toHaveProperty("reasoning");
     expect(request.text.format).toMatchObject({ type: "json_schema", name: "image_prompt_output", strict: true });
     expect(request.text.format.schema).toMatchObject({
       required: ["image_prompt", "editorial_rationale"],
@@ -83,6 +87,12 @@ describe("writeScenePrompt", () => {
     expect(SCENE_PROMPT_TIMEOUT_MS).toBe(120_000);
     // Our loop does the retries, so the SDK must not retry on top of it.
     expect(requestOptions).toEqual({ timeout: 120_000, maxRetries: 0 });
+  });
+
+  it("uses the model and effort it is given (for evals)", async () => {
+    const { client, create } = fakeClient(OUTPUT);
+    await writeScenePrompt(CONTEXT, { client, retryDelayMs: 0, model: "gpt-6-sol", effort: "low" });
+    expect(create.mock.calls[0][0]).toMatchObject({ model: "gpt-6-sol", reasoning: { effort: "low" } });
   });
 
   it("retries twice, for a failed call or output that does not match the schema", async () => {

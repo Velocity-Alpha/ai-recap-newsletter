@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   buildExtractionPrompt,
   createOpenAIExtractor,
+  EXTRACTION_EFFORT,
   EXTRACTION_MODEL,
   parseExtractedStories,
   STORY_CATEGORIES,
@@ -70,10 +71,17 @@ describe("createOpenAIExtractor", () => {
     const request = create.mock.calls[0][0] as Record<string, unknown> & { text: { format: Record<string, unknown> } };
     expect(request.model).toBe(EXTRACTION_MODEL);
     expect(EXTRACTION_MODEL).toBe("gpt-6-luna");
+    expect(EXTRACTION_EFFORT).toBe("low");
     expect(request.reasoning).toEqual({ effort: "low" });
     expect(request.store).toBe(false);
     expect(request.tools).toBeUndefined();
     expect(request.text.format).toMatchObject({ type: "json_schema", name: "news_stories", strict: true });
+  });
+
+  it("uses the model and effort it is given (for evals)", async () => {
+    const { client, create } = fakeClient(JSON.stringify({ stories: [] }));
+    await createOpenAIExtractor({ client, model: "gpt-6-sol", effort: "high" })({ sourceDate: "2026-11-09", text: "x" });
+    expect(create.mock.calls[0][0]).toMatchObject({ model: "gpt-6-sol", reasoning: { effort: "high" } });
   });
 
   it("retries once, then reports the failure", async () => {

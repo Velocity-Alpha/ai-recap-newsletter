@@ -1,5 +1,7 @@
 import OpenAI from "openai";
 
+import { effortOrDefault, reasoningField, type EffortSetting } from "@/src/lib/reasoning-effort";
+
 /**
  * One model call per newsletter issue: n8n's extraction prompt and output schema
  * (docs/n8n-backend/10-ingestion.md §4.4), moved from gpt-5.4-mini to gpt-6-luna.
@@ -9,6 +11,7 @@ import OpenAI from "openai";
  */
 
 export const EXTRACTION_MODEL = "gpt-6-luna";
+export const EXTRACTION_EFFORT: EffortSetting = "low";
 
 export const STORY_CATEGORIES = [
   "Launches",
@@ -251,15 +254,23 @@ export interface ResponsesClient {
   responses: { create(request: never): Promise<{ output_text?: string }> };
 }
 
-export function createOpenAIExtractor(options: { client?: ResponsesClient; apiKey?: string } = {}): Extractor {
+export interface ExtractorOptions {
+  client?: ResponsesClient;
+  apiKey?: string;
+  /** For evals. Production uses EXTRACTION_MODEL and EXTRACTION_EFFORT. */
+  model?: string;
+  effort?: EffortSetting;
+}
+
+export function createOpenAIExtractor(options: ExtractorOptions = {}): Extractor {
   const client =
     options.client ??
     (new OpenAI({ apiKey: options.apiKey ?? process.env.OPENAI_API_KEY, timeout: 120_000, maxRetries: 1 }) as unknown as ResponsesClient);
 
   async function once(input: ExtractionInput): Promise<ExtractedStory[]> {
     const request = {
-      model: EXTRACTION_MODEL,
-      reasoning: { effort: "low" },
+      model: options.model ?? EXTRACTION_MODEL,
+      ...reasoningField(effortOrDefault(options, EXTRACTION_EFFORT)),
       instructions: SYSTEM_PROMPT,
       input: buildExtractionPrompt(input),
       store: false,

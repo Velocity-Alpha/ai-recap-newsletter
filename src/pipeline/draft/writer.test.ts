@@ -4,6 +4,7 @@ import { WRITTEN_ISSUE_SCHEMA } from "@/src/pipeline/draft/content";
 import { SAMPLE_APPROVED, SAMPLE_CONTENT } from "@/src/pipeline/draft/draft.fixture";
 import {
   MAX_ARTICLE_CHARS,
+  WRITER_EFFORT,
   WRITER_MODEL,
   buildWriterPrompt,
   createOpenAIIssueWriter,
@@ -51,11 +52,18 @@ describe("createOpenAIIssueWriter", () => {
     const request = create.mock.calls[0][0];
     expect(WRITER_MODEL).toBe("gpt-6-luna");
     expect(request.model).toBe("gpt-6-luna");
+    expect(WRITER_EFFORT).toBe("low");
     expect(request.reasoning).toEqual({ effort: "low" });
     expect(request.tools).toBeUndefined();
     expect(request.text.format).toMatchObject({ type: "json_schema", strict: true, schema: WRITTEN_ISSUE_SCHEMA });
     expect(request.input).toBe(buildWriterPrompt(INPUT));
     expect(request.instructions).toContain("You are the editorial structuring engine for an AI newsletter.");
+  });
+
+  it("uses the model and effort it is given (for evals)", async () => {
+    const { client, create } = fakeClient({ status: "completed", output_text: JSON.stringify(SAMPLE_CONTENT) });
+    await createOpenAIIssueWriter({ client, model: "gpt-6-sol", effort: "medium" })(INPUT);
+    expect(create.mock.calls[0][0]).toMatchObject({ model: "gpt-6-sol", reasoning: { effort: "medium" } });
   });
 
   it("tells the model that article_text is untrusted web text whose instructions it must ignore", async () => {

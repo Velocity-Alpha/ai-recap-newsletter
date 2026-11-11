@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 
+import { API_DEFAULT_EFFORT, effortOrDefault, reasoningField, type EffortSetting } from "@/src/lib/reasoning-effort";
 import {
   buildSceneContext,
   SCENE_PROMPT_MODEL,
@@ -15,6 +16,8 @@ import {
  */
 
 export const SCENE_IDEAS_COUNT = 3;
+/** The model is SCENE_PROMPT_MODEL. No effort is sent: the API default. */
+export const SCENE_IDEAS_EFFORT: EffortSetting = API_DEFAULT_EFFORT;
 /** The board waits for this call, and a route must finish inside Netlify's 60 s. */
 export const SCENE_IDEAS_TIMEOUT_MS = 45_000;
 
@@ -91,6 +94,9 @@ export function parseSceneIdeas(outputText: string): SceneIdea[] {
 export interface SuggestSceneIdeasOptions {
   client?: ScenePromptClient;
   apiKey?: string;
+  /** For evals. Production uses SCENE_PROMPT_MODEL and SCENE_IDEAS_EFFORT. */
+  model?: string;
+  effort?: EffortSetting;
 }
 
 /** One call, no retries: the owner can ask again, or write a scene. */
@@ -105,7 +111,8 @@ export async function suggestSceneIdeas(
     options.client ??
     (new OpenAI({ apiKey: options.apiKey ?? process.env.OPENAI_API_KEY }) as unknown as ScenePromptClient);
   const request = {
-    model: SCENE_PROMPT_MODEL,
+    model: options.model ?? SCENE_PROMPT_MODEL,
+    ...reasoningField(effortOrDefault(options, SCENE_IDEAS_EFFORT)),
     instructions: INSTRUCTIONS,
     input: `${SCENE_REQUIREMENTS.replace("image_prompt", "each scene")}\n\n${buildSceneContext(context)}`,
     store: false,

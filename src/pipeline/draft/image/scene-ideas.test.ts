@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { parseSceneIdeas, SCENE_IDEAS_TIMEOUT_MS, suggestSceneIdeas } from "@/src/pipeline/draft/image/scene-ideas";
+import { parseSceneIdeas, SCENE_IDEAS_EFFORT, SCENE_IDEAS_TIMEOUT_MS, suggestSceneIdeas } from "@/src/pipeline/draft/image/scene-ideas";
 import { buildSceneContext, SCENE_PROMPT_MODEL, type ScenePromptContext } from "@/src/pipeline/draft/image/scene-prompt";
 
 const CONTEXT: ScenePromptContext = {
@@ -40,11 +40,20 @@ describe("suggestSceneIdeas", () => {
       store: false,
       text: { format: { type: "json_schema", strict: true } },
     });
+    // No effort is set, so the API default applies.
+    expect(SCENE_IDEAS_EFFORT).toBeUndefined();
+    expect(request).not.toHaveProperty("reasoning");
     expect(String(request.input)).toContain(buildSceneContext(CONTEXT));
     expect(String(request.instructions)).toContain("three");
     // The board waits for this, so there are no retries, and it ends inside Netlify's 60 s.
     expect(options).toEqual({ timeout: SCENE_IDEAS_TIMEOUT_MS, maxRetries: 0 });
     expect(SCENE_IDEAS_TIMEOUT_MS).toBeLessThan(60_000);
+  });
+
+  it("uses the model and effort it is given (for evals)", async () => {
+    const { client, create } = fakeClient(JSON.stringify({ ideas: IDEAS }));
+    await suggestSceneIdeas(CONTEXT, { client, model: "gpt-6-sol", effort: "none" });
+    expect(create.mock.calls[0][0]).toMatchObject({ model: "gpt-6-sol", reasoning: { effort: "none" } });
   });
 
   it("refuses an issue with no subject line or no top stories, without calling the model", async () => {

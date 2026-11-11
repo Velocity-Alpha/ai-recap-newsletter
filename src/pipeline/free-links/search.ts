@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 
+import { API_DEFAULT_EFFORT, effortOrDefault, reasoningField, type EffortSetting, type ReasoningEffort } from "@/src/lib/reasoning-effort";
 import { siteOf } from "@/src/pipeline/free-links/sites";
 
 /**
@@ -10,6 +11,8 @@ import { siteOf } from "@/src/pipeline/free-links/sites";
  */
 
 export const SEARCH_MODEL = "gpt-6-luna";
+/** No effort is sent: the API default. */
+export const SEARCH_EFFORT: EffortSetting = API_DEFAULT_EFFORT;
 const REQUEST_OPTIONS = { timeout: 120_000, maxRetries: 1 };
 
 export interface SearchStory {
@@ -27,6 +30,7 @@ export interface FoundLink {
 
 export interface SearchRequest {
   model: string;
+  reasoning?: { effort: ReasoningEffort };
   tools: { type: "web_search" }[];
   input: string;
 }
@@ -41,6 +45,9 @@ export interface SearchDeps {
   apiKey?: string;
   /** Gets one line when the answer cannot be used. */
   log?: (message: string) => void;
+  /** For evals. Production uses SEARCH_MODEL and SEARCH_EFFORT. */
+  model?: string;
+  effort?: EffortSetting;
 }
 
 export function buildSearchPrompt(story: SearchStory): string {
@@ -77,7 +84,12 @@ export function parseSearchAnswer(text: string): FoundLink[] | null {
 /** Asks the web search for free articles that report the story's news. An answer that cannot be used is no links. */
 export async function searchFreeLinks(story: SearchStory, deps: SearchDeps = {}): Promise<FoundLink[]> {
   const client = deps.client ?? (new OpenAI({ apiKey: deps.apiKey ?? process.env.OPENAI_API_KEY }) as unknown as SearchClient);
-  const request: SearchRequest = { model: SEARCH_MODEL, tools: [{ type: "web_search" }], input: buildSearchPrompt(story) };
+  const request: SearchRequest = {
+    model: deps.model ?? SEARCH_MODEL,
+    ...reasoningField(effortOrDefault(deps, SEARCH_EFFORT)),
+    tools: [{ type: "web_search" }],
+    input: buildSearchPrompt(story),
+  };
   const response = await client.responses.create(request, REQUEST_OPTIONS);
   const text = response.output_text ?? "";
   const links = parseSearchAnswer(text);

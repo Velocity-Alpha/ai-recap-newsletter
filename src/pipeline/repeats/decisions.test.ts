@@ -67,6 +67,15 @@ describe("judgePairs", () => {
     });
   });
 
+  it("uses the model it is given (for evals); the Decisions API takes no effort", async () => {
+    const fetchMock = vi.fn(async () => respond(200, okBody));
+    const judge = createPairJudge({ apiKey: "key", fetch: fetchMock as unknown as typeof fetch, model: "gpt-6-luna-next" });
+    await judge(newer, olders);
+    const body = JSON.parse((fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].body as string);
+    expect(body.model).toBe("gpt-6-luna-next");
+    expect(body).not.toHaveProperty("reasoning");
+  });
+
   it("drops a pair when one of its answers is a refusal", async () => {
     const body = { ...okBody, answers: [...okBody.answers] };
     body.answers[1] = { type: "refusal", name: "news:10" } as never;

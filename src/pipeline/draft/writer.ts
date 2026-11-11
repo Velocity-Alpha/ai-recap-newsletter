@@ -1,5 +1,7 @@
 import OpenAI from "openai";
 
+import { effortOrDefault, reasoningField, type EffortSetting } from "@/src/lib/reasoning-effort";
+
 import { CANDIDATE_SECTION_CONFIGS, type SectionKey } from "@/src/features/newsletter/section-config";
 import {
   CONTENT_SECTION_KEYS,
@@ -22,6 +24,7 @@ import {
  */
 
 export const WRITER_MODEL = "gpt-6-luna";
+export const WRITER_EFFORT: EffortSetting = "low";
 
 /** Article text beyond this is cut, so 8 feature stories stay well inside the model's context. */
 export const MAX_ARTICLE_CHARS = 20_000;
@@ -249,7 +252,15 @@ function refusalOf(response: WriterResponse): string | null {
   return null;
 }
 
-export function createOpenAIIssueWriter(options: { client?: ResponsesClient; apiKey?: string } = {}): IssueWriter {
+export interface IssueWriterOptions {
+  client?: ResponsesClient;
+  apiKey?: string;
+  /** For evals. Production uses WRITER_MODEL and WRITER_EFFORT. */
+  model?: string;
+  effort?: EffortSetting;
+}
+
+export function createOpenAIIssueWriter(options: IssueWriterOptions = {}): IssueWriter {
   const client =
     options.client ??
     (new OpenAI({
@@ -260,8 +271,8 @@ export function createOpenAIIssueWriter(options: { client?: ResponsesClient; api
 
   return async (input) => {
     const request = {
-      model: WRITER_MODEL,
-      reasoning: { effort: "low" },
+      model: options.model ?? WRITER_MODEL,
+      ...reasoningField(effortOrDefault(options, WRITER_EFFORT)),
       instructions: SYSTEM_PROMPT,
       input: buildWriterPrompt(input),
       store: false,
