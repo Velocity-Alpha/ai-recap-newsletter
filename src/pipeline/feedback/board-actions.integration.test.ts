@@ -7,6 +7,7 @@ import { randomInt, randomUUID } from "node:crypto";
 
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
+import { readFeedback } from "@/src/features/admin/feedback";
 import { commitNativeDraft } from "@/src/pipeline/draft/native-commit";
 import type { ApprovalOutline, ProposedBoard } from "@/src/pipeline/draft/outline";
 import { prisma } from "@/src/server/prisma";
@@ -118,6 +119,21 @@ describe.skipIf(!enabled)("board actions on a real database", () => {
       { issueDate: date, storyId: ids.b, action: "move", from: ["headlines", 2], to: ["tools", 1], reason: ["wrong section", "a tool"] },
       { issueDate: date, storyId: ids.d, action: "restore_repeat", from: [null, null], to: ["headlines", 2], reason: [null, null] },
     ]);
+  });
+
+  it("/admin/feedback reads the newest commit of the date, with its own actions", async () => {
+    const summary = await readFeedback();
+
+    expect(summary.days.find((entry) => entry.date === date)).toEqual({
+      date,
+      proposed: 3,
+      keptInPlace: 2,
+      excluded: 0,
+      added: 1,
+      moved: 1,
+      leadChanged: false,
+    });
+    expect(summary.reasons).toContainEqual(expect.objectContaining({ action: "move", code: "wrong section" }));
   });
 
   it("refuses an action the CHECK constraint does not know", async () => {
