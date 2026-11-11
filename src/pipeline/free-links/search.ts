@@ -1,18 +1,21 @@
 import OpenAI from "openai";
 
-import { API_DEFAULT_EFFORT, effortOrDefault, reasoningField, type EffortSetting, type ReasoningEffort } from "@/src/lib/reasoning-effort";
+import { effortOrDefault, reasoningField, type EffortSetting, type ReasoningEffort } from "@/src/lib/reasoning-effort";
 import { siteOf } from "@/src/pipeline/free-links/sites";
 
 /**
  * The web search for free links (#59): one OpenAI request with the web search tool, for a story whose link is
  * paywalled and that has no free link among our own stories. The request and the prompt are those of issue #59;
- * the recorded answers in `__fixtures__/search-answers.json` were made with them, so keep them equal.
- * Measured on 10 stories: 2 to 9 searches for each request, 11 to 62 seconds, about 4 cents.
+ * the recorded answers in `__fixtures__/search-answers.json` were made with them before the effort was set (the
+ * API default, medium), so keep the prompt equal. Measured at no effort, 3 runs of 10 stories: about 7 searches
+ * and 7 cents for each request, 21 s p50 and 131 s p95 (evals/results/free-links.md).
  */
 
 export const SEARCH_MODEL = "gpt-6-luna";
-/** No effort is sent: the API default. */
-export const SEARCH_EFFORT: EffortSetting = API_DEFAULT_EFFORT;
+/** None, from evals/results/free-links.md (2026-11-11, 3 runs of 10 stories): it found a usable link most often
+ * (26 of 30 against 20 of 30 at medium, the API default). It searches more, so a request can reach the 120 s limit;
+ * a story whose search fails is searched again by the next run. */
+export const SEARCH_EFFORT: EffortSetting = "none";
 const REQUEST_OPTIONS = { timeout: 120_000, maxRetries: 1 };
 
 export interface SearchStory {

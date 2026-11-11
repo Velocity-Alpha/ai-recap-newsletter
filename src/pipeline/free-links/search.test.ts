@@ -28,18 +28,17 @@ describe("buildSearchPrompt", () => {
 });
 
 describe("searchFreeLinks", () => {
-  it("sends one web search request to gpt-6-luna, with a 120 s limit and one retry", async () => {
+  it("sends one web search request to gpt-6-luna at no effort, with a 120 s limit and one retry", async () => {
     const { client, create } = clientAnswering('{"links":[]}');
 
     await searchFreeLinks(STORY, { client });
 
     expect(create).toHaveBeenCalledTimes(1);
     expect(create).toHaveBeenCalledWith(
-      { model: "gpt-6-luna", tools: [{ type: "web_search" }], input: buildSearchPrompt(STORY) },
+      { model: "gpt-6-luna", reasoning: { effort: "none" }, tools: [{ type: "web_search" }], input: buildSearchPrompt(STORY) },
       { timeout: 120_000, maxRetries: 1 },
     );
-    // No effort is set, so the API default applies.
-    expect(SEARCH_EFFORT).toBeUndefined();
+    expect(SEARCH_EFFORT).toBe("none");
   });
 
   it("uses the model and effort it is given (for evals)", async () => {
