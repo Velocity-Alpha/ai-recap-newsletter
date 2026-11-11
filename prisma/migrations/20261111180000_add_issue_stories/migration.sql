@@ -22,7 +22,7 @@ CREATE INDEX "issue_stories_story_id_idx" ON "newsletter"."issue_stories"("story
 ALTER TABLE "newsletter"."issue_stories" ADD CONSTRAINT "issue_stories_section_check" CHECK ("section" IN ('headlines', 'research_and_analysis', 'tools', 'quick_hits'));
 
 -- Backfill: one row for each story of each published issue, from the four section arrays of content_json.
--- Only an item with a whole-number story_id gets a row. position is the item's place in its array. is_lead stays
+-- Only an item whose story_id is a positive whole number gets a row, as in issueStoryRows (issue-stories.ts). position is the item's place in its array. is_lead stays
 -- NULL: the sent draft of a past issue is not known here. A story listed twice in one issue keeps its first row.
 -- Older issues use other keys (topStories, quickHits) with no story ids, and get no rows.
 INSERT INTO "newsletter"."issue_stories" ("issue_id", "story_id", "section", "position", "url")
@@ -34,6 +34,6 @@ CROSS JOIN LATERAL jsonb_array_elements(
 ) WITH ORDINALITY AS item("value", "position")
 WHERE i."published_at" IS NOT NULL
   AND jsonb_typeof(item."value"->'story_id') = 'number'
-  AND item."value"->>'story_id' ~ '^[0-9]{1,9}$'
+  AND item."value"->>'story_id' ~ '^[1-9][0-9]{0,8}$'
 ORDER BY i."id", s."section_order", item."position"
 ON CONFLICT DO NOTHING;
