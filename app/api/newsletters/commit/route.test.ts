@@ -26,6 +26,10 @@ const storyChanges = vi.hoisted(() => ({ applyStoryChanges: vi.fn() }));
 
 vi.mock("@/src/pipeline/draft/story-changes", () => storyChanges);
 
+const boardActionStore = vi.hoisted(() => ({ readStoredUrls: vi.fn(), saveBoardActions: vi.fn() }));
+
+vi.mock("@/src/pipeline/feedback/board-action-store", () => boardActionStore);
+
 import { POST } from "@/app/api/newsletters/commit/route";
 import { IssuePublishedError } from "@/src/pipeline/draft/draft-store";
 
@@ -85,10 +89,22 @@ function boardCommitPayload() {
   };
   const notesOverrides: Record<number, string> = { 101: "Lead with the numbers." };
   const urlOverrides: Record<number, string> = { 201: "https://example.com/paper-201" };
-  const excludeState: Record<number, { excluded: boolean; reason: string }> = {
-    103: { excluded: true, reason: "Duplicate of 101" },
+  const excludeState: Record<number, { excluded: boolean; reason: string; reasonCode: string }> = {
+    103: { excluded: true, reason: "Duplicate of 101", reasonCode: "repeat" },
   };
   const headlineStoryId = 101;
+  // The board before the owner's first change: 103 was selected, 102 was the proposed lead, 501 a removed repeat.
+  const proposed = {
+    sections: [
+      { key: "headlines", story_ids: [101, 102, 103] },
+      { key: "research", story_ids: [201] },
+      { key: "tools", story_ids: [] },
+      { key: "quickHits", story_ids: [401] },
+    ],
+    lead_story_id: 102,
+    repeats_removed: [501],
+  };
+  const feedback = [{ story_id: 101, action: "lead", code: "bigger story", text: "" }];
 
   const toOption = (slot: BoardSlot) => ({
     id: slot.story.id,
@@ -126,6 +142,7 @@ function boardCommitPayload() {
         summary: slot.story.summary,
         note: notesOverrides[slot.story.id] ?? "",
         reason: exclude?.reason ?? "",
+        reason_code: exclude?.reasonCode ?? "",
         newsletter_category: section.key,
       })),
     newsletter_headline: headlineStoryId,
@@ -168,6 +185,8 @@ function boardCommitPayload() {
       newsletter_category: section.key,
     })),
     queue_update_count: selectedStoryIds.length,
+    proposed,
+    feedback,
   };
 }
 
@@ -186,7 +205,7 @@ describe("POST /api/newsletters/commit", () => {
     sections: [{ key: "top_stories", storyIds: [3, 1] }],
     leadStoryId: 3,
     stories: [{ id: 3, section: "top_stories", url: "https://example.com/edited", note: "n" }],
-    excluded: [{ id: 9, section: "top_stories", reason: "off topic" }],
+    excluded: [{ id: 9, section: "top_stories", reason: "off topic", reasonCode: "" }],
   };
 
   beforeEach(() => {
@@ -202,6 +221,8 @@ describe("POST /api/newsletters/commit", () => {
     draftStore.createDraft.mockResolvedValue({ draftId: 41, issueId: 3, version: 2, issueDate: "2026-05-21" });
     draftStore.markDraftStartFailed.mockResolvedValue(true);
     storyChanges.applyStoryChanges.mockResolvedValue({ excluded: 1, queued: 2, edited: 1 });
+    boardActionStore.readStoredUrls.mockResolvedValue(new Map([[3, "https://example.com/edited"]]));
+    boardActionStore.saveBoardActions.mockResolvedValue(0);
     process.env.SESSION_SECRET = "s".repeat(32);
     process.env.APPROVAL_PASSWORD = "approval-secret";
   });
@@ -237,7 +258,7 @@ describe("POST /api/newsletters/commit", () => {
       success: true,
       draft: { draftId: 41, issueId: 3, version: 2, issueDate: "2026-05-21" },
     });
-    expect(outlineStore.saveOutline).toHaveBeenCalledWith(OUTLINE);
+    expect(outlineStore.saveOutline).toHaveBeenCalledWith(OUTLINE, null);
     expect(storyChanges.applyStoryChanges).toHaveBeenCalledWith(OUTLINE, expect.anything());
     expect(draftStore.createDraft).toHaveBeenCalledWith(BigInt(5), expect.anything());
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -248,6 +269,9 @@ describe("POST /api/newsletters/commit", () => {
   });
 
   it("accepts the body the approval board posts", async () => {
+    const stored = [101, 102, 103, 201, 301, 401].map((id) => [id, `https://example.com/story-${id}`] as const);
+    boardActionStore.readStoredUrls.mockResolvedValueOnce(new Map(stored));
+
     const { response, json } = await commit(boardCommitPayload());
 
     expect(response.status).toBe(200);
@@ -262,8 +286,57 @@ describe("POST /api/newsletters/commit", () => {
           { key: "tools", storyIds: [] },
           { key: "quickHits", storyIds: [401] },
         ],
+        excluded: [{ id: 103, section: "headlines", reason: "Duplicate of 101", reasonCode: "repeat" }],
       }),
+      {
+        sections: [
+          { key: "headlines", storyIds: [101, 102, 103] },
+          { key: "research", storyIds: [201] },
+          { key: "tools", storyIds: [] },
+          { key: "quickHits", storyIds: [401] },
+        ],
+        leadStoryId: 102,
+        repeatsRemoved: [501],
+      },
     );
+    const rows = boardActionStore.saveBoardActions.mock.calls[0][3] as { action: string; reasonCode: string | null }[];
+    expect(rows.map((row) => [row.action, row.reasonCode])).toEqual([
+      ["exclude", "repeat"],
+      ["lead", "bigger story"],
+      ["link", null],
+    ]);
+  });
+
+  it("saves the proposed board and the board actions with their reasons", async () => {
+    const body = {
+      ...BODY,
+      excluded_stories: [{ id: 9, reason: "", reason_code: "promo", newsletter_category: "top_stories" }],
+      proposed: { sections: [{ key: "top_stories", story_ids: [1, 9, 3] }], lead_story_id: 1, repeats_removed: [] },
+      feedback: [{ story_id: 3, action: "lead", code: "bigger story", text: "" }, { action: "nonsense" }],
+    };
+
+    const { response } = await commit(body);
+
+    expect(response.status).toBe(200);
+    const proposed = { sections: [{ key: "top_stories", storyIds: [1, 9, 3] }], leadStoryId: 1, repeatsRemoved: [] };
+    expect(outlineStore.saveOutline).toHaveBeenCalledWith(expect.objectContaining({ leadStoryId: 3 }), proposed);
+    const [, outlineId, date, rows] = boardActionStore.saveBoardActions.mock.calls[0];
+    expect([outlineId, date]).toEqual([BigInt(5), "2026-05-21"]);
+    expect(rows.map((row: { action: string; storyId: number | null; reasonCode: string | null }) => [row.action, row.storyId, row.reasonCode])).toEqual([
+      ["exclude", 9, "promo"],
+      ["reorder", null, null],
+      ["lead", 3, "bigger story"],
+    ]);
+  });
+
+  it("still commits when the board actions cannot be saved", async () => {
+    boardActionStore.saveBoardActions.mockRejectedValueOnce(new Error("board_actions is gone"));
+
+    const { response, json } = await commit(BODY);
+
+    expect(response.status).toBe(200);
+    expect(json.success).toBe(true);
+    expect(draftStore.createDraft).toHaveBeenCalled();
   });
 
   it("saves only the normalised YYYY-MM-DD date", async () => {
@@ -271,7 +344,7 @@ describe("POST /api/newsletters/commit", () => {
 
     expect(response.status).toBe(200);
     expect(repositoryFns.fetchLastPublishedIssueDateOnOrBefore).toHaveBeenCalledWith("2026-05-21");
-    expect(outlineStore.saveOutline).toHaveBeenCalledWith(OUTLINE);
+    expect(outlineStore.saveOutline).toHaveBeenCalledWith(OUTLINE, null);
   });
 
   it("rejects requests without an approval session", async () => {
