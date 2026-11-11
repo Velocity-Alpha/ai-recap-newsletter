@@ -22,10 +22,21 @@ describe("checkLink", () => {
     await expect(checkLink("https://news.example/a", { fetcher: vi.fn().mockResolvedValue(reply({ paywall: state })) })).resolves.toBe(state);
   });
 
-  it("answers error for a refused request, a reply it does not know, or a failed request", async () => {
-    const link = "https://news.example/a";
-    await expect(checkLink(link, { fetcher: vi.fn().mockResolvedValue(reply({ error: "Unauthorized." }, false)) })).resolves.toBe("error");
-    await expect(checkLink(link, { fetcher: vi.fn().mockResolvedValue(reply({ paywall: "maybe" })) })).resolves.toBe("error");
-    await expect(checkLink(link, { fetcher: vi.fn().mockRejectedValue(new Error("offline")) })).resolves.toBe("error");
+  it("answers error for a refused request", async () => {
+    const fetcher = vi.fn().mockResolvedValue(reply({ error: "Unauthorized." }, false));
+
+    await expect(checkLink("https://news.example/a", { fetcher })).resolves.toBe("error");
+  });
+
+  it("answers error for a reply it does not know", async () => {
+    const fetcher = vi.fn().mockResolvedValue(reply({ paywall: "maybe" }));
+
+    await expect(checkLink("https://news.example/a", { fetcher })).resolves.toBe("error");
+  });
+
+  it("answers error for a request that failed", async () => {
+    const fetcher = vi.fn().mockRejectedValue(new Error("offline"));
+
+    await expect(checkLink("https://news.example/a", { fetcher })).resolves.toBe("error");
   });
 });

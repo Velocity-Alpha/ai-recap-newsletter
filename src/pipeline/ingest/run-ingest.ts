@@ -1,5 +1,5 @@
 import type { Prisma } from "@/src/generated/prisma";
-import { learnedSites } from "@/src/pipeline/free-links/paywall-sites";
+import { learnedSitesOrNone } from "@/src/pipeline/free-links/paywall-sites";
 import { createOpenAIExtractor } from "@/src/pipeline/ingest/extract";
 import { ingestStories, type IngestResult, type SourceResult } from "@/src/pipeline/ingest/ingest";
 import { createPrismaIngestStore } from "@/src/pipeline/ingest/ingest-store";
@@ -72,7 +72,7 @@ function defaultIngest(env: Record<string, string | undefined>) {
   const gmail = createGmailReader(readGmailCredentials(env));
   const extract = createOpenAIExtractor({ apiKey: env.OPENAI_API_KEY });
   const store = createPrismaIngestStore();
-  return async (now: Date) => ingestStories({ gmail, fetch, extract, store, now, learnedSites: await learnedSites() });
+  return async (now: Date) => ingestStories({ gmail, fetch, extract, store, now, learnedSites: await learnedSitesOrNone() });
 }
 
 function sourceEvent(source: SourceResult): { level: EventLevel; message: string } {

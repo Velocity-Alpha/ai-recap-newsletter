@@ -18,7 +18,7 @@ export default async function AdminSettingsPage() {
   return (
     <>
       <PageHeader eyebrow="Settings" title="Pipeline settings">
-        The values the jobs read from the pipeline_settings table, and the sites the paywall check learned. A job
+        The values the jobs read from the pipeline_settings table, and the learned paywalled sites. A job
         uses its default when a settings row is missing. Times are New York time.
       </PageHeader>
 
@@ -53,7 +53,7 @@ export default async function AdminSettingsPage() {
       </section>
 
       <section className="mt-12">
-        <SectionTitle aside={`${sites.length} sites`}>Learned paywalled sites</SectionTitle>
+        <SectionTitle aside={`${sites.filter((site) => site.learned).length} learned`}>Paywalled sites found</SectionTitle>
         <p className="mb-4 max-w-2xl text-sm leading-6 text-[var(--text-secondary)]">
           Sites where the article reader found a suggested link paywalled. From 2 stories on, the paywall check
           treats the site as paywalled. Ignore a site that is not paywalled: it is then never learned again.

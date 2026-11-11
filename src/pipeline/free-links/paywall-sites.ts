@@ -12,7 +12,25 @@ export const LEARNED_FROM_STORIES = 2;
 /** The learned paywalled sites, by name. The paywall check treats them like its own list of paywalled sites. */
 export async function learnedSites(): Promise<string[]> {
   const rows = await prisma.paywallSite.findMany({ where: { ignored: false }, orderBy: { site: "asc" } });
-  return rows.filter((row) => row.storyIds.length >= LEARNED_FROM_STORIES).map((row) => row.site);
+  return rows.filter(isLearned).map((row) => row.site);
+}
+
+/** The one rule for a learned paywalled site. */
+export function isLearned(row: { storyIds: readonly number[]; ignored: boolean }): boolean {
+  return !row.ignored && row.storyIds.length >= LEARNED_FROM_STORIES;
+}
+
+/**
+ * The learned paywalled sites, or none when they cannot be read. They only make the paywall check better, so
+ * ingestion, a commit and a typed link's check go on without them. The failure is logged.
+ */
+export async function learnedSitesOrNone(read: () => Promise<string[]> = learnedSites): Promise<string[]> {
+  try {
+    return await read();
+  } catch (error) {
+    console.error(`[free-links] Could not read the learned paywalled sites: ${error instanceof Error ? error.message : String(error)}`);
+    return [];
+  }
 }
 
 /** Notes that the article reader found a suggested link of this story paywalled on the site. */

@@ -24,12 +24,16 @@ describe.skipIf(!enabled)("paywall sites on a real database", () => {
     await prisma.paywallSite.deleteMany({ where: { site } });
   });
 
-  it("keeps the story ids distinct, also for calls at the same time, and learns the site from the second story", async () => {
+  it("keeps the story ids distinct for calls at the same time", async () => {
     await Promise.all([recordPaywalledSite(site, 1), recordPaywalledSite(site, 1), recordPaywalledSite(site, 1)]);
+
     expect((await prisma.paywallSite.findUnique({ where: { site } }))?.storyIds).toEqual([1]);
     expect(await learnedSites()).not.toContain(site);
+  });
 
+  it("learns the site from the second story", async () => {
     await recordPaywalledSite(site, 2);
+
     expect((await prisma.paywallSite.findUnique({ where: { site } }))?.storyIds).toEqual([1, 2]);
     expect(await learnedSites()).toContain(site);
   });

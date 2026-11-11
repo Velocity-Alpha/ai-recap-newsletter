@@ -1,11 +1,11 @@
 import { siteOf } from "@/src/pipeline/free-links/sites";
 import type { PaywallStatus } from "@/src/pipeline/ingest/paywall";
 
-/** The paywall state of each link the reviewer selected or typed on this board, by story id (#59). */
+/** The paywall state of each link the owner typed on this board, by story id (#59). */
 export type LinkState = Record<number, PaywallStatus>;
 
 /**
- * The paywall state of the link that is selected now: the reviewer's own link when there is one, otherwise the
+ * The paywall state of the link that is selected now: the owner's own link when there is one, otherwise the
  * stored state of the original link. The lock icon and the commit check both read it.
  */
 export function selectedLinkState(storyId: number, linkState: LinkState, stored: PaywallStatus | null | undefined): PaywallStatus {
@@ -13,7 +13,7 @@ export function selectedLinkState(storyId: number, linkState: LinkState, stored:
 }
 
 /**
- * The link the reviewer typed, trimmed. Null when the field is empty or holds the story's own link again: the
+ * The link the owner typed, trimmed. Null when the field is empty or holds the story's own link again: the
  * story then has no link edit.
  */
 export function typedLinkOf(value: string, storyUrl: string | null | undefined): string | null {

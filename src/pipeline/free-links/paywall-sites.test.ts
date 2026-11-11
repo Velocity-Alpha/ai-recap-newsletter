@@ -28,7 +28,7 @@ const db = vi.hoisted(() => {
 
 vi.mock("@/src/server/prisma", () => ({ prisma: { paywallSite: db.paywallSite } }));
 
-import { learnedSites, recordPaywalledSite } from "@/src/pipeline/free-links/paywall-sites";
+import { isLearned, learnedSites, learnedSitesOrNone, recordPaywalledSite } from "@/src/pipeline/free-links/paywall-sites";
 
 beforeEach(() => {
   db.rows.length = 0;
@@ -69,5 +69,34 @@ describe("learned paywalled sites", () => {
     await recordPaywalledSite("once.example", 1);
 
     expect(await learnedSites()).toEqual(["a.example", "b.example"]);
+  });
+});
+
+describe("isLearned", () => {
+  it("is true from 2 stories on", () => {
+    expect(isLearned({ storyIds: [1], ignored: false })).toBe(false);
+    expect(isLearned({ storyIds: [1, 2], ignored: false })).toBe(true);
+  });
+
+  it("is never true for an ignored site", () => {
+    expect(isLearned({ storyIds: [1, 2, 3], ignored: true })).toBe(false);
+  });
+});
+
+describe("learnedSitesOrNone", () => {
+  it("gives the learned sites", async () => {
+    await recordPaywalledSite("a.example", 1);
+    await recordPaywalledSite("a.example", 2);
+
+    expect(await learnedSitesOrNone()).toEqual(["a.example"]);
+  });
+
+  it("gives none, and logs why, when the sites cannot be read", async () => {
+    const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    await expect(learnedSitesOrNone(async () => Promise.reject(new Error("no such table")))).resolves.toEqual([]);
+
+    expect(logged).toHaveBeenCalledWith(expect.stringContaining("no such table"));
+    logged.mockRestore();
   });
 });

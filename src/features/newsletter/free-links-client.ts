@@ -8,7 +8,7 @@ interface CheckLinkOptions {
   fetcher?: (url: string, init: RequestInit) => Promise<Response>;
 }
 
-/** Asks /api/approval/check-link if a link the reviewer typed is paywalled. Never throws: a failure is "error". */
+/** Asks /api/approval/check-link if a link the owner typed is paywalled. Never throws: a failure is "error". */
 export async function checkLink(url: string, options: CheckLinkOptions = {}): Promise<PaywallStatus> {
   const { fetcher = (input, init) => fetch(input, init) } = options;
   try {

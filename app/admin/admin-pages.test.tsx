@@ -184,10 +184,12 @@ describe("admin pages render", () => {
     expect(html).not.toContain("Stage owners");
   });
 
-  it("/admin/settings lists the learned paywalled sites, with an Ignore button on each site that is not ignored", async () => {
+  it("/admin/settings lists the paywalled sites found, with an Ignore button on each site that is not ignored", async () => {
     const html = await render(AdminSettingsPage());
 
     for (const site of ["ignored.example", "learned.example", "once.example"]) expect(html).toContain(site);
+    expect(html).toContain("Paywalled sites found");
+    expect(html).toContain("1 learned");
     expect(html).toContain("not learned yet");
     expect(html).toContain('aria-label="Ignore learned.example"');
     expect(html).toContain('aria-label="Ignore once.example"');

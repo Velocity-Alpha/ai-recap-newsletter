@@ -16,7 +16,7 @@ describe("siteOf", () => {
 });
 
 describe("the free link limits", () => {
-  it("skips social and aggregator sites, needs 300 words, and keeps 3 links", () => {
+  it("skips social and aggregator sites", () => {
     expect(SKIPPED_SITES).toEqual([
       "reddit.com",
       "facebook.com",
@@ -30,7 +30,13 @@ describe("the free link limits", () => {
       "tiktok.com",
       "news.ycombinator.com",
     ]);
+  });
+
+  it("needs 300 words for a free link", () => {
     expect(MIN_WORDS).toBe(300);
+  });
+
+  it("keeps 3 free links for one story", () => {
     expect(MAX_LINKS).toBe(3);
   });
 });

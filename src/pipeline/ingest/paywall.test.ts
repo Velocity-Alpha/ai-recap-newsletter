@@ -86,12 +86,25 @@ describe("checkPaywall", () => {
 });
 
 describe("checkSiteList", () => {
-  it("answers from the site lists alone, and null for a site on no list", () => {
+  it("answers yes for a site on the paywalled list", () => {
     expect(checkSiteList("https://www.wsj.com/tech/ai/story")).toBe("yes");
+  });
+
+  it("answers no for a site on the free list", () => {
     expect(checkSiteList("https://github.com/org/repo")).toBe("no");
-    expect(checkSiteList("https://news.example/a")).toBeNull();
+  });
+
+  it("answers yes for a learned paywalled site", () => {
     expect(checkSiteList("https://news.example/a", ["news.example"])).toBe("yes");
+  });
+
+  it("answers null for a site on no list", () => {
+    expect(checkSiteList("https://news.example/a")).toBeNull();
+  });
+
+  it("answers null for text that is not an http or https link", () => {
     expect(checkSiteList("not a link")).toBeNull();
+    expect(checkSiteList("ftp://wsj.com/a")).toBeNull();
   });
 });
 

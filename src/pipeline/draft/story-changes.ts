@@ -1,7 +1,7 @@
 import { outlineStoryIds } from "@/src/pipeline/draft/approved-stories";
 import type { ApprovalOutline } from "@/src/pipeline/draft/outline";
-import { learnedSites } from "@/src/pipeline/free-links/paywall-sites";
-import { checkPaywall, type PaywallResult } from "@/src/pipeline/ingest/paywall";
+import { learnedSites, learnedSitesOrNone } from "@/src/pipeline/free-links/paywall-sites";
+import { checkPaywall, guardedFetch, OWNER_CHECK_TIMEOUT_MS, type PaywallResult } from "@/src/pipeline/ingest/paywall";
 import { prisma } from "@/src/server/prisma";
 
 /**
@@ -17,7 +17,9 @@ import { prisma } from "@/src/server/prisma";
  * - keeps the old link in `original_url`, the first time only, so the original link is never lost;
  * - sets `paywall_detected` for the new link: "no" when it is a free link of the story (`story_free_links`),
  *   otherwise the answer of the paywall check, with its `error`. The lock icon is then right on later boards.
- * The paywall checks open pages, so they run first. All the writes then happen in one transaction.
+ * The paywall checks open pages, so they run first, each with a 5 second limit. All the writes then happen in
+ * one transaction. A commit never fails for the check: when the free links or the learned paywalled sites
+ * cannot be read, the link is checked without them.
  */
 
 export interface StoryChanges {
@@ -43,17 +45,20 @@ function unique(ids: number[]): number[] {
 /** The paywall state of each new link, by story id. */
 async function checkNewLinks(changes: LinkChange[], deps: StoryChangeDeps): Promise<Map<number, PaywallResult>> {
   if (changes.length === 0) return new Map();
-  const freeLinks = await prisma.storyFreeLink.findMany({
-    where: { storyId: { in: changes.map((change) => change.id) } },
-    select: { storyId: true, url: true },
-  });
+  const freeLinks = await prisma.storyFreeLink
+    .findMany({ where: { storyId: { in: changes.map((change) => change.id) } }, select: { storyId: true, url: true } })
+    .catch((error: unknown) => {
+      console.error(`[free-links] Could not read the free links: ${error instanceof Error ? error.message : String(error)}`);
+      return [];
+    });
   const isFreeLink = (change: LinkChange) => freeLinks.some((link) => link.storyId === change.id && link.url === change.url);
-  const sites = changes.every(isFreeLink) ? [] : await (deps.learnedSites ?? learnedSites)();
+  const sites = changes.every(isFreeLink) ? [] : await learnedSitesOrNone(deps.learnedSites ?? learnedSites);
+  const send = deps.fetch ?? guardedFetch();
   return new Map(
     await Promise.all(
       changes.map(
         async (change) =>
-          [change.id, isFreeLink(change) ? FREE_LINK : await checkPaywall(change.url, { fetch: deps.fetch, learnedSites: sites })] as const,
+          [change.id, isFreeLink(change) ? FREE_LINK : await checkPaywall(change.url, { fetch: send, learnedSites: sites, timeoutMs: OWNER_CHECK_TIMEOUT_MS })] as const,
       ),
     ),
   );

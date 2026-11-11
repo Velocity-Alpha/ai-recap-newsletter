@@ -4,7 +4,8 @@ import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { hasBoardEdits } from "@/components/approval/board-edits";
 import { repeatOfText, restoreRepeat, similarLabel, similarTooltip } from "@/components/approval/repeat-labels";
-import { type LinkState, paywalledLinks, selectedLinkState, typedLinkOf } from "@/components/approval/story-links";
+import { type LinkState, paywalledLinks, selectedLinkState } from "@/components/approval/story-links";
+import { createTypedLinks } from "@/components/approval/typed-links";
 import type { AlsoFrom, RestorableRepeat } from "@/src/features/newsletter/board-repeats";
 import type { SimilarStory } from "@/src/pipeline/repeats/repeat-rules";
 import { storySources } from "@/src/features/newsletter/lead-story";
@@ -266,15 +267,17 @@ export default function ApprovalBoard({
   const dragStory = useRef<{ storyId: number; fromSectionKey: string } | null>(null);
   const [dragOverSection, setDragOverSection] = useState<string | null>(null);
   const [restoredIds, setRestoredIds] = useState<Set<number>>(new Set());
-  // The paywall state of each link the reviewer typed (#59). A story with no entry shows its stored state.
+  // The paywall state of each link the owner typed (#59). A story with no entry shows its stored state.
   const [linkState, setLinkState] = useState<LinkState>({});
   const [paywallWarningOpen, setPaywallWarningOpen] = useState(false);
-  const latestUrlOverrides = useRef(urlOverrides);
-  useEffect(() => {
-    latestUrlOverrides.current = urlOverrides;
-  }, [urlOverrides]);
-  /** The typed link of each story that was sent to the paywall check, so leaving the field twice asks once. */
-  const checkedLinks = useRef<Record<number, string>>({});
+  const [isCheckingLinks, setIsCheckingLinks] = useState(false);
+  const [typedLinks] = useState(() =>
+    createTypedLinks({
+      checkLink,
+      onStates: setLinkState,
+      onDropped: (id) => setUrlOverrides((prev) => Object.fromEntries(Object.entries(prev).filter(([key]) => Number(key) !== id))),
+    })
+  );
 
   useEffect(() => {
     setSections(initSections(candidateSections));
@@ -305,29 +308,12 @@ export default function ApprovalBoard({
 
   const typeLink = (id: number, value: string) => {
     setUrlOverrides((prev) => ({ ...prev, [id]: value }));
-    // The lock icon describes the selected link. This one is not checked until the reviewer leaves the field.
-    setLinkState((prev) => ({ ...prev, [id]: "unknown" }));
-    delete checkedLinks.current[id];
+    // The lock icon describes the selected link. This one is not checked until the owner leaves the field.
+    typedLinks.type(id, value);
   };
 
-  /** The reviewer left the link field or pressed "Done": check the typed link, or drop an edit that changed nothing. */
-  const finishTypedLink = async (id: number) => {
-    const value = latestUrlOverrides.current[id];
-    if (value === undefined) return;
-    const storyUrl = candidateMap[String(id)]?.url;
-    const url = typedLinkOf(value, storyUrl);
-    if (url === null) {
-      const without = <T,>(map: Record<number, T>) => Object.fromEntries(Object.entries(map).filter(([key]) => Number(key) !== id));
-      setUrlOverrides(without);
-      setLinkState(without);
-      return;
-    }
-    if (checkedLinks.current[id] === url) return;
-    checkedLinks.current[id] = url;
-    const state = await checkLink(url);
-    const current = latestUrlOverrides.current[id];
-    if (current !== undefined && typedLinkOf(current, storyUrl) === url) setLinkState((prev) => ({ ...prev, [id]: state }));
-  };
+  /** The owner left the link field or pressed "Done": check the typed link, or drop an edit that changed nothing. */
+  const finishTypedLink = (id: number) => typedLinks.finish(id, candidateMap[String(id)]?.url);
 
   const closePreview = () => {
     if (previewStoryId !== null) void finishTypedLink(previewStoryId);
@@ -676,11 +662,17 @@ export default function ApprovalBoard({
     setCommitModalOpen(false);
   };
 
-  /** No issue goes out with a paywalled link unless the reviewer says so (#59). */
+  /** No issue goes out with a paywalled link unless the owner says so (#59). */
   const handleCommitContinue = async (options: { withPaywalledLinks?: boolean } = {}) => {
-    if (paywalled.length > 0 && !options.withPaywalledLinks) {
-      setPaywallWarningOpen(true);
-      return;
+    if (!options.withPaywalledLinks) {
+      // A typed link can still be at the paywall check. Its answer decides, so wait for it.
+      setIsCheckingLinks(true);
+      await typedLinks.settle();
+      setIsCheckingLinks(false);
+      if (paywalledLinks({ sections, excludeState, urlOverrides, linkState: typedLinks.states(), candidateMap }).length > 0) {
+        setPaywallWarningOpen(true);
+        return;
+      }
     }
     setPaywallWarningOpen(false);
     setIsCommitting(true);
@@ -1419,8 +1411,8 @@ export default function ApprovalBoard({
                   Commit anyway
                 </Button>
               ) : (
-                <Button className="bg-[var(--text-primary)] text-white hover:bg-[var(--watercolor-ink)]" onClick={() => handleCommitContinue()} disabled={isCommitting}>
-                  {isCommitting ? "Committing..." : "Commit outline"}
+                <Button className="bg-[var(--text-primary)] text-white hover:bg-[var(--watercolor-ink)]" onClick={() => handleCommitContinue()} disabled={isCommitting || isCheckingLinks}>
+                  {isCommitting ? "Committing..." : isCheckingLinks ? "Checking links..." : "Commit outline"}
                 </Button>
               )}
             </div>

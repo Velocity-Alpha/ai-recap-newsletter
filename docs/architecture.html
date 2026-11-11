@@ -82,7 +82,7 @@
              A commit with a paywalled link asks first: "Go back" or "Commit anyway"
          owner edits, then commits -> POST /api/newsletters/commit  ("No issue today" marks a skipped date)
          -> approval_outlines row -> story changes (queued, excluded, edits) in one transaction; a changed
-            link keeps the old one in stories.original_url and gets its own paywall state
+            link keeps the old one in stories.original_url (the first time only) and gets its own paywall state
          -> new issue_drafts row (version n+1) -> starts draft-issue-background (job token)
 
 draft-issue-background (15 min limit)

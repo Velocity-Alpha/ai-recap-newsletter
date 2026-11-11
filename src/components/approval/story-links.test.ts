@@ -24,13 +24,16 @@ function board(overrides: Partial<Parameters<typeof paywalledLinks>[0]> = {}): P
 }
 
 describe("selectedLinkState", () => {
-  it("is the state of the link the reviewer selected or typed, when there is one", () => {
+  it("is the state of the link the owner typed, when there is one", () => {
     expect(selectedLinkState(1, { 1: "no" }, "yes")).toBe("no");
     expect(selectedLinkState(1, { 1: "error" }, "no")).toBe("error");
   });
 
-  it("is the stored state of the original link otherwise, and unknown when nothing is stored", () => {
+  it("is the stored state of the original link when the owner typed no link", () => {
     expect(selectedLinkState(1, {}, "yes")).toBe("yes");
+  });
+
+  it("is unknown when the owner typed no link and nothing is stored", () => {
     expect(selectedLinkState(1, { 2: "no" }, undefined)).toBe("unknown");
   });
 });
@@ -67,7 +70,7 @@ describe("paywalledLinks", () => {
     expect(links.map((link) => link.id)).toEqual([3]);
   });
 
-  it("lists a story with a free original link when the reviewer typed a paywalled one", () => {
+  it("lists a story with a free original link when the owner typed a paywalled one", () => {
     const links = paywalledLinks(board({ urlOverrides: { 2: "https://www.nytimes.com/two" }, linkState: { 2: "yes" } }));
 
     expect(links).toContainEqual({ id: 2, headline: "Story 2", site: "nytimes.com" });

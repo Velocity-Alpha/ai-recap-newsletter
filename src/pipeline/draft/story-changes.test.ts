@@ -145,12 +145,58 @@ describe("applyStoryChanges", () => {
     expect(deps.fetch).toHaveBeenCalledTimes(1);
   });
 
-  it("saves the paywall check's answer and error for a typed link", async () => {
+  it("saves the paywall check's answer for a typed link", async () => {
+    await applyStoryChanges(outlineWithLink("https://typed.example/b"), fakePages());
+
+    expect(row(1)).toMatchObject({ url: "https://typed.example/b", paywallDetected: "no", error: "" });
+  });
+
+  it("saves the paywall check's error for a typed link whose page cannot be opened", async () => {
     await applyStoryChanges(outlineWithLink("https://typed.example/a"), fakePages(() => new Response("", { status: 403 })));
+
     expect(row(1)).toMatchObject({ url: "https://typed.example/a", paywallDetected: "error", error: "HTTP 403" });
+  });
+
+  it("clears the stored error when a later link is checked with no error", async () => {
+    await applyStoryChanges(outlineWithLink("https://typed.example/a"), fakePages(() => new Response("", { status: 403 })));
 
     await applyStoryChanges(outlineWithLink("https://typed.example/b"), fakePages());
-    expect(row(1)).toMatchObject({ url: "https://typed.example/b", paywallDetected: "no", error: "" });
+
+    expect(row(1)).toMatchObject({ paywallDetected: "no", error: "" });
+  });
+
+  it("checks a typed link without the learned sites when they cannot be read, and still commits", async () => {
+    const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const deps = { ...fakePages(), learnedSites: vi.fn(async () => Promise.reject(new Error("database is down"))) };
+
+    await applyStoryChanges(outlineWithLink("https://www.learned.example/a"), deps);
+
+    expect(row(1)).toMatchObject({ url: "https://www.learned.example/a", paywallDetected: "no" });
+    expect(deps.fetch).toHaveBeenCalledTimes(1);
+    expect(logged).toHaveBeenCalledWith(expect.stringContaining("database is down"));
+    logged.mockRestore();
+  });
+
+  it("checks a typed link like any link when the free links cannot be read, and still commits", async () => {
+    const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const findMany = vi.spyOn(fakeDb.client.storyFreeLink, "findMany").mockRejectedValue(new Error("no such table"));
+    const deps = fakePages();
+
+    await applyStoryChanges(outlineWithLink("https://typed.example/a"), deps);
+
+    expect(row(1)).toMatchObject({ url: "https://typed.example/a", paywallDetected: "no" });
+    expect(deps.fetch).toHaveBeenCalledTimes(1);
+    findMany.mockRestore();
+    logged.mockRestore();
+  });
+
+  it("gives each page check a 5 second limit", async () => {
+    const timeout = vi.spyOn(AbortSignal, "timeout");
+
+    await applyStoryChanges(outlineWithLink("https://typed.example/a"), fakePages());
+
+    expect(timeout).toHaveBeenCalledWith(5_000);
+    timeout.mockRestore();
   });
 
   it("marks a typed link on a learned paywalled site as paywalled, without opening its page", async () => {

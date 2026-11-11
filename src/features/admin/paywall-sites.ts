@@ -1,4 +1,4 @@
-import { LEARNED_FROM_STORIES } from "@/src/pipeline/free-links/paywall-sites";
+import { isLearned } from "@/src/pipeline/free-links/paywall-sites";
 import { prisma } from "@/src/server/prisma";
 
 export type PaywallSiteRow = {
@@ -18,7 +18,7 @@ export async function readPaywallSites(): Promise<PaywallSiteRow[]> {
     site: row.site,
     stories: row.storyIds.length,
     ignored: row.ignored,
-    learned: !row.ignored && row.storyIds.length >= LEARNED_FROM_STORIES,
+    learned: isLearned(row),
     updatedAt: row.updatedAt,
   }));
 }
