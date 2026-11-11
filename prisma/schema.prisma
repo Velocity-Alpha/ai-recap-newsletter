@@ -82,6 +82,8 @@ model Story {
   excludedOn               DateTime? @map("excluded_on") @db.Date
   /// When the search for free links (#59) finished for the story, also with no result. Null means not searched.
   freeLinksCheckedAt       DateTime? @map("free_links_checked_at") @db.Timestamptz(6)
+  /// When a run of the search for free links (#59) claimed the story. A claim older than 15 minutes is void.
+  freeLinksStartedAt       DateTime? @map("free_links_started_at") @db.Timestamptz(6)
   /// The original link (#59): the link the story had before a commit first changed it. Null means never changed.
   originalUrl              String?   @map("original_url")
 

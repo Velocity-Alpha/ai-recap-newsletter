@@ -2,17 +2,18 @@ import crypto from "node:crypto";
 
 /**
  * Short-lived tokens one part of the system uses to ask another to do a job: the publish job asks the site
- * to refresh its cache, the ingest schedule starts the background ingest function, and a commit starts the
- * background draft function.
+ * to refresh its cache, the ingest schedule starts the background ingest function, a commit starts the
+ * background draft function, and the board starts the background search for free links.
  *
  * They reuse SESSION_SECRET, so no new credential is needed. Each purpose signs with its own key derived
  * from that secret, so a token for one purpose never verifies for another, or as a subscriber session
  * (which signs with the raw secret). A token is `<expiresAtMs>.<signature>`. A leaked token works for a
- * few minutes, for its one purpose. A token can also sign a subject (the draft id for `draft-issue`), so it
- * works only for that one input; the receiver passes the subject it was sent to check it.
+ * few minutes, for its one purpose. A token can also sign a subject (the draft id for `draft-issue`, the story
+ * ids for `find-free-links`), so it works only for that one input; the receiver passes the subject it was sent
+ * to check it.
  */
 
-export type JobTokenPurpose = "cache-refresh" | "ingest-stories" | "draft-issue";
+export type JobTokenPurpose = "cache-refresh" | "ingest-stories" | "draft-issue" | "find-free-links";
 
 export const JOB_TOKEN_TTL_MS = 5 * 60 * 1000;
 const CLOCK_SKEW_MS = 60 * 1000;

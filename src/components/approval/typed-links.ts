@@ -2,7 +2,7 @@ import { typedLinkOf, type LinkState } from "@/src/components/approval/story-lin
 import type { PaywallStatus } from "@/src/pipeline/ingest/paywall";
 
 /**
- * The links the owner types on the board (#59), and the paywall state of each. The board keeps the text of the
+ * The links the owner types or selects on the board (#59), and the paywall state of each. The board keeps the text of the
  * field; this keeps what was asked and what the answer was, so the rules can be tested without the board:
  * a link is checked once when the owner leaves the field, an answer for an older text is dropped, and a commit
  * can wait for the checks that still run.
@@ -22,6 +22,11 @@ export interface TypedLinks {
   type(id: number, value: string): void;
   /** The owner left the field: checks the typed link, or drops an edit that changed nothing. */
   finish(id: number, storyUrl: string | null | undefined): Promise<void>;
+  /**
+   * A link with a known state was selected for the story (a free link is "no"), or the story went back to its
+   * original link (null). The typed link of the story, and the answer of a check that still runs for it, are dropped.
+   */
+  select(id: number, state: PaywallStatus | null): void;
   /** Resolves when no check runs. */
   settle(): Promise<void>;
   /** The states now. After `settle()` they are the answers. */
@@ -80,6 +85,12 @@ export function createTypedLinks(options: TypedLinksOptions): TypedLinks {
       } finally {
         running.delete(run);
       }
+    },
+
+    select(id, state) {
+      typed.delete(id);
+      asked.delete(id);
+      setState(id, state);
     },
 
     async settle() {

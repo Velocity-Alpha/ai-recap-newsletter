@@ -93,6 +93,7 @@ Read routes:
 - `GET /api/approval/outline/marker?date=` the highest story id in the board's candidate window; the board reads it to spot stories newer than its cached copy (approval session)
 - `GET /api/approval/outline/lead?response_id=` polls the AI lead pick that `/api/approval/outline` started; returns the picked lead and its reason (approval session)
 - `GET /api/newsletters/outline?date=` for the authenticated newsletter outline API
+- `GET /api/approval/free-links?ids=` the free links found so far for up to 60 stories: `{ stories: { [id]: { done, links: [{ url, site, title, words }] } } }`. The board polls it while a search runs (approval session)
 - `GET /api/approval/issues/[id]/publish` previews what "Mark as published" would publish (approval session)
 - `GET /api/approval/skipped-dates?date=` says whether a date is a skipped date (approval session)
 - `GET /api/approval/drafts?date=` a date's state (`no_outline`, `drafting`, `draft_failed`, `draft_ready`, `staged`, `published`), its current draft, and its staged versions, for the board and the draft page (approval session)
@@ -102,6 +103,7 @@ Read routes:
 Mutation routes:
 
 - `POST /api/approval/check-link` with `{ url }` says if a link the owner typed on the board is paywalled: `{ paywall: "yes" | "no" | "unknown" | "error" }`, from the site lists and one page check (approval session)
+- `POST /api/approval/free-links` with `{ story_ids }` (60 at most) starts the background search for free links, for the stories with a paywalled link that were not searched before: `{ started }` (approval session)
 - `POST /api/for-brands`
 - `POST /api/subscriber/subscribe`
 - `POST /api/subscriber/request-code`

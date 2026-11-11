@@ -144,6 +144,36 @@ describe("typed links", () => {
     expect(links.states()).toEqual({ 1: "yes", 2: "no" });
   });
 
+  it("gives a selected free link its known state, with no check", () => {
+    const { links, checkLink } = setup();
+
+    links.select(1, "no");
+
+    expect(links.states()).toEqual({ 1: "no" });
+    expect(checkLink).not.toHaveBeenCalled();
+  });
+
+  it("drops the state of a story that went back to its original link", () => {
+    const { links } = setup();
+    links.select(1, "no");
+
+    links.select(1, null);
+
+    expect(links.states()).toEqual({});
+  });
+
+  it("drops the answer for a typed link when a free link was selected while the check ran", async () => {
+    const { links, answers } = setup();
+    links.type(1, "https://walled.example/a");
+    const first = links.finish(1, STORY_URL);
+
+    links.select(1, "no");
+    answers[0].answer("yes");
+    await first;
+
+    expect(links.states()).toEqual({ 1: "no" });
+  });
+
   it("settles at once when no check runs", async () => {
     await expect(setup().links.settle()).resolves.toBeUndefined();
   });

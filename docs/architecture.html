@@ -80,10 +80,26 @@
            + links (#59): a story with a paywalled link can lead. A link the owner types is checked by
              POST /api/approval/check-link (the same paywall check) and the story's lock icon shows the answer.
              A commit with a paywalled link asks first: "Go back" or "Commit anyway"
+           + free links (#59): for each story on the board with a paywalled link, the board calls
+             POST /api/approval/free-links -> starts find-free-links-background (job token) for the stories
+             not searched before, then polls GET /api/approval/free-links every 3 s, for 2 minutes at most.
+             The board selects the first free link of a story unless the owner changed the story's link.
+             The story's link box lists the original link, the free links and "Other link"
          owner edits, then commits -> POST /api/newsletters/commit  ("No issue today" marks a skipped date)
          -> approval_outlines row -> story changes (queued, excluded, edits) in one transaction; a changed
             link keeps the old one in stories.original_url (the first time only) and gets its own paywall state
          -> new issue_drafts row (version n+1) -> starts draft-issue-background (job token)
+
+find-free-links-background (15 min limit; 3 stories at once; starts no new story after 9 min)
+         for each story with paywall_detected = "yes" and free_links_checked_at null, that the run can claim
+         (stories.free_links_started_at; a claim lasts 15 min, so two runs never search one story):
+         -> our own stories first: sure pairs in story_matches, 14 days around the story, link not paywalled
+         -> if none is a free link: one OpenAI request with the web search tool (gpt-6-luna), up to 3 links
+         -> each link is checked: not the original site, not a social or aggregator site, not on a paywalled
+            site list; then the article reader must read 300 words or more (45 s for all links of a story).
+            A link the reader finds paywalled adds the story to its site's paywall_sites row
+         -> story_free_links rows (at most 3) and stories.free_links_checked_at, also with no free link.
+            A story with an error stays not searched; the next board load tries it again
 
 draft-issue-background (15 min limit)
          -> read feature-section articles (story_articles) -> gpt-6-luna writes the issue JSON
@@ -130,6 +146,7 @@ If the issue is missing after a send: /approval/issues -> "Mark as published"
   <tr><td><code>detect-publish</code></td><td><code>*/5 0,1,13-23 * * *</code></td><td>weekdays 09:00–21:00 New York</td><td>Reads the seed inbox (only <code>PUBLISH_SEED_RECIPIENTS</code>, the monitor seed address, so each send is read once), 20-minute lookback, publishes. It checks Gmail first and opens the database only when an issue email arrived</td></tr>
   <tr><td><code>detect-publish-catch-up</code></td><td><code>0 3 * * *</code></td><td>daily</td><td>Same, 3-day lookback</td></tr>
   <tr><td><code>draft-issue-background</code></td><td>none (on commit)</td><td>valid token signed for the draft; the draft is waiting to run</td><td><code>runDraftJob()</code> in <code>src/pipeline/draft/run-draft.ts</code>; gives up at 13 min. The commit route and "Retry" start it with <code>startDraftJob()</code></td></tr>
+  <tr><td><code>find-free-links-background</code></td><td>none (the board starts it)</td><td>valid token signed for the story ids</td><td><code>findFreeLinks()</code> in <code>src/pipeline/free-links/find-free-links.ts</code>. <code>POST /api/approval/free-links</code> starts it with <code>startFreeLinksJob()</code></td></tr>
   <tr><td><code>run-checks</code></td><td><code>0,5 14,15,16,17,22,23 * * 1-5</code></td><td>10:05, 12:00, 18:00 New York on weekdays (1 min early to 4 min late); outside production, a run at any other time ("Run now") is a full 18:00 pass</td><td>Outcome checks raise or resolve incidents; at 18:00 the daily summary to the ops chat, then the Healthchecks.io ping. Each outside call gets 5 s; Telegram and site calls stop 20 s into the run. <code>runChecks()</code> in <code>src/pipeline/checks/run-checks.ts</code></td></tr>
 </table>
 <p>Each run writes <code>pipeline_runs</code> (job, trigger, status, stats) and <code>pipeline_events</code> (step log). Job tokens: <code>src/server/job-token.ts</code>, format <code>&lt;expiresAtMs&gt;.&lt;sig&gt;</code>, HMAC key derived from <code>SESSION_SECRET</code> per purpose.</p>
@@ -154,7 +171,7 @@ If the issue is missing after a send: /approval/issues -> "Mark as published"
   <tr><th>Service</th><th>Used for</th><th>Called by</th></tr>
   <tr><td>Netlify</td><td>Site hosting, functions, env vars, deploy previews</td><td>all</td></tr>
   <tr><td>Neon</td><td>Postgres: production branch and <code>dev</code> branch</td><td>app, jobs</td></tr>
-  <tr><td>OpenAI</td><td>Extraction, lead pick, drafting and image prompt; story embeddings and the Decisions API (<code>POST /v1/decisions</code> by <code>fetch</code>) for the repeat check</td><td>app, jobs</td></tr>
+  <tr><td>OpenAI</td><td>Extraction, lead pick, drafting and image prompt; story embeddings and the Decisions API (<code>POST /v1/decisions</code> by <code>fetch</code>) for the repeat check; the web search tool for free links (about 4 cents for each search)</td><td>app, jobs</td></tr>
   <tr><td>Gmail API (read-only)</td><td>Newsletter emails for ingestion; sent-campaign copies for publish detection</td><td>ingest and publish jobs</td></tr>
   <tr><td>Telegram</td><td>Review bot: "board ready" and "draft is ready for review" messages to the review group; ops alerts and the daily summary to the "AI Recap Ops" chat (<code>TELEGRAM_OPS_CHAT_ID</code>)</td><td>ingest, <code>run-checks</code>, draft job (production only)</td></tr>
   <tr><td>GoHighLevel (GHL)</td><td>Subscriber list, campaign emails, email templates; subscribe and unsubscribe webhooks</td><td>app (subscribe, unsubscribe webhook), "Stage for sending" (templates, <code>src/pipeline/distribution/</code>), owner (send). GHL cannot schedule a campaign through its API, so sending stays manual</td></tr>
@@ -171,12 +188,12 @@ If the issue is missing after a send: /approval/issues -> "Mark as published"
 <h2 id="data">6. Data (Postgres schema <code>newsletter</code>)</h2>
 <table>
   <tr><th>Table</th><th>Holds</th><th>Written by</th></tr>
-  <tr><td><code>stories</code></td><td>Extracted stories per day and source (snake_case columns, but <code>"createdAt"</code> is camelCase). <code>matched_at</code>: when the repeat check went through the story. <code>excluded_on</code>: the board date of the commit that excluded it (null for older exclusions). <code>original_url</code>: the original link, kept when a commit first changes a story's link. <code>free_links_checked_at</code>: when the search for free links finished for the story (nothing sets it yet)</td><td>ingest job; the commit (exclusions, queue date, edits)</td></tr>
+  <tr><td><code>stories</code></td><td>Extracted stories per day and source (snake_case columns, but <code>"createdAt"</code> is camelCase). <code>matched_at</code>: when the repeat check went through the story. <code>excluded_on</code>: the board date of the commit that excluded it (null for older exclusions). <code>original_url</code>: the original link, kept when a commit first changes a story's link. <code>free_links_checked_at</code>: when the search for free links finished for the story, also with no free link. <code>free_links_started_at</code>: when a run of that search claimed the story</td><td>ingest job; the commit (exclusions, queue date, edits); the free link job (<code>free_links_checked_at</code>, <code>free_links_started_at</code>)</td></tr>
   <tr><td><code>story_sources</code></td><td>Which newsletters covered each story, one row per story and source key. <code>stories.source</code> keeps only the last writer, so the board reads coverage here. If the table is missing, ingestion and the board log and fall back to <code>stories.source</code>.</td><td>ingest job</td></tr>
   <tr><td><code>story_embeddings</code></td><td>One embedding for each story (512 numbers, <code>real[]</code>, length 1), made once by the repeat check</td><td>ingest job; the board for candidates ingestion did not check</td></tr>
   <tr><td><code>story_matches</code></td><td>Story matches: one row for each judged pair (<code>newer_story_id</code>, <code>older_story_id</code>, <code>similarity</code>, and the judge's <code>same</code> and <code>news</code>). <code>stories.matched_at</code> is set when a story went through the check; null means not checked yet</td><td>ingest job; the board for candidates ingestion did not check</td></tr>
-  <tr><td><code>paywall_sites</code></td><td>Sites where the article reader found a suggested link paywalled, with the distinct stories (<code>story_ids</code>). A site with 2 or more stories and <code>ignored = false</code> is a learned paywalled site: the paywall check treats it like its own list. Shown on <code>/admin/settings</code></td><td>nothing yet (the free link job is not built); the owner sets <code>ignored</code> with "Ignore" on <code>/admin/settings</code></td></tr>
-  <tr><td><code>story_free_links</code></td><td>The free links of a story with a paywalled link, in <code>position</code> order: <code>url</code>, <code>site</code>, <code>title</code>, <code>words</code>, and <code>origin</code> (<code>story</code> or <code>search</code>). A commit that changes a story's link to one of its rows marks the story as not paywalled</td><td>nothing yet (the free link job is not built)</td></tr>
+  <tr><td><code>paywall_sites</code></td><td>Sites where the article reader found a suggested link paywalled, with the distinct stories (<code>story_ids</code>). A site with 2 or more stories and <code>ignored = false</code> is a learned paywalled site: the paywall check treats it like its own list. Shown on <code>/admin/settings</code></td><td>the free link job; the owner sets <code>ignored</code> with "Ignore" on <code>/admin/settings</code></td></tr>
+  <tr><td><code>story_free_links</code></td><td>The free links of a story with a paywalled link, in <code>position</code> order: <code>url</code>, <code>site</code>, <code>title</code>, <code>words</code>, and <code>origin</code> (<code>story</code> or <code>search</code>). A commit that changes a story's link to one of its rows marks the story as not paywalled</td><td>the free link job</td></tr>
   <tr><td><code>issue_stories</code></td><td>Which stories ran in which published issue: one row for each story of the sent email (<code>issue_id</code>, <code>story_id</code>), with its <code>section</code>, its <code>position</code> in the section (from 1), the link that was sent (<code>url</code>), and <code>is_lead</code> (null when the sent draft is not known: an email that names no draft, and the rows the migration made for past issues). A second copy of the email writes nothing. Nothing reads it yet: the board, held stories, and the checks still read <code>stories.used_in_publication_date</code> and <code>queued_for_publication_date</code></td><td>publish job, owner ("Mark as published")</td></tr>
   <tr><td><code>scraper_bookmarks</code></td><td>Last-read time per source (keys such as <code>the_signal</code>; <code>tldr_ai</code> and <code>aloa_ai</code> are unused)</td><td>ingest job</td></tr>
   <tr><td><code>issues</code></td><td>One row per date (<code>issue_date</code> is unique): <code>html</code>, <code>content_json</code>, <code>published_at</code>, <code>slug</code> (generated), and <code>status</code> (<code>draft</code> or <code>published</code>). The database computes <code>status</code> from <code>published_at</code>: read it to ask "is it published?", never write it</td><td>draft job (insert, update), title and image changes (update), publish job (update; the sent staged version is copied over), owner ("Mark as published", from the newest staged version)</td></tr>
@@ -205,7 +222,7 @@ app/                         Next.js routes
   admin/                     overview, runs/ (+ [id]), incidents/, settings/ (pipeline settings, read only; learned paywalled
                              sites with "Ignore"); guard: src/server/admin-auth.ts
   api/newsletters/           list, [id], outline, commit (starts the draft job), publish-status
-  api/approval/              login, outline (+ lead, marker), check-link, issues/[id]/publish, skipped-dates,
+  api/approval/              login, outline (+ lead, marker), check-link, free-links, issues/[id]/publish, skipped-dates,
                              drafts (+ [id], html, retry, image, image/ideas, image/generate)
   api/admin/                 paywall-sites/ignore (the "Ignore" button of /admin/settings)
   api/subscriber/            subscribe, request-code, verify-code, sign-out, unsubscribe (+ webhook from GHL)
@@ -217,8 +234,11 @@ src/features/admin/          admin page data
 src/pipeline/                runner-neutral job logic
   ingest/                    sources.ts, feeds, beehiiv-site, email-text, redirects, url, extract (gpt-6-luna), paywall,
                              ingest-store, schedule, start-ingest, run-ingest
+  background-job.ts          starts a background function with a job token (the draft and free link jobs)
   free-links/                sites (a link's site, skipped sites, limits; pure), paywall-sites (the learned
-                             paywalled sites); __fixtures__/ is the recorded web search test set
+                             paywalled sites), search (the web search), check-links (the rules and the article
+                             read), find-free-links (the job), start-free-links, read-free-links;
+                             __fixtures__/ is the recorded web search test set
   repeats/                   the repeat check: embed, nearest, decisions (Decisions API), match-stories, repeats-store,
                              repeat-rules (pair levels and board rules, pure); __fixtures__/ is the measured test set
   publish/                   gmail-client, sent-email-parser, publish-decision, publish-store, issue-stories,
@@ -242,7 +262,7 @@ src/server/                  prisma client, job-token, approval, admin and cache
                              client-ip, same-origin, safe-compare, observability
 src/trigger/                 dormant Trigger.dev adapters
 netlify/functions/           thin wrappers: ingest-stories(.mts, -background.mts), detect-publish(.mts, -catch-up.mts),
-                             run-checks.mts, draft-issue-background.mts
+                             run-checks.mts, draft-issue-background.mts, find-free-links-background.mts
 prisma/                      schema.prisma, migrations/, bootstrap/
 scripts/                     reset-dev-branch.mjs, run-prisma-prod.mjs, import-subscribers-from-csv.mjs,
                              replay-drafts.mts (redo a past draft)
