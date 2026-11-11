@@ -121,7 +121,8 @@ Nine keys. The date in each key is the issue date in New York time.
   home page did not load or does not list the issue.
 - **Do (check, fix):** Open the issue page and the home page. If a page is missing or stale, look at the
   latest Netlify deploy and at the site refresh in the `detect-publish` run. If the title is wrong, fix
-  the issue row. The check runs again at the next check time.
+  the issue row. The site check runs once a day, at 18:00, and does not run again for that date: the
+  incident closes at 10:05 the next weekday, when the date is over. Each page gets 12 s to answer.
 
 ### `draft.failed:<date>`
 

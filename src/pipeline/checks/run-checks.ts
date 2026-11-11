@@ -1,7 +1,7 @@
 import { resolveAlert } from "@/src/pipeline/alerts";
 import { dayIncidentDate, evaluateChecks, needsSiteCheck, type Finding } from "@/src/pipeline/checks/checks";
 import { readDayFacts, type DayFacts } from "@/src/pipeline/checks/day-facts";
-import { OUTSIDE_CALLS_BUDGET_MS, withDeadline } from "@/src/pipeline/checks/deadline";
+import { OUTSIDE_CALLS_BUDGET_MS, SITE_CALL_TIMEOUT_MS, withDeadline } from "@/src/pipeline/checks/deadline";
 import { pingHeartbeat, type HeartbeatResult } from "@/src/pipeline/checks/heartbeat";
 import {
   CHECK_TIMES,
@@ -208,7 +208,7 @@ export async function runChecks(options: RunChecksOptions = {}): Promise<RunChec
     for (const warning of facts.warnings) await logEvent(runId, { level: "warn", step: "facts", message: warning });
     const site =
       needsSiteCheck(time, facts) && facts.issue?.slug
-        ? await readSiteFacts({ slug: facts.issue.slug, title: facts.issue.title }, { siteUrl, fetch: outsideFetch })
+        ? await readSiteFacts({ slug: facts.issue.slug, title: facts.issue.title }, { siteUrl, fetch: withDeadline(baseFetch, deadline, SITE_CALL_TIMEOUT_MS) })
         : null;
     const outcome = evaluateChecks(time, facts, { site, siteUrl, runLink: runLink(runId) });
 

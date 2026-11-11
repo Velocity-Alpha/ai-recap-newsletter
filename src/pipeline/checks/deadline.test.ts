@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { CALL_TIMEOUT_MS, OUTSIDE_CALLS_BUDGET_MS, withDeadline } from "@/src/pipeline/checks/deadline";
+import { CALL_TIMEOUT_MS, OUTSIDE_CALLS_BUDGET_MS, SITE_CALL_TIMEOUT_MS, withDeadline } from "@/src/pipeline/checks/deadline";
 
 function signalOf(base: ReturnType<typeof vi.fn>): AbortSignal {
   return (base.mock.calls[0][1] as RequestInit).signal as AbortSignal;
@@ -11,6 +11,13 @@ describe("withDeadline", () => {
     expect(CALL_TIMEOUT_MS).toBe(5_000);
     // The heartbeat gets its own call after the budget, and the database needs a few seconds.
     expect(OUTSIDE_CALLS_BUDGET_MS + CALL_TIMEOUT_MS).toBeLessThanOrEqual(25_000);
+  });
+
+  it("gives the site more time than a cold server function needs, inside the budget", () => {
+    // Cold requests took up to 8.6 s on 2026-11-10.
+    expect(SITE_CALL_TIMEOUT_MS).toBeGreaterThanOrEqual(10_000);
+    // The alerts that follow the site check still need one call.
+    expect(SITE_CALL_TIMEOUT_MS + CALL_TIMEOUT_MS).toBeLessThanOrEqual(OUTSIDE_CALLS_BUDGET_MS);
   });
 
   it("passes the request through, with a signal", async () => {

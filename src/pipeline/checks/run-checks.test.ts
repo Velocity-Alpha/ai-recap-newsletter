@@ -411,6 +411,34 @@ describe("runChecks time limits", () => {
     expect(notify.opsChannelFromEnv).not.toHaveBeenCalled();
   });
 
+  it("passes a site that takes 7 s to answer (a cold server function)", async () => {
+    // Stand-in timers: when the site answers, every timeout shorter than 7 s has already fired.
+    const timers: Array<{ ms: number; controller: AbortController }> = [];
+    const timeout = vi.spyOn(AbortSignal, "timeout").mockImplementation((ms) => {
+      const controller = new AbortController();
+      timers.push({ ms, controller });
+      return controller.signal;
+    });
+    try {
+      const { fetch, options: opts } = options(AT_1800, normalDay());
+      const answer = fetch.getMockImplementation();
+      fetch.mockImplementation(async (url, init) => {
+        if (String(url).startsWith("https://airecap.news/")) {
+          for (const timer of timers) if (timer.ms < 7_000) timer.controller.abort(new Error("The operation was aborted due to timeout"));
+          if (init?.signal?.aborted) throw init.signal.reason;
+        }
+        return answer!(url, init);
+      });
+
+      await runChecks(opts);
+
+      expect(raisedKeys()).toEqual([]);
+      expect(resolvedKeys()).toContain("site-check-failed:2026-11-10");
+    } finally {
+      timeout.mockRestore();
+    }
+  });
+
   it("gives each site fetch a signal, and logs when the run passed its budget for outside calls", async () => {
     const { fetch, options: opts } = options(AT_1800, normalDay(), { budgetMs: 1 });
     const answer = fetch.getMockImplementation();
