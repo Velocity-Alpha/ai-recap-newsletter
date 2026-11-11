@@ -6,6 +6,10 @@
  * The recorded answers in `__fixtures__/` were made with exactly this request. If a text changes, record them again.
  */
 
+/**
+ * The Decisions API takes no reasoning effort, and `gpt-6-luna` is the only model it accepts today
+ * (https://developers.openai.com/api/reference/resources/decisions/methods/create).
+ */
 export const DECISIONS_MODEL = "gpt-6-luna";
 const DECISIONS_URL = "https://api.openai.com/v1/decisions";
 const TIMEOUT_MS = 20_000;
@@ -40,6 +44,8 @@ interface DecisionAnswer {
 
 export function createPairJudge(options: {
   apiKey: string;
+  /** For evals. Production uses DECISIONS_MODEL. */
+  model?: string;
   fetch?: typeof fetch;
   sleep?: (ms: number) => Promise<void>;
 }): JudgePairs {
@@ -75,7 +81,7 @@ export function createPairJudge(options: {
       ];
     });
     const body = JSON.stringify({
-      model: DECISIONS_MODEL,
+      model: options.model ?? DECISIONS_MODEL,
       input: [
         { role: "developer", content: DEVELOPER_MESSAGE },
         { role: "user", content: `Story A:\n${newer.headline}\n${newer.summary}` },

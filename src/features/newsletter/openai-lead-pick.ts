@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 
+import { modelFields, type ModelOverrides, type ReasoningEffort } from "@/src/lib/reasoning-effort";
 import type { LeadShortlistEntry } from "@/src/features/newsletter/lead-story";
 import { logServerError, logServerInfo } from "@/src/server/observability";
 
@@ -12,7 +13,32 @@ import { logServerError, logServerInfo } from "@/src/server/observability";
  * The rubric comes first and the day's stories last, so a rebuilt board can reuse OpenAI's cached prompt prefix.
  */
 
-const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+export const LEAD_PICK_MODEL = "gpt-6-luna";
+/**
+ * Low, from evals/results/lead-pick.md (11 boards, 3 runs each). The AI lead is the owner's lead in 22 of 33 runs
+ * at low, against 18 of 33 at none, medium and high. Only 11 boards have a lead the owner committed, so this is weak
+ * evidence; low is the cheapest effort that is not worse.
+ */
+export const LEAD_PICK_EFFORT: ReasoningEffort = "low";
+
+/** The part of the OpenAI client the lead pick uses, so tests and evals can pass their own. */
+export interface LeadPickClient {
+  responses: {
+    create(request: never): Promise<{ id: string }>;
+    retrieve(responseId: string): Promise<{
+      status?: string | null;
+      output_text?: string | null;
+      error?: { message?: string | null } | null;
+    }>;
+  };
+}
+
+const defaultClient = new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) as unknown as LeadPickClient;
+
+/** `model` and `effort` are for evals: production uses LEAD_PICK_MODEL and LEAD_PICK_EFFORT. */
+export interface LeadPickOptions extends ModelOverrides {
+  client?: LeadPickClient;
+}
 
 export const LEAD_PICK_INSTRUCTIONS = `You are the editor of AI Recap, a daily AI newsletter for people who follow AI closely. You choose the lead story: the one the issue's subject line is about.
 
@@ -63,10 +89,10 @@ export function leadPickUserMessage(input: LeadPickInput): string {
 }
 
 /** Submits the lead pick in background mode and returns the response id to poll. */
-export async function submitLeadPick(input: LeadPickInput, date: string): Promise<string> {
-  const response = await client.responses.create({
-    model: "gpt-6-luna",
-    reasoning: { effort: "low" },
+export async function submitLeadPick(input: LeadPickInput, date: string, options: LeadPickOptions = {}): Promise<string> {
+  const client = options.client ?? defaultClient;
+  const request = {
+    ...modelFields(options, { model: LEAD_PICK_MODEL, effort: LEAD_PICK_EFFORT }),
     instructions: LEAD_PICK_INSTRUCTIONS,
     input: leadPickUserMessage(input),
     background: true,
@@ -88,7 +114,8 @@ export async function submitLeadPick(input: LeadPickInput, date: string): Promis
         },
       },
     },
-  });
+  };
+  const response = await client.responses.create(request as never);
 
   logServerInfo("openai.lead_pick.submit.success", {
     responseId: response.id,
@@ -112,9 +139,10 @@ function parseLeadPick(outputText: string): LeadPickResult | null {
 
 /** Polls a submitted lead pick. */
 export async function checkLeadPickStatus(
-  responseId: string
+  responseId: string,
+  options: { client?: LeadPickClient } = {}
 ): Promise<{ status: "pending" } | { status: "completed"; result: LeadPickResult } | { status: "failed"; error: string }> {
-  const response = await client.responses.retrieve(responseId);
+  const response = await (options.client ?? defaultClient).responses.retrieve(responseId);
 
   if (response.status === "queued" || response.status === "in_progress") return { status: "pending" };
 

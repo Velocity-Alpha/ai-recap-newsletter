@@ -1,9 +1,13 @@
+import { createHash } from "node:crypto";
+
 import { describe, expect, it, vi } from "vitest";
 
 import {
   buildExtractionPrompt,
   createOpenAIExtractor,
+  EXTRACTION_EFFORT,
   EXTRACTION_MODEL,
+  EXTRACTION_SYSTEM_PROMPT,
   parseExtractedStories,
   STORY_CATEGORIES,
 } from "@/src/pipeline/ingest/extract";
@@ -25,6 +29,14 @@ describe("buildExtractionPrompt", () => {
     expect(prompt.endsWith("# Source Text:\nIssue body")).toBe(true);
     expect(prompt).not.toMatch(/web ?search/i);
     expect(prompt).not.toContain("{{");
+  });
+
+  // The prompt is built from exported parts that the eval's judge imports. This pins the text the app sends:
+  // a change to any part must be a deliberate prompt change, made here too.
+  it("sends the same prompt text, byte for byte", () => {
+    const prompt = buildExtractionPrompt({ sourceDate: "2026-11-09", text: "Issue body" });
+    expect(createHash("sha256").update(prompt).digest("hex")).toBe("ed63bd620028b5587ad27e3c9052ce814e253c56021762f0ff4e015773301c27");
+    expect(createHash("sha256").update(EXTRACTION_SYSTEM_PROMPT).digest("hex")).toBe("42ec893200e717633968abb323d3280099a667a6dc4a654fa6ff0b09fb269ef2");
   });
 });
 
@@ -62,18 +74,43 @@ describe("createOpenAIExtractor", () => {
     return { client: { responses: { create } }, create };
   }
 
-  it("calls gpt-6-luna with low effort and the strict schema, without web search or storage", async () => {
+  async function sentRequest() {
     const { client, create } = fakeClient(JSON.stringify({ stories: [STORY] }));
-    const extract = createOpenAIExtractor({ client });
+    await createOpenAIExtractor({ client })({ sourceDate: "2026-11-09", text: "Issue body" });
+    return create.mock.calls[0][0] as Record<string, unknown> & { text: { format: Record<string, unknown> } };
+  }
 
-    await expect(extract({ sourceDate: "2026-11-09", text: "Issue body" })).resolves.toEqual([STORY]);
-    const request = create.mock.calls[0][0] as Record<string, unknown> & { text: { format: Record<string, unknown> } };
-    expect(request.model).toBe(EXTRACTION_MODEL);
+  it("returns the stories of the answer", async () => {
+    const { client } = fakeClient(JSON.stringify({ stories: [STORY] }));
+    await expect(createOpenAIExtractor({ client })({ sourceDate: "2026-11-09", text: "Issue body" })).resolves.toEqual([STORY]);
+  });
+
+  it("calls gpt-6-luna", async () => {
     expect(EXTRACTION_MODEL).toBe("gpt-6-luna");
-    expect(request.reasoning).toEqual({ effort: "low" });
-    expect(request.store).toBe(false);
-    expect(request.tools).toBeUndefined();
-    expect(request.text.format).toMatchObject({ type: "json_schema", name: "news_stories", strict: true });
+    expect((await sentRequest()).model).toBe("gpt-6-luna");
+  });
+
+  it("calls at medium effort", async () => {
+    expect(EXTRACTION_EFFORT).toBe("medium");
+    expect((await sentRequest()).reasoning).toEqual({ effort: "medium" });
+  });
+
+  it("asks for the strict news_stories schema", async () => {
+    expect((await sentRequest()).text.format).toMatchObject({ type: "json_schema", name: "news_stories", strict: true });
+  });
+
+  it("uses no web search", async () => {
+    expect((await sentRequest()).tools).toBeUndefined();
+  });
+
+  it("stores nothing", async () => {
+    expect((await sentRequest()).store).toBe(false);
+  });
+
+  it("uses the model and effort it is given (for evals)", async () => {
+    const { client, create } = fakeClient(JSON.stringify({ stories: [] }));
+    await createOpenAIExtractor({ client, model: "gpt-6-sol", effort: "high" })({ sourceDate: "2026-11-09", text: "x" });
+    expect(create.mock.calls[0][0]).toMatchObject({ model: "gpt-6-sol", reasoning: { effort: "high" } });
   });
 
   it("retries once, then reports the failure", async () => {

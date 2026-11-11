@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 
+import { modelFields, type ModelOverrides, type ReasoningEffort } from "@/src/lib/reasoning-effort";
 import { withRetries } from "@/src/pipeline/draft/image/retry";
 
 /**
@@ -10,6 +11,13 @@ import { withRetries } from "@/src/pipeline/draft/image/retry";
  */
 
 export const SCENE_PROMPT_MODEL = "gpt-6-luna";
+/**
+ * High, from evals/results/scene-prompt.md (100 issues, 2 runs each, against medium). High keeps all hard rules in
+ * 184 of 200 runs against 156 of 200 (+14 pts, 95% range +7 to +21), and no extras in 200 of 200 against 193 of
+ * 200; the lead depicted and a lead identifier shown are level. Low is worse on hard rules (−17 pts, −24 to −9).
+ * High costs 0.14 cents a call against 0.08, and its p95 is 44 s of the 120 s timeout, in a background step.
+ */
+export const SCENE_PROMPT_EFFORT: ReasoningEffort = "high";
 export const SCENE_PROMPT_TIMEOUT_MS = 120_000;
 export const SCENE_PROMPT_RETRIES = 2;
 
@@ -27,6 +35,60 @@ export interface ScenePrompt {
   rationale: string;
 }
 
+/** A bullet list, one `* ` line per rule, as the prompts write them. */
+export function bulletList(lines: readonly string[]): string {
+  return lines.map((line) => `* ${line}`).join("\n");
+}
+
+/** The frame both scene calls design for. The scene prompt must name it exactly once. */
+export const SCENE_FRAME = "16:9";
+/** The three layers every scene names. */
+export const SCENE_LAYERS = ["foreground", "midground", "background"] as const;
+/** Style words the scene must not use: the fixed style prompt owns them. Both scene calls forbid them. */
+export const SCENE_STYLE_WORDS = ["watercolor", "palette", "negative space", "technique"] as const;
+/** The scene prompt's list of forbidden interpretive words. */
+export const SCENE_PROMPT_INTERPRETIVE_WORDS = [
+  "represents",
+  "symbolizes",
+  "suggests",
+  "implies",
+  "commentary",
+  "metaphor",
+  "theme",
+  "message",
+  "critique",
+  "scrutiny",
+  "oversight",
+  "regulation",
+] as const;
+export const SCENE_PROMPT_WORDS = { min: 200, max: 300 };
+/** The rationale's limits, from the output schema. */
+export const SCENE_RATIONALE_LIMITS = { minSentences: 1, maxSentences: 2, maxWords: 45 };
+
+/** The system prompt's "Global composition invariants", one rule each. Evals grade against these texts. */
+export const SCENE_PROMPT_COMPOSITION = {
+  centralVignette: `The scene must be designed as a central vignette within a ${SCENE_FRAME} frame.`,
+  noEdges: "Avoid any objects, lines, or paint that touch the edges of the frame.",
+  centralCluster: "The subject and supporting elements must form a central cluster.",
+  thumbnail: "Instant readability at thumbnail size through bold, simple shapes and clear silhouette separation.",
+  hierarchy: "Strict hierarchy: one dominant subject, at most one supporting element.",
+  noScreens: "Avoid scenes that require reading screens, dashboards, paragraphs, multiple labels, code, or UI.",
+  noExtras: "Do not introduce extra characters, extra objects, or extra scenery beyond what the scene needs.",
+  logo: "If a logo or readable brand mark is needed, include only one, printed on a physical object in the scene, small and natural.",
+} as const;
+
+/** The system prompt's "Rules for \"image_prompt\"", one rule each. */
+export const SCENE_PROMPT_IMAGE_RULES = {
+  words: `${SCENE_PROMPT_WORDS.min} to ${SCENE_PROMPT_WORDS.max} words of vivid description.`,
+  visibleOnly: "Describe only what is visibly present: subjects, objects, setting, lighting, composition, scale, materials, and motion.",
+  layers: `Must specify ${SCENE_LAYERS.join(", ")}.`,
+  taper:
+    "All background and midground elements must be described as tapering off or dissolving into the surrounding background space before reaching the frame boundaries",
+  camera: "Must specify camera angle and distance.",
+  interpretive: `Avoid interpretive or intent language. Do not use words such as: ${SCENE_PROMPT_INTERPRETIVE_WORDS.join(", ")}.`,
+  style: `Do not mention ${SCENE_STYLE_WORDS.join(", ")}, or any fixed style constraints.`,
+} as const;
+
 const SYSTEM_PROMPT = `You are an editorial image creative director and prompt writer for a watercolor-style news illustration pipeline. You will be given three AI news articles. Your job is to select the single best article to drive a readable illustration, then write a dynamic scene prompt that will later be combined with a separate fixed style prompt.
 
 You must output only valid JSON with exactly these keys:
@@ -38,24 +100,11 @@ You must output only valid JSON with exactly these keys:
 
 Global composition invariants:
 
-* The scene must be designed as a central vignette within a 16:9 frame.
-* Avoid any objects, lines, or paint that touch the edges of the frame.
-* The subject and supporting elements must form a central cluster.
-* Instant readability at thumbnail size through bold, simple shapes and clear silhouette separation.
-* Strict hierarchy: one dominant subject, at most one supporting element.
-* Avoid scenes that require reading screens, dashboards, paragraphs, multiple labels, code, or UI.
-* Do not introduce extra characters, extra objects, or extra scenery beyond what the scene needs.
-* If a logo or readable brand mark is needed, include only one, printed on a physical object in the scene, small and natural.
+${bulletList(Object.values(SCENE_PROMPT_COMPOSITION))}
 
 Rules for "image_prompt":
 
-* 200 to 300 words of vivid description.
-* Describe only what is visibly present: subjects, objects, setting, lighting, composition, scale, materials, and motion.
-* Must specify foreground, midground, background.
-* All background and midground elements must be described as tapering off or dissolving into the surrounding background space before reaching the frame boundaries
-* Must specify camera angle and distance.
-* Avoid interpretive or intent language. Do not use words such as: represents, symbolizes, suggests, implies, commentary, metaphor, theme, message, critique, scrutiny, oversight, regulation.
-* Do not mention watercolor, palette, negative space, technique, or any fixed style constraints.
+${bulletList(Object.values(SCENE_PROMPT_IMAGE_RULES))}
 
 Rules for "caption_prompt":
 
@@ -85,17 +134,22 @@ Internal requirements (do not output):
 Output discipline:
 Return JSON only. No preface. No markdown. No explanations.`;
 
+/** The user message's scene requirements, one rule each. Both scene calls send them. */
+export const SCENE_REQUIREMENT_RULES = {
+  vignette: `Stage the scene as a vignetted central cluster within a ${SCENE_FRAME} frame.`,
+  layers: `Describe ${SCENE_LAYERS.join(", ")}.`,
+  camera: "State camera angle and distance.",
+  lighting: "State lighting and mood as visible conditions.",
+  identifiers: "Include only a small number of grounding identifiers.",
+  supporting: "At most one supporting element, clearly secondary.",
+  visibleOnly: "No interpretive language. Describe only what is visible.",
+  logos: "Logos/brand elements can be explicitly mentioned when needed instead of simulating them.",
+  simple: "Prefer scenes with simpler composition.",
+} as const;
+
 export const SCENE_REQUIREMENTS = `Dynamic scene requirements for image_prompt:
 
-* Stage the scene as a vignetted central cluster within a 16:9 frame.
-* Describe foreground, midground, background.
-* State camera angle and distance.
-* State lighting and mood as visible conditions.
-* Include only a small number of grounding identifiers.
-* At most one supporting element, clearly secondary.
-* No interpretive language. Describe only what is visible.
-* Logos/brand elements can be explicitly mentioned when needed instead of simulating them.
-* Prefer scenes with simpler composition.`;
+${bulletList(Object.values(SCENE_REQUIREMENT_RULES))}`;
 
 const OUTPUT_SCHEMA = {
   type: "object",
@@ -105,15 +159,18 @@ const OUTPUT_SCHEMA = {
     image_prompt: {
       type: "string",
       description:
-        "Dynamic scene-only image generation prompt (200–300 words). Must include '16:9' exactly once. Must describe a central cluster where foreground, midground, and background dissolve into white space before touching any frame edges. Specify camera angle and distance, lighting. No style constraints.",
+        `Dynamic scene-only image generation prompt (${SCENE_PROMPT_WORDS.min}–${SCENE_PROMPT_WORDS.max} words). Must include '${SCENE_FRAME}' exactly once. Must describe a central cluster where foreground, midground, and background dissolve into white space before touching any frame edges. Specify camera angle and distance, lighting. No style constraints.`,
     },
     editorial_rationale: {
       type: "string",
       description:
-        "1–2 sentences explaining why this scene was chosen and what it shows from the chosen article. Can reference the chosen article explicitly. No more than 45 words.",
+        `${SCENE_RATIONALE_LIMITS.minSentences}–${SCENE_RATIONALE_LIMITS.maxSentences} sentences explaining why this scene was chosen and what it shows from the chosen article. Can reference the chosen article explicitly. No more than ${SCENE_RATIONALE_LIMITS.maxWords} words.`,
     },
   },
 };
+
+/** The context's rule for which story the scene is about: the lead story, the one the subject line is about. */
+export const SCENE_CONTEXT_FOCUS = "Important: Focus on the main topic from the subject line of the email";
 
 /** n8n's `context` for 2.2.1: the subject line, then the top stories as compact JSON. */
 export function buildSceneContext(context: ScenePromptContext): string {
@@ -126,7 +183,7 @@ Using the summary provided, create a strong editorial featured image for an emai
   * A clear visual anchor you can stage as one dominant subject
   * Instant readability at a glance in 16:9 with minimal detail
 
-Important: Focus on the main topic from the subject line of the email
+${SCENE_CONTEXT_FOCUS}
 
 Subject Line: ${context.subjectLine}
 
@@ -162,7 +219,8 @@ export interface ScenePromptClient {
   responses: { create(request: never, options?: never): Promise<{ output_text?: string }> };
 }
 
-export interface WriteScenePromptOptions {
+/** `model` and `effort` are for evals: production uses SCENE_PROMPT_MODEL and SCENE_PROMPT_EFFORT. */
+export interface WriteScenePromptOptions extends ModelOverrides {
   client?: ScenePromptClient;
   apiKey?: string;
   /** Wait between attempts. n8n waits 5 s. */
@@ -181,7 +239,7 @@ export async function writeScenePrompt(
     options.client ??
     (new OpenAI({ apiKey: options.apiKey ?? process.env.OPENAI_API_KEY }) as unknown as ScenePromptClient);
   const request = {
-    model: SCENE_PROMPT_MODEL,
+    ...modelFields(options, { model: SCENE_PROMPT_MODEL, effort: SCENE_PROMPT_EFFORT }),
     instructions: SYSTEM_PROMPT,
     input: buildScenePromptInput(context),
     store: false,

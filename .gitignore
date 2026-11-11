@@ -17,3 +17,6 @@ netlify/deno.lock
 .mcp.json
 # Trigger.dev local build output
 .trigger
+# Evals: local datasets with third-party text, and raw run output (evals/README.md)
+evals/data/
+evals/out/

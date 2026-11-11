@@ -1,9 +1,14 @@
 import OpenAI from "openai";
 
+import { modelFields, type ModelOverrides, type ReasoningEffort } from "@/src/lib/reasoning-effort";
 import {
+  bulletList,
   buildSceneContext,
+  SCENE_FRAME,
+  SCENE_LAYERS,
   SCENE_PROMPT_MODEL,
   SCENE_REQUIREMENTS,
+  SCENE_STYLE_WORDS,
   type ScenePromptClient,
   type ScenePromptContext,
 } from "@/src/pipeline/draft/image/scene-prompt";
@@ -15,6 +20,13 @@ import {
  */
 
 export const SCENE_IDEAS_COUNT = 3;
+/**
+ * The model is SCENE_PROMPT_MODEL. Medium, from evals/results/scene-ideas.md (100 issues, 2 runs each). Low is
+ * worse than medium on no extras (−22 pts, 95% range −29 to −16), clearly different ideas (−12, −19 to −7) and a
+ * lead identifier shown (−13, −20 to −6). High has more ideas with no extras (+12 pts), but the call runs in a web
+ * request with a 45 s timeout: 17 of high's 200 calls timed out, and its p95 is 43.5 s.
+ */
+export const SCENE_IDEAS_EFFORT: ReasoningEffort = "medium";
 /** The board waits for this call, and a route must finish inside Netlify's 60 s. */
 export const SCENE_IDEAS_TIMEOUT_MS = 45_000;
 
@@ -25,28 +37,54 @@ export interface SceneIdea {
   scene: string;
 }
 
+/** The scene ideas' shorter list of forbidden interpretive words. */
+export const SCENE_IDEAS_INTERPRETIVE_WORDS = ["represents", "symbolizes", "suggests", "metaphor", "theme", "message"] as const;
+export const SCENE_IDEA_WORDS = { min: 120, max: 200 };
+export const SCENE_IDEA_LABEL_WORDS = { min: 2, max: 6 };
+
+/** The rule for the set of ideas. */
+export const SCENE_IDEAS_DIFFERENT =
+  "Make the three scenes clearly different: a different story, a different dominant subject, or a different visual idea.";
+
+/** The instructions' "Global composition invariants for every scene", one rule each. Evals grade against these texts. */
+export const SCENE_IDEAS_COMPOSITION = {
+  centralVignette: `A central vignette within a ${SCENE_FRAME} frame. No objects, lines, or paint touch the edges of the frame.`,
+  thumbnail: "Instant readability at thumbnail size through bold, simple shapes and clear silhouette separation.",
+  hierarchy: "Strict hierarchy: one dominant subject, at most one supporting element.",
+  noScreens: "No scenes that need reading screens, dashboards, paragraphs, multiple labels, code, or UI.",
+  logo: "If a logo or readable brand mark is needed, include only one, printed on a physical object in the scene, small and natural.",
+} as const;
+
+/** The instructions' rules for each "scene", one rule each. */
+export const SCENE_IDEAS_SCENE_RULES = {
+  visibleOnly: `${SCENE_IDEA_WORDS.min} to ${SCENE_IDEA_WORDS.max} words of vivid description of what is visibly present.`,
+  layers: `Specify ${SCENE_LAYERS.join(", ")}, camera angle and distance, and lighting.`,
+  interpretive: `No interpretive or intent language (${SCENE_IDEAS_INTERPRETIVE_WORDS.join(", ")}).`,
+  style: `Do not mention ${SCENE_STYLE_WORDS.join(", ")}, or any fixed style constraints.`,
+} as const;
+
+export const SCENE_IDEAS_LABEL_RULE = `${SCENE_IDEA_LABEL_WORDS.min} to ${SCENE_IDEA_LABEL_WORDS.max} plain words that name the scene.`;
+
 const INSTRUCTIONS = `You are an editorial image creative director for a watercolor-style news illustration pipeline. You will be given a newsletter issue's subject line and its top stories. Suggest three different scenes for the issue's featured image. Each scene is a dynamic scene prompt that will later be combined with a separate fixed style prompt.
 
-Make the three scenes clearly different: a different story, a different dominant subject, or a different visual idea.
+${SCENE_IDEAS_DIFFERENT}
 
 Global composition invariants for every scene:
 
-* A central vignette within a 16:9 frame. No objects, lines, or paint touch the edges of the frame.
-* Instant readability at thumbnail size through bold, simple shapes and clear silhouette separation.
-* Strict hierarchy: one dominant subject, at most one supporting element.
-* No scenes that need reading screens, dashboards, paragraphs, multiple labels, code, or UI.
-* If a logo or readable brand mark is needed, include only one, printed on a physical object in the scene, small and natural.
+${bulletList(Object.values(SCENE_IDEAS_COMPOSITION))}
 
 Rules for each "scene":
 
-* 120 to 200 words of vivid description of what is visibly present.
-* Specify foreground, midground, background, camera angle and distance, and lighting.
-* No interpretive or intent language (represents, symbolizes, suggests, metaphor, theme, message).
-* Do not mention watercolor, palette, negative space, technique, or any fixed style constraints.
+${bulletList(Object.values(SCENE_IDEAS_SCENE_RULES))}
 
-Rules for each "label": 2 to 6 plain words that name the scene.
+Rules for each "label": ${SCENE_IDEAS_LABEL_RULE}
 
 Return JSON only.`;
+
+/** The user message: the shared scene requirements, worded for each scene, then the context. */
+export function buildSceneIdeasInput(context: ScenePromptContext): string {
+  return `${SCENE_REQUIREMENTS.replace("image_prompt", "each scene")}\n\n${buildSceneContext(context)}`;
+}
 
 const OUTPUT_SCHEMA = {
   type: "object",
@@ -61,8 +99,8 @@ const OUTPUT_SCHEMA = {
         additionalProperties: false,
         required: ["label", "scene"],
         properties: {
-          label: { type: "string", description: "2 to 6 plain words that name the scene." },
-          scene: { type: "string", description: "The scene prompt, 120 to 200 words. No style constraints." },
+          label: { type: "string", description: SCENE_IDEAS_LABEL_RULE },
+          scene: { type: "string", description: `The scene prompt, ${SCENE_IDEA_WORDS.min} to ${SCENE_IDEA_WORDS.max} words. No style constraints.` },
         },
       },
     },
@@ -88,7 +126,8 @@ export function parseSceneIdeas(outputText: string): SceneIdea[] {
   return ideas;
 }
 
-export interface SuggestSceneIdeasOptions {
+/** `model` and `effort` are for evals: production uses SCENE_PROMPT_MODEL and SCENE_IDEAS_EFFORT. */
+export interface SuggestSceneIdeasOptions extends ModelOverrides {
   client?: ScenePromptClient;
   apiKey?: string;
 }
@@ -105,9 +144,9 @@ export async function suggestSceneIdeas(
     options.client ??
     (new OpenAI({ apiKey: options.apiKey ?? process.env.OPENAI_API_KEY }) as unknown as ScenePromptClient);
   const request = {
-    model: SCENE_PROMPT_MODEL,
+    ...modelFields(options, { model: SCENE_PROMPT_MODEL, effort: SCENE_IDEAS_EFFORT }),
     instructions: INSTRUCTIONS,
-    input: `${SCENE_REQUIREMENTS.replace("image_prompt", "each scene")}\n\n${buildSceneContext(context)}`,
+    input: buildSceneIdeasInput(context),
     store: false,
     text: { format: { type: "json_schema", name: "scene_ideas", strict: true, schema: OUTPUT_SCHEMA } },
   };

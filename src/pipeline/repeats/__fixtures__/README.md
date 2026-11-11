@@ -52,5 +52,7 @@ it is not sure.
 | Blocks: sure pairs that Haiku called `different` | 9 of 208 sure pairs inside blocks |
 | Cost of the 2,136 pairs | 1.27 million input tokens, about $0.13 |
 
+To call the judge again on the labelled pairs (for a new model), run `npm run eval -- evals/repeats`.
+
 Known weak spots: a "bundle" story that covers two events matches both, and a wrong summary from extraction
 (story 10864) makes a true repeat look different.

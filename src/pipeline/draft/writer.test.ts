@@ -1,9 +1,13 @@
+import { createHash } from "node:crypto";
+
 import { describe, expect, it, vi } from "vitest";
 
 import { WRITTEN_ISSUE_SCHEMA } from "@/src/pipeline/draft/content";
 import { SAMPLE_APPROVED, SAMPLE_CONTENT } from "@/src/pipeline/draft/draft.fixture";
 import {
   MAX_ARTICLE_CHARS,
+  WRITER_EFFORT,
+  WRITER_INSTRUCTIONS,
   WRITER_MODEL,
   buildWriterPrompt,
   createOpenAIIssueWriter,
@@ -42,20 +46,54 @@ function payloadOf(prompt: string): Record<string, Array<Record<string, unknown>
 }
 
 describe("createOpenAIIssueWriter", () => {
-  it("makes one strict-schema GPT-6 Luna call with low effort and no web search", async () => {
+  async function sentRequest() {
     const { client, create } = fakeClient({ status: "completed", output_text: JSON.stringify(SAMPLE_CONTENT) });
-
-    await expect(createOpenAIIssueWriter({ client })(INPUT)).resolves.toEqual(SAMPLE_CONTENT);
-
+    await createOpenAIIssueWriter({ client })(INPUT);
     expect(create).toHaveBeenCalledTimes(1);
-    const request = create.mock.calls[0][0];
+    return create.mock.calls[0][0];
+  }
+
+  it("returns the written issue of one call", async () => {
+    const { client } = fakeClient({ status: "completed", output_text: JSON.stringify(SAMPLE_CONTENT) });
+    await expect(createOpenAIIssueWriter({ client })(INPUT)).resolves.toEqual(SAMPLE_CONTENT);
+  });
+
+  it("calls GPT-6 Luna", async () => {
     expect(WRITER_MODEL).toBe("gpt-6-luna");
-    expect(request.model).toBe("gpt-6-luna");
-    expect(request.reasoning).toEqual({ effort: "low" });
-    expect(request.tools).toBeUndefined();
-    expect(request.text.format).toMatchObject({ type: "json_schema", strict: true, schema: WRITTEN_ISSUE_SCHEMA });
+    expect((await sentRequest()).model).toBe("gpt-6-luna");
+  });
+
+  it("calls at high effort", async () => {
+    expect(WRITER_EFFORT).toBe("high");
+    expect((await sentRequest()).reasoning).toEqual({ effort: "high" });
+  });
+
+  it("uses no web search", async () => {
+    expect((await sentRequest()).tools).toBeUndefined();
+  });
+
+  it("asks for the strict written-issue schema", async () => {
+    expect((await sentRequest()).text.format).toMatchObject({ type: "json_schema", strict: true, schema: WRITTEN_ISSUE_SCHEMA });
+  });
+
+  it("sends the writer prompt under the editorial instructions", async () => {
+    const request = await sentRequest();
     expect(request.input).toBe(buildWriterPrompt(INPUT));
+    expect(request.instructions).toBe(WRITER_INSTRUCTIONS);
     expect(request.instructions).toContain("You are the editorial structuring engine for an AI newsletter.");
+  });
+
+  it("sends the same instructions and prompt bytes as before the prompt was split into named parts", async () => {
+    const request = await sentRequest();
+    const sha = (text: string) => createHash("sha256").update(text).digest("hex");
+    expect(sha(request.instructions)).toBe("66f1427ddc9e72ca77bf3b00c74bccc5db0f20737cbfcd474cd3ee0db6d3e9df");
+    expect(sha(request.input)).toBe("fe6389a2605aa13882ddc80b41e9e7d22951673d9109d3de5d29a1b4e4dd6c2d");
+  });
+
+  it("uses the model and effort it is given (for evals)", async () => {
+    const { client, create } = fakeClient({ status: "completed", output_text: JSON.stringify(SAMPLE_CONTENT) });
+    await createOpenAIIssueWriter({ client, model: "gpt-6-sol", effort: "medium" })(INPUT);
+    expect(create.mock.calls[0][0]).toMatchObject({ model: "gpt-6-sol", reasoning: { effort: "medium" } });
   });
 
   it("tells the model that article_text is untrusted web text whose instructions it must ignore", async () => {

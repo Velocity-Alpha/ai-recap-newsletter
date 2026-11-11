@@ -553,7 +553,7 @@ function highestStoryId(stories: StoryRecord[]): number | null {
  * The returned order drives section selection later, so higher-ranked stories
  * are chosen before lower-ranked fill-ins.
  */
-function processAndRankStories(
+export function processAndRankStories(
   stories: StoryRecord[]
 ): ProcessedStory[] {
   const processed = stories.map((story) => {

@@ -1,7 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
 
 import answers from "@/src/pipeline/free-links/__fixtures__/search-answers.json";
-import { buildSearchPrompt, parseSearchAnswer, searchFreeLinks, type SearchClient } from "@/src/pipeline/free-links/search";
+import {
+  buildSearchPrompt,
+  FREE_ARTICLES_ASK,
+  FREE_LINK_EXCLUSIONS,
+  FREE_LINK_PREFERENCE,
+  parseSearchAnswer,
+  SEARCH_EFFORT,
+  searchFreeLinks,
+  type SearchClient,
+} from "@/src/pipeline/free-links/search";
 
 const STORY = {
   headline: "Pretend Lab Ships A Toy Model",
@@ -25,17 +34,48 @@ describe("buildSearchPrompt", () => {
       Search the web and find up to 3 free-to-read articles that report this same news. Prefer original reporting, large news sites, and primary sources (a company post, a filing, a court document). Do not return paywalled sites (WSJ, FT, Bloomberg, NYT, The Information, Reuters, CNBC Pro), social media posts, aggregators, or short rewrites. Answer with JSON only: {"links":[{"url":"...","title":"...","site":"..."}]}. Use an empty list when you find none."
     `);
   });
+
+  it("is built from the exported rules the free-links eval uses", () => {
+    const prompt = buildSearchPrompt(STORY);
+    for (const part of [FREE_ARTICLES_ASK, FREE_LINK_PREFERENCE, FREE_LINK_EXCLUSIONS]) expect(prompt).toContain(part);
+  });
 });
 
 describe("searchFreeLinks", () => {
-  it("sends one web search request to gpt-6-luna, with a 120 s limit and one retry", async () => {
+  async function sentCall() {
     const { client, create } = clientAnswering('{"links":[]}');
-
     await searchFreeLinks(STORY, { client });
-
     expect(create).toHaveBeenCalledTimes(1);
+    const [request, options] = create.mock.calls[0] as unknown as [Record<string, unknown>, Record<string, unknown>];
+    return { request, options };
+  }
+
+  it("sends one web search request with the search prompt", async () => {
+    expect((await sentCall()).request).toMatchObject({ tools: [{ type: "web_search" }], input: buildSearchPrompt(STORY) });
+  });
+
+  it("calls gpt-6-luna", async () => {
+    expect((await sentCall()).request.model).toBe("gpt-6-luna");
+  });
+
+  it("calls at low effort", async () => {
+    expect(SEARCH_EFFORT).toBe("low");
+    expect((await sentCall()).request.reasoning).toEqual({ effort: "low" });
+  });
+
+  it("gives the call a 120 s limit", async () => {
+    expect((await sentCall()).options.timeout).toBe(120_000);
+  });
+
+  it("retries the call once", async () => {
+    expect((await sentCall()).options.maxRetries).toBe(1);
+  });
+
+  it("uses the model and effort it is given (for evals)", async () => {
+    const { client, create } = clientAnswering('{"links":[]}');
+    await searchFreeLinks(STORY, { client, model: "gpt-6-sol", effort: "high" });
     expect(create).toHaveBeenCalledWith(
-      { model: "gpt-6-luna", tools: [{ type: "web_search" }], input: buildSearchPrompt(STORY) },
+      { model: "gpt-6-sol", reasoning: { effort: "high" }, tools: [{ type: "web_search" }], input: buildSearchPrompt(STORY) },
       { timeout: 120_000, maxRetries: 1 },
     );
   });

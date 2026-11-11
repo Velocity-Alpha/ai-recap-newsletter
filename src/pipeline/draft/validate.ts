@@ -23,7 +23,8 @@ const SECTION_LABELS = Object.fromEntries(
 ) as Record<ContentSectionKey, string>;
 
 // Links, HTML tags, and markdown links, bold, or code: none belong in plain-text fields.
-const MARKUP = /https?:\/\/|\bwww\.|<\/?[a-z][^>]*>|\]\(|\*\*|`/i;
+/** A link, an HTML tag, a markdown link, bold or code: plain-text fields must have none. */
+export const MARKUP = /https?:\/\/|\bwww\.|<\/?[a-z][^>]*>|\]\(|\*\*|`/i;
 
 export function countWords(text: string): number {
   return text.split(/\s+/).filter((word) => /[\p{L}\p{N}]/u.test(word)).length;

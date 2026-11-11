@@ -1,5 +1,7 @@
 import OpenAI from "openai";
 
+import { modelFields, type ModelOverrides, type ReasoningEffort } from "@/src/lib/reasoning-effort";
+
 /**
  * One model call per newsletter issue: n8n's extraction prompt and output schema
  * (docs/n8n-backend/10-ingestion.md §4.4), moved from gpt-5.4-mini to gpt-6-luna.
@@ -9,6 +11,13 @@ import OpenAI from "openai";
  */
 
 export const EXTRACTION_MODEL = "gpt-6-luna";
+/**
+ * Medium, from evals/results/extraction.md (58 issues, 2 runs each, scored against golden values). Against medium,
+ * low finds fewer of the golden stories (recall −6 pts, 95% range −8 to −3), puts fewer in the golden category
+ * (−5 pts, −7 to −2) and misses 2.75 stories per issue against 1.97. High is no better on any metric, and its p95
+ * of 105 s is close to the 120 s timeout.
+ */
+export const EXTRACTION_EFFORT: ReasoningEffort = "medium";
 
 export const STORY_CATEGORIES = [
   "Launches",
@@ -41,63 +50,42 @@ export interface ExtractionInput {
 
 export type Extractor = (input: ExtractionInput) => Promise<ExtractedStory[]>;
 
-const SYSTEM_PROMPT =
+export const EXTRACTION_SYSTEM_PROMPT =
   "You are an information extraction engine. Your only job is to extract news stories from newsletter text and return structured JSON. You do not editorialize. You do not summarize loosely. You apply rules mechanically.";
 
-const USER_PROMPT = `Extract all qualifying news stories from the source text below.
-
----
-
-## Step 1 — Filter Out
-
-Discard any item that matches one or more of the following. Never extract these:
-
-- Sponsored content: marked as "Presented By", "Together with", "SPONSOR", or "In partnership with"
+// The prompt is built from these named parts so the eval's judge (evals/extraction/judge.ts) imports the
+// same rules instead of restating them.
+/** The items step 1 tells the model to discard: never extracted. */
+export const EXTRACTION_FILTER_RULES = `- Sponsored content: marked as "Presented By", "Together with", "SPONSOR", or "In partnership with"
 - Sponsored events or webinars
 - Tools or links marked with an asterisk (*) indicating sponsorship
 - Lead magnets: demos, ebook downloads, free guides, whitepapers, waitlists with no news
 - Newsletter self-promotion, referral links, or "how to use this newsletter" content
 - Recurring sections with no news story (e.g. "Community workflow of the week", "tip of the day")
-- Negative news: Any negative story about the effect or consequences of AI. For example a story on how AI would take the jobs of humans.
+- Negative news: Any negative story about the effect or consequences of AI. For example a story on how AI would take the jobs of humans.`;
 
----
-
-## Step 2 — Extract Each Qualifying Story
-
-For each story, populate every field as follows:
-
-### Headline
-- Stay close to the original headline text if one exists
+export const EXTRACTION_HEADLINE_RULES = `- Stay close to the original headline text if one exists
 - If no headline exists, write a tight news headline (max 12 words) describing the event
 - Never start with "How", "Why", or "What" — those are analysis framings, not news headlines
 - Format in Title Case with the obvious exceptions like:
-  - OpenAI, ChatGPT, macOS, iOS, xAI, AI, RAG, etc.
+  - OpenAI, ChatGPT, macOS, iOS, xAI, AI, RAG, etc.`;
 
-### Summary
-- 1–2 sentences. What happened and why it matters.
+export const EXTRACTION_SUMMARY_RULES = `- 1–2 sentences. What happened and why it matters.
 - If a story covers multiple items (e.g. a list of tools), use markdown with inline links for each item
-- Do not pad. Do not editorialize.
+- Do not pad. Do not editorialize.`;
 
-### Story Detail
-- The full explanatory detail available in the source text, preserved faithfully
+export const EXTRACTION_STORY_DETAIL_RULES = `- The full explanatory detail available in the source text, preserved faithfully
 - Include any specific numbers, quotes, named parties, or technical specifics mentioned
 - If the story details are vague or brief, story_detail may equal summary. Do not invent detail.
-- Provide the output as a short editorial blurb without mentioning the source, page, listing, etc
+- Provide the output as a short editorial blurb without mentioning the source, page, listing, etc`;
 
-### URL
-- Prefer the direct link to the original source over the newsletter permalink
+export const EXTRACTION_URL_RULES = `- Prefer the direct link to the original source over the newsletter permalink
 - If the story has a single clear source URL, use it
 - If the story has multiple URLs (e.g. a roundup), leave url as empty string "" and embed links in summary using markdown
-- If no external URL is present, use empty string ""
+- If no external URL is present, use empty string ""`;
 
-### Published At
-- Use the article's own publication date if visible
-- Otherwise use: {{SOURCE_DATE}}
-- Format: YYYY-MM-DD
-
-### Category
-
-Assign exactly one. Apply the **first rule that matches** — do not use a later rule if an earlier one fits:
+/** The category rules, in order: the first that matches wins. */
+export const EXTRACTION_CATEGORY_RULES = `Assign exactly one. Apply the **first rule that matches** — do not use a later rule if an earlier one fits:
 
 1. **Launches** — A genuinely new product, model, or market entry that is publicly available for the first time today. Must meet ALL of the following:
    - It is live and usable today (not just announced)
@@ -141,11 +129,10 @@ Use for:
 
 8. **Community** — User stories, social moments, surveys, grassroots usage, or "how people are using AI" content.
 
-9. **Culture** — Broader societal impact stories: AI and jobs, AI and creativity, AI and education, AI ethics debates without a specific policy action.
+9. **Culture** — Broader societal impact stories: AI and jobs, AI and creativity, AI and education, AI ethics debates without a specific policy action.`;
 
-### Importance Score
-
-Importance score measures newsworthiness within the AI industry. Assign a single integer 1–5. Use the **first level that fully matches**:
+/** The importance rubric, 5 down to 1: the first level that fully matches. */
+export const EXTRACTION_IMPORTANCE_RUBRIC = `Importance score measures newsworthiness within the AI industry. Assign a single integer 1–5. Use the **first level that fully matches**:
 
 **Tier 1 company examples (for scoring):** OpenAI, Anthropic, Google/DeepMind, Meta AI, NVIDIA, Microsoft, Apple, Amazon/AWS, xAI
 
@@ -169,7 +156,48 @@ Importance score measures newsworthiness within the AI industry. Assign a single
 
 **2** — Incremental update or new isolated feature added to an existing product (regardless of company tier), minor model release, small funding round, tooling from an unknown company, or analysis piece with no news event anchor
 
-**1** — Opinion, evergreen explainer, job move, minor integration, event recap, or no clear news event
+**1** — Opinion, evergreen explainer, job move, minor integration, event recap, or no clear news event`;
+
+const USER_PROMPT = `Extract all qualifying news stories from the source text below.
+
+---
+
+## Step 1 — Filter Out
+
+Discard any item that matches one or more of the following. Never extract these:
+
+${EXTRACTION_FILTER_RULES}
+
+---
+
+## Step 2 — Extract Each Qualifying Story
+
+For each story, populate every field as follows:
+
+### Headline
+${EXTRACTION_HEADLINE_RULES}
+
+### Summary
+${EXTRACTION_SUMMARY_RULES}
+
+### Story Detail
+${EXTRACTION_STORY_DETAIL_RULES}
+
+### URL
+${EXTRACTION_URL_RULES}
+
+### Published At
+- Use the article's own publication date if visible
+- Otherwise use: {{SOURCE_DATE}}
+- Format: YYYY-MM-DD
+
+### Category
+
+${EXTRACTION_CATEGORY_RULES}
+
+### Importance Score
+
+${EXTRACTION_IMPORTANCE_RUBRIC}
 
 ## Step 3 — Output
 
@@ -251,16 +279,21 @@ export interface ResponsesClient {
   responses: { create(request: never): Promise<{ output_text?: string }> };
 }
 
-export function createOpenAIExtractor(options: { client?: ResponsesClient; apiKey?: string } = {}): Extractor {
+/** `model` and `effort` are for evals: production uses EXTRACTION_MODEL and EXTRACTION_EFFORT. */
+export interface ExtractorOptions extends ModelOverrides {
+  client?: ResponsesClient;
+  apiKey?: string;
+}
+
+export function createOpenAIExtractor(options: ExtractorOptions = {}): Extractor {
   const client =
     options.client ??
     (new OpenAI({ apiKey: options.apiKey ?? process.env.OPENAI_API_KEY, timeout: 120_000, maxRetries: 1 }) as unknown as ResponsesClient);
 
   async function once(input: ExtractionInput): Promise<ExtractedStory[]> {
     const request = {
-      model: EXTRACTION_MODEL,
-      reasoning: { effort: "low" },
-      instructions: SYSTEM_PROMPT,
+      ...modelFields(options, { model: EXTRACTION_MODEL, effort: EXTRACTION_EFFORT }),
+      instructions: EXTRACTION_SYSTEM_PROMPT,
       input: buildExtractionPrompt(input),
       store: false,
       text: {

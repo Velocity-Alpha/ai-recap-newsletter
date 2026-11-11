@@ -1,0 +1,1119 @@
+{
+  "about": "Free-links golden values: per paywalled story of evals/free-links/stories.json, whether a free, same-news article exists, and up to 3 such article URLs that Claude Opus found by web search and read (evals/free-links/golden-todo.md). Story ids and public URLs only.",
+  "producer": "claude-opus-5-5",
+  "entries": {
+    "10077": {
+      "inputHash": "86c20f595b759b90",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://www.sltrib.com/religion/global/2026/10/05/how-anthropic-consulted-religious/",
+          "https://www.gadgetreview.com/?p=416464"
+        ]
+      }
+    },
+    "10131": {
+      "inputHash": "bde3cb5084b19647",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://labour.org.uk/updates/stories/andy-burnhams-speech-to-labour-party-conference-2026/",
+          "https://www.smeweb.com/what-was-in-andy-burnhams-labour-party-conference-speech-for-businesses/",
+          "https://www.abc.net.au/news/2026-09-30/key-takeaways-from-uk-pm-andy-burnham-labour-conference-speech/107205962"
+        ]
+      }
+    },
+    "10250": {
+      "inputHash": "2c902922b42cba6f",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": false,
+        "urls": []
+      }
+    },
+    "10263": {
+      "inputHash": "4b32758629c4dde0",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://www.trendingtopics.eu/hone-moritz-stephan-60-million/",
+          "https://magica.com/news/hone-raises-60-million-persistent-ai-business-goals",
+          "https://angelinvestorsnetwork.com/startups/hone-raises-60-million-seed-led-by-benchmark-and-index-at-285-million-valuation"
+        ]
+      }
+    },
+    "10294": {
+      "inputHash": "9ac0be68c081e4a1",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://siliconangle.com/2026/10/11/nvidia-reportedly-in-early-talks-to-buy-acqui-hire-or-invest-more-in-reflection-ai/",
+          "https://www.verdict.co.uk/nvidia-acquire-expand-stake-reflection-ai/",
+          "https://thenextweb.com/news/nvidia-reflection-ai-acquisition-talks-ft"
+        ]
+      }
+    },
+    "10312": {
+      "inputHash": "a39728fe8ac30c18",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://arena.ai/blog/series-b",
+          "https://unite.ai/arena-secures-200m-series-b-at-3-1b-valuation-to-advance-ai-evaluation",
+          "https://pulse2.com/arena-raises-200-million-series-b-at-3-1-billion-valuation-to-evaluate-frontier-ai-models-and-agents"
+        ]
+      }
+    },
+    "10342": {
+      "inputHash": "b81be658a8cc9cd2",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://sciencemediacentre.es/en/alphaproof-nexus-new-ai-tool-designed-tackle-mathematical-proofs",
+          "https://xenospectrum.com/en/alphaproof-nexus-math-proof-science/"
+        ]
+      }
+    },
+    "10426": {
+      "inputHash": "4ace5460273817a4",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://www.justice.gov/opa/pr/saudi-national-arrested-installing-surreptitious-audio-recording-device-openai",
+          "https://www.aljazeera.com/news/2026/10/14/saudi-national-charged-with-planting-a-listening-device-at-openai-offices",
+          "https://abc30.com/post/employee-arrested-listening-device-found-sf-openai-conference-room-fbi-company-say/19936054/"
+        ]
+      }
+    },
+    "10458": {
+      "inputHash": "be61b5dc0025be59",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://www.theregister.com/security/2026/10/15/bank-of-america-had-to-bring-in-1000-contractors-to-patch-all-the-bugs-mythos-identified/5303275",
+          "https://thenextweb.com/news/bank-of-america-1000-contractors-mythos-flaws",
+          "https://thepaypers.com/fraud-and-fincrime/news/bank-of-america-hires-1000-contractors-to-patch-ai-exposed-flaws"
+        ]
+      }
+    },
+    "10554": {
+      "inputHash": "d0215efd0e300b94",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://mixed-news.com/en/openai-misalignment-reports-october-15-disclosure-gap/",
+          "https://ai-tldr.dev/releases/openai-misalignment-reports-oct15/"
+        ]
+      }
+    },
+    "10621": {
+      "inputHash": "d20c0030e78c88a3",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://investinglive.com/stocks/anthropic-ipo-draft-shows-nearly-15-fold-revenue-jump-and-600-billion-in-compute-deals/",
+          "https://www.vktr.com/ai-market/anthropics-s1-shows-163b-in-revenue-and-compute-squeeze/",
+          "https://aljazeera.com/economy/2026/10/21/anthropic-posts-80bn-loss-in-first-half-of-2026-wsj"
+        ]
+      }
+    },
+    "10710": {
+      "inputHash": "6fdc4ffc27ba358b",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://investinglive.com/stocks/openai-close-to-raising-up-to-30-billion-at-1-25-trillion-valuation-uae-investors-lead/",
+          "https://techstartups.com/2026/10/22/openai-nears-30-billion-funding-round-at-1-25-trillion-valuation-ahead-of-ipo/",
+          "https://www.techjuice.pk/openai-30-billion-raise-1-25-trillion-valuation-ipo-/"
+        ]
+      }
+    },
+    "10802": {
+      "inputHash": "5185bca452db0d90",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://investor.atmeta.com/investor-news/press-release-details/2026/Meta-Announces-Launch-of-Offering-of-Depositary-Shares-Representing-Series-A-Mandatory-Convertible-Preferred-Stock-and-Offering-of-Class-A-Common-Stock-in-Connection-with-Forward-Sale-Agreements/default.aspx",
+          "https://siliconangle.com/2026/10/26/meta-to-sell-up-to-95b-in-stock-to-finance-ai-infrastructure-buildout/",
+          "https://americanbazaaronline.com/2026/10/26/meta-plans-record-95-billion-fundraising-effort-to-fuel-ai-expansion-490775/"
+        ]
+      }
+    },
+    "10844": {
+      "inputHash": "152cace4245b70ea",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://nvidianews.nvidia.com/news/nvidia-and-meta-to-expand-collaboration-on-muse-and-muse-family-of-models-amid-robust-growth",
+          "https://www.vktr.com/ai-market/nvidia-to-invest-3b-in-meta-as-companies-expand-work-on-muse-ai-agents/",
+          "https://www.techzine.eu/news/applications/145303/nvidia-invests-3-billion-in-meta-deepens-muse-partnership/"
+        ]
+      }
+    },
+    "10873": {
+      "inputHash": "456b5deb49fc747b",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": false,
+        "urls": []
+      }
+    },
+    "10916": {
+      "inputHash": "c16c8a0971288e60",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://gvwire.com/2026/10/29/nvidia-chief-seen-as-target-of-chinese-spy-plot/",
+          "https://thenightly.com.au/politics/world/the-new-york-times-nvidia-chief-jensen-huang-seen-as-target-of-chinese-spy-plot-c-23091245",
+          "https://abc7news.com/story/nvidia-denies-report-ceo-was-allegedly-targeted-chinese-spy-plot/20000206/"
+        ]
+      }
+    },
+    "10955": {
+      "inputHash": "a6fbd05e9ecd0dd1",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://www.cnbc.com/2026/10/31/openai-fundraising-20-billion-valuation.html",
+          "https://innovation-village.com/openai-cuts-funding-target-from-30b-to-20b/",
+          "https://thepaypers.com/fintech/news/openai-reportedly-cuts-funding-round-target-to-usd-20-billion"
+        ]
+      }
+    },
+    "11006": {
+      "inputHash": "ff9ca8c2b6c850f7",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://the-gadgeteer.com/2026/11/03/anthropic-tells-ipo-investors-its-ai-builds-ai-threshold-may-be-imminent/",
+          "https://www.idlen.io/news/anthropic-s1-recursive-self-improvement-rsp-threshold-ai-rd/",
+          "https://cxotoday.com/ai/anthropic-claims-in-ipo-filing-that-it-is-close-to-recursive-self-improvement/"
+        ]
+      }
+    },
+    "11042": {
+      "inputHash": "d80dd8935cc59d26",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://blog.google/products-and-platforms/products/education/ai-learning-era-updates-2026/",
+          "https://www.nbcbayarea.com/news/national-international/google-shut-search-schools-opt-ai/4169332/",
+          "https://techcrunch.com/2026/11/03/google-will-let-schools-disable-its-ai-tools-but-not-without-sacrificing-search/"
+        ]
+      }
+    },
+    "11053": {
+      "inputHash": "599fadb38372aec5",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://www.cmswire.com/digital-experience/chatgpt-search-volume-gains-on-google-openais-consumer-lead-says/",
+          "https://bestforandroid.com/radar/openai-chatgpt-handles-one-fifth-googles-search-volume/"
+        ]
+      }
+    },
+    "11165": {
+      "inputHash": "8d9c40cca5019a60",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://www.latintimes.com/voters-data-center-restrictions-41-ballot-measures-600949",
+          "https://stateline.org/2026/11/04/voters-across-the-country-reject-data-centers/",
+          "https://www.venable.com/insights/publications/2026/11/voters-approve-data-center-restrictions"
+        ]
+      }
+    },
+    "11168": {
+      "inputHash": "13659a64997a5d27",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://www.idlen.io/news/anthropic-first-publisher-licensing-deal-associated-press/",
+          "https://www.aichatdaily.com/ai-business/anthropic-signs-ap-licensing-deal-first-digital-news"
+        ]
+      }
+    },
+    "11216": {
+      "inputHash": "e79d4f7e4c1df6b9",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://ventureburn.com/openai-raises-11-billion-1-25-trillion-valuation-below-target/",
+          "https://nairametrics.com/2026/11/07/openai-secures-11-billion-in-fresh-funding-at-1-25-trillion-valuation/",
+          "https://www.unite.ai/openai-secures-11b-in-initial-funding-at-1-25t-valuation/"
+        ]
+      }
+    },
+    "11334": {
+      "inputHash": "a3512ac55b1c8ec0",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://arxiv.org/html/2610.35138v1",
+          "https://singularitymoments.com/content/coding-agents-hit-99-percent-on-older-benchmarks-but-fail-real-apps/",
+          "https://letsdatascience.com/news/co-design-bench-shows-top-coding-agent-fully-solves-264-of-t-bf2e0c23"
+        ]
+      }
+    },
+    "7182": {
+      "inputHash": "7f169a91347b3490",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://aiweekly.co/alerts/meta-hires-three-virtue-ai-founders-into-superintelligence-labs"
+        ]
+      }
+    },
+    "7186": {
+      "inputHash": "f8ac4e6ae3f5fef0",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://thenextweb.com/news/trump-administration-openai-stagger-model-release",
+          "https://www.govinfosecurity.com/openai-limits-gpt-56-rollout-at-us-governments-request-a-32092",
+          "https://letsdatascience.com/news/openai-delays-gpt-56-after-government-request-94334ab7"
+        ]
+      }
+    },
+    "7188": {
+      "inputHash": "c504250805b1c373",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": false,
+        "urls": []
+      }
+    },
+    "7200": {
+      "inputHash": "49c81a7b35628f65",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://thenextweb.com/news/anthropic-hires-orange-ai-chief",
+          "https://www.resultsense.com/news/2026-06-26-anthropic-orange-ai-chief-europe/"
+        ]
+      }
+    },
+    "7201": {
+      "inputHash": "15861f4f7ee6f824",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://blog.interceptfund.com/p/ending-respiratory-infections",
+          "https://respiratory-therapy.com/disorders-diseases/infectious-diseases/other-infections/tech-funded-project-intercept-aims-to-strike-down-cold-and-flu/"
+        ]
+      }
+    },
+    "7230": {
+      "inputHash": "b60701b4dd0ca8a8",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://winbuzzer.com/2026/06/29/google-keeps-meta-gemini-access-under-reported-limit-xcxwbn/",
+          "https://www.techzine.eu/news/infrastructure/142568/google-restricts-metas-use-of-gemini/",
+          "https://letsdatascience.com/news/google-limits-metas-access-to-gemini-ai-models-f6148b56"
+        ]
+      }
+    },
+    "7239": {
+      "inputHash": "df8deebe218b251a",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://winbuzzer.com/2026/06/29/google-keeps-meta-gemini-access-under-reported-limit-xcxwbn/",
+          "https://www.techzine.eu/news/infrastructure/142568/google-restricts-metas-use-of-gemini/",
+          "https://letsdatascience.com/news/google-limits-metas-access-to-gemini-ai-models-f6148b56"
+        ]
+      }
+    },
+    "7334": {
+      "inputHash": "42b691b900563452",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://thenextweb.com/news/openai-codex-micro-hardware-work-louder",
+          "https://letsdatascience.com/news/openai-teases-codex-branded-input-device-with-work-louder-f604534d"
+        ]
+      }
+    },
+    "7336": {
+      "inputHash": "272b0ffb021870b4",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://thenextweb.com/news/meta-restricts-claude-code-codex-distillation",
+          "https://www.claudeainews.com/news/meta-limits-claude-codex-distillation-fears"
+        ]
+      }
+    },
+    "7337": {
+      "inputHash": "b78f1d8e426f6f6c",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://www.aboutamazon.com/news/aws/aws-1-billion-forward-deployed-ai-engineers",
+          "https://siliconangle.com/2026/06/30/aws-launches-forward-deployed-engineering-team-speed-enterprise-agentic-ai-adoption/",
+          "https://thenextweb.com/news/aws-1bn-forward-deployed-engineers-enterprise-ai"
+        ]
+      }
+    },
+    "7396": {
+      "inputHash": "53a40d400ccb33a8",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://gizmodo.com/america-first-sam-altman-proposes-us-led-international-forum-for-ai-and-5-stake-for-trump-admin-2000780668",
+          "https://siliconangle.com/2026/07/02/sam-altman-calls-us-led-international-forum-set-global-ai-standards/"
+        ]
+      }
+    },
+    "7397": {
+      "inputHash": "1cc28a60cf9f2c99",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://www.microsoft.com/en-us/microsoft-365/blog/2026/06/25/copilot-in-excel-built-for-the-era-of-frontier-finance/",
+          "https://www.computerworld.com/article/4189977/microsoft-adds-new-skills-and-more-oversight-for-copilot-in-excel.html"
+        ]
+      }
+    },
+    "7416": {
+      "inputHash": "31c114d7a897b0ac",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://www.entrepreneur.com/business-news/cisco-has-90000-employees-each-of-them-will-soon-have-their-own-ai-agent",
+          "https://www.peoplematters.in/news/ai-and-emerging-tech/every-one-of-ciscos-90000-employees-now-has-an-ai-agent-its-cfo-explains-the-cost-50638"
+        ]
+      }
+    },
+    "7417": {
+      "inputHash": "1205595ba9780574",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://www.ftc.gov/news-events/news/press-releases/2026/07/ftc-seeks-public-comment-policy-statement-addressing-ai-accuracy",
+          "https://san.com/cc/ftc-takes-aim-at-ai-bias-warns-ideological-objectives-could-violate-federal-law/"
+        ]
+      }
+    },
+    "7493": {
+      "inputHash": "fadd62f26f4e7dbe",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://www2.yicaiglobal.com/news/bytedance-alibaba-to-shut-human-like-ai-agent-features-sparking-user-discontent",
+          "https://thenextweb.com/news/china-humanlike-ai-agent-rules"
+        ]
+      }
+    },
+    "7501": {
+      "inputHash": "20e371d5b3562f98",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://thenextweb.com/news/broadcom-apple-extend-chip-deal-2031",
+          "https://www.verdict.co.uk/broadcom-chip-supply-deal-apple/",
+          "https://www.khaleejtimes.com/business/tech/broadcom-secures-role-as-key-apple-supplier-with-chip-deal-through-2031"
+        ]
+      }
+    },
+    "7629": {
+      "inputHash": "189342f8139dde98",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://techcrunch.com/2026/07/09/fidji-simo-steps-down-from-openais-no-2-role/",
+          "https://thenextweb.com/news/fidji-simo-steps-down-from-openais-number-two-job",
+          "https://www.enca.com/business/openai-number-two-simo-steps-down-focus-health"
+        ]
+      }
+    },
+    "7658": {
+      "inputHash": "00334ac07f49d933",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://officechai.com/ai/nyts-blind-test-with-readers-shows-54-prefer-ai-written-content"
+        ]
+      }
+    },
+    "7670": {
+      "inputHash": "d6a6acb87d4897c3",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://thenextweb.com/news/tencent-in-talks-to-become-manus-largest-shareholder",
+          "https://www.tomshardware.com/tech-industry/artificial-intelligence/tencent-is-reportedly-in-talks-to-acquire-manus-from-meta-following-beijing-intervention-company-expects-to-remain-independent-of-chinese-tech-giant",
+          "https://www.thestar.com.my/business/business-news/2026/07/13/tencent-in-talks-to-acquire-large-stake-in-manus"
+        ]
+      }
+    },
+    "7735": {
+      "inputHash": "b506b4e6a1ebbcbd",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://www.igeeksblog.com/openai-first-device-screenless-ai-speaker/",
+          "https://letsdatascience.com/news/new-report-details-openais-screen-free-ai-home-companion-7af35366"
+        ]
+      }
+    },
+    "7741": {
+      "inputHash": "dc9c6ca7f7dfbb75",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://9to5mac.com/2026/07/14/report-openais-first-device-will-be-a-portable-speaker-with-a-camera-and-other-sensors/",
+          "https://thenextweb.com/news/openai-jony-ive-smart-speaker-io-hardware"
+        ]
+      }
+    },
+    "7793": {
+      "inputHash": "17c8c5114ebdd8a2",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://neurohive.io/en/state-of-the-art/h1-bonsai-27b-1-bit-weights-put-a-27b-parameter-model-on-a-smartphone-for-the-first-time-h1/",
+          "https://www.developersdigest.tech/blog/bonsai-27b-mobile-inference"
+        ]
+      }
+    },
+    "7804": {
+      "inputHash": "63e420c23871e77b",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://www.deccanchronicle.com/technology/google-gemini-35-pro-launch-delayed-as-tech-falls-short-of-internal-goals-report-1971634",
+          "https://www.digitaltrends.com/phones/googles-next-gemini-upgrade-might-not-arrive-as-soon-as-expected/",
+          "https://techstrong.ai/articles/google-delays-gemini-3-5-pro-as-coding-improvements-fall-short/"
+        ]
+      }
+    },
+    "7840": {
+      "inputHash": "847f59646a5345ec",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://siliconangle.com/2026/07/19/alibaba-previews-qwen3-8-claims-second-claude-fable-5/",
+          "https://www.digitaltoday.co.kr/en/view/82911/alibaba-teases-qwen38-says-it-ranks-second-only-to-anthropics-claude-fable5"
+        ]
+      }
+    },
+    "7976": {
+      "inputHash": "240cc5f54ed7fd17",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://newsroom.amd.com/news/amd-anthropic-strategic-partnership/",
+          "https://www.tomshardware.com/tech-industry/amd-to-supply-anthropic-with-2-gigawatts-of-instinct-mi450-gpus",
+          "https://thenextweb.com/news/amd-anthropic-5-billion-investment-2gw-helios-mi450"
+        ]
+      }
+    },
+    "7977": {
+      "inputHash": "9b770e266738e4c1",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://nairametrics.com/2026/07/22/amazon-announces-job-cuts-in-ai-unit-months-after-16000-layoffs/",
+          "https://www.outlookbusiness.com/corporate/after-januarys-mass-layoffs-amazons-job-cuts-now-hit-its-agi-team",
+          "https://www.businesstoday.in/technology/news/story/amazon-cuts-jobs-in-agi-team-after-laying-off-16000-employees-544682-2026-07-23"
+        ]
+      }
+    },
+    "8056": {
+      "inputHash": "cb782b3c0008df09",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://www.igeeksblog.com/apple-planning-wwdc-2027-debut-for-privacy-focused-smart-glasses/",
+          "https://www.uctoday.com/immersive-workplace-xr-tech/apple-smart-glasses-2027-launch/"
+        ]
+      }
+    },
+    "8124": {
+      "inputHash": "59a0daee2fc37947",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://futurism.com/artificial-intelligence/ai-execs-quaking-boots-chinese-models",
+          "https://www.implicator.ai/openai-anthropic-lobby-washington-open-weight-ai/"
+        ]
+      }
+    },
+    "8146": {
+      "inputHash": "8b2562c00849082c",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://investor.nvidia.com/news/press-release-details/2026/Ilya-Sutskevers-Safe-Superintelligence-Inc--and-NVIDIA-Announce-Long-Term-Strategic-Partnership/",
+          "https://www.unite.ai/nvidia-takes-a-stake-in-sutskevers-safe-superintelligence/"
+        ]
+      }
+    },
+    "8173": {
+      "inputHash": "03d81444706aa4bb",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://www.news4jax.com/news/politics/2026/07/28/minnesotas-first-in-the-nation-law-banning-prediction-markets-is-halted-in-federal-court/",
+          "https://fox9.com/news/judge-blocks-minnesotas-prediction-market-ban-amid-polymarket-lawsuit"
+        ]
+      }
+    },
+    "8201": {
+      "inputHash": "83c29b5bd8e703fc",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://www.tbsnews.net/worldbiz/usa/openais-rogue-agent-compromised-customer-second-tech-firm-executive-says-1500601",
+          "https://thenextweb.com/news/openai-rogue-agent-second-firm-modal-labs"
+        ]
+      }
+    },
+    "8264": {
+      "inputHash": "67a8ec7eaafea33f",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://thenextweb.com/news/microsoft-copilot-super-app-nadella-consumer-enterprise",
+          "https://www.digitaltrends.com/computing/microsoft-is-making-a-copilot-super-app-to-end-your-ai-app-juggling"
+        ]
+      }
+    },
+    "8302": {
+      "inputHash": "a8dc773af3412c58",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://www.staradvertiser.com/2026/07/31/breaking-news/openai-finds-evidence-other-ai-agents-escaped-containment-as-probe-widens/",
+          "https://www.tbsnews.net/worldbiz/usa/openai-investigates-additional-ai-agent-containment-breaches-after-hugging-face"
+        ]
+      }
+    },
+    "8331": {
+      "inputHash": "e64266a086cf6baa",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://betakit.com/u-of-t-professor-jacob-tsimerman-who-won-maths-highest-prize-to-join-openai/",
+          "https://e.vnexpress.net/news/tech/personalities/fields-medalist-who-warned-ai-could-threaten-humanity-joins-openai-5104536.html"
+        ]
+      }
+    },
+    "8366": {
+      "inputHash": "257e181fb3d88625",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://www.khaleejtimes.com/business/tech/meta-anthropic-google-openai-to-meet-trump-officials-about-ai-safety-testing",
+          "https://thenextweb.com/news/us-finalises-voluntary-tests-for-ai-models-hacking-powers"
+        ]
+      }
+    },
+    "8386": {
+      "inputHash": "90aa716081c0443c",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://english.aawsat.com/node/5302838",
+          "https://thenextweb.com/news/deepseek-v4-flash-cheapest-ai-model-to-run",
+          "https://www.deccanchronicle.com/technology/deepseeks-v4-flash-is-the-cheapest-well-known-ai-model-to-run-report-1976203"
+        ]
+      }
+    },
+    "8408": {
+      "inputHash": "19378153a90a7193",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://thenextweb.com/news/apple-openai-preliminary-injunction-trade-secrets",
+          "https://www.deccanchronicle.com/technology/apple-seeks-preliminary-injunction-against-openai-in-trade-secrets-case-1976447",
+          "https://www.claimsjournal.com/news/national/2026/08/04/339276.htm"
+        ]
+      }
+    },
+    "8411": {
+      "inputHash": "d61116d7f791be3d",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://cryptobriefing.com/volta-10b-partnership-a16z-series-a-funding/",
+          "https://thenextweb.com/news/volta-ai-cloud-300m-nvidia-dell-2-4bn"
+        ]
+      }
+    },
+    "8477": {
+      "inputHash": "e196f09973d18904",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": false,
+        "urls": []
+      }
+    },
+    "8503": {
+      "inputHash": "b08235bd4d89b3fb",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://www.xataka.com.br/diversos/a-deepmind-nao-e-mais-um-laboratorio-vanguarda-especialistas-da-semianalysis-acreditam-que-google-vencera-a-corrida-da-ia-mesmo-que-gemini-perca"
+        ]
+      }
+    },
+    "8506": {
+      "inputHash": "9cfd437cd2da5a36",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://en.kocpc.com.tw/?p=24229"
+        ]
+      }
+    },
+    "8510": {
+      "inputHash": "7d3a6689405a9d76",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://arxiv.org/html/2608.00146v1",
+          "https://the-decoder.com/googles-diffusiongemma-proves-you-dont-need-to-train-from-scratch-to-build-a-text-diffusion-model/"
+        ]
+      }
+    },
+    "8580": {
+      "inputHash": "0e6fb585580d8839",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://the-decoder.com/anthropics-planned-mega-ipo-faces-investor-skepticism-over-chinese-rivals-and-political-headwinds/"
+        ]
+      }
+    },
+    "8602": {
+      "inputHash": "cfe1332ce288a17c",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://www.macquarie.com/es/en/about/news/2026/anthropic-mam-gic-data-centre-infrastructure-partnership.html",
+          "https://thenextweb.com/news/anthropic-macquarie-gic-theseus-infrastructure-data-centre-partnership"
+        ]
+      }
+    },
+    "8605": {
+      "inputHash": "6c06af99f550db61",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://abcnews4.com/news/nation-world/google-gemini-passes-1-billion-monthly-users-as-chatgpt-reaches-1-billion-weekly-users",
+          "https://www.trendingtopics.eu/gemini-and-chatgpt-both-hit-1-billion-users/"
+        ]
+      }
+    },
+    "8653": {
+      "inputHash": "3bc42c12823a4ab1",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://lovable.dev/blog/series-c",
+          "https://tech.eu/2026/08/12/lovables-valuation-doubles-to-13bn-as-raises-400m/"
+        ]
+      }
+    },
+    "8682": {
+      "inputHash": "a552d8c8f37f209c",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": false,
+        "urls": []
+      }
+    },
+    "8807": {
+      "inputHash": "a4b5c1dbf417ec29",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://www.cerebras.ai/press-release/cerebras-unveils-cs-4-up-to-30-times-faster-than-gpu-based-solutions-3347356",
+          "https://thenextweb.com/news/cerebras-cs-4-wafer-scale-ai-inference-system"
+        ]
+      }
+    },
+    "8945": {
+      "inputHash": "4ecd376868b3e451",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://www.implicator.ai/chinese-hackers-double-attack-volume-deepseek/",
+          "https://www.tech2.com/ai/hackers-are-using-chinas-deepseek-ai-model-to-increase-cyberattacks-text-ws-l-10291886.html"
+        ]
+      }
+    },
+    "8946": {
+      "inputHash": "1b0f357505374fa9",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://siliconangle.com/2026/08/24/nvidia-reportedly-eyes-another-investment-in-perplexity-ai-at-a-30b-valuation/",
+          "https://www.outlookbusiness.com/corporate/perplexitys-valuation-could-jump-50-with-nvidia-investment-on-the-cards"
+        ]
+      }
+    },
+    "8952": {
+      "inputHash": "47d1eee1b84010ce",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://cryptobriefing.com/ox-alpha-stealth-ai-model-1m-context/",
+          "https://tbreak.com/ox-alpha-model-openrouter-stealth/"
+        ]
+      }
+    },
+    "8954": {
+      "inputHash": "0bb320a6edba28ef",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://techstrong.ai/articles/nvidia-expands-open-weight-ai-push-with-poolside-deal/"
+        ]
+      }
+    },
+    "8967": {
+      "inputHash": "f82b150aa03d3d17",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://thenextweb.com/news/openai-head-of-data-centres-chris-malone-departure",
+          "https://gizmodo.com/head-of-data-centers-at-openai-reportedly-quits-2000803117"
+        ]
+      }
+    },
+    "8999": {
+      "inputHash": "0005beb58cd3b6ba",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://thenextweb.com/news/barret-zoph-google-deepmind-thinking-machines",
+          "https://officechai.com/ai/thinking-machines-co-founder-barrett-zoph-leaves-openai-to-join-google/"
+        ]
+      }
+    },
+    "9000": {
+      "inputHash": "e4e0968aa7385f43",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://www.thenationalnews.com/future/technology/2026/08/26/bill-gates-warning-about-ai-jobs/"
+        ]
+      }
+    },
+    "9027": {
+      "inputHash": "b9b03481939ab52c",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://www.implicator.ai/nvidia-hugging-face-12-9-billion-acquisition/",
+          "https://thenextweb.com/news/nvidia-hugging-face-13bn-acquisition-talks"
+        ]
+      }
+    },
+    "9038": {
+      "inputHash": "865a90ca51e6a5e2",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://ai2.work/blog/deepseek-nears-7-4b-raise-at-74b-valuation-before-shanghai-ipo"
+        ]
+      }
+    },
+    "9075": {
+      "inputHash": "3bf22879b7a540d3",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://fedscoop.com/anthropic-government-ban-court-ruling/",
+          "https://gizmodo.com/judge-says-the-pentagons-blacklisting-of-anthropic-is-illegal-2000804313"
+        ]
+      }
+    },
+    "9181": {
+      "inputHash": "ce5ec66964fd9885",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://blogs.nvidia.com/blog/nvidia-crowdstrike-fal-con-2026/",
+          "https://itbrief.news/story/crowdstrike-launches-safemind-agentic-cybersecurity-system"
+        ]
+      }
+    },
+    "9204": {
+      "inputHash": "aa4e16067a8af53e",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://thenextweb.com/news/thinking-machines-lab-6bn-round-nvidia-accel",
+          "https://cryptobriefing.com/thinking-machines-lab-40b-valuation/"
+        ]
+      }
+    },
+    "9219": {
+      "inputHash": "8a27c3ed05bbcec8",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://gimletlabs.ai/blog/announcing-series-b",
+          "https://siliconangle.com/2026/09/04/gimlet-labs-nabs-300m-for-its-disaggregated-inference-platform/",
+          "https://datacenter.news/story/gimlet-labs-raises-usd-300m-in-andreessen-led-round"
+        ]
+      }
+    },
+    "9238": {
+      "inputHash": "10447c427c3431eb",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://www.pcguide.com/news/all-the-rtx-spark-laptops-and-mini-desktops-from-acer-asus-and-lenovo-unveiled-during-ifa-berlin-2026/",
+          "https://camerajabber.com/photography-news/nvidias-rtx-spark-brings-a-petaflop-and-128gb-to-mini-pcs-and-cuda-with-it/"
+        ]
+      }
+    },
+    "9360": {
+      "inputHash": "8259407193bf22bf",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://newsweek.com/anthropic-researcher-quits-warns-ai-could-kill-everyone-12418798",
+          "https://tribune.com.pk/story/2628354/theyre-playing-with-our-lives-ai-researcher-quits-anthropic",
+          "https://nairametrics.com/2026/09/09/anthropic-researcher-quits-warns-ai-labs-are-gambling-with-our-lives/"
+        ]
+      }
+    },
+    "9444": {
+      "inputHash": "e49e5fc1ea3e1c1f",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://elevenlabs.io/blog/umg",
+          "https://thenextweb.com/news/umg-elevenlabs-licensed-ai-music-platform",
+          "https://www.musicweek.com/labels/read/umg-and-elevenlabs-to-launch-ai-powered-music-platform-as-part-of-groundbreaking-deal/094936"
+        ]
+      }
+    },
+    "9494": {
+      "inputHash": "d96f5ed2138193ad",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://www.khaleejtimes.com/business/openais-altman-wont-do-ipo-this-year-calls-ai-extinction-risk-unacceptable",
+          "https://www.businessday.co.za/world/2026-09-13-openais-altman-calls-ai-extinction-risk-unacceptable/",
+          "https://www.freepressjournal.in/tech/sam-altman-rules-out-openai-ipo-in-2026-cites-ai-safety-as-the-reason"
+        ]
+      }
+    },
+    "9512": {
+      "inputHash": "7668f37bead292a7",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://www.contentgrip.com/openai-sponsored-agent-ads/",
+          "https://thedeepdive.ca/sponsored-ai-agents-entered-the-chat-angi-among-first-chatgpt-testers/",
+          "https://mixed-news.com/en/chatgpt-testing-ads-open-chat-with-brand-ai-agent"
+        ]
+      }
+    },
+    "9557": {
+      "inputHash": "e967e7748ec5676e",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://whbl.com/2026/09/16/calls-to-slow-down-ai-development-serve-the-interests-of-us-ai-leaders-says-french-finance-minister/",
+          "https://econotimes.com/France-Urges-Faster-AI-Push-Despite-Safety-Risks-1752276"
+        ]
+      }
+    },
+    "9606": {
+      "inputHash": "99f32408848b7368",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://darioamodei.com/post/we-must-pace-the-frontier",
+          "https://www.vktr.com/ai-news/amodeis-ai-slowdown-plan-draws-rare-industry-unity/",
+          "https://www.newsweek.com/anthropic-ceo-calls-for-ai-slowdown-warns-of-dangers-of-bot-swarms-12435379"
+        ]
+      }
+    },
+    "9700": {
+      "inputHash": "6cbad245a355d21b",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://nextgov.com/artificial-intelligence/2026/09/dc-area-airports-first-deploy-ai-tool-airspace-management/416114",
+          "https://wjla.com/news/nation-world/faa-federal-aviation-administration-to-launch-ai-artificial-intelligence-system-smart-to-predict-flight-delays-before-takeoff-airspace-traffic-control-weather-routes-departure-arrival",
+          "https://www.aviationpros.com/airport-business/airport-infrastructure-operations/news/55407458/faa-begins-rollout-of-ai-air-traffic-tool-to-reduce-delays"
+        ]
+      }
+    },
+    "9728": {
+      "inputHash": "572ceb0acacb6837",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://www.implicator.ai/metas-muse-tops-us-app-store-ahead-of-chatgpt-ten-days-after-launch/",
+          "https://www.foxbusiness.com/technology/metas-muse-becomes-app-stores-hottest-download",
+          "https://techcrunch.com/2026/09/21/metas-muse-is-outpacing-chatgpts-early-mobile-launch/"
+        ]
+      }
+    },
+    "9774": {
+      "inputHash": "2039be79ff85da05",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://alibabacloud.com/en/press-room/alibaba-unveils-roadmap-on-full-stack-ai-strategy",
+          "https://www.newcastleherald.com.au/story/9355315/alibaba-unveils-plans-for-artificial-superintelligence/",
+          "https://analyticsindiamag.com/ai-news/alibaba-unveils-new-ai-chip-plans-to-train-new-5-10-trillion-parameter-models"
+        ]
+      }
+    },
+    "9800": {
+      "inputHash": "14c0377c860c92cd",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://theedgemalaysia.com/node/818854",
+          "https://kr-asia.com/tencent-uses-its-products-to-guide-hy-image-3-5-development"
+        ]
+      }
+    },
+    "9801": {
+      "inputHash": "e31a080690090622",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://www.forbes.com.au/news/uncategorized/this-25-year-old-raised-us100-million-for-his-ai-startup-at-a-us4-billion-valuation/",
+          "https://inforcapital.com/news/ai-training-data-startup-micro1-reportedly-hits-4b-valuation/"
+        ]
+      }
+    },
+    "9837": {
+      "inputHash": "a2beaa2710f7ec42",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": false,
+        "urls": []
+      }
+    },
+    "9888": {
+      "inputHash": "3065a6a27d89b793",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://thenextweb.com/news/anthropic-pentagon-supply-chain-risk-appeals-court-ruling",
+          "https://www.defensenews.com/news/pentagon-congress/2026/09/25/us-appeals-court-upholds-pentagons-blacklisting-of-anthropic/",
+          "https://www.aljazeera.com/economy/2026/9/25/us-court-upholds-pentagons-blacklisting-of-anthropic"
+        ]
+      }
+    },
+    "9950": {
+      "inputHash": "f6d6fccae36b8b46",
+      "date": "2026-11-11",
+      "value": {
+        "free_source_exists": true,
+        "urls": [
+          "https://thenextweb.com/news/nvidia-150bn-share-buyback-235bn-record",
+          "https://investinglive.com/stocks/icymi-nvidia-lifts-buyback-by-record-150-billion-to-235-billion-shares-rise/"
+        ]
+      }
+    }
+  }
+}
