@@ -210,9 +210,51 @@ describe("site refresh after a native publish", () => {
     mocks.startRun.mockResolvedValue(42n);
   });
 
+  it("logs the warmed pages after the refresh", async () => {
+    settings();
+    const refreshSite = vi.fn(async () => ({ warmed: ["/", "/archive", "/issue/ai-recap-2026-11-09"], failed: [] }));
+
+    await runDetectPublish("netlify", 20, { gmail: issueMail(), store: draftStore(), now: () => NOW, refreshSite });
+
+    expect(mocks.logEvent).toHaveBeenCalledWith(42n, {
+      level: "info",
+      step: "site_warm_up",
+      message: "Loaded 3 pages for the cache: /, /archive, /issue/ai-recap-2026-11-09.",
+    });
+  });
+
+  it("logs a warning but does not fail the run when a page fails to warm", async () => {
+    settings();
+    const refreshSite = vi.fn(async () => ({
+      warmed: ["/"],
+      failed: [
+        { path: "/archive", reason: "HTTP 500" },
+        { path: "/issue/ai-recap-2026-11-09", reason: "The operation was aborted due to timeout" },
+      ],
+    }));
+
+    const result = await runDetectPublish("netlify", 20, {
+      gmail: issueMail(),
+      store: draftStore(),
+      now: () => NOW,
+      refreshSite,
+    });
+
+    expect(result).toMatchObject({ status: "ran", siteRefresh: "refreshed" });
+    expect(mocks.logEvent).toHaveBeenCalledWith(42n, {
+      level: "warn",
+      step: "site_warm_up",
+      message:
+        "Could not load /archive (HTTP 500), /issue/ai-recap-2026-11-09 (The operation was aborted due to timeout). " +
+        "The first reader of those pages waits for a fresh render.",
+    });
+    expect(mocks.finishRun).toHaveBeenCalledWith(42n, expect.objectContaining({ status: "succeeded" }), NOW);
+    expect(() => throwIfPublishRunFailed(result)).not.toThrow();
+  });
+
   it("refreshes the site once when an issue was published", async () => {
     settings();
-    const refreshSite = vi.fn(async () => {});
+    const refreshSite = vi.fn(async () => ({ warmed: [], failed: [] }));
 
     const result = await runDetectPublish("netlify", 20, {
       gmail: issueMail(),
@@ -268,7 +310,7 @@ describe("site refresh after a native publish", () => {
 
   it("does not refresh the site when the issue was already published", async () => {
     settings();
-    const refreshSite = vi.fn(async () => {});
+    const refreshSite = vi.fn(async () => ({ warmed: [], failed: [] }));
     const db = draftStore();
     vi.mocked(db.findIssue).mockResolvedValue({ id: 268, publishedAt: NOW, contentJson: null });
 
