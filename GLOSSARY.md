@@ -1,7 +1,7 @@
 # AI Recap
 
 AI Recap is a weekday AI newsletter. This glossary covers the editorial pipeline, from collecting stories to
-publishing an issue, and the operations that watch it.
+publishing an issue, the public site, and the operations that watch it.
 
 ## Editorial
 
@@ -157,6 +157,29 @@ _Avoid_: sent, live
 **Skipped date**:
 A weekday on which the owner chose not to publish an issue.
 _Avoid_: holiday, day off
+
+## Site
+
+**Subscriber view**:
+How a public page looks to a signed-in subscriber: no Subscribe buttons or form, and the article lock open.
+The server sends every reader the same signed-out page; the browser shows the subscriber view when `<html>`
+has `data-subscriber`.
+_Avoid_: signed-in page, logged-in mode
+
+**Signed-in hint**:
+A cookie the browser can read (`ai_recap_signed_in=1`) that says this browser has a subscriber session. It
+carries no email or id and only decides the display. It is set and cleared with the session cookie.
+_Avoid_: session cookie (that is the signed, httpOnly one), auth cookie
+
+**Article lock**:
+The part of an issue page a signed-out reader sees instead of the rest of the issue: the issue cut to a preview
+height, and the access gate (sign in or subscribe) over it. The subscriber view opens it.
+_Avoid_: paywall (in code), gate (that is only the sign-in and subscribe form)
+
+**Warm-up**:
+Loading the main public pages once, one after another, so the CDN caches them before a reader asks. The
+publish job warms after it refreshes the site; the `deploy-succeeded` function warms after each deploy.
+_Avoid_: prefetch, preload, cache priming
 
 ## Operations
 

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { createSiteRefresher, siteUrlForDeploy } from "@/src/pipeline/publish/site-refresh";
+import { createSiteRefresher, describeWarmUp, siteUrlForDeploy, warmPages } from "@/src/pipeline/publish/site-refresh";
 import { isValidCacheRefreshToken } from "@/src/server/cache-refresh-auth";
 
 const NOW = new Date("2026-11-09T16:00:00.000Z");
@@ -36,16 +36,214 @@ describe("createSiteRefresher", () => {
     expect(authorization).not.toContain("s3cret");
   });
 
-  it("throws with the status when the site answers with an error", async () => {
+  it("after the refresh, loads each page the site returns, one after another, and reports them", async () => {
+    const calls: string[] = [];
+    const fetch = vi.fn<typeof globalThis.fetch>(async (input) => {
+      const url = String(input);
+      calls.push(url);
+      if (url.endsWith("/api/revalidate")) {
+        return Response.json({ refreshed: ["published-issues"], warm: ["/", "/archive", "/issue/ai-recap-2026-11-12"] });
+      }
+      return new Response('<a href="/issue/ai-recap-2026-11-12">Newest</a>', { status: 200 });
+    });
+    const refresh = createSiteRefresher({ siteUrl: "https://airecap.news/", secret: "s3cret", fetch, now: () => NOW });
+
+    const report = await refresh?.();
+
+    expect(calls).toEqual([
+      "https://airecap.news/api/revalidate",
+      "https://airecap.news/",
+      "https://airecap.news/archive",
+      "https://airecap.news/issue/ai-recap-2026-11-12",
+    ]);
+    const pageLoad = fetch.mock.calls[1] as unknown as [string, RequestInit];
+    expect(pageLoad[1].method ?? "GET").toBe("GET");
+    expect(new Headers(pageLoad[1].headers).get("authorization")).toBeNull();
+    expect(report).toEqual({ warmed: ["/", "/archive", "/issue/ai-recap-2026-11-12"], failed: [], cacheStatus: {} });
+  });
+
+  it("reports a page that fails to load and still loads the rest", async () => {
+    const fetch = vi.fn<typeof globalThis.fetch>(async (input) => {
+      const url = String(input);
+      if (url.endsWith("/api/revalidate")) return Response.json({ warm: ["/", "/archive", "/issue/x"] });
+      if (url.endsWith("/archive")) return new Response("", { status: 500 });
+      if (url.endsWith("/issue/x")) throw new Error("The operation was aborted due to timeout");
+      return new Response('<a href="/issue/x">Newest</a>', { status: 200 });
+    });
+    const refresh = createSiteRefresher({ siteUrl: "https://airecap.news", secret: "s3cret", fetch, now: () => NOW });
+
+    const report = await refresh?.();
+
+    expect(report).toEqual({
+      warmed: ["/"],
+      failed: [
+        { path: "/archive", reason: "HTTP 500" },
+        { path: "/issue/x", reason: "The operation was aborted due to timeout" },
+      ],
+      cacheStatus: {},
+    });
+  });
+
+  it("warms nothing when the site returns no pages to warm", async () => {
+    const fetch = vi.fn(async () => Response.json({ refreshed: ["published-issues"] }));
+    const refresh = createSiteRefresher({ siteUrl: "https://airecap.news", secret: "s3cret", fetch, now: () => NOW });
+
+    expect(await refresh?.()).toEqual({ warmed: [], failed: [], cacheStatus: {} });
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("throws with the status when the site answers with an error, and loads no pages", async () => {
     const fetch = vi.fn(async () => new Response("{}", { status: 401 }));
     const refresh = createSiteRefresher({ siteUrl: "https://airecap.news", secret: "s3cret", fetch, now: () => NOW });
 
     await expect(refresh?.()).rejects.toThrow("Site refresh failed with HTTP 401.");
+    expect(fetch).toHaveBeenCalledTimes(1);
   });
 
   it("is not configured without a secret or a site address", () => {
     expect(createSiteRefresher({ siteUrl: "https://airecap.news", secret: undefined })).toBeUndefined();
     expect(createSiteRefresher({ siteUrl: "https://airecap.news", secret: "  " })).toBeUndefined();
     expect(createSiteRefresher({ siteUrl: "", secret: "s3cret" })).toBeUndefined();
+  });
+});
+
+describe("warmPages", () => {
+  it("asks for Brotli or gzip like a browser, so it fills the cached copy browsers read", async () => {
+    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => new Response("ok"));
+
+    await warmPages("https://site.example/", ["/"], { fetch: fetchMock as unknown as typeof fetch });
+
+    const headers = new Headers(fetchMock.mock.calls[0]?.[1]?.headers);
+    expect(headers.get("accept-encoding")).toBe("br, gzip");
+  });
+});
+
+describe("warmPages cache status", () => {
+  it("records what Netlify's durable cache did with each page, so the log shows whether the warm-up was stored", async () => {
+    const fetchMock = vi.fn(
+      async () =>
+        new Response("ok", {
+          headers: { "cache-status": '"Next.js"; hit, "Netlify Durable"; fwd=uri-miss; stored, "Netlify Edge"; fwd=miss' },
+        }),
+    );
+
+    const report = await warmPages("https://site.example", ["/", "/archive"], { fetch: fetchMock as unknown as typeof fetch });
+
+    expect(report.cacheStatus).toEqual({ "/": "fwd=uri-miss; stored", "/archive": "fwd=uri-miss; stored" });
+    expect(describeWarmUp(report).message).toBe(
+      "Loaded 2 of 2 pages for the cache: / (fwd=uri-miss; stored), /archive (fwd=uri-miss; stored).",
+    );
+  });
+
+  it("leaves a page out of the cache status when Netlify sends none (local runs)", async () => {
+    const fetchMock = vi.fn(async () => new Response("ok"));
+
+    const report = await warmPages("https://site.example", ["/"], { fetch: fetchMock as unknown as typeof fetch });
+
+    expect(report.cacheStatus).toEqual({});
+    expect(describeWarmUp(report).message).toBe("Loaded 1 of 1 pages for the cache: /.");
+  });
+});
+
+describe("createSiteRefresher when the purge has not reached the cache yet", () => {
+  it("loads again, after a pause, a page that came back as the old cached copy", async () => {
+    // Seen on the PR #173 preview: right after the refresh, "/" answered "Netlify Durable"; hit (the old page).
+    const answers: Record<string, string[]> = {
+      "/": ['"Netlify Durable"; hit; ttl=107', '"Netlify Durable"; fwd=stale; stored'],
+      "/archive": ['"Netlify Durable"; fwd=stale; stored'],
+    };
+    const fetchMock = vi.fn<typeof globalThis.fetch>(async (input) => {
+      const url = new URL(String(input));
+      if (url.pathname === "/api/revalidate") return Response.json({ warm: ["/", "/archive"] });
+      return new Response("ok", { headers: { "cache-status": answers[url.pathname]?.shift() ?? "" } });
+    });
+    const pauses: number[] = [];
+    const refresh = createSiteRefresher({
+      siteUrl: "https://airecap.news",
+      secret: "s3cret",
+      fetch: fetchMock,
+      now: () => NOW,
+      pause: async (ms) => void pauses.push(ms),
+    });
+
+    const report = await refresh?.();
+
+    expect(fetchMock.mock.calls.map(([url]) => new URL(String(url)).pathname)).toEqual([
+      "/api/revalidate",
+      "/",
+      "/archive",
+      "/",
+    ]);
+    expect(pauses).toEqual([3000]);
+    expect(report?.cacheStatus).toEqual({ "/": "fwd=stale; stored", "/archive": "fwd=stale; stored" });
+  });
+});
+
+describe("createSiteRefresher when a list page comes back without the new issue", () => {
+  const NEWEST = "/issue/ai-recap-2026-11-12";
+  const fresh = `<a href="${NEWEST}">New</a>`;
+  const old = `<a href="/issue/ai-recap-2026-11-11">Old</a>`;
+
+  function siteAnswering(pages: Record<string, string[]>) {
+    const calls: string[] = [];
+    const fetchMock = vi.fn<typeof globalThis.fetch>(async (input) => {
+      const path = new URL(String(input)).pathname;
+      calls.push(path);
+      if (path === "/api/revalidate") return Response.json({ warm: ["/", "/archive", NEWEST] });
+      // An Edge hit sends no "Netlify Durable" entry, so only the page itself shows it is old.
+      const body = pages[path]?.length ? pages[path].shift()! : fresh;
+      return new Response(body, { headers: { "cache-status": '"Netlify Edge"; hit; ttl=300' } });
+    });
+    const pauses: number[] = [];
+    const refresh = createSiteRefresher({
+      siteUrl: "https://airecap.news",
+      secret: "s3cret",
+      fetch: fetchMock,
+      now: () => NOW,
+      pause: async (ms) => void pauses.push(ms),
+    });
+    return { calls, pauses, refresh: refresh! };
+  }
+
+  it("loads it again after a pause, so the cached copy is the new one", async () => {
+    // Seen on the PR #173 preview: right after the refresh, "/" and "/archive" came from the Edge cache, old.
+    const site = siteAnswering({ "/": [old], "/archive": [old] });
+
+    const report = await site.refresh();
+
+    expect(site.calls).toEqual(["/api/revalidate", "/", "/archive", NEWEST, "/", "/archive"]);
+    expect(site.pauses).toEqual([3000]);
+    expect(report).toMatchObject({ warmed: ["/", "/archive", NEWEST], failed: [] });
+  });
+
+  it("refreshes the site again before the last try when a page is still old, since a copy stored after the purge stays", async () => {
+    const site = siteAnswering({ "/archive": [old, old] });
+
+    const report = await site.refresh();
+
+    // The second refresh clears the newest issue page too, so it is loaded again with the old page.
+    expect(site.calls).toEqual([
+      "/api/revalidate",
+      "/",
+      "/archive",
+      NEWEST,
+      "/archive",
+      "/api/revalidate",
+      "/archive",
+      NEWEST,
+    ]);
+    expect(site.pauses).toEqual([3000, 3000]);
+    expect(report).toMatchObject({ warmed: ["/", "/archive", NEWEST], failed: [] });
+  });
+
+  it("reports a page that is still old after the last try, so the run log warns", async () => {
+    const site = siteAnswering({ "/archive": [old, old, old] });
+
+    const report = await site.refresh();
+
+    expect(report).toMatchObject({
+      warmed: ["/", NEWEST],
+      failed: [{ path: "/archive", reason: "still the old page, without the newest issue" }],
+    });
   });
 });

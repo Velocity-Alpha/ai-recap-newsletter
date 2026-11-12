@@ -1,5 +1,6 @@
 import Footer from "@/src/components/Footer";
 import Header from "@/src/components/Header";
+import ShowSignedOutView from "@/src/components/ShowSignedOutView";
 import { unsubscribeSubscriberByToken } from "@/src/features/subscriber/service";
 
 // Browser-facing unsubscribe page for signed links such as /unsubscribe?token=...
@@ -18,16 +19,21 @@ export default async function UnsubscribePage({ searchParams }: UnsubscribePageP
   let message =
     "If this unsubscribe link was valid, you have been unsubscribed from AI Recap emails.";
 
+  let unsubscribed = false;
+
   try {
-    await unsubscribeSubscriberByToken({
+    const subscriber = await unsubscribeSubscriberByToken({
       token: getToken(token),
     });
+    unsubscribed = subscriber !== null;
   } catch {
     message = "We couldn't process your unsubscribe request right now. Please try again later.";
   }
 
   return (
     <div className="flex min-h-screen flex-col bg-[var(--bg-main)]">
+      {/* A server page cannot set cookies, so the browser signs itself out through the sign-out route. */}
+      {unsubscribed ? <ShowSignedOutView /> : null}
       <Header />
       <main className="flex flex-1 items-center justify-center px-6 py-16">
         <section className="w-full max-w-2xl rounded-[28px] border border-[var(--border-light)] bg-white px-8 py-12 text-center shadow-[0_18px_40px_rgba(28,42,50,0.06)]">

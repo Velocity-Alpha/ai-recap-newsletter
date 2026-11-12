@@ -33,3 +33,7 @@
 
 [functions."run-checks*"]
   included_files = ["node_modules/@prisma/client-runtime-utils/**"]
+
+# Reads the newest issue to warm its page after a deploy.
+[functions."deploy-succeeded"]
+  included_files = ["node_modules/@prisma/client-runtime-utils/**"]

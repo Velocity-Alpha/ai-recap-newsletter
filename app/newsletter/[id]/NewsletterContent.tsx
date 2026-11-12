@@ -2,10 +2,8 @@ import Header from "@/src/components/Header";
 import ArticlePreviewLock from "@/src/components/ArticlePreviewLock";
 import Footer from "@/src/components/Footer";
 import ArticleAccessGate from "@/src/components/ArticleAccessGate";
-import SubscriptionSuccessToast from "@/src/components/SubscriptionSuccessToast";
 import { NewsletterIssueV1 } from "@/src/features/newsletter/render/NewsletterIssueV1";
 import { NewsletterIssueV2 } from "@/src/features/newsletter/render/NewsletterIssueV2";
-import { hasActiveSubscriberSession } from "@/src/features/subscriber/server";
 import type { ParsedNewsletterIssue } from "@/src/features/newsletter/types";
 
 function NewsletterNotFound() {
@@ -16,40 +14,28 @@ function NewsletterNotFound() {
   );
 }
 
-export default async function NewsletterContent({ issue }: { issue: ParsedNewsletterIssue | null }) {
-  const hasSubscriberAccess = issue ? await hasActiveSubscriberSession() : false;
-  const shouldShowGate = Boolean(issue && !hasSubscriberAccess);
-
+// A public page: always the full issue behind the article lock. The browser opens the lock in the subscriber
+// view (see src/features/subscriber/subscriber-view.ts).
+export default function NewsletterContent({ issue }: { issue: ParsedNewsletterIssue | null }) {
   return (
     <div className="flex min-h-screen flex-col bg-white">
-      <Header showSubscribeButton={!hasSubscriberAccess} />
-      <SubscriptionSuccessToast />
+      <Header />
 
       {issue ? (
         <main className="flex-1">
-          {shouldShowGate ? (
-            <ArticlePreviewLock gate={<ArticleAccessGate />}>
-              {issue.schemaVersion === 2 ? (
-                <NewsletterIssueV2 issue={issue} />
-              ) : (
-                <NewsletterIssueV1 issue={issue} />
-              )}
-            </ArticlePreviewLock>
-          ) : (
-            <>
-              {issue.schemaVersion === 2 ? (
-                <NewsletterIssueV2 issue={issue} />
-              ) : (
-                <NewsletterIssueV1 issue={issue} />
-              )}
-            </>
-          )}
+          <ArticlePreviewLock gate={<ArticleAccessGate />}>
+            {issue.schemaVersion === 2 ? (
+              <NewsletterIssueV2 issue={issue} />
+            ) : (
+              <NewsletterIssueV1 issue={issue} />
+            )}
+          </ArticlePreviewLock>
         </main>
       ) : (
         <NewsletterNotFound />
       )}
 
-      <Footer showSubscribeLink={!hasSubscriberAccess} />
+      <Footer />
     </div>
   );
 }

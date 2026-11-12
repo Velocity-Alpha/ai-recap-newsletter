@@ -7,6 +7,7 @@ import {
   POLL_LOOKBACK_MINUTES,
 } from "@/src/pipeline/publish/publish-schedule";
 import { createPrismaPublishStore } from "@/src/pipeline/publish/publish-store";
+import { describeWarmUp, type WarmUpReport } from "@/src/pipeline/publish/site-refresh";
 import { finishRun, logEvent, startRun } from "@/src/pipeline/runs";
 import { readSetting } from "@/src/pipeline/settings";
 
@@ -52,8 +53,11 @@ export interface RunDetectPublishOptions {
   store?: PublishStore;
   env?: Record<string, string | undefined>;
   now?: () => Date;
-  /** Asks the site to refresh its cached lists. The runner adapter builds it (see site-refresh). */
-  refreshSite?: () => Promise<void>;
+  /**
+   * Asks the site to refresh its cached lists, then loads its main pages so the CDN caches them. The runner
+   * adapter builds it (see site-refresh).
+   */
+  refreshSite?: () => Promise<WarmUpReport>;
 }
 
 export async function runDetectPublish(
@@ -128,7 +132,7 @@ export async function runDetectPublish(
 /** A failed refresh only delays the lists by up to an hour, so it is a warning, not a failed run. */
 async function refreshSiteAfterPublish(
   runId: bigint,
-  refreshSite: (() => Promise<void>) | undefined,
+  refreshSite: RunDetectPublishOptions["refreshSite"],
 ): Promise<SiteRefreshStatus> {
   if (!refreshSite) {
     await logEvent(runId, {
@@ -139,8 +143,9 @@ async function refreshSiteAfterPublish(
     return "not_configured";
   }
   try {
-    await refreshSite();
+    const warmUp = await refreshSite();
     await logEvent(runId, { level: "info", step: "site_refresh", message: "Refreshed the site lists and issue pages." });
+    await logWarmUp(runId, warmUp);
     return "refreshed";
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
@@ -151,6 +156,12 @@ async function refreshSiteAfterPublish(
     });
     return "failed";
   }
+}
+
+/** A page that failed to warm still works: its first reader waits for a render. So it is a warning. */
+async function logWarmUp(runId: bigint, report: WarmUpReport): Promise<void> {
+  if (report.warmed.length === 0 && report.failed.length === 0) return;
+  await logEvent(runId, { step: "site_warm_up", ...describeWarmUp(report) });
 }
 
 /** The frequent check: every 5 minutes, weekdays 09:00–20:59 New York. Outside that it does nothing. */

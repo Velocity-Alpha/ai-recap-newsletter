@@ -73,7 +73,14 @@ describe("POST /api/subscriber/subscribe", () => {
 
     expect(response.status).toBe(200);
     expect(ghlFns.submitSubscriberToGhl).toHaveBeenCalledTimes(1);
-    expect(response.headers.get("set-cookie")).toContain("ai_recap_subscriber=");
+    const [session, hint] = response.headers.getSetCookie();
+    expect(session).toMatch(/^ai_recap_subscriber=[^;]+;/);
+    expect(session).toContain("HttpOnly");
+    expect(hint).toMatch(/^ai_recap_signed_in=1;/);
+    expect(hint).toContain("Path=/;");
+    expect(hint).toContain("Max-Age=2592000;");
+    expect(hint).toContain("SameSite=lax");
+    expect(hint).not.toContain("HttpOnly");
   });
 
   it("limits sign-ups per email across IPs", async () => {

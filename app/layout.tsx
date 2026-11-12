@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Libre_Baskerville, Source_Sans_3 } from "next/font/google";
 import GoogleAnalytics from "@/src/components/GoogleAnalytics";
 import ScrollProgress from "@/src/components/ScrollProgress";
+import SubscriptionSuccessToast from "@/src/components/SubscriptionSuccessToast";
+import { SUBSCRIBER_VIEW_HEAD_SCRIPT } from "@/src/features/subscriber/subscriber-view";
 import "./globals.css";
 
 const gaMeasurementId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID?.trim();
@@ -55,6 +57,8 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        {/* First in the head: marks the subscriber view before the first paint, so a subscriber sees no lock. */}
+        <script dangerouslySetInnerHTML={{ __html: SUBSCRIBER_VIEW_HEAD_SCRIPT }} />
         <GoogleAnalytics measurementId={gaMeasurementId} />
       </head>
       <body
@@ -62,6 +66,8 @@ export default function RootLayout({
         className={`${libreBaskerville.variable} ${sourceSans.variable} antialiased`}
       >
         <ScrollProgress />
+        {/* Outside every subscribe form: those hide in the subscriber view the moment a reader subscribes. */}
+        <SubscriptionSuccessToast />
         {children}
       </body>
     </html>

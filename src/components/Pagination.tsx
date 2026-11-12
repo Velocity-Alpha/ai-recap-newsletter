@@ -1,26 +1,21 @@
 import React from "react";
 import Link from "next/link";
+import { ARCHIVE_PATH, archivePagePath } from "@/src/features/newsletter/archive-paths";
 
 interface PaginationProps {
   currentPage: number;
   totalPages: number;
-  basePath: string;
 }
 
 const Pagination: React.FC<PaginationProps> = ({
   currentPage,
   totalPages,
-  basePath,
 }) => {
-  const buildPageHref = (page: number) => {
-    return page <= 1 ? basePath : `${basePath}?page=${page}`;
-  };
-
   return (
     <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-[var(--border-light)] bg-[var(--bg-card)] px-4 py-4 sm:px-6">
       {/* Previous */}
       <Link
-        href={buildPageHref(currentPage - 1)}
+        href={archivePagePath(currentPage - 1)}
         aria-disabled={currentPage === 1}
         className={`inline-flex items-center justify-center rounded border px-5 py-2.5 font-semibold shadow-sm transition-[background-color,border-color,color,box-shadow,transform] ${
           currentPage === 1
@@ -32,8 +27,8 @@ const Pagination: React.FC<PaginationProps> = ({
         Previous
       </Link>
 
-      {/* Page info + input */}
-      <form action={basePath} className="flex items-center gap-2 whitespace-nowrap font-sans text-[var(--text-secondary)]">
+      {/* Page info + input. The form sends ?page=N; a next.config redirect turns it into /archive/page/N. */}
+      <form action={ARCHIVE_PATH} className="flex items-center gap-2 whitespace-nowrap font-sans text-[var(--text-secondary)]">
         <span className="text-[var(--text-primary)]" style={{ fontSize: 'var(--text-body)' }}>Page</span>
         <input
           type="text"
@@ -60,7 +55,7 @@ const Pagination: React.FC<PaginationProps> = ({
 
       {/* Next */}
       <Link
-        href={buildPageHref(currentPage + 1)}
+        href={archivePagePath(currentPage + 1)}
         aria-disabled={currentPage === totalPages}
         className={`inline-flex items-center justify-center rounded border px-5 py-2.5 font-semibold shadow-sm transition-[background-color,border-color,color,box-shadow,transform] ${
           currentPage === totalPages

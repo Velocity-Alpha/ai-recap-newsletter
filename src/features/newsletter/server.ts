@@ -4,9 +4,7 @@ import { PUBLISHED_ISSUES_MAX_AGE_SECONDS, PUBLISHED_ISSUES_TAG } from "@/src/fe
 import { parseNewsletterIssue } from "@/src/features/newsletter/parsers";
 import type { NewsletterIssueApiResponse, ParsedNewsletterIssue } from "@/src/features/newsletter/types";
 import {
-  type NewsletterListPage,
   type PublishedNewsletterEntry,
-  type TickerFeed,
   fetchNewsletterIssueApiResponseById,
   fetchNewsletterIssueApiResponseBySlug,
   fetchNewsletterListPage,
@@ -37,7 +35,8 @@ export const getCachedPublishedNewsletterEntries = unstable_cache(
   publishedIssuesCache,
 );
 
-const getCachedNewsletterListPage = unstable_cache(
+/** Throws when the database cannot be read, so a cached page keeps its last good copy instead of an empty list. */
+export const getCachedNewsletterListPage = unstable_cache(
   async (page: number, limit: number) => fetchNewsletterListPage(page, limit),
   ["published-newsletter-list-page"],
   publishedIssuesCache,
@@ -49,45 +48,11 @@ export const getCachedTickerFeed = unstable_cache(
   { revalidate: 300 },
 );
 
-export async function getSafeNewsletterListPage(page: number, limit: number): Promise<NewsletterListPage> {
-  try {
-    return await getCachedNewsletterListPage(page, limit);
-  } catch {
-    return {
-      data: [],
-      pagination: {
-        currentPage: Math.max(1, Math.trunc(page) || 1),
-        totalPages: 0,
-        totalCount: 0,
-        limit: Math.max(1, Math.trunc(limit) || 6),
-        hasNextPage: false,
-        hasPreviousPage: false,
-      },
-    };
-  }
-}
-
 export async function getSafeCachedPublishedNewsletterEntries(): Promise<PublishedNewsletterEntry[]> {
   try {
     return await getCachedPublishedNewsletterEntries();
   } catch {
     return [];
-  }
-}
-
-export async function getSafeCachedTickerFeed(): Promise<TickerFeed> {
-  try {
-    return await getCachedTickerFeed();
-  } catch {
-    return {
-      data: [],
-      stats: {
-        stories: 0,
-        tools: 0,
-        papers: 0,
-      },
-      count: 0,
-    };
   }
 }
 
@@ -109,19 +74,19 @@ export async function fetchNewsletterIssueById(id: string): Promise<ParsedNewsle
   }
 }
 
+/**
+ * Null when no published issue has this slug. A failed read throws, so a cached issue page keeps its last good
+ * copy instead of caching "not found".
+ */
 export async function fetchNewsletterIssueBySlug(slug: string): Promise<ParsedNewsletterIssue | null> {
-  try {
-    if (!slug.trim()) {
-      return null;
-    }
-
-    const data = (await getCachedNewsletterIssueApiResponseBySlug(slug)) as NewsletterIssueApiResponse | null;
-    if (!data) {
-      return null;
-    }
-
-    return parseNewsletterIssue(data);
-  } catch {
+  if (!slug.trim()) {
     return null;
   }
+
+  const data = (await getCachedNewsletterIssueApiResponseBySlug(slug)) as NewsletterIssueApiResponse | null;
+  if (!data) {
+    return null;
+  }
+
+  return parseNewsletterIssue(data);
 }

@@ -1,8 +1,10 @@
 "use client";
 
 import { CheckCircle2, LoaderCircle } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
+
+import { announceSubscribed } from "@/src/components/subscribed-toast";
+import { markSubscriberView, signedOutOnly } from "@/src/features/subscriber/subscriber-view";
 
 class ApiRequestError extends Error {
   code?: string;
@@ -44,7 +46,6 @@ async function postJson<TResponse>(url: string, body: object) {
 type SubscribeStep = "email" | "subscribe" | "sign_in_code" | "subscribed";
 
 export default function SubscribeNewsletter() {
-  const router = useRouter();
   const [step, setStep] = useState<SubscribeStep>("email");
   const [firstName, setFirstName] = useState("");
   const [email, setEmail] = useState("");
@@ -99,6 +100,10 @@ export default function SubscribeNewsletter() {
     try {
       await submitSubscription();
       setStep("subscribed");
+      // The subscribe route set the signed-in hint; the page is cached signed-out HTML, so switch it here. That
+      // hides this form at once, so the toast confirms the subscribe.
+      markSubscriberView();
+      announceSubscribed();
     } catch (submitError) {
       if (submitError instanceof ApiRequestError && submitError.code === "already_subscribed") {
         try {
@@ -124,7 +129,8 @@ export default function SubscribeNewsletter() {
     try {
       await postJson("/api/subscriber/verify-code", { email, code });
       setStep("subscribed");
-      router.refresh();
+      // The verify route set the signed-in hint; the page is cached signed-out HTML, so switch it here.
+      markSubscriberView();
     } catch (submitError) {
       setError(getErrorMessage(submitError, "Could not verify your code."));
     } finally {
@@ -133,7 +139,7 @@ export default function SubscribeNewsletter() {
   }
 
   return (
-    <section id="subscribe" className="py-24 bg-[var(--watercolor-ink)] relative overflow-hidden">
+    <section {...signedOutOnly} id="subscribe" className="py-24 bg-[var(--watercolor-ink)] relative overflow-hidden">
       <div
         className="absolute -top-1/2 -right-1/5 w-[600px] h-[600px] rounded-full opacity-10"
         style={{ background: "radial-gradient(circle, var(--watercolor-blue) 0%, transparent 60%)" }}

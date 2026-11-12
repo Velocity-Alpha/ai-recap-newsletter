@@ -114,6 +114,7 @@ Mutation routes:
 - The three routes above, and `POST /api/approval/login`, answer `429` with `Retry-After` once a caller passes its limit (per IP, with IPv6 grouped by /64; per email where there is one; and for the approval login, across the whole site). The IP comes from Netlify's `x-nf-client-connection-ip` header. Limits live in `src/server/rate-limit.ts`; counts are in `newsletter.rate_limits`.
 - `POST /api/subscriber/sign-out`
 - `GET|POST /api/subscriber/unsubscribe` with a signed `token`
+- Subscribe and verify-code set the session cookie and the signed-in hint (`ai_recap_signed_in`) together; sign-out, and unsubscribe when it unsubscribes someone, clear both. See [architecture, public pages and the CDN](./docs/architecture.html#public-pages).
 - `POST /api/subscriber/unsubscribe/webhook` with `Authorization: Bearer <GHL_UNSUBSCRIBE_WEBHOOK_SECRET>` or `x-webhook-secret`
 - `POST /api/newsletters/commit` commits an approved outline: it saves the story changes, makes the next draft, and starts `draft-issue-background`. It creates no email in the distribution service
 - `PATCH /api/approval/drafts/[id]` with `{ title }` changes the title of the issue's newest ready draft, in the same draft and on the issue row. An empty title or one over 200 characters answers 400; a title another issue uses answers 409 (approval session)
@@ -125,11 +126,11 @@ Mutation routes:
 - `POST /api/approval/skipped-dates` with `{ date, note? }` marks a skipped date, and `DELETE /api/approval/skipped-dates?date=` undoes it, until that day is over (approval session). Used by "No issue today" on `/approval`.
 - `POST /api/approval/issues/[id]/publish` publishes an unpublished issue from the HTML of its newest staged version, or from the issue's own HTML when nothing is staged (approval session). Used by the "Mark as published" button on `/approval/issues`. It sends no email.
 - `proxy.ts` refuses writes (any method but GET, HEAD, OPTIONS) to `/approval/*`, `/api/approval/*`, `/api/newsletters/commit`, and `/api/admin/*` unless they come from this site's own origin (`403`), and refuses API writes that are not `Content-Type: application/json` (`415`). See `src/server/same-origin.ts`.
-- `POST /api/revalidate` refreshes the cached issue lists, issue pages, and sitemap. It needs `Authorization: Bearer <token>`, a 5-minute token signed with a key derived from `SESSION_SECRET` (`src/server/cache-refresh-auth.ts`). The publish job calls it after it publishes an issue.
+- `POST /api/revalidate` refreshes the cached issue lists, issue pages, and sitemap. It needs `Authorization: Bearer <token>`, a 5-minute token signed with a key derived from `SESSION_SECRET` (`src/server/cache-refresh-auth.ts`). The publish job calls it after it publishes an issue. It answers `{ refreshed: ["published-issues"], warm: [...] }`: the paths the job loads next (`/`, `/archive`, the newest issue), so the CDN caches them before a reader asks.
 
 Public unsubscribe page:
 
-- `GET /unsubscribe?token=...`
+- `GET /unsubscribe?token=...` (the one public page rendered on every request)
 
 Admin pages (approval login; `proxy.ts` and `requireAdminPage()` in `src/server/admin-auth.ts` both check it):
 
@@ -143,7 +144,7 @@ Admin pages (approval login; `proxy.ts` and `requireAdminPage()` in `src/server/
 - The repository layer mixes Prisma model queries with Prisma-backed raw SQL for the complex ticker and archive queries.
 - Route handlers under `app/api` provide the public JSON interface.
 
-The homepage and archive lists, individual issue lookups, and sitemap entries share one data cache tag (`published-issues`, `src/features/newsletter/cache.ts`) and expire after one hour. Publishing refreshes the tag at once: "Mark as published" does it in the route, and the publish job calls `POST /api/revalidate`. `GET /api/newsletters` stays uncached and sends `Cache-Control: no-store`. The ticker keeps its five-minute data cache.
+The public pages always render the signed-out markup and are cached at Netlify's CDN: the home page for 5 minutes, `/archive`, `/archive/page/N` and issue pages for up to an hour. The browser shows the subscriber view from the signed-in hint cookie. The homepage and archive lists, individual issue lookups, and sitemap entries share one data cache tag (`published-issues`, `src/features/newsletter/cache.ts`) and expire after one hour. Publishing refreshes the tag at once, which also clears the cached pages: "Mark as published" does it in the route, and the publish job calls `POST /api/revalidate` and then does the warm-up: it loads the main pages again. `/archive?page=N` redirects to `/archive/page/N` for N of 2 or more. `GET /api/newsletters` stays uncached and sends `Cache-Control: no-store`. The ticker keeps its five-minute data cache. How it all works: [architecture, public pages and the CDN](./docs/architecture.html#public-pages).
 
 ## Background jobs
 

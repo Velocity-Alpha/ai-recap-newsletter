@@ -113,6 +113,19 @@
   }
 }
 
+/* ==================== SUBSCRIBER VIEW ==================== */
+/* Public pages render the signed-out markup. The head script sets data-subscriber on <html> from the signed-in
+   hint cookie (src/features/subscriber/subscriber-view.ts). !important beats utility classes and the lock's
+   inline max-height. */
+html[data-subscriber] [data-signed-out-only] {
+  display: none !important;
+}
+
+html[data-subscriber] [data-article-lock-clip] {
+  max-height: none !important;
+  overflow: visible !important;
+}
+
 /* ==================== WATERCOLOR EFFECTS ==================== */
 .watercolor-blob {
   position: absolute;

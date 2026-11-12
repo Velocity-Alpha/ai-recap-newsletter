@@ -137,8 +137,9 @@ every 5 min, 09:00-21:00 weekdays
          -> parses the sent email -> matches the issue -> sets published_at + content_json (status: published)
          -> stories.used_in_publication_date + issue_stories rows: one for each story of the sent email (ADR 0007)
          -> publish_events row -> POST /api/revalidate (cache tag published-issues) -> issue is live
+         -> warm-up: loads the pages the refresh answer lists (/, /archive, the new issue), run log step site_warm_up
 03:00 UTC daily: detect-publish-catch-up does the same over the last 3 days
-If the issue is missing after a send: /approval/issues -> "Mark as published"
+If the issue is missing after a send: /approval/issues -> "Mark as published" (refreshes the cache, no warm-up)
 
 18:00  run-checks: draft ready, issue published, issue page and home page OK
          -> daily summary to the ops chat -> Healthchecks.io ping
@@ -156,6 +157,33 @@ If the issue is missing after a send: /approval/issues -> "Mark as published"
   <li><strong>Timings:</strong> each attempt in <code>story_articles.attempts</code> records its total time, the time it waited for host and worker slots, every wait counted (<code>waitMs</code>), and the time of its text part (<code>textMs</code>).</li>
 </ul>
 
+<h3 id="public-pages">Public pages and the CDN</h3>
+<p>The public pages are signed-out pages: the server renders one copy for every reader, and Netlify's CDN caches it. Netlify's durable cache is shared, so one render serves every edge location. The browser then decides the subscriber view.</p>
+<table>
+  <tr><th>Page</th><th>Built</th><th>Cached for</th></tr>
+  <tr><td><code>/</code></td><td>at deploy</td><td>5 min (the ticker data's lifetime), then rebuilt in the background</td></tr>
+  <tr><td><code>/archive</code> (page 1)</td><td>at deploy</td><td>1 h</td></tr>
+  <tr><td><code>/archive/page/N</code></td><td>on first visit</td><td>1 h</td></tr>
+  <tr><td><code>/issue/[slug]</code></td><td>on first visit (no issue is read at build)</td><td>1 h</td></tr>
+  <tr><td><code>/privacy</code>, <code>/terms</code>, <code>/for-brands</code></td><td>at deploy</td><td>until the next deploy</td></tr>
+  <tr><td><code>/unsubscribe</code></td><td colspan="2">every request (it reads its token); the only public page that does</td></tr>
+</table>
+<ul>
+  <li><strong>No server reads of the reader.</strong> Public pages read no cookies, headers or query string on the server, except <code>/unsubscribe</code>. One such read makes every page that uses it dynamic. <code>app/public-pages.test.tsx</code> renders each public page with <code>cookies()</code>, <code>headers()</code>, <code>searchParams</code> and <code>useSearchParams()</code> throwing.</li>
+  <li><strong>Freshness.</strong> The home, archive and issue data reads carry the <code>published-issues</code> tag (<code>src/features/newsletter/cache.ts</code>). On publish, <code>revalidateTag</code> with <code>expire: 0</code> clears the cached pages, and Netlify clears the matching CDN tag. The next request builds a fresh page and waits for it; the warm-up makes that request. Each production deploy clears the CDN too.</li>
+  <li><strong>Failed reads.</strong> The data reads of cached pages throw on a database error (<code>src/features/newsletter/server.ts</code>). A failed background rebuild keeps the last good page. A page with no cached copy yet shows the error page, never an empty list or "not found".</li>
+  <li><strong>Archive paging in the path.</strong> <code>/archive</code> is page 1 and <code>/archive/page/N</code> is page N (<code>src/features/newsletter/archive-paths.ts</code>), so the CDN caches each page. <code>/archive?page=N</code>, which the page-jump form submits, redirects (308, <code>next.config.mjs</code>) to <code>/archive/page/N</code> for N of 2 or more, written without leading zeros. <code>/archive/page/1</code> redirects to <code>/archive</code>, so <code>/archive?page=1</code> (or 0, or a leading zero) just serves <code>/archive</code>: both redirects keep the query string, and a redirect for page 1 would loop. A page that is not a number is not found, and a page past the end shows the last page.</li>
+  <li><strong>The archive cache key.</strong> <code>/archive</code> sends <code>Netlify-Vary: query=page</code> (<code>next.config.mjs</code>; Netlify's Next.js runtime merges it into its own header). Netlify's cache key leaves out query values unless the response names them, so without it a cached <code>/archive</code> would answer <code>/archive?page=N</code> and the redirect would never run. Other query values stay out of the key.</li>
+  <li><strong>Warm-up.</strong> <code>POST /api/revalidate</code> answers with the paths to warm (<code>warm</code>: <code>/</code>, <code>/archive</code>, the newest published issue; <code>src/features/newsletter/warm-paths.ts</code>). The publish job does the warm-up: it loads them one after another, 20 s each, asking for Brotli or gzip like a browser, because Netlify keeps one cached copy per compression (<code>warmPages()</code> in <code>src/pipeline/publish/site-refresh.ts</code>), and logs the run step <code>site_warm_up</code>: info, or a warning for a page that failed. It never fails the run, and a failed refresh skips it. After each deploy the <code>deploy-succeeded</code> function warms the same paths. A warmed page does not always leave the new copy in the cache. In the first seconds after a deploy Netlify's durable cache can answer <code>fwd=bypass</code>. Right after a refresh the CDN can still answer with the old page (durable <code>hit</code>, or an Edge hit), because Next.js runs a Route Handler's <code>revalidateTag</code>, and so Netlify's CDN purge, after the response, and the purge takes a moment to reach every cache. A list page counts as old when its HTML does not link the newest issue (<code>href="/issue/&lt;slug&gt;"</code>). Both warm-ups load such a page again after 3 s, at most twice (<code>warmPagesUntilStored()</code>). Before the last try the publish job calls <code>/api/revalidate</code> again if a list page is still old, because a copy stored after the purge stays until the next purge. A page still old after that is logged as a warning. The log line names each page's durable cache status. The run log and the function log share one line format (<code>describeWarmUp()</code> next to <code>WarmUpReport</code>). "Mark as published" refreshes the cache in its route and warms nothing.</li>
+</ul>
+<p><strong>The subscriber view.</strong> Every element only a signed-out reader should see (the Subscribe buttons, the footer subscribe link, the subscribe form, the article lock and its gate) carries <code>data-signed-out-only</code>. When <code>&lt;html&gt;</code> carries <code>data-subscriber</code>, <code>app/globals.css</code> hides those elements and lifts the lock's height clip (<code>data-article-lock-clip</code>). Code: <code>src/features/subscriber/subscriber-view.ts</code>.</p>
+<ul>
+  <li><strong>The signed-in hint</strong> is the cookie <code>ai_recap_signed_in=1</code>, readable by the browser, with no email or id (<code>src/features/subscriber/signed-in-hint.ts</code>). <code>setSubscriberSessionCookies</code> and <code>clearSubscriberSessionCookies</code> in <code>src/features/subscriber/server.ts</code> set and clear it with the httpOnly session cookie, with the same 30-day lifetime, path and SameSite. Sign-in code verify and subscribe set both. Sign-out clears both, and so does the unsubscribe route on a real unsubscribe.</li>
+  <li><strong>Before the first paint</strong> an inline script at the start of <code>&lt;head&gt;</code> (<code>app/layout.tsx</code>) sets <code>data-subscriber</code> when the hint is present. No React state decides the view, so there is no flash and no hydration mismatch.</li>
+  <li><strong>In the page.</strong> After a sign-in or a subscribe, the access gate and the subscribe form set <code>data-subscriber</code> themselves (<code>markSubscriberView</code>); there is no reload. That hides the form at once, so a subscribe shows the "Subscribed!" toast, mounted once in <code>app/layout.tsx</code> (<code>src/components/subscribed-toast.ts</code>). The <code>/unsubscribe</code> page cannot set cookies, so on a real unsubscribe the browser signs itself out (<code>ShowSignedOutView</code>): it clears the hint and posts to <code>/api/subscriber/sign-out</code>, which clears the session cookie too.</li>
+  <li><strong>Display only.</strong> By design every reader gets the same page with the full issue in its HTML, and the browser decides whether the article lock shows. The hint only chooses between markup the page already has. The subscriber view follows the hint, so an unsubscribe through the GHL webhook shows in a browser when its hint is cleared or runs out.</li>
+</ul>
+
 <h2 id="jobs">3. Jobs (Netlify functions)</h2>
 <p>Netlify cron is UTC only, so each job checks New York time in code. Scheduled functions stop at 30 s. Background functions (<code>-background</code> suffix) stop at 15 min.</p>
 <table>
@@ -166,6 +194,7 @@ If the issue is missing after a send: /approval/issues -> "Mark as published"
   <tr><td><code>detect-publish-catch-up</code></td><td><code>0 3 * * *</code></td><td>daily</td><td>Same, 3-day lookback</td></tr>
   <tr><td><code>draft-issue-background</code></td><td>none (on commit)</td><td>valid token signed for the draft; the draft is waiting to run</td><td><code>runDraftJob()</code> in <code>src/pipeline/draft/run-draft.ts</code>; gives up at 13 min. The commit route and "Retry" start it with <code>startDraftJob()</code></td></tr>
   <tr><td><code>find-free-links-background</code></td><td>none (the board starts it)</td><td>valid token signed for the story ids</td><td><code>findFreeLinks()</code> in <code>src/pipeline/free-links/find-free-links.ts</code>. <code>POST /api/approval/free-links</code> starts it with <code>startFreeLinksJob()</code></td></tr>
+  <tr><td><code>deploy-succeeded</code></td><td>none (Netlify deploy event)</td><td>every successful deploy (the file name is the event name)</td><td>Loads <code>/</code>, <code>/archive</code> and the newest issue once, so the CDN holds them again after the deploy cleared it (<a href="#public-pages">public pages and the CDN</a>). Netlify posts the deploy as <code>{ payload }</code> (Netlify docs, "Trigger functions on events", legacy filename convention). Only the published production deploy (<code>context</code> <code>production</code> and a <code>published_at</code>) warms the main site address; any other deploy, such as a preview or a production deploy held back by a locked production, warms only its own address. With no deploy in the body it falls back to the function context. The log line names the address and where it came from. No token; it reads the newest issue from the database. A failed page is only logged. <code>warmDeploy()</code> in <code>src/pipeline/publish/deploy-warm-up.ts</code></td></tr>
   <tr><td><code>run-checks</code></td><td><code>0,5 14,15,16,17,22,23 * * 1-5</code></td><td>10:05, 12:00, 18:00 New York on weekdays (1 min early to 4 min late); outside production, a run at any other time ("Run now") is a full 18:00 pass</td><td>Outcome checks raise or resolve incidents; at 18:00 the daily summary to the ops chat, then the Healthchecks.io ping. Each Telegram and heartbeat call gets 5 s, and each site page 12 s (a cold site answers in 6 to 9 s); Telegram and site calls stop 20 s into the run. <code>runChecks()</code> in <code>src/pipeline/checks/run-checks.ts</code></td></tr>
 </table>
 <p>Each run writes <code>pipeline_runs</code> (job, trigger, status, stats) and <code>pipeline_events</code> (step log). Job tokens: <code>src/server/job-token.ts</code>, format <code>&lt;expiresAtMs&gt;.&lt;sig&gt;</code>, HMAC key derived from <code>SESSION_SECRET</code> per purpose.</p>
@@ -189,7 +218,7 @@ If the issue is missing after a send: /approval/issues -> "Mark as published"
 <h2 id="services">5. External services</h2>
 <table>
   <tr><th>Service</th><th>Used for</th><th>Called by</th></tr>
-  <tr><td>Netlify</td><td>Site hosting, functions, env vars, deploy previews</td><td>all</td></tr>
+  <tr><td>Netlify</td><td>Site hosting, the CDN cache of the public pages, functions, env vars, deploy previews</td><td>all</td></tr>
   <tr><td>Neon</td><td>Postgres: production branch and <code>dev</code> branch</td><td>app, jobs</td></tr>
   <tr><td>OpenAI</td><td>Extraction, lead pick, drafting and image prompt; story embeddings and the Decisions API (<code>POST /v1/decisions</code> by <code>fetch</code>) for the repeat check; the web search tool for free links (about 4 cents for each search)</td><td>app, jobs</td></tr>
   <tr><td>Gmail API (read-only)</td><td>Newsletter emails for ingestion; sent-campaign copies for publish detection</td><td>ingest and publish jobs</td></tr>
@@ -236,7 +265,8 @@ If the issue is missing after a send: /approval/issues -> "Mark as published"
 <h2 id="code">7. Code map</h2>
 <pre>
 app/                         Next.js routes
-  page.tsx, archive/, issue/[slug]/, newsletter/[id]/, for-brands/, unsubscribe/, privacy/, terms/
+  page.tsx, archive/ (+ page/[page]/), issue/[slug]/, newsletter/[id]/, for-brands/, unsubscribe/, privacy/, terms/;
+                             layout.tsx holds the subscriber view head script
   approval/                  board (page.tsx), login/, issues/ ("Mark as published"), submitted/,
                              drafts/ (drafts for a date: live steps, Retry, email preview, the title field, "New image",
                              "Stage for sending")
@@ -249,10 +279,12 @@ app/                         Next.js routes
                              drafts (+ [id], html, retry, image, image/ideas, image/generate)
   api/admin/                 paywall-sites/ignore (the "Ignore" button of /admin/settings)
   api/subscriber/            subscribe, request-code, verify-code, sign-out, unsubscribe (+ webhook from GHL)
-  api/issues/[slug], api/ticker, api/for-brands, api/revalidate (job token)
-src/features/newsletter/     site and board logic: repository, cache, curation.service, board-repeats, lead-story,
-                             openai-lead-pick, issue-status, render/, parsers/
-src/features/subscriber/     subscriber sessions, provider switch (ghl | beehiiv), Resend email, GHL webhook
+  api/issues/[slug], api/ticker, api/for-brands, api/revalidate (job token; answers the paths to warm)
+src/features/newsletter/     site and board logic: repository, cache, server (cached data reads), archive-paths,
+                             warm-paths, curation.service, board-repeats, lead-story, openai-lead-pick, issue-status,
+                             render/, parsers/
+src/features/subscriber/     subscriber sessions (server: session cookie + signed-in hint), signed-in-hint,
+                             subscriber-view (browser), provider switch (ghl | beehiiv), Resend email, GHL webhook
 src/features/admin/          admin page data
 src/pipeline/                runner-neutral job logic
   ingest/                    sources.ts, feeds, beehiiv-site, email-text, redirects, url, extract (gpt-6-luna), paywall,
@@ -265,7 +297,8 @@ src/pipeline/                runner-neutral job logic
   repeats/                   the repeat check: embed, nearest, decisions (Decisions API), match-stories, repeats-store,
                              repeat-rules (pair levels and board rules, pure); __fixtures__/ is the measured test set
   publish/                   gmail-client, sent-email-parser, publish-decision, publish-store, issue-stories,
-                             site-refresh, manual-publish, publish-schedule, detect-publish, run-detect-publish
+                             site-refresh (refresh + warm-up), deploy-warm-up, manual-publish, publish-schedule,
+                             detect-publish, run-detect-publish
   checks/                    schedule, day-facts (its DB reads; staged facts through distribution/issue-state-store),
                              checks (pure), site, summary, heartbeat,
                              skipped-dates, run-checks
@@ -287,7 +320,8 @@ src/server/                  prisma client, job-token, approval, admin and cache
                              client-ip, same-origin, safe-compare, observability
 src/trigger/                 dormant Trigger.dev adapters
 netlify/functions/           thin wrappers: ingest-stories(.mts, -background.mts), detect-publish(.mts, -catch-up.mts),
-                             run-checks.mts, draft-issue-background.mts, find-free-links-background.mts
+                             run-checks.mts, draft-issue-background.mts, find-free-links-background.mts,
+                             deploy-succeeded.mts (deploy event)
 prisma/                      schema.prisma, migrations/, bootstrap/
 evals/                       model evals (not deployed): lib/ (harness), one folder per call; results/ is committed
 scripts/                     reset-dev-branch.mjs, run-prisma-prod.mjs, import-subscribers-from-csv.mjs,

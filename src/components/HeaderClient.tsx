@@ -3,11 +3,9 @@
 import Image from 'next/image'
 import Link from 'next/link'
 
-type HeaderClientProps = {
-  showSubscribeButton: boolean
-}
+import { signedOutOnly } from '@/src/features/subscriber/subscriber-view'
 
-export default function HeaderClient({ showSubscribeButton }: HeaderClientProps) {
+export default function HeaderClient() {
   return (
     <header className="w-full bg-[var(--bg-card)] border-b border-[var(--border-light)] sticky top-0 z-50">
       <nav className="container mx-auto flex items-center justify-between px-6 py-4 max-w-[var(--container)]">
@@ -44,26 +42,24 @@ export default function HeaderClient({ showSubscribeButton }: HeaderClientProps)
           >
             Archive
           </Link>
-          {showSubscribeButton ? (
-            <button
-              onClick={() => document.getElementById('subscribe')?.scrollIntoView({ behavior: 'smooth' })}
-              className="cursor-pointer px-6 py-3 bg-[var(--text-primary)] text-white font-semibold rounded transition-all duration-200 hover:bg-[var(--watercolor-ink)]"
-              style={{ fontSize: 'var(--text-small)' }}
-            >
-              Subscribe
-            </button>
-          ) : null}
-        </div>
-
-        {showSubscribeButton ? (
           <button
+            {...signedOutOnly}
             onClick={() => document.getElementById('subscribe')?.scrollIntoView({ behavior: 'smooth' })}
-            className="md:hidden cursor-pointer px-4 py-2 bg-[var(--text-primary)] text-white font-semibold rounded transition-all duration-200 hover:bg-[var(--watercolor-ink)]"
+            className="cursor-pointer px-6 py-3 bg-[var(--text-primary)] text-white font-semibold rounded transition-all duration-200 hover:bg-[var(--watercolor-ink)]"
             style={{ fontSize: 'var(--text-small)' }}
           >
             Subscribe
           </button>
-        ) : null}
+        </div>
+
+        <button
+          {...signedOutOnly}
+          onClick={() => document.getElementById('subscribe')?.scrollIntoView({ behavior: 'smooth' })}
+          className="md:hidden cursor-pointer px-4 py-2 bg-[var(--text-primary)] text-white font-semibold rounded transition-all duration-200 hover:bg-[var(--watercolor-ink)]"
+          style={{ fontSize: 'var(--text-small)' }}
+        >
+          Subscribe
+        </button>
       </nav>
     </header>
   )

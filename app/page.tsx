@@ -4,30 +4,36 @@ import Features from '@/src/components/Features'
 import RecentNewslettersPreview from '@/src/components/RecentNewslettersPreview'
 import SubscribeNewsletter from '@/src/components/SubscribeNewsletter'
 import Footer from '@/src/components/Footer'
-import { getSafeNewsletterListPage, getSafeCachedTickerFeed } from '@/src/features/newsletter/server'
-import { hasActiveSubscriberSession } from '@/src/features/subscriber/server'
+import { getCachedNewsletterListPage, getCachedTickerFeed } from '@/src/features/newsletter/server'
 import React from 'react'
 
+// The CDN caches the home page. It rebuilds in the background every 5 minutes, the ticker data's lifetime, and at
+// once when an issue publishes (the published-issues tag on its data reads).
+export const revalidate = 300
+
+/** Newest issues in the home page's preview. */
+const HOME_PREVIEW_ISSUE_COUNT = 6
+
+// A public page: always the signed-out markup. The browser hides the Subscribe buttons and form in the
+// subscriber view. The data reads throw on a failed read, so a failed rebuild keeps the last good page instead
+// of caching an empty one.
 export default async function HomePage() {
-  const [isSignedIn, newsletterPage, tickerFeed] = await Promise.all([
-    hasActiveSubscriberSession(),
-    getSafeNewsletterListPage(1, 6),
-    getSafeCachedTickerFeed(),
+  const [newsletterPage, tickerFeed] = await Promise.all([
+    getCachedNewsletterListPage(1, HOME_PREVIEW_ISSUE_COUNT),
+    getCachedTickerFeed(),
   ])
-  const showSubscribe = !isSignedIn
 
   return (
         <div className='flex flex-col min-h-screen bg-[var(--bg-main)]'>
-            <Header showSubscribeButton={showSubscribe} />
+            <Header />
             <Hero
-              showSubscribeButton={showSubscribe}
               initialTickerStories={tickerFeed.data}
               initialTickerStats={tickerFeed.stats}
             />
             <Features />
-            <RecentNewslettersPreview newsletters={newsletterPage.data} showSubscribeButton={showSubscribe} />
-            {showSubscribe ? <SubscribeNewsletter /> : null}
-            <Footer showSubscribeLink={showSubscribe} />
+            <RecentNewslettersPreview newsletters={newsletterPage.data} />
+            <SubscribeNewsletter />
+            <Footer />
         </div>
     )
 }

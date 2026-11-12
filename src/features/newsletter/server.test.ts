@@ -42,9 +42,9 @@ import type { NewsletterListPage } from "@/src/features/newsletter/repository";
 import {
   getCachedNewsletterIssueApiResponseById,
   getCachedNewsletterIssueApiResponseBySlug,
+  getCachedNewsletterListPage,
+  getCachedTickerFeed,
   getSafeCachedPublishedNewsletterEntries,
-  getSafeCachedTickerFeed,
-  getSafeNewsletterListPage,
 } from "@/src/features/newsletter/server";
 
 const existingIssueRow = {
@@ -101,15 +101,15 @@ describe("newsletter page data", () => {
 
   it("keeps the page list cached until published issues are refreshed", async () => {
     prismaMock.$queryRaw.mockResolvedValueOnce([existingIssueRow]);
-    const beforePublish = await getSafeNewsletterListPage(1, 6);
+    const beforePublish = await getCachedNewsletterListPage(1, 6);
     expect(beforePublish.data.map((issue) => issue.title)).toEqual(["Existing issue"]);
 
     prismaMock.$queryRaw.mockResolvedValueOnce(newlyPublishedRows);
-    await expect(getSafeNewsletterListPage(1, 6)).resolves.toEqual(beforePublish);
+    await expect(getCachedNewsletterListPage(1, 6)).resolves.toEqual(beforePublish);
 
     refreshPublishedIssues();
 
-    const afterRefresh = await getSafeNewsletterListPage(1, 6);
+    const afterRefresh = await getCachedNewsletterListPage(1, 6);
     expect(afterRefresh.data.map((issue) => issue.title)).toEqual(["Newly published issue", "Existing issue"]);
     expect(afterRefresh.pagination.totalCount).toBe(2);
   });
@@ -152,24 +152,14 @@ describe("newsletter page data", () => {
     expect(revalidations).toContainEqual([PUBLISHED_ISSUES_TAG, { expire: 0 }]);
   });
 
-  it("returns an empty page during a database error and recovers on the next read", async () => {
+  it("throws on a database error, so a cached page keeps its last good copy, and recovers on the next read", async () => {
     prismaMock.$queryRaw.mockRejectedValueOnce(new Error("Database unavailable"));
 
-    await expect(getSafeNewsletterListPage(2, 6)).resolves.toEqual({
-      data: [],
-      pagination: {
-        currentPage: 2,
-        totalPages: 0,
-        totalCount: 0,
-        limit: 6,
-        hasNextPage: false,
-        hasPreviousPage: false,
-      },
-    });
+    await expect(getCachedNewsletterListPage(2, 6)).rejects.toThrow("Database unavailable");
 
     // The failure is not cached: the same page reads the database again.
     prismaMock.$queryRaw.mockResolvedValueOnce([existingIssueRow]);
-    const recovered = await getSafeNewsletterListPage(2, 6);
+    const recovered = await getCachedNewsletterListPage(2, 6);
     expect(recovered.data[0].title).toBe("Existing issue");
   });
 
@@ -212,11 +202,11 @@ describe("newsletter page data", () => {
       .mockResolvedValueOnce([{ stories: 1, tools: 0, papers: 0 }])
       .mockResolvedValueOnce([{ headline: "Cached story", day: null, category: "Industry", createdAt: null }]);
 
-    const original = await getSafeCachedTickerFeed();
+    const original = await getCachedTickerFeed();
     expect(original.data[0].headline).toBe("Cached story");
     expect(original.stats.stories).toBe(1);
 
     prismaMock.$queryRaw.mockResolvedValue([]);
-    await expect(getSafeCachedTickerFeed()).resolves.toEqual(original);
+    await expect(getCachedTickerFeed()).resolves.toEqual(original);
   });
 });

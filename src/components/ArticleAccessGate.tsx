@@ -1,10 +1,12 @@
 "use client";
 
 import { CheckCircle2, ChevronRight, LoaderCircle, Mail } from "lucide-react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useState } from "react";
 
-export const SUBSCRIBED_TOAST_STORAGE_KEY = "ai-recap:subscriber-toast";
+import { announceSubscribed } from "@/src/components/subscribed-toast";
+import { markSubscriberView } from "@/src/features/subscriber/subscriber-view";
+
 
 type GateStep = "email" | "subscribe" | "sign_in_code";
 type SubscribeReason = "new" | "unsubscribed";
@@ -57,7 +59,6 @@ export default function ArticleAccessGate() {
   const [submitting, setSubmitting] = useState(false);
   const [dismissed, setDismissed] = useState(false);
 
-  const router = useRouter();
   const pathname = usePathname();
 
   async function requestCodeForEmail(nextEmail: string) {
@@ -113,8 +114,9 @@ export default function ArticleAccessGate() {
 
     try {
       await submitSubscription();
-      sessionStorage.setItem(SUBSCRIBED_TOAST_STORAGE_KEY, "1");
-      router.refresh();
+      // The subscribe route set the signed-in hint; the page is cached signed-out HTML, so open it here.
+      markSubscriberView();
+      announceSubscribed();
     } catch (submitError) {
       if (submitError instanceof ApiRequestError && submitError.code === "already_subscribed") {
         try {
@@ -140,7 +142,8 @@ export default function ArticleAccessGate() {
 
     try {
       await postJson("/api/subscriber/verify-code", { email, code });
-      router.refresh();
+      // The verify route set the signed-in hint; the page is cached signed-out HTML, so open it here.
+      markSubscriberView();
     } catch (submitError) {
       setError(getErrorMessage(submitError, "Could not verify your code."));
     } finally {

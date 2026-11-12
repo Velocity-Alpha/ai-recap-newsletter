@@ -1,5 +1,4 @@
 import crypto from "crypto";
-import { cookies } from "next/headers";
 import type { ResponseCookies } from "next/dist/compiled/@edge-runtime/cookies";
 
 import type { SubscriberRecord, SubscriberSessionPayload } from "@/src/features/subscriber/types";
@@ -8,16 +7,13 @@ import { getBeehiivSubscriberStatus } from "@/src/features/subscriber/beehiiv";
 import { getSubscriberProvider } from "@/src/features/subscriber/provider";
 import { consumeRateLimit, RATE_LIMITS } from "@/src/server/rate-limit";
 import { safeEqual } from "@/src/server/safe-compare";
+import { SIGNED_IN_HINT_COOKIE, SIGNED_IN_HINT_VALUE } from "@/src/features/subscriber/signed-in-hint";
 
 const COOKIE_NAME = "ai_recap_subscriber";
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
 const UNSUBSCRIBE_TOKEN_MAX_AGE_SECONDS = 60 * 60 * 24 * 365;
 const OTP_LENGTH = 6;
 const OTP_TTL_MINUTES = 10;
-
-type CookieReader = {
-  get(name: string): { value: string } | undefined;
-};
 
 type SubscriberRow = {
   id: bigint;
@@ -208,43 +204,25 @@ export function buildSubscriberSessionPayload(subscriber: SubscriberRecord): Sub
   };
 }
 
-export function setSubscriberSessionCookie(
+// The signed-in hint shares the session cookie's lifetime, path and SameSite, but the browser can read it.
+function getSignedInHintCookieOptions() {
+  return { ...getCookieOptions(), httpOnly: false };
+}
+
+/** Sets the session cookie and the signed-in hint together, so the two cannot drift apart. */
+export function setSubscriberSessionCookies(
   cookieStore: ResponseCookies,
   subscriber: SubscriberRecord,
 ) {
   const token = createSubscriberSessionToken(buildSubscriberSessionPayload(subscriber));
   cookieStore.set(COOKIE_NAME, token, getCookieOptions());
+  cookieStore.set(SIGNED_IN_HINT_COOKIE, SIGNED_IN_HINT_VALUE, getSignedInHintCookieOptions());
 }
 
-export function clearSubscriberSessionCookie(cookieStore: ResponseCookies) {
-  cookieStore.set(COOKIE_NAME, "", {
-    ...getCookieOptions(),
-    maxAge: 0,
-  });
-}
-
-export async function getSubscriberSessionFromCookies(
-  cookieStore?: CookieReader,
-) {
-  const resolvedCookies = cookieStore ?? (await cookies());
-  const token = resolvedCookies.get(COOKIE_NAME)?.value;
-  return verifySubscriberSessionToken(token);
-}
-
-export async function hasActiveSubscriberSession(cookieStore?: CookieReader) {
-  const session = await getSubscriberSessionFromCookies(cookieStore);
-
-  if (!session) {
-    return false;
-  }
-
-  const subscriber = await findSubscriberByIdSafely(session.subscriberId);
-
-  return Boolean(
-    subscriber &&
-    subscriber.status === "active" &&
-    subscriber.email === session.email,
-  );
+/** Clears the session cookie and the signed-in hint together. */
+export function clearSubscriberSessionCookies(cookieStore: ResponseCookies) {
+  cookieStore.set(COOKIE_NAME, "", { ...getCookieOptions(), maxAge: 0 });
+  cookieStore.set(SIGNED_IN_HINT_COOKIE, "", { ...getSignedInHintCookieOptions(), maxAge: 0 });
 }
 
 export async function findSubscriberByEmail(email: string) {
@@ -273,21 +251,6 @@ export async function findSubscriberByEmail(email: string) {
   return subscriber;
 }
 
-export async function findSubscriberById(id: number) {
-  const record = await prisma.subscriber.findUnique({
-    where: { id: BigInt(id) },
-  });
-
-  return record ? mapSubscriberRecord(record) : null;
-}
-
-export async function findSubscriberByIdSafely(id: number) {
-  try {
-    return await findSubscriberById(id);
-  } catch {
-    return null;
-  }
-}
 
 export async function upsertSubscriber(input: {
   email: string;

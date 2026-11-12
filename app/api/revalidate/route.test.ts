@@ -1,10 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const cache = vi.hoisted(() => ({ refreshPublishedIssues: vi.fn() }));
+const repository = vi.hoisted(() => ({ fetchPublishedNewsletterEntries: vi.fn() }));
 
 vi.mock("@/src/features/newsletter/cache", () => ({
   PUBLISHED_ISSUES_TAG: "published-issues",
   refreshPublishedIssues: cache.refreshPublishedIssues,
+}));
+
+vi.mock("@/src/features/newsletter/repository", () => ({
+  fetchPublishedNewsletterEntries: repository.fetchPublishedNewsletterEntries,
 }));
 
 import { POST } from "@/app/api/revalidate/route";
@@ -21,6 +26,10 @@ describe("POST /api/revalidate", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubEnv("SESSION_SECRET", "test-session-secret");
+    repository.fetchPublishedNewsletterEntries.mockResolvedValue([
+      { id: "12", slug: "ai-recap-2026-11-12", published_at: "2026-11-12T15:00:00.000Z", issue_date: "2026-11-12" },
+      { id: "11", slug: "ai-recap-2026-11-11", published_at: "2026-11-11T15:00:00.000Z", issue_date: "2026-11-11" },
+    ]);
   });
 
   afterEach(() => vi.unstubAllEnvs());
@@ -31,7 +40,21 @@ describe("POST /api/revalidate", () => {
     const response = await POST(request(`Bearer ${token}`));
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ refreshed: ["published-issues"] });
+    expect(await response.json()).toEqual({
+      refreshed: ["published-issues"],
+      warm: ["/", "/archive", "/issue/ai-recap-2026-11-12"],
+    });
+    expect(cache.refreshPublishedIssues).toHaveBeenCalledTimes(1);
+  });
+
+  it("still refreshes and returns the list pages to warm when the newest issue cannot be read", async () => {
+    repository.fetchPublishedNewsletterEntries.mockRejectedValue(new Error("database down"));
+    const token = createCacheRefreshToken("test-session-secret", new Date());
+
+    const response = await POST(request(`Bearer ${token}`));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ refreshed: ["published-issues"], warm: ["/", "/archive"] });
     expect(cache.refreshPublishedIssues).toHaveBeenCalledTimes(1);
   });
 

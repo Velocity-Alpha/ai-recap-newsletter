@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { getArticlePreviewHeight } from "@/src/components/articlePreview";
+import { articleLockClip, signedOutOnly } from "@/src/features/subscriber/subscriber-view";
 
 export default function ArticlePreviewLock({
   children,
@@ -65,12 +66,14 @@ export default function ArticlePreviewLock({
   return (
     <div className="relative">
       <div
+        {...articleLockClip}
         ref={contentRef}
         className="relative overflow-hidden"
         style={{ maxHeight: `${previewHeight}px` }}
       >
         {children}
         <div
+          {...signedOutOnly}
           aria-hidden="true"
           className="pointer-events-none absolute inset-x-0 bottom-0 h-56 sm:h-72"
           style={{
@@ -80,7 +83,7 @@ export default function ArticlePreviewLock({
         />
       </div>
 
-      <div className="relative z-10 bg-[var(--bg-main)] px-6 pb-6 shadow-[0_-20px_36px_-30px_rgba(28,42,50,0.28)] sm:px-0 sm:pb-2 sm:shadow-[0_-24px_44px_-34px_rgba(28,42,50,0.3)]">
+      <div {...signedOutOnly} className="relative z-10 bg-[var(--bg-main)] px-6 pb-6 shadow-[0_-20px_36px_-30px_rgba(28,42,50,0.28)] sm:px-0 sm:pb-2 sm:shadow-[0_-24px_44px_-34px_rgba(28,42,50,0.3)]">
         <div className="relative">
           {gate}
         </div>

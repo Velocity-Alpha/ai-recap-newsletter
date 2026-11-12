@@ -1,4 +1,4 @@
-import { setSubscriberSessionCookie } from "@/src/features/subscriber/server";
+import { setSubscriberSessionCookies } from "@/src/features/subscriber/server";
 import { verifySubscriberSignInCode, SubscriberError } from "@/src/features/subscriber/service";
 import type { VerifyCodeResponse } from "@/src/features/subscriber/types";
 import {
@@ -31,7 +31,7 @@ export async function POST(request: Request) {
     const response = jsonWithRequestId<VerifyCodeResponse>(context, {
       success: true,
     });
-    setSubscriberSessionCookie(response.cookies, subscriber);
+    setSubscriberSessionCookies(response.cookies, subscriber);
 
     logRequestSuccess(context, {
       email: maskEmail(email),
