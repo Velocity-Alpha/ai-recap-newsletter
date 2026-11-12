@@ -11,10 +11,12 @@ export const VERTEX_IMAGE_URL = `https://aiplatform.googleapis.com/v1/publishers
 export const IMAGE_TIMEOUT_MS = 120_000;
 export const IMAGE_RETRIES = 2;
 
-/** The fixed part of every image prompt, verbatim from n8n (typo included, so the look does not drift). */
+/** The fixed part of every image prompt. From n8n (typo kept, so the look does not drift), plus one accent colour. */
 export const STYLE_PROMPT = `- Watercolor editorial illustration with expressive realism, confident gestural brushwork, controlled blooms, and occasional drips.
 
-- Limited earth-tone palette (ochre, burnt sienna), cool grays, and muted blues.
+- Base palette: earth tones (ochre, burnt sienna), cool grays, and muted blues. The base palette sets the mood and covers most of the painting.
+
+- Give the painting one clear pop of a single saturated colour that suits the subject, to draw the eye. Keep it small: the base palette stays dominant.
 
 - **Isolated on a white background **
 
