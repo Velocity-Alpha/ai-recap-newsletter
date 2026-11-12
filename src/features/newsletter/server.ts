@@ -110,19 +110,19 @@ export async function fetchNewsletterIssueById(id: string): Promise<ParsedNewsle
   }
 }
 
+/**
+ * Null when no published issue has this slug. A failed read throws, so a cached issue page keeps its last good
+ * copy instead of caching "not found".
+ */
 export async function fetchNewsletterIssueBySlug(slug: string): Promise<ParsedNewsletterIssue | null> {
-  try {
-    if (!slug.trim()) {
-      return null;
-    }
-
-    const data = (await getCachedNewsletterIssueApiResponseBySlug(slug)) as NewsletterIssueApiResponse | null;
-    if (!data) {
-      return null;
-    }
-
-    return parseNewsletterIssue(data);
-  } catch {
+  if (!slug.trim()) {
     return null;
   }
+
+  const data = (await getCachedNewsletterIssueApiResponseBySlug(slug)) as NewsletterIssueApiResponse | null;
+  if (!data) {
+    return null;
+  }
+
+  return parseNewsletterIssue(data);
 }

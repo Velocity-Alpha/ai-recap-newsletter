@@ -2,6 +2,16 @@ import type { Metadata } from "next";
 import { fetchNewsletterIssueBySlug } from "@/src/features/newsletter/server";
 import NewsletterContent from "./NewsletterContent";
 
+// The CDN caches issue pages for up to an hour, cleared at once when an issue publishes (the published-issues
+// tag on the issue read). Each page is built on its first visit, so the build reads no issues. A failed read
+// throws, so a failed rebuild keeps the last good page.
+export const revalidate = 3600;
+export const dynamicParams = true;
+
+export async function generateStaticParams(): Promise<{ slug: string }[]> {
+  return [];
+}
+
 interface PageProps {
   params: Promise<{ slug: string }>;
 }
