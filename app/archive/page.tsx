@@ -3,7 +3,6 @@ import RecentNewsletters from '@/src/components/RecentNewsletters'
 import SubscribeNewsletter from '@/src/components/SubscribeNewsletter'
 import Footer from '@/src/components/Footer'
 import { getSafeNewsletterListPage } from '@/src/features/newsletter/server'
-import { hasActiveSubscriberSession } from '@/src/features/subscriber/server'
 import React from 'react'
 
 interface ArchivePageProps {
@@ -21,11 +20,9 @@ function parsePageNumber(value: string | string[] | undefined) {
     return parsedValue
 }
 
+// A public page: always the signed-out markup. The browser hides the subscribe form in the subscriber view.
 export default async function ArchivePage({ searchParams }: ArchivePageProps) {
-    const [{ page }, isSignedIn] = await Promise.all([
-        searchParams,
-        hasActiveSubscriberSession(),
-    ])
+    const { page } = await searchParams
     const currentPage = parsePageNumber(page)
     let newsletterPage = await getSafeNewsletterListPage(currentPage, 6)
 
@@ -33,21 +30,18 @@ export default async function ArchivePage({ searchParams }: ArchivePageProps) {
         newsletterPage = await getSafeNewsletterListPage(newsletterPage.pagination.totalPages, 6)
     }
 
-    const showSubscribe = !isSignedIn
-
     return (
         <div className='flex flex-col min-h-screen bg-[var(--bg-main)]'>
-            <Header showSubscribeButton={showSubscribe} />
+            <Header />
             <div className="pt-8 relative overflow-hidden">
                 <RecentNewsletters
                     newsletters={newsletterPage.data}
                     currentPage={newsletterPage.pagination.currentPage}
                     totalPages={newsletterPage.pagination.totalPages}
-                    showSubscribeButton={showSubscribe}
                 />
             </div>
-            {showSubscribe ? <SubscribeNewsletter /> : null}
-            <Footer showSubscribeLink={showSubscribe} />
+            <SubscribeNewsletter />
+            <Footer />
         </div>
     )
 }

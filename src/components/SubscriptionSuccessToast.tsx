@@ -3,41 +3,53 @@
 import { CheckCircle2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import { SUBSCRIBED_TOAST_STORAGE_KEY } from "@/src/components/ArticleAccessGate";
+import { SUBSCRIBED_TOAST_EVENT, SUBSCRIBED_TOAST_STORAGE_KEY } from "@/src/components/ArticleAccessGate";
 
 export default function SubscriptionSuccessToast() {
   const [rendered, setRendered] = useState(false);
   const [visible, setVisible] = useState(false);
 
+  // Shows once when the page loads with the toast key set, or when the access gate announces a subscribe on
+  // this page (the page no longer reloads after a subscribe).
   useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
+    const frameIds: number[] = [];
+    const timeoutIds: number[] = [];
+
+    function showIfSubscribed() {
+      if (!sessionStorage.getItem(SUBSCRIBED_TOAST_STORAGE_KEY)) {
+        return;
+      }
+
+      sessionStorage.removeItem(SUBSCRIBED_TOAST_STORAGE_KEY);
+      frameIds.push(
+        window.requestAnimationFrame(() => {
+          setRendered(true);
+          frameIds.push(
+            window.requestAnimationFrame(() => {
+              setVisible(true);
+            }),
+          );
+        }),
+      );
+      timeoutIds.push(
+        window.setTimeout(() => {
+          setVisible(false);
+        }, 3000),
+      );
+      timeoutIds.push(
+        window.setTimeout(() => {
+          setRendered(false);
+        }, 3350),
+      );
     }
 
-    if (!sessionStorage.getItem(SUBSCRIBED_TOAST_STORAGE_KEY)) {
-      return;
-    }
-
-    sessionStorage.removeItem(SUBSCRIBED_TOAST_STORAGE_KEY);
-    let enterFrameId = 0;
-    const mountFrameId = window.requestAnimationFrame(() => {
-      setRendered(true);
-      enterFrameId = window.requestAnimationFrame(() => {
-        setVisible(true);
-      });
-    });
-    const hideTimeoutId = window.setTimeout(() => {
-      setVisible(false);
-    }, 3000);
-    const unmountTimeoutId = window.setTimeout(() => {
-      setRendered(false);
-    }, 3350);
+    showIfSubscribed();
+    window.addEventListener(SUBSCRIBED_TOAST_EVENT, showIfSubscribed);
 
     return () => {
-      window.cancelAnimationFrame(mountFrameId);
-      window.cancelAnimationFrame(enterFrameId);
-      window.clearTimeout(hideTimeoutId);
-      window.clearTimeout(unmountTimeoutId);
+      window.removeEventListener(SUBSCRIBED_TOAST_EVENT, showIfSubscribed);
+      frameIds.forEach((id) => window.cancelAnimationFrame(id));
+      timeoutIds.forEach((id) => window.clearTimeout(id));
     };
   }, []);
 

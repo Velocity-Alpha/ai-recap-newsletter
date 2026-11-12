@@ -1,5 +1,4 @@
 import crypto from "crypto";
-import { cookies } from "next/headers";
 import type { ResponseCookies } from "next/dist/compiled/@edge-runtime/cookies";
 
 import type { SubscriberRecord, SubscriberSessionPayload } from "@/src/features/subscriber/types";
@@ -15,10 +14,6 @@ const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
 const UNSUBSCRIBE_TOKEN_MAX_AGE_SECONDS = 60 * 60 * 24 * 365;
 const OTP_LENGTH = 6;
 const OTP_TTL_MINUTES = 10;
-
-type CookieReader = {
-  get(name: string): { value: string } | undefined;
-};
 
 type SubscriberRow = {
   id: bigint;
@@ -230,30 +225,6 @@ export function clearSubscriberSessionCookies(cookieStore: ResponseCookies) {
   cookieStore.set(SIGNED_IN_HINT_COOKIE, "", { ...getSignedInHintCookieOptions(), maxAge: 0 });
 }
 
-export async function getSubscriberSessionFromCookies(
-  cookieStore?: CookieReader,
-) {
-  const resolvedCookies = cookieStore ?? (await cookies());
-  const token = resolvedCookies.get(COOKIE_NAME)?.value;
-  return verifySubscriberSessionToken(token);
-}
-
-export async function hasActiveSubscriberSession(cookieStore?: CookieReader) {
-  const session = await getSubscriberSessionFromCookies(cookieStore);
-
-  if (!session) {
-    return false;
-  }
-
-  const subscriber = await findSubscriberByIdSafely(session.subscriberId);
-
-  return Boolean(
-    subscriber &&
-    subscriber.status === "active" &&
-    subscriber.email === session.email,
-  );
-}
-
 export async function findSubscriberByEmail(email: string) {
   const normalizedEmail = normalizeSubscriberEmail(email);
   const record = await prisma.subscriber.findUnique({
@@ -286,14 +257,6 @@ export async function findSubscriberById(id: number) {
   });
 
   return record ? mapSubscriberRecord(record) : null;
-}
-
-export async function findSubscriberByIdSafely(id: number) {
-  try {
-    return await findSubscriberById(id);
-  } catch {
-    return null;
-  }
 }
 
 export async function upsertSubscriber(input: {

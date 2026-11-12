@@ -1,11 +1,9 @@
 import Image from 'next/image'
 import Link from 'next/link'
 
-type FooterClientProps = {
-  showSubscribeLink: boolean
-}
+import { signedOutOnly } from '@/src/features/subscriber/subscriber-view'
 
-export default function FooterClient({ showSubscribeLink }: FooterClientProps) {
+export default function FooterClient() {
   return (
     <footer className="bg-[var(--bg-card)] border-t border-[var(--border-light)] py-16">
       <div className="container mx-auto px-6 max-w-[var(--container)]">
@@ -40,13 +38,11 @@ export default function FooterClient({ showSubscribeLink }: FooterClientProps) {
                   Archive
                 </Link>
               </li>
-              {showSubscribeLink ? (
-                <li>
-                  <Link href="/#subscribe" className="text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-colors" style={{ fontSize: 'var(--text-small)' }}>
-                    Subscribe
-                  </Link>
-                </li>
-              ) : null}
+              <li {...signedOutOnly}>
+                <Link href="/#subscribe" className="text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-colors" style={{ fontSize: 'var(--text-small)' }}>
+                  Subscribe
+                </Link>
+              </li>
               <li>
                 <Link href="/for-brands" className="text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-colors" style={{ fontSize: 'var(--text-small)' }}>
                   For brands

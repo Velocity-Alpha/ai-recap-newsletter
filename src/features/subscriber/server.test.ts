@@ -52,11 +52,9 @@ import {
   consumeOneTimeCode,
   createOneTimeCode,
   createSubscriberSessionToken,
-  hasActiveSubscriberSession,
   deleteOneTimeCode,
   findSubscriberByEmail,
   findSubscriberById,
-  findSubscriberByIdSafely,
   hashOneTimeCode,
   markSubscriberUnsubscribed,
   storeOneTimeCode,
@@ -121,49 +119,6 @@ describe("subscriber server", () => {
       status: "unsubscribed",
       lastSeenAt: "2026-04-05T12:00:00.000Z",
     });
-  });
-
-  it("returns null safely when subscriber lookup throws", async () => {
-    prismaMock.prisma.subscriber.findUnique.mockRejectedValueOnce(new Error("boom"));
-
-    await expect(findSubscriberByIdSafely(99)).resolves.toBeNull();
-  });
-
-  it("reports an active subscriber session when the cookie and subscriber match", async () => {
-    const token = createSubscriberSessionToken({
-      subscriberId: 42,
-      email: "reader@example.com",
-      issuedAt: Date.now(),
-      expiresAt: Date.now() + 60_000,
-    });
-
-    prismaMock.prisma.subscriber.findUnique.mockResolvedValueOnce({
-      id: 42n,
-      email: "reader@example.com",
-      firstName: "Reader",
-      status: "active",
-      source: "article_gate",
-      subscribedAt: new Date("2026-04-03T12:00:00.000Z"),
-      lastSeenAt: null,
-      createdAt: new Date("2026-04-03T12:00:00.000Z"),
-      updatedAt: new Date("2026-04-03T12:00:00.000Z"),
-    });
-
-    await expect(
-      hasActiveSubscriberSession({
-        get: () => ({ name: "ai_recap_subscriber", value: token }),
-      }),
-    ).resolves.toBe(true);
-  });
-
-  it("returns false when the subscriber session cookie is missing", async () => {
-    await expect(
-      hasActiveSubscriberSession({
-        get: () => undefined,
-      }),
-    ).resolves.toBe(false);
-
-    expect(prismaMock.prisma.subscriber.findUnique).not.toHaveBeenCalled();
   });
 
   it("creates a subscriber when none exists", async () => {

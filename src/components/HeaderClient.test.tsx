@@ -26,16 +26,9 @@ vi.mock("next/link", () => ({
 import HeaderClient from "@/src/components/HeaderClient";
 
 describe("HeaderClient", () => {
-  it("hides subscribe buttons for signed-in readers", () => {
-    const html = renderToStaticMarkup(<HeaderClient showSubscribeButton={false} />);
+  it("renders both Subscribe buttons with a pointer cursor, marked signed-out only", () => {
+    const html = renderToStaticMarkup(<HeaderClient />);
 
-    expect(html).not.toContain(">Subscribe<");
-  });
-
-  it("renders subscribe buttons with a pointer cursor when shown", () => {
-    const html = renderToStaticMarkup(<HeaderClient showSubscribeButton />);
-
-    expect(html.match(/>Subscribe</g)).toHaveLength(2);
-    expect(html).toContain("cursor-pointer");
+    expect(html.match(/<button[^>]*data-signed-out-only[^>]*cursor-pointer[^>]*>Subscribe</g)).toHaveLength(2);
   });
 });

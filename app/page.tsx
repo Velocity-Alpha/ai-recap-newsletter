@@ -5,29 +5,27 @@ import RecentNewslettersPreview from '@/src/components/RecentNewslettersPreview'
 import SubscribeNewsletter from '@/src/components/SubscribeNewsletter'
 import Footer from '@/src/components/Footer'
 import { getSafeNewsletterListPage, getSafeCachedTickerFeed } from '@/src/features/newsletter/server'
-import { hasActiveSubscriberSession } from '@/src/features/subscriber/server'
 import React from 'react'
 
+// A public page: always the signed-out markup. The browser hides the Subscribe buttons and form in the
+// subscriber view.
 export default async function HomePage() {
-  const [isSignedIn, newsletterPage, tickerFeed] = await Promise.all([
-    hasActiveSubscriberSession(),
+  const [newsletterPage, tickerFeed] = await Promise.all([
     getSafeNewsletterListPage(1, 6),
     getSafeCachedTickerFeed(),
   ])
-  const showSubscribe = !isSignedIn
 
   return (
         <div className='flex flex-col min-h-screen bg-[var(--bg-main)]'>
-            <Header showSubscribeButton={showSubscribe} />
+            <Header />
             <Hero
-              showSubscribeButton={showSubscribe}
               initialTickerStories={tickerFeed.data}
               initialTickerStats={tickerFeed.stats}
             />
             <Features />
-            <RecentNewslettersPreview newsletters={newsletterPage.data} showSubscribeButton={showSubscribe} />
-            {showSubscribe ? <SubscribeNewsletter /> : null}
-            <Footer showSubscribeLink={showSubscribe} />
+            <RecentNewslettersPreview newsletters={newsletterPage.data} />
+            <SubscribeNewsletter />
+            <Footer />
         </div>
     )
 }

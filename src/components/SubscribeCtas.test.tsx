@@ -37,43 +37,28 @@ import Hero from "@/src/components/Hero";
 import RecentNewsletters from "@/src/components/RecentNewsletters";
 import RecentNewslettersPreview from "@/src/components/RecentNewslettersPreview";
 
-describe("subscribe CTA visibility", () => {
-  it("hides the hero subscribe button for signed-in readers", () => {
-    const html = renderToStaticMarkup(
-      <Hero
-        initialTickerStories={[]}
-        initialTickerStats={null}
-        showSubscribeButton={false}
-      />,
-    );
+describe("subscribe CTAs are marked signed-out only", () => {
+  it("marks the hero subscribe button", () => {
+    const html = renderToStaticMarkup(<Hero initialTickerStories={[]} initialTickerStats={null} />);
 
-    expect(html).not.toContain(">Subscribe Free<");
+    expect(html).toMatch(/<button[^>]*data-signed-out-only[^>]*>Subscribe Free</);
   });
 
-  it("hides the recent preview subscribe CTA for signed-in readers", () => {
-    const html = renderToStaticMarkup(
-      <RecentNewslettersPreview newsletters={[]} showSubscribeButton={false} />,
-    );
+  it("marks the recent preview subscribe CTA", () => {
+    const html = renderToStaticMarkup(<RecentNewslettersPreview newsletters={[]} />);
 
-    expect(html).not.toContain(">Keep Me Updated<");
+    expect(html).toMatch(/<a[^>]*data-signed-out-only[^>]*>Keep Me Updated</);
   });
 
-  it("hides the archive empty-state subscribe CTA for signed-in readers", () => {
-    const html = renderToStaticMarkup(
-      <RecentNewsletters
-        newsletters={[]}
-        currentPage={1}
-        totalPages={1}
-        showSubscribeButton={false}
-      />,
-    );
+  it("marks the archive empty-state subscribe CTA", () => {
+    const html = renderToStaticMarkup(<RecentNewsletters newsletters={[]} currentPage={1} totalPages={1} />);
 
-    expect(html).not.toContain(">Get Notified<");
+    expect(html).toMatch(/<a[^>]*data-signed-out-only[^>]*>(?:<svg><\/svg>)?Get Notified</);
   });
 
-  it("hides the footer subscribe link for signed-in readers", () => {
-    const html = renderToStaticMarkup(<FooterClient showSubscribeLink={false} />);
+  it("marks the footer subscribe link", () => {
+    const html = renderToStaticMarkup(<FooterClient />);
 
-    expect(html).not.toContain(">Subscribe<");
+    expect(html).toMatch(/<li data-signed-out-only=""><a href="\/#subscribe"[^>]*>Subscribe</);
   });
 });
