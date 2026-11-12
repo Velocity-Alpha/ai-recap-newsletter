@@ -29,6 +29,17 @@ const nextConfig = {
       },
     ],
   },
+  async headers() {
+    return [
+      // Netlify's cache key ignores query values unless the response names them, so a cached /archive would
+      // answer /archive?page=N and the redirect below would never run. Netlify's Next.js runtime merges this
+      // into its own Netlify-Vary header. Other query values stay out of the key.
+      {
+        source: "/archive",
+        headers: [{ key: "Netlify-Vary", value: "query=page" }],
+      },
+    ];
+  },
   async redirects() {
     return [
       // Archive pages live in the path so the CDN can cache them. Old `?page=N` links and the archive's
