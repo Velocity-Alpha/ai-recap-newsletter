@@ -144,3 +144,37 @@ describe("warmPages cache status", () => {
     expect(describeWarmUp(report).message).toBe("Loaded 1 of 1 pages for the cache: /.");
   });
 });
+
+describe("createSiteRefresher when the purge has not reached the cache yet", () => {
+  it("loads again, after a pause, a page that came back as the old cached copy", async () => {
+    // Seen on the PR #173 preview: right after the refresh, "/" answered "Netlify Durable"; hit (the old page).
+    const answers: Record<string, string[]> = {
+      "/": ['"Netlify Durable"; hit; ttl=107', '"Netlify Durable"; fwd=stale; stored'],
+      "/archive": ['"Netlify Durable"; fwd=stale; stored'],
+    };
+    const fetchMock = vi.fn<typeof globalThis.fetch>(async (input) => {
+      const url = new URL(String(input));
+      if (url.pathname === "/api/revalidate") return Response.json({ warm: ["/", "/archive"] });
+      return new Response("ok", { headers: { "cache-status": answers[url.pathname]?.shift() ?? "" } });
+    });
+    const pauses: number[] = [];
+    const refresh = createSiteRefresher({
+      siteUrl: "https://airecap.news",
+      secret: "s3cret",
+      fetch: fetchMock,
+      now: () => NOW,
+      pause: async (ms) => void pauses.push(ms),
+    });
+
+    const report = await refresh?.();
+
+    expect(fetchMock.mock.calls.map(([url]) => new URL(String(url)).pathname)).toEqual([
+      "/api/revalidate",
+      "/",
+      "/archive",
+      "/",
+    ]);
+    expect(pauses).toEqual([3000]);
+    expect(report?.cacheStatus).toEqual({ "/": "fwd=stale; stored", "/archive": "fwd=stale; stored" });
+  });
+});

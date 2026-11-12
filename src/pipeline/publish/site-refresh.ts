@@ -22,6 +22,8 @@ export interface SiteRefresherOptions {
   secret: string | undefined;
   fetch?: typeof fetch;
   now?: () => Date;
+  /** Waits between tries (see `warmPagesUntilStored`). Tests pass a stub. */
+  pause?: (ms: number) => Promise<void>;
 }
 
 /** Which pages loaded after a refresh or a deploy, and which did not. */
@@ -102,6 +104,35 @@ export async function warmPages(
   return report;
 }
 
+/**
+ * Netlify's durable cache sometimes does not store a warmed page: in the first seconds after a deploy it can
+ * answer `fwd=bypass`, and right after a refresh it can still answer `hit` with the old page before the purge
+ * reaches it. Such a page is loaded again after a pause, at most twice, so the stored copy is the new one.
+ */
+const RETRY_PAUSE_MS = 3_000;
+const RETRIES = 2;
+
+const notStoredYet = (status: string | undefined) => !!status && (status.startsWith("fwd=bypass") || status.startsWith("hit"));
+
+export async function warmPagesUntilStored(
+  siteUrl: string,
+  paths: string[],
+  options: { fetch?: typeof fetch; pause?: (ms: number) => Promise<void> } = {},
+): Promise<WarmUpReport> {
+  const pause = options.pause ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+  const report = await warmPages(siteUrl, paths, { fetch: options.fetch });
+  for (let retry = 0; retry < RETRIES; retry++) {
+    const again = report.warmed.filter((path) => notStoredYet(report.cacheStatus?.[path]));
+    if (again.length === 0) break;
+    await pause(RETRY_PAUSE_MS);
+    const retried = await warmPages(siteUrl, again, { fetch: options.fetch });
+    report.warmed = report.warmed.filter((path) => !retried.failed.some((failure) => failure.path === path));
+    report.failed.push(...retried.failed);
+    report.cacheStatus = { ...report.cacheStatus, ...retried.cacheStatus };
+  }
+  return report;
+}
+
 /** The site-relative paths in the refresh answer. Anything else is ignored. */
 async function parseWarmPaths(response: Response): Promise<string[]> {
   const body = (await response.json().catch(() => null)) as { warm?: unknown } | null;
@@ -128,7 +159,7 @@ export function createSiteRefresher(options: SiteRefresherOptions): (() => Promi
       signal: AbortSignal.timeout(10_000),
     });
     if (!response.ok) throw new Error(`Site refresh failed with HTTP ${response.status}.`);
-    return warmPages(siteUrl, await parseWarmPaths(response), { fetch: send });
+    return warmPagesUntilStored(siteUrl, await parseWarmPaths(response), { fetch: send, pause: options.pause });
   };
 }
 
