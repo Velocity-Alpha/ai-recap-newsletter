@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import { SIGNED_IN_HINT_COOKIE } from "@/src/features/subscriber/signed-in-hint";
+import { SIGNED_IN_HINT_COOKIE, SIGNED_IN_HINT_VALUE } from "@/src/features/subscriber/signed-in-hint";
 import {
   ARTICLE_LOCK_CLIP_ATTRIBUTE,
   SIGNED_OUT_ONLY_ATTRIBUTE,
@@ -10,6 +10,7 @@ import {
   SUBSCRIBER_VIEW_HEAD_SCRIPT,
   hasSignedInHint,
   markSubscriberView,
+  signOutThisBrowser,
   unmarkSubscriberView,
 } from "@/src/features/subscriber/subscriber-view";
 
@@ -31,7 +32,7 @@ describe("hasSignedInHint", () => {
     ["only the hint", `${SIGNED_IN_HINT_COOKIE}=1`],
     ["the hint among other cookies", `_ga=GA1.1; ${SIGNED_IN_HINT_COOKIE}=1; theme=light`],
   ])("is true for %s", (_label, cookie) => {
-    expect(hasSignedInHint(cookie)).toBe(true);
+    expect(hasSignedInHint(cookie, SIGNED_IN_HINT_COOKIE, SIGNED_IN_HINT_VALUE)).toBe(true);
   });
 
   it.each([
@@ -41,7 +42,7 @@ describe("hasSignedInHint", () => {
     ["a different value", `${SIGNED_IN_HINT_COOKIE}=0`],
     ["a cookie whose name only ends with the hint name", `x${SIGNED_IN_HINT_COOKIE}=1`],
   ])("is false for %s", (_label, cookie) => {
-    expect(hasSignedInHint(cookie)).toBe(false);
+    expect(hasSignedInHint(cookie, SIGNED_IN_HINT_COOKIE, SIGNED_IN_HINT_VALUE)).toBe(false);
   });
 });
 
@@ -88,5 +89,29 @@ describe("mark and unmark the subscriber view", () => {
     expect(document.cookie).toMatch(new RegExp(`^${SIGNED_IN_HINT_COOKIE}=;`));
     expect(document.cookie).toContain("max-age=0");
     expect(document.cookie).toContain("path=/");
+  });
+});
+
+describe("signOutThisBrowser", () => {
+  it("shows the signed-out view and asks the sign-out route to clear the session cookie too", async () => {
+    const document = fakeDocument(`${SIGNED_IN_HINT_COOKIE}=1`);
+    document.documentElement.setAttribute(SUBSCRIBER_VIEW_ATTRIBUTE, "");
+    const fetchSignOut = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
+
+    await signOutThisBrowser(document as unknown as Document, fetchSignOut);
+
+    expect(document.attributes.has(SUBSCRIBER_VIEW_ATTRIBUTE)).toBe(false);
+    expect(document.cookie).toMatch(new RegExp(`^${SIGNED_IN_HINT_COOKIE}=;`));
+    expect(fetchSignOut).toHaveBeenCalledWith("/api/subscriber/sign-out", expect.objectContaining({ method: "POST" }));
+  });
+
+  it("still shows the signed-out view when the sign-out request fails", async () => {
+    const document = fakeDocument(`${SIGNED_IN_HINT_COOKIE}=1`);
+    document.documentElement.setAttribute(SUBSCRIBER_VIEW_ATTRIBUTE, "");
+    const fetchSignOut = vi.fn().mockRejectedValue(new Error("offline"));
+
+    await expect(signOutThisBrowser(document as unknown as Document, fetchSignOut)).resolves.toBeUndefined();
+
+    expect(document.attributes.has(SUBSCRIBER_VIEW_ATTRIBUTE)).toBe(false);
   });
 });

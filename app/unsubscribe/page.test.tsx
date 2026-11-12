@@ -6,7 +6,7 @@ const service = vi.hoisted(() => ({ unsubscribeSubscriberByToken: vi.fn() }));
 vi.mock("@/src/features/subscriber/service", () => service);
 vi.mock("@/src/components/Header", () => ({ default: () => null }));
 vi.mock("@/src/components/Footer", () => ({ default: () => null }));
-// Runs in the browser: clears the signed-in hint and unmarks the subscriber view.
+// Runs in the browser: signs this browser out (session cookie and signed-in hint) and unmarks the subscriber view.
 vi.mock("@/src/components/ShowSignedOutView", () => ({ default: () => <i>signed-out view</i> }));
 
 import UnsubscribePage from "@/app/unsubscribe/page";

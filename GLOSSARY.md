@@ -171,6 +171,16 @@ A cookie the browser can read (`ai_recap_signed_in=1`) that says this browser ha
 carries no email or id and only decides the display. It is set and cleared with the session cookie.
 _Avoid_: session cookie (that is the signed, httpOnly one), auth cookie
 
+**Article lock**:
+The part of an issue page a signed-out reader sees instead of the rest of the issue: the issue cut to a preview
+height, and the access gate (sign in or subscribe) over it. The subscriber view opens it.
+_Avoid_: paywall (in code), gate (that is only the sign-in and subscribe form)
+
+**Warm-up**:
+Loading the main public pages once, one after another, so the CDN caches them before a reader asks. The
+publish job warms after it refreshes the site; the `deploy-succeeded` function warms after each deploy.
+_Avoid_: prefetch, preload, cache priming
+
 ## Operations
 
 **Stage**:

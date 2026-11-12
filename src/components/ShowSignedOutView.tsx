@@ -2,13 +2,13 @@
 
 import { useEffect } from "react";
 
-import { unmarkSubscriberView } from "@/src/features/subscriber/subscriber-view";
+import { signOutThisBrowser } from "@/src/features/subscriber/subscriber-view";
 
-// For server pages that cannot set cookies, such as /unsubscribe: clears the signed-in hint in the browser and
-// shows the signed-out view, here and on every page opened after.
+// For server pages that cannot set cookies, such as /unsubscribe: signs this browser out (the session cookie and
+// the signed-in hint) and shows the signed-out view, here and on every page opened after.
 export default function ShowSignedOutView() {
   useEffect(() => {
-    unmarkSubscriberView();
+    void signOutThisBrowser();
   }, []);
 
   return null;

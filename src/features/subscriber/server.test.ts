@@ -54,7 +54,6 @@ import {
   createSubscriberSessionToken,
   deleteOneTimeCode,
   findSubscriberByEmail,
-  findSubscriberById,
   hashOneTimeCode,
   markSubscriberUnsubscribed,
   storeOneTimeCode,
@@ -81,43 +80,25 @@ describe("subscriber server", () => {
     vi.unstubAllEnvs();
   });
 
-  it("maps subscriber lookups by email and id", async () => {
-    prismaMock.prisma.subscriber.findUnique
-      .mockResolvedValueOnce({
-        id: 11n,
-        email: "reader@example.com",
-        firstName: "Reader",
-        status: "active",
-        source: "article_gate",
-        subscribedAt: new Date("2026-04-03T12:00:00.000Z"),
-        lastSeenAt: null,
-        createdAt: new Date("2026-04-03T12:00:00.000Z"),
-        updatedAt: new Date("2026-04-03T12:00:00.000Z"),
-      })
-      .mockResolvedValueOnce({
-        id: 12n,
-        email: "another@example.com",
-        firstName: null,
-        status: "unsubscribed",
-        source: "ghl_import",
-        subscribedAt: new Date("2026-04-04T12:00:00.000Z"),
-        lastSeenAt: new Date("2026-04-05T12:00:00.000Z"),
-        createdAt: new Date("2026-04-04T12:00:00.000Z"),
-        updatedAt: new Date("2026-04-05T12:00:00.000Z"),
-      });
+  it("maps a subscriber lookup by email", async () => {
+    prismaMock.prisma.subscriber.findUnique.mockResolvedValueOnce({
+      id: 11n,
+      email: "reader@example.com",
+      firstName: "Reader",
+      status: "active",
+      source: "article_gate",
+      subscribedAt: new Date("2026-04-03T12:00:00.000Z"),
+      lastSeenAt: null,
+      createdAt: new Date("2026-04-03T12:00:00.000Z"),
+      updatedAt: new Date("2026-04-03T12:00:00.000Z"),
+    });
 
     await expect(findSubscriberByEmail(" Reader@example.com ")).resolves.toMatchObject({
       id: 11,
       email: "reader@example.com",
       firstName: "Reader",
       status: "active",
-    });
-
-    await expect(findSubscriberById(12)).resolves.toMatchObject({
-      id: 12,
-      email: "another@example.com",
-      status: "unsubscribed",
-      lastSeenAt: "2026-04-05T12:00:00.000Z",
+      lastSeenAt: null,
     });
   });
 

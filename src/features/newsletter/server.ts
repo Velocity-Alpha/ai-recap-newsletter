@@ -4,9 +4,7 @@ import { PUBLISHED_ISSUES_MAX_AGE_SECONDS, PUBLISHED_ISSUES_TAG } from "@/src/fe
 import { parseNewsletterIssue } from "@/src/features/newsletter/parsers";
 import type { NewsletterIssueApiResponse, ParsedNewsletterIssue } from "@/src/features/newsletter/types";
 import {
-  type NewsletterListPage,
   type PublishedNewsletterEntry,
-  type TickerFeed,
   fetchNewsletterIssueApiResponseById,
   fetchNewsletterIssueApiResponseBySlug,
   fetchNewsletterListPage,
@@ -50,45 +48,11 @@ export const getCachedTickerFeed = unstable_cache(
   { revalidate: 300 },
 );
 
-export async function getSafeNewsletterListPage(page: number, limit: number): Promise<NewsletterListPage> {
-  try {
-    return await getCachedNewsletterListPage(page, limit);
-  } catch {
-    return {
-      data: [],
-      pagination: {
-        currentPage: Math.max(1, Math.trunc(page) || 1),
-        totalPages: 0,
-        totalCount: 0,
-        limit: Math.max(1, Math.trunc(limit) || 6),
-        hasNextPage: false,
-        hasPreviousPage: false,
-      },
-    };
-  }
-}
-
 export async function getSafeCachedPublishedNewsletterEntries(): Promise<PublishedNewsletterEntry[]> {
   try {
     return await getCachedPublishedNewsletterEntries();
   } catch {
     return [];
-  }
-}
-
-export async function getSafeCachedTickerFeed(): Promise<TickerFeed> {
-  try {
-    return await getCachedTickerFeed();
-  } catch {
-    return {
-      data: [],
-      stats: {
-        stories: 0,
-        tools: 0,
-        papers: 0,
-      },
-      count: 0,
-    };
   }
 }
 

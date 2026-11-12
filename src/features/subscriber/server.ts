@@ -251,13 +251,6 @@ export async function findSubscriberByEmail(email: string) {
   return subscriber;
 }
 
-export async function findSubscriberById(id: number) {
-  const record = await prisma.subscriber.findUnique({
-    where: { id: BigInt(id) },
-  });
-
-  return record ? mapSubscriberRecord(record) : null;
-}
 
 export async function upsertSubscriber(input: {
   email: string;

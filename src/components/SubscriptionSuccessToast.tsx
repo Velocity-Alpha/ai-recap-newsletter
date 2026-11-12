@@ -3,24 +3,22 @@
 import { CheckCircle2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import { SUBSCRIBED_TOAST_EVENT, SUBSCRIBED_TOAST_STORAGE_KEY } from "@/src/components/ArticleAccessGate";
+import { SUBSCRIBED_TOAST_EVENT, takeSubscribedToast } from "@/src/components/subscribed-toast";
 
 export default function SubscriptionSuccessToast() {
   const [rendered, setRendered] = useState(false);
   const [visible, setVisible] = useState(false);
 
-  // Shows once when the page loads with the toast key set, or when the access gate announces a subscribe on
-  // this page (the page no longer reloads after a subscribe).
+  // Shows once when the page loads after a subscribe, or when a subscribe form announces one on this page.
   useEffect(() => {
     const frameIds: number[] = [];
     const timeoutIds: number[] = [];
 
     function showIfSubscribed() {
-      if (!sessionStorage.getItem(SUBSCRIBED_TOAST_STORAGE_KEY)) {
+      if (!takeSubscribedToast()) {
         return;
       }
 
-      sessionStorage.removeItem(SUBSCRIBED_TOAST_STORAGE_KEY);
       frameIds.push(
         window.requestAnimationFrame(() => {
           setRendered(true);

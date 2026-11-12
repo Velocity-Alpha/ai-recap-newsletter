@@ -11,12 +11,15 @@ import React from 'react'
 // once when an issue publishes (the published-issues tag on its data reads).
 export const revalidate = 300
 
+/** Newest issues in the home page's preview. */
+const HOME_PREVIEW_ISSUE_COUNT = 6
+
 // A public page: always the signed-out markup. The browser hides the Subscribe buttons and form in the
 // subscriber view. The data reads throw on a failed read, so a failed rebuild keeps the last good page instead
 // of caching an empty one.
 export default async function HomePage() {
   const [newsletterPage, tickerFeed] = await Promise.all([
-    getCachedNewsletterListPage(1, 6),
+    getCachedNewsletterListPage(1, HOME_PREVIEW_ISSUE_COUNT),
     getCachedTickerFeed(),
   ])
 

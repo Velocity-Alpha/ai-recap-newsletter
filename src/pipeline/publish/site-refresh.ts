@@ -30,9 +30,24 @@ export interface WarmUpReport {
   failed: { path: string; reason: string }[];
 }
 
-/** "/archive (HTTP 500), /issue/x (timeout)", for the run log and the function log. */
-export function listFailedPages(failed: WarmUpReport["failed"]): string {
-  return failed.map(({ path, reason }) => `${path} (${reason})`).join(", ");
+/**
+ * One line about a warm-up, for the publish run log and the deploy function log. A page that failed to load
+ * still works (its first reader waits for a render), so failures are a warning.
+ */
+export function describeWarmUp({ warmed, failed }: WarmUpReport): { level: "info" | "warn"; message: string } {
+  const loaded = `Loaded ${warmed.length} of ${warmed.length + failed.length} pages for the cache`;
+  if (failed.length === 0) {
+    return { level: "info", message: warmed.length > 0 ? `${loaded}: ${warmed.join(", ")}.` : `${loaded}.` };
+  }
+  const failedPages = failed.map(({ path, reason }) => `${path} (${reason})`).join(", ");
+  return {
+    level: "warn",
+    message: `${loaded}. Could not load ${failedPages}. The first reader of those pages waits for a fresh render.`,
+  };
+}
+
+function withoutTrailingSlash(siteUrl: string): string {
+  return siteUrl.replace(/\/+$/, "");
 }
 
 /** A cold render can take about 9 s; this leaves room for a slow database wake-up. */
@@ -48,7 +63,7 @@ export async function warmPages(
   options: { fetch?: typeof fetch } = {},
 ): Promise<WarmUpReport> {
   const send = options.fetch ?? fetch;
-  const base = siteUrl.replace(/\/+$/, "");
+  const base = withoutTrailingSlash(siteUrl);
   const report: WarmUpReport = { warmed: [], failed: [] };
   for (const path of paths) {
     try {
@@ -65,7 +80,7 @@ export async function warmPages(
 }
 
 /** The site-relative paths in the refresh answer. Anything else is ignored. */
-async function readWarmPaths(response: Response): Promise<string[]> {
+async function parseWarmPaths(response: Response): Promise<string[]> {
   const body = (await response.json().catch(() => null)) as { warm?: unknown } | null;
   if (!Array.isArray(body?.warm)) return [];
   return body.warm.filter((path): path is string => typeof path === "string" && /^\/(?!\/)/.test(path));
@@ -81,7 +96,7 @@ export function createSiteRefresher(options: SiteRefresherOptions): (() => Promi
   const send = options.fetch ?? fetch;
   const now = options.now ?? (() => new Date());
   const siteUrl = options.siteUrl;
-  const url = `${siteUrl.replace(/\/+$/, "")}/api/revalidate`;
+  const url = `${withoutTrailingSlash(siteUrl)}/api/revalidate`;
 
   return async () => {
     const response = await send(url, {
@@ -90,7 +105,7 @@ export function createSiteRefresher(options: SiteRefresherOptions): (() => Promi
       signal: AbortSignal.timeout(10_000),
     });
     if (!response.ok) throw new Error(`Site refresh failed with HTTP ${response.status}.`);
-    return warmPages(siteUrl, await readWarmPaths(response), { fetch: send });
+    return warmPages(siteUrl, await parseWarmPaths(response), { fetch: send });
   };
 }
 

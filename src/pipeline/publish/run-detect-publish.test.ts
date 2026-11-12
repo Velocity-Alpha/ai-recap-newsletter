@@ -219,7 +219,7 @@ describe("site refresh after a native publish", () => {
     expect(mocks.logEvent).toHaveBeenCalledWith(42n, {
       level: "info",
       step: "site_warm_up",
-      message: "Loaded 3 pages for the cache: /, /archive, /issue/ai-recap-2026-11-09.",
+      message: "Loaded 3 of 3 pages for the cache: /, /archive, /issue/ai-recap-2026-11-09.",
     });
   });
 
@@ -245,7 +245,7 @@ describe("site refresh after a native publish", () => {
       level: "warn",
       step: "site_warm_up",
       message:
-        "Could not load /archive (HTTP 500), /issue/ai-recap-2026-11-09 (The operation was aborted due to timeout). " +
+        "Loaded 1 of 3 pages for the cache. Could not load /archive (HTTP 500), /issue/ai-recap-2026-11-09 (The operation was aborted due to timeout). " +
         "The first reader of those pages waits for a fresh render.",
     });
     expect(mocks.finishRun).toHaveBeenCalledWith(42n, expect.objectContaining({ status: "succeeded" }), NOW);

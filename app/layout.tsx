@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Libre_Baskerville, Source_Sans_3 } from "next/font/google";
 import GoogleAnalytics from "@/src/components/GoogleAnalytics";
 import ScrollProgress from "@/src/components/ScrollProgress";
+import SubscriptionSuccessToast from "@/src/components/SubscriptionSuccessToast";
 import { SUBSCRIBER_VIEW_HEAD_SCRIPT } from "@/src/features/subscriber/subscriber-view";
 import "./globals.css";
 
@@ -65,6 +66,8 @@ export default function RootLayout({
         className={`${libreBaskerville.variable} ${sourceSans.variable} antialiased`}
       >
         <ScrollProgress />
+        {/* Outside every subscribe form: those hide in the subscriber view the moment a reader subscribes. */}
+        <SubscriptionSuccessToast />
         {children}
       </body>
     </html>

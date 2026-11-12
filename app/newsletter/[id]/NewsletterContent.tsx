@@ -2,7 +2,6 @@ import Header from "@/src/components/Header";
 import ArticlePreviewLock from "@/src/components/ArticlePreviewLock";
 import Footer from "@/src/components/Footer";
 import ArticleAccessGate from "@/src/components/ArticleAccessGate";
-import SubscriptionSuccessToast from "@/src/components/SubscriptionSuccessToast";
 import { NewsletterIssueV1 } from "@/src/features/newsletter/render/NewsletterIssueV1";
 import { NewsletterIssueV2 } from "@/src/features/newsletter/render/NewsletterIssueV2";
 import type { ParsedNewsletterIssue } from "@/src/features/newsletter/types";
@@ -21,7 +20,6 @@ export default function NewsletterContent({ issue }: { issue: ParsedNewsletterIs
   return (
     <div className="flex min-h-screen flex-col bg-white">
       <Header />
-      <SubscriptionSuccessToast />
 
       {issue ? (
         <main className="flex-1">

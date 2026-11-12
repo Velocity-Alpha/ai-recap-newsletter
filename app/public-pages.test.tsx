@@ -1,6 +1,6 @@
 // Public pages are signed-out pages: the CDN caches one copy for everyone, and the browser decides whether to
-// show the subscriber view. A page that reads cookies or headers on the server becomes dynamic and loses the
-// CDN cache, so here cookies() and headers() throw.
+// show the subscriber view. A page that reads cookies, headers or searchParams on the server becomes dynamic and
+// loses the CDN cache, so here cookies(), headers(), searchParams and useSearchParams() throw.
 import type { ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -31,6 +31,9 @@ vi.mock("next/cache", () => ({
 
 vi.mock("next/navigation", () => ({
   usePathname: () => "/",
+  useSearchParams: () => {
+    throw new Error("A public page read useSearchParams()");
+  },
   useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }),
   redirect: (url: string) => {
     throw new Error(`NEXT_REDIRECT ${url}`);
@@ -112,9 +115,33 @@ const issueResponse = {
 
 const SIGNED_OUT_ONLY = "data-signed-out-only";
 
-async function render(page: Promise<ReactElement> | ReactElement) {
-  return renderToStaticMarkup(await page);
+type Page<Props> = (props: Props) => Promise<ReactElement> | ReactElement;
+
+/** The page's props, plus a searchParams that throws when the page reads it. */
+function propsWithoutSearchParams<Props extends object>(props: Props): Props {
+  return Object.defineProperty({ ...props }, "searchParams", {
+    enumerable: true,
+    get() {
+      throw new Error("A public page read searchParams on the server");
+    },
+  });
 }
+
+/** Renders a public page the way Next.js calls it, except that reading searchParams throws. */
+async function render<Props extends object>(page: Page<Props>, props: Props = {} as Props) {
+  return renderToStaticMarkup(await page(propsWithoutSearchParams(props)));
+}
+
+describe("the public page guard", () => {
+  it("fails a page that reads searchParams", async () => {
+    async function PageReadingSearchParams({ searchParams }: { searchParams?: Promise<{ page?: string }> }) {
+      const { page } = (await searchParams) ?? {};
+      return <p>{page}</p>;
+    }
+
+    await expect(render(PageReadingSearchParams)).rejects.toThrow("A public page read searchParams on the server");
+  });
+});
 
 describe("public pages render the signed-out view without reading cookies", () => {
   beforeEach(() => {
@@ -128,7 +155,7 @@ describe("public pages render the signed-out view without reading cookies", () =
   });
 
   it("renders the home page with its Subscribe buttons and form marked signed-out only", async () => {
-    const html = await render(HomePage());
+    const html = await render(HomePage);
 
     expect(html).toContain(SAMPLE_CONTENT.title);
     expect(html).toMatch(new RegExp(`<button[^>]*${SIGNED_OUT_ONLY}[^>]*>Subscribe Free<`));
@@ -137,7 +164,7 @@ describe("public pages render the signed-out view without reading cookies", () =
   });
 
   it("renders the archive with the subscribe form marked signed-out only", async () => {
-    const html = await render(ArchivePage());
+    const html = await render(ArchivePage);
 
     expect(html).toContain(SAMPLE_CONTENT.title);
     expect(html).toContain(SIGNED_OUT_ONLY);
@@ -147,7 +174,7 @@ describe("public pages render the signed-out view without reading cookies", () =
   it("renders archive page N with the subscribe form marked signed-out only", async () => {
     repository.fetchNewsletterListPage.mockResolvedValue(pageOf(2, 3));
 
-    const html = await render(ArchivePageN({ params: Promise.resolve({ page: "2" }) }));
+    const html = await render(ArchivePageN, { params: Promise.resolve({ page: "2" }) });
 
     expect(repository.fetchNewsletterListPage).toHaveBeenCalledWith(2, 6);
     expect(html).toContain(SAMPLE_CONTENT.title);
@@ -156,7 +183,7 @@ describe("public pages render the signed-out view without reading cookies", () =
   });
 
   it("renders an issue in full, behind a lock marked signed-out only", async () => {
-    const html = await render(IssuePage({ params: Promise.resolve({ slug: ISSUE_SLUG }) }));
+    const html = await render(IssuePage, { params: Promise.resolve({ slug: ISSUE_SLUG }) });
 
     expect(html).toContain(SAMPLE_CONTENT.title);
     expect(html).toContain(LAST_QUICK_HIT.text);
@@ -168,7 +195,7 @@ describe("public pages render the signed-out view without reading cookies", () =
   it("renders the not-found message for an unknown issue slug", async () => {
     repository.fetchNewsletterIssueApiResponseBySlug.mockResolvedValue(null);
 
-    const html = await render(IssuePage({ params: Promise.resolve({ slug: "missing" }) }));
+    const html = await render(IssuePage, { params: Promise.resolve({ slug: "missing" }) });
 
     expect(html).toContain("Newsletter not found");
   });
@@ -176,8 +203,8 @@ describe("public pages render the signed-out view without reading cookies", () =
   it("does not render an empty archive when the issue list cannot be read", async () => {
     repository.fetchNewsletterListPage.mockRejectedValue(new Error("database down"));
 
-    await expect(render(ArchivePage())).rejects.toThrow("database down");
-    await expect(render(ArchivePageN({ params: Promise.resolve({ page: "2" }) }))).rejects.toThrow("database down");
+    await expect(render(ArchivePage)).rejects.toThrow("database down");
+    await expect(render(ArchivePageN, { params: Promise.resolve({ page: "2" }) })).rejects.toThrow("database down");
   });
 
   it.each([
@@ -185,7 +212,7 @@ describe("public pages render the signed-out view without reading cookies", () =
     ["terms", TermsPage],
     ["for-brands", ForBrandsPage],
   ])("renders /%s with the header Subscribe buttons marked signed-out only", async (_label, Page) => {
-    const html = await render(Page());
+    const html = await render(Page);
 
     expect(html).toMatch(new RegExp(`<button[^>]*${SIGNED_OUT_ONLY}[^>]*>Subscribe<`));
   });
@@ -197,13 +224,13 @@ describe("archive paging in the path", () => {
   });
 
   it("sends /archive/page/1 to /archive", async () => {
-    await expect(render(ArchivePageN({ params: Promise.resolve({ page: "1" }) }))).rejects.toThrow(
+    await expect(render(ArchivePageN, { params: Promise.resolve({ page: "1" }) })).rejects.toThrow(
       "NEXT_REDIRECT /archive",
     );
   });
 
   it.each(["abc", "0", "2abc", "-1", "1.5"])("answers not-found for /archive/page/%s", async (page) => {
-    await expect(render(ArchivePageN({ params: Promise.resolve({ page }) }))).rejects.toThrow("NEXT_NOT_FOUND");
+    await expect(render(ArchivePageN, { params: Promise.resolve({ page }) })).rejects.toThrow("NEXT_NOT_FOUND");
     expect(repository.fetchNewsletterListPage).not.toHaveBeenCalled();
   });
 
@@ -212,7 +239,7 @@ describe("archive paging in the path", () => {
       page === 3 ? pageOf(3, 3) : { ...pageOf(page, 3), data: [] },
     );
 
-    const html = await render(ArchivePageN({ params: Promise.resolve({ page: "99" }) }));
+    const html = await render(ArchivePageN, { params: Promise.resolve({ page: "99" }) });
 
     expect(repository.fetchNewsletterListPage).toHaveBeenLastCalledWith(3, 6);
     expect(html).toContain(SAMPLE_CONTENT.title);

@@ -3,6 +3,7 @@
 import { CheckCircle2, LoaderCircle } from "lucide-react";
 import { useState } from "react";
 
+import { announceSubscribed } from "@/src/components/subscribed-toast";
 import { markSubscriberView, signedOutOnly } from "@/src/features/subscriber/subscriber-view";
 
 class ApiRequestError extends Error {
@@ -99,8 +100,10 @@ export default function SubscribeNewsletter() {
     try {
       await submitSubscription();
       setStep("subscribed");
-      // The subscribe route set the signed-in hint; the page is cached signed-out HTML, so switch it here.
+      // The subscribe route set the signed-in hint; the page is cached signed-out HTML, so switch it here. That
+      // hides this form at once, so the toast confirms the subscribe.
       markSubscriberView();
+      announceSubscribed();
     } catch (submitError) {
       if (submitError instanceof ApiRequestError && submitError.code === "already_subscribed") {
         try {

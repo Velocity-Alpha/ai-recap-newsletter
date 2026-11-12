@@ -4,11 +4,9 @@ import { CheckCircle2, ChevronRight, LoaderCircle, Mail } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 
+import { announceSubscribed } from "@/src/components/subscribed-toast";
 import { markSubscriberView } from "@/src/features/subscriber/subscriber-view";
 
-export const SUBSCRIBED_TOAST_STORAGE_KEY = "ai-recap:subscriber-toast";
-/** Tells a mounted SubscriptionSuccessToast to check SUBSCRIBED_TOAST_STORAGE_KEY now. */
-export const SUBSCRIBED_TOAST_EVENT = "ai-recap:subscribed";
 
 type GateStep = "email" | "subscribe" | "sign_in_code";
 type SubscribeReason = "new" | "unsubscribed";
@@ -116,10 +114,9 @@ export default function ArticleAccessGate() {
 
     try {
       await submitSubscription();
-      sessionStorage.setItem(SUBSCRIBED_TOAST_STORAGE_KEY, "1");
       // The subscribe route set the signed-in hint; the page is cached signed-out HTML, so open it here.
       markSubscriberView();
-      window.dispatchEvent(new Event(SUBSCRIBED_TOAST_EVENT));
+      announceSubscribed();
     } catch (submitError) {
       if (submitError instanceof ApiRequestError && submitError.code === "already_subscribed") {
         try {

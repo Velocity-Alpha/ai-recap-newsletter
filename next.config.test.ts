@@ -17,9 +17,24 @@ describe("old archive links", () => {
     expect(pageQuery).toMatchObject({ type: "query", key: "page" });
 
     const matchesPage = new RegExp(`^(?:${(pageQuery as { value: string }).value})$`);
+    expect(matchesPage.test("2")).toBe(true);
     expect(matchesPage.test("3")).toBe(true);
+    expect(matchesPage.test("10")).toBe(true);
     expect(matchesPage.test("abc")).toBe(false);
     expect(matchesPage.test("")).toBe(false);
+  });
+
+  // /archive/page/1 redirects to /archive and both redirects carry the query, so a rule that matched page 1 would
+  // send /archive?page=1 round in a loop. Page 1 (and 0 or leading zeros) just serves /archive.
+  it("leave /archive?page=1, 0 and leading zeros on /archive, so no redirect loop", async () => {
+    const redirects = await loadRedirects();
+    const rule = redirects.find((redirect) => redirect.source === "/archive");
+    const [pageQuery] = rule?.has ?? [];
+    const matchesPage = new RegExp(`^(?:${(pageQuery as { value: string }).value})$`);
+
+    for (const value of ["1", "0", "01", "02", "00"]) {
+      expect(matchesPage.test(value), value).toBe(false);
+    }
   });
 });
 

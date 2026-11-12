@@ -16,25 +16,23 @@ export const signedOutOnly = { [SIGNED_OUT_ONLY_ATTRIBUTE]: "" } as const;
 /** Spread onto the article lock's height clip. */
 export const articleLockClip = { [ARTICLE_LOCK_CLIP_ATTRIBUTE]: "" } as const;
 
-// Self-contained on purpose: the head script is built from this function's source, so it must not use
-// anything from outside its own body.
-function cookieStringHasHint(cookieString: string, name: string, value: string) {
+/**
+ * True when a cookie string (document.cookie) holds the signed-in hint: pass SIGNED_IN_HINT_COOKIE and
+ * SIGNED_IN_HINT_VALUE. Self-contained on purpose: the head script is built from this function's source, so it
+ * must not use anything from outside its own body, which is why the hint's name and value are parameters.
+ */
+export function hasSignedInHint(cookieString: string, hintName: string, hintValue: string) {
   const parts = cookieString.split(";");
   for (let index = 0; index < parts.length; index++) {
-    if (parts[index].trim() === name + "=" + value) {
+    if (parts[index].trim() === hintName + "=" + hintValue) {
       return true;
     }
   }
   return false;
 }
 
-/** True when a cookie string (document.cookie) holds the signed-in hint. */
-export function hasSignedInHint(cookieString: string) {
-  return cookieStringHasHint(cookieString, SIGNED_IN_HINT_COOKIE, SIGNED_IN_HINT_VALUE);
-}
-
 /** Inline script for the start of <head>: marks the page as subscriber view before the first paint. */
-export const SUBSCRIBER_VIEW_HEAD_SCRIPT = `try{if((${cookieStringHasHint.toString()})(document.cookie,${JSON.stringify(
+export const SUBSCRIBER_VIEW_HEAD_SCRIPT = `try{if((${hasSignedInHint.toString()})(document.cookie,${JSON.stringify(
   SIGNED_IN_HINT_COOKIE,
 )},${JSON.stringify(SIGNED_IN_HINT_VALUE)})){document.documentElement.setAttribute(${JSON.stringify(
   SUBSCRIBER_VIEW_ATTRIBUTE,
@@ -49,4 +47,17 @@ export function markSubscriberView(doc: Document = document) {
 export function unmarkSubscriberView(doc: Document = document) {
   doc.documentElement.removeAttribute(SUBSCRIBER_VIEW_ATTRIBUTE);
   doc.cookie = `${SIGNED_IN_HINT_COOKIE}=; path=/; max-age=0; samesite=lax`;
+}
+
+/**
+ * Signs this browser out: shows the signed-out view at once, then asks the sign-out route to clear the httpOnly
+ * session cookie, which browser code cannot touch. For pages that end a subscription.
+ */
+export async function signOutThisBrowser(doc: Document = document, fetchImpl: typeof fetch = fetch) {
+  unmarkSubscriberView(doc);
+  try {
+    await fetchImpl("/api/subscriber/sign-out", { method: "POST", credentials: "same-origin" });
+  } catch {
+    // The view and the hint are already signed out; the session cookie runs out on its own.
+  }
 }

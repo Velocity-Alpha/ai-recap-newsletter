@@ -32,7 +32,7 @@ export default async function UnsubscribePage({ searchParams }: UnsubscribePageP
 
   return (
     <div className="flex min-h-screen flex-col bg-[var(--bg-main)]">
-      {/* A server page cannot set cookies, so the browser clears the signed-in hint itself. */}
+      {/* A server page cannot set cookies, so the browser signs itself out through the sign-out route. */}
       {unsubscribed ? <ShowSignedOutView /> : null}
       <Header />
       <main className="flex flex-1 items-center justify-center px-6 py-16">
