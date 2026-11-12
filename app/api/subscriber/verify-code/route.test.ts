@@ -85,7 +85,14 @@ describe("POST /api/subscriber/verify-code", () => {
     const response = await verify({ email: EMAIL, code: CODE });
 
     expect(response.status).toBe(200);
-    expect(response.headers.get("set-cookie")).toContain("ai_recap_subscriber=");
+    const [session, hint] = response.headers.getSetCookie();
+    expect(session).toMatch(/^ai_recap_subscriber=[^;]+;/);
+    expect(session).toContain("HttpOnly");
+    expect(hint).toMatch(/^ai_recap_signed_in=1;/);
+    expect(hint).toContain("Path=/;");
+    expect(hint).toContain("Max-Age=2592000;");
+    expect(hint).toContain("SameSite=lax");
+    expect(hint).not.toContain("HttpOnly");
   });
 
   it("invalidates a code after five wrong tries, so the right code no longer works", async () => {

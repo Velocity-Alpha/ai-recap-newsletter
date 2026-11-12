@@ -1,5 +1,5 @@
 import { subscribeAndUpsertSubscriber, SubscriberError } from "@/src/features/subscriber/service";
-import { setSubscriberSessionCookie } from "@/src/features/subscriber/server";
+import { setSubscriberSessionCookies } from "@/src/features/subscriber/server";
 import type { SubscribeResponse } from "@/src/features/subscriber/types";
 import {
   createRequestLogContext,
@@ -44,7 +44,7 @@ export async function POST(request: Request) {
       success: true,
       newlySubscribed,
     });
-    setSubscriberSessionCookie(response.cookies, subscriber);
+    setSubscriberSessionCookies(response.cookies, subscriber);
 
     logRequestSuccess(context, {
       email: maskEmail(email),

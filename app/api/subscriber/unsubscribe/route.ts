@@ -1,3 +1,4 @@
+import { clearSubscriberSessionCookies } from "@/src/features/subscriber/server";
 import { unsubscribeSubscriberByToken } from "@/src/features/subscriber/service";
 import type { UnsubscribeResponse } from "@/src/features/subscriber/types";
 import {
@@ -59,9 +60,17 @@ async function handleUnsubscribe(request: Request) {
       });
     }
 
-    return jsonWithRequestId<UnsubscribeResponse>(context, {
+    const response = jsonWithRequestId<UnsubscribeResponse>(context, {
       success: true,
     });
+
+    // In the reader's browser, an unsubscribe ends the session and the subscriber view.
+    // A bad token signs nobody out.
+    if (result) {
+      clearSubscriberSessionCookies(response.cookies);
+    }
+
+    return response;
   } catch (error) {
     if (error instanceof Error && /not configured/i.test(error.message)) {
       logRequestError(context, "Subscriber unsubscribe route is not configured", error);
