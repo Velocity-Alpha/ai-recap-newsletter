@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { createSiteRefresher, siteUrlForDeploy } from "@/src/pipeline/publish/site-refresh";
+import { createSiteRefresher, siteUrlForDeploy, warmPages } from "@/src/pipeline/publish/site-refresh";
 import { isValidCacheRefreshToken } from "@/src/server/cache-refresh-auth";
 
 const NOW = new Date("2026-11-09T16:00:00.000Z");
@@ -103,5 +103,16 @@ describe("createSiteRefresher", () => {
     expect(createSiteRefresher({ siteUrl: "https://airecap.news", secret: undefined })).toBeUndefined();
     expect(createSiteRefresher({ siteUrl: "https://airecap.news", secret: "  " })).toBeUndefined();
     expect(createSiteRefresher({ siteUrl: "", secret: "s3cret" })).toBeUndefined();
+  });
+});
+
+describe("warmPages", () => {
+  it("asks for Brotli or gzip like a browser, so it fills the cached copy browsers read", async () => {
+    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => new Response("ok"));
+
+    await warmPages("https://site.example/", ["/"], { fetch: fetchMock as unknown as typeof fetch });
+
+    const headers = new Headers(fetchMock.mock.calls[0]?.[1]?.headers);
+    expect(headers.get("accept-encoding")).toBe("br, gzip");
   });
 });

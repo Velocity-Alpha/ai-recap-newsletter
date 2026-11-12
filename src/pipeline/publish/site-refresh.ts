@@ -57,6 +57,12 @@ const PAGE_LOAD_TIMEOUT_MS = 20_000;
  * Loads each public page once, one after another, so the CDN caches it before a reader asks. Never throws:
  * a page that fails is reported, and the rest still load.
  */
+/**
+ * Netlify keeps one cached copy per compression (Brotli, gzip, none). Browsers ask for Brotli; Node's fetch
+ * asks only for gzip unless told, which would warm a copy no browser reads.
+ */
+const BROWSER_ACCEPT_ENCODING = "br, gzip";
+
 export async function warmPages(
   siteUrl: string,
   paths: string[],
@@ -67,7 +73,10 @@ export async function warmPages(
   const report: WarmUpReport = { warmed: [], failed: [] };
   for (const path of paths) {
     try {
-      const response = await send(`${base}${path}`, { signal: AbortSignal.timeout(PAGE_LOAD_TIMEOUT_MS) });
+      const response = await send(`${base}${path}`, {
+        headers: { "accept-encoding": BROWSER_ACCEPT_ENCODING },
+        signal: AbortSignal.timeout(PAGE_LOAD_TIMEOUT_MS),
+      });
       // Read the body so the whole page has rendered before the next one starts.
       await response.text();
       if (response.ok) report.warmed.push(path);
