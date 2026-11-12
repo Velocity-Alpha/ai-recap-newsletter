@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { PUBLISHED_ISSUES_TAG, refreshPublishedIssues } from "@/src/features/newsletter/cache";
+import { readWarmPaths } from "@/src/features/newsletter/warm-paths";
 import { isValidCacheRefreshToken } from "@/src/server/cache-refresh-auth";
 import { logServerInfo, logServerWarn } from "@/src/server/observability";
 
@@ -8,7 +9,8 @@ export const runtime = "nodejs";
 
 /**
  * Refreshes the cached lists, issue pages, and sitemap. The publish job calls it after it publishes an
- * issue, with a short-lived token signed from SESSION_SECRET (see cache-refresh-auth).
+ * issue, with a short-lived token signed from SESSION_SECRET (see cache-refresh-auth). The answer lists the
+ * pages the job loads next (`warm`), so the first reader gets a cached page rather than a cold render.
  */
 export async function POST(request: Request) {
   const secret = process.env.SESSION_SECRET?.trim();
@@ -24,6 +26,7 @@ export async function POST(request: Request) {
   }
 
   refreshPublishedIssues();
-  logServerInfo("api.revalidate", { tags: [PUBLISHED_ISSUES_TAG] });
-  return NextResponse.json({ refreshed: [PUBLISHED_ISSUES_TAG] });
+  const warm = await readWarmPaths();
+  logServerInfo("api.revalidate", { tags: [PUBLISHED_ISSUES_TAG], warm });
+  return NextResponse.json({ refreshed: [PUBLISHED_ISSUES_TAG], warm });
 }
