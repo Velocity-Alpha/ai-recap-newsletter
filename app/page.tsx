@@ -4,15 +4,20 @@ import Features from '@/src/components/Features'
 import RecentNewslettersPreview from '@/src/components/RecentNewslettersPreview'
 import SubscribeNewsletter from '@/src/components/SubscribeNewsletter'
 import Footer from '@/src/components/Footer'
-import { getSafeNewsletterListPage, getSafeCachedTickerFeed } from '@/src/features/newsletter/server'
+import { getCachedNewsletterListPage, getCachedTickerFeed } from '@/src/features/newsletter/server'
 import React from 'react'
 
+// The CDN caches the home page. It rebuilds in the background every 5 minutes, the ticker data's lifetime, and at
+// once when an issue publishes (the published-issues tag on its data reads).
+export const revalidate = 300
+
 // A public page: always the signed-out markup. The browser hides the Subscribe buttons and form in the
-// subscriber view.
+// subscriber view. The data reads throw on a failed read, so a failed rebuild keeps the last good page instead
+// of caching an empty one.
 export default async function HomePage() {
   const [newsletterPage, tickerFeed] = await Promise.all([
-    getSafeNewsletterListPage(1, 6),
-    getSafeCachedTickerFeed(),
+    getCachedNewsletterListPage(1, 6),
+    getCachedTickerFeed(),
   ])
 
   return (
