@@ -37,10 +37,10 @@ describe("STYLE_PROMPT", () => {
     );
   });
 
-  it("keeps the earth-tone base and asks for one small pop of colour, without naming where it goes", () => {
+  it("keeps the earth-tone base and asks for one pop of colour, without naming where it goes", () => {
     expect(STYLE_PROMPT).toContain("Base palette: earth tones (ochre, burnt sienna), cool grays, and muted blues.");
     expect(STYLE_PROMPT).toContain("one clear pop of a single saturated colour that suits the subject");
-    expect(STYLE_PROMPT).toContain("the base palette stays dominant");
+    expect(STYLE_PROMPT).toContain("The base palette stays dominant.");
   });
 });
 

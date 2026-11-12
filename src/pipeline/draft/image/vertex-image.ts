@@ -16,7 +16,7 @@ export const STYLE_PROMPT = `- Watercolor editorial illustration with expressive
 
 - Base palette: earth tones (ochre, burnt sienna), cool grays, and muted blues. The base palette sets the mood and covers most of the painting.
 
-- Give the painting one clear pop of a single saturated colour that suits the subject, to draw the eye. Keep it small: the base palette stays dominant.
+- Give the painting one clear pop of a single saturated colour that suits the subject, to draw the eye. The base palette stays dominant.
 
 - **Isolated on a white background **
 
