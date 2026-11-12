@@ -68,23 +68,26 @@ function withoutTrailingSlash(siteUrl: string): string {
 const PAGE_LOAD_TIMEOUT_MS = 20_000;
 
 /**
- * Loads each public page once, one after another, so the CDN caches it before a reader asks. Never throws:
- * a page that fails is reported, and the rest still load.
- */
-/**
  * Netlify keeps one cached copy per compression (Brotli, gzip, none). Browsers ask for Brotli; Node's fetch
  * asks only for gzip unless told, which would warm a copy no browser reads.
  */
 const BROWSER_ACCEPT_ENCODING = "br, gzip";
 
-export async function warmPages(
+/** The newest issue's page among the pages to warm. Every other page warmed (the lists) links it. */
+function newestIssuePath(paths: string[]): string | undefined {
+  return paths.find((path) => path.startsWith("/issue/"));
+}
+
+/** A warm-up pass: the report, plus the pages that loaded but did not link the newest issue (old copies). */
+async function loadPages(
   siteUrl: string,
   paths: string[],
-  options: { fetch?: typeof fetch } = {},
-): Promise<WarmUpReport> {
+  options: { fetch?: typeof fetch; newestIssue?: string },
+): Promise<{ report: WarmUpReport; oldPages: string[] }> {
   const send = options.fetch ?? fetch;
   const base = withoutTrailingSlash(siteUrl);
   const report: WarmUpReport = { warmed: [], failed: [], cacheStatus: {} };
+  const oldPages: string[] = [];
   for (const path of paths) {
     try {
       const response = await send(`${base}${path}`, {
@@ -92,22 +95,42 @@ export async function warmPages(
         signal: AbortSignal.timeout(PAGE_LOAD_TIMEOUT_MS),
       });
       // Read the body so the whole page has rendered before the next one starts.
-      await response.text();
+      const html = await response.text();
       const durable = durableCacheStatus(response.headers.get("cache-status"));
       if (durable && report.cacheStatus) report.cacheStatus[path] = durable;
-      if (response.ok) report.warmed.push(path);
-      else report.failed.push({ path, reason: `HTTP ${response.status}` });
+      if (!response.ok) {
+        report.failed.push({ path, reason: `HTTP ${response.status}` });
+        continue;
+      }
+      report.warmed.push(path);
+      const { newestIssue } = options;
+      if (newestIssue && path !== newestIssue && !html.includes(`href="${newestIssue}"`)) oldPages.push(path);
     } catch (error) {
       report.failed.push({ path, reason: error instanceof Error ? error.message : String(error) });
     }
   }
-  return report;
+  return { report, oldPages };
 }
 
 /**
- * Netlify's durable cache sometimes does not store a warmed page: in the first seconds after a deploy it can
- * answer `fwd=bypass`, and right after a refresh it can still answer `hit` with the old page before the purge
- * reaches it. Such a page is loaded again after a pause, at most twice, so the stored copy is the new one.
+ * Loads each public page once, one after another, so the CDN caches it before a reader asks. Never throws:
+ * a page that fails is reported, and the rest still load.
+ */
+export async function warmPages(
+  siteUrl: string,
+  paths: string[],
+  options: { fetch?: typeof fetch } = {},
+): Promise<WarmUpReport> {
+  return (await loadPages(siteUrl, paths, options)).report;
+}
+
+/**
+ * A warmed page can come back without the new copy stored. In the first seconds after a deploy Netlify's
+ * durable cache can answer `fwd=bypass`. Right after a refresh the CDN can still answer with the old page
+ * (`hit`, or an Edge hit with no durable status) because the purge runs after the refresh answer and takes a
+ * moment to reach every cache. Such a page is loaded again after a pause, at most twice. A list page is old
+ * when it does not link the newest issue. If one is still old before the last try, `refreshAgain` runs first:
+ * a copy stored after the purge stays old until another purge.
  */
 const RETRY_PAUSE_MS = 3_000;
 const RETRIES = 2;
@@ -117,18 +140,31 @@ const notStoredYet = (status: string | undefined) => !!status && (status.startsW
 export async function warmPagesUntilStored(
   siteUrl: string,
   paths: string[],
-  options: { fetch?: typeof fetch; pause?: (ms: number) => Promise<void> } = {},
+  options: {
+    fetch?: typeof fetch;
+    pause?: (ms: number) => Promise<void>;
+    refreshAgain?: () => Promise<void>;
+  } = {},
 ): Promise<WarmUpReport> {
   const pause = options.pause ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
-  const report = await warmPages(siteUrl, paths, { fetch: options.fetch });
+  const load = { fetch: options.fetch, newestIssue: newestIssuePath(paths) };
+  const first = await loadPages(siteUrl, paths, load);
+  const report = first.report;
+  let oldPages = first.oldPages;
   for (let retry = 0; retry < RETRIES; retry++) {
-    const again = report.warmed.filter((path) => notStoredYet(report.cacheStatus?.[path]));
+    const again = report.warmed.filter((path) => oldPages.includes(path) || notStoredYet(report.cacheStatus?.[path]));
     if (again.length === 0) break;
+    if (retry === RETRIES - 1 && oldPages.length > 0 && options.refreshAgain) await options.refreshAgain();
     await pause(RETRY_PAUSE_MS);
-    const retried = await warmPages(siteUrl, again, { fetch: options.fetch });
-    report.warmed = report.warmed.filter((path) => !retried.failed.some((failure) => failure.path === path));
-    report.failed.push(...retried.failed);
-    report.cacheStatus = { ...report.cacheStatus, ...retried.cacheStatus };
+    const retried = await loadPages(siteUrl, again, load);
+    report.warmed = report.warmed.filter((path) => !retried.report.failed.some((failure) => failure.path === path));
+    report.failed.push(...retried.report.failed);
+    report.cacheStatus = { ...report.cacheStatus, ...retried.report.cacheStatus };
+    oldPages = retried.oldPages;
+  }
+  for (const path of oldPages) {
+    report.warmed = report.warmed.filter((warmed) => warmed !== path);
+    report.failed.push({ path, reason: "still the old page, without the newest issue" });
   }
   return report;
 }
@@ -152,14 +188,23 @@ export function createSiteRefresher(options: SiteRefresherOptions): (() => Promi
   const siteUrl = options.siteUrl;
   const url = `${withoutTrailingSlash(siteUrl)}/api/revalidate`;
 
-  return async () => {
-    const response = await send(url, {
+  const refresh = () =>
+    send(url, {
       method: "POST",
       headers: { authorization: `Bearer ${createCacheRefreshToken(secret, now())}` },
       signal: AbortSignal.timeout(10_000),
     });
+  // The second refresh is best effort: if it fails, the old page is reported by the warm-up.
+  const refreshAgain = async () => void (await refresh().catch(() => undefined));
+
+  return async () => {
+    const response = await refresh();
     if (!response.ok) throw new Error(`Site refresh failed with HTTP ${response.status}.`);
-    return warmPagesUntilStored(siteUrl, await parseWarmPaths(response), { fetch: send, pause: options.pause });
+    return warmPagesUntilStored(siteUrl, await parseWarmPaths(response), {
+      fetch: send,
+      pause: options.pause,
+      refreshAgain,
+    });
   };
 }
 

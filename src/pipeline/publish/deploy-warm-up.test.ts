@@ -7,7 +7,7 @@ import { describeDeployWarmUp, warmDeploy } from "@/src/pipeline/publish/deploy-
 const PATHS = ["/", "/archive", "/issue/ai-recap-2026-11-12"];
 
 function okFetch() {
-  return vi.fn<typeof fetch>(async () => new Response("<html></html>", { status: 200 }));
+  return vi.fn<typeof fetch>(async () => new Response(`<a href="${PATHS[2]}">Newest</a>`, { status: 200 }));
 }
 
 // Netlify posts `{ payload: <the deploy> }` to a function named after the event (docs: "Trigger functions on

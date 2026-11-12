@@ -44,7 +44,7 @@ describe("createSiteRefresher", () => {
       if (url.endsWith("/api/revalidate")) {
         return Response.json({ refreshed: ["published-issues"], warm: ["/", "/archive", "/issue/ai-recap-2026-11-12"] });
       }
-      return new Response("<html></html>", { status: 200 });
+      return new Response('<a href="/issue/ai-recap-2026-11-12">Newest</a>', { status: 200 });
     });
     const refresh = createSiteRefresher({ siteUrl: "https://airecap.news/", secret: "s3cret", fetch, now: () => NOW });
 
@@ -68,7 +68,7 @@ describe("createSiteRefresher", () => {
       if (url.endsWith("/api/revalidate")) return Response.json({ warm: ["/", "/archive", "/issue/x"] });
       if (url.endsWith("/archive")) return new Response("", { status: 500 });
       if (url.endsWith("/issue/x")) throw new Error("The operation was aborted due to timeout");
-      return new Response("ok", { status: 200 });
+      return new Response('<a href="/issue/x">Newest</a>', { status: 200 });
     });
     const refresh = createSiteRefresher({ siteUrl: "https://airecap.news", secret: "s3cret", fetch, now: () => NOW });
 
@@ -176,5 +176,64 @@ describe("createSiteRefresher when the purge has not reached the cache yet", () 
     ]);
     expect(pauses).toEqual([3000]);
     expect(report?.cacheStatus).toEqual({ "/": "fwd=stale; stored", "/archive": "fwd=stale; stored" });
+  });
+});
+
+describe("createSiteRefresher when a list page comes back without the new issue", () => {
+  const NEWEST = "/issue/ai-recap-2026-11-12";
+  const fresh = `<a href="${NEWEST}">New</a>`;
+  const old = `<a href="/issue/ai-recap-2026-11-11">Old</a>`;
+
+  function siteAnswering(pages: Record<string, string[]>) {
+    const calls: string[] = [];
+    const fetchMock = vi.fn<typeof globalThis.fetch>(async (input) => {
+      const path = new URL(String(input)).pathname;
+      calls.push(path);
+      if (path === "/api/revalidate") return Response.json({ warm: ["/", "/archive", NEWEST] });
+      // An Edge hit sends no "Netlify Durable" entry, so only the page itself shows it is old.
+      const body = pages[path]?.length ? pages[path].shift()! : fresh;
+      return new Response(body, { headers: { "cache-status": '"Netlify Edge"; hit; ttl=300' } });
+    });
+    const pauses: number[] = [];
+    const refresh = createSiteRefresher({
+      siteUrl: "https://airecap.news",
+      secret: "s3cret",
+      fetch: fetchMock,
+      now: () => NOW,
+      pause: async (ms) => void pauses.push(ms),
+    });
+    return { calls, pauses, refresh: refresh! };
+  }
+
+  it("loads it again after a pause, so the cached copy is the new one", async () => {
+    // Seen on the PR #173 preview: right after the refresh, "/" and "/archive" came from the Edge cache, old.
+    const site = siteAnswering({ "/": [old], "/archive": [old] });
+
+    const report = await site.refresh();
+
+    expect(site.calls).toEqual(["/api/revalidate", "/", "/archive", NEWEST, "/", "/archive"]);
+    expect(site.pauses).toEqual([3000]);
+    expect(report).toMatchObject({ warmed: ["/", "/archive", NEWEST], failed: [] });
+  });
+
+  it("refreshes the site again before the last try when a page is still old, since a copy stored after the purge stays", async () => {
+    const site = siteAnswering({ "/archive": [old, old] });
+
+    const report = await site.refresh();
+
+    expect(site.calls).toEqual(["/api/revalidate", "/", "/archive", NEWEST, "/archive", "/api/revalidate", "/archive"]);
+    expect(site.pauses).toEqual([3000, 3000]);
+    expect(report).toMatchObject({ warmed: ["/", "/archive", NEWEST], failed: [] });
+  });
+
+  it("reports a page that is still old after the last try, so the run log warns", async () => {
+    const site = siteAnswering({ "/archive": [old, old, old] });
+
+    const report = await site.refresh();
+
+    expect(report).toMatchObject({
+      warmed: ["/", NEWEST],
+      failed: [{ path: "/archive", reason: "still the old page, without the newest issue" }],
+    });
   });
 });
