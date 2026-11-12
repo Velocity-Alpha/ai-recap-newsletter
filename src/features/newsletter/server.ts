@@ -37,7 +37,8 @@ export const getCachedPublishedNewsletterEntries = unstable_cache(
   publishedIssuesCache,
 );
 
-const getCachedNewsletterListPage = unstable_cache(
+/** Throws when the database cannot be read, so a cached page keeps its last good copy instead of an empty list. */
+export const getCachedNewsletterListPage = unstable_cache(
   async (page: number, limit: number) => fetchNewsletterListPage(page, limit),
   ["published-newsletter-list-page"],
   publishedIssuesCache,

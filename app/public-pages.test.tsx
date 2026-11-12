@@ -64,6 +64,7 @@ vi.mock("@/src/server/prisma", () => ({ prisma: {} }));
 
 import HomePage from "@/app/page";
 import ArchivePage from "@/app/archive/page";
+import ArchivePageN from "@/app/archive/page/[page]/page";
 import IssuePage from "@/app/issue/[slug]/page";
 import PrivacyPage from "@/app/privacy/page";
 import TermsPage from "@/app/terms/page";
@@ -136,11 +137,22 @@ describe("public pages render the signed-out view without reading cookies", () =
   });
 
   it("renders the archive with the subscribe form marked signed-out only", async () => {
-    const html = await render(ArchivePage({ searchParams: Promise.resolve({}) }));
+    const html = await render(ArchivePage());
 
     expect(html).toContain(SAMPLE_CONTENT.title);
     expect(html).toContain(SIGNED_OUT_ONLY);
     expect(html).toMatch(new RegExp(`<section[^>]*${SIGNED_OUT_ONLY}[^>]*id="subscribe"|<section[^>]*id="subscribe"[^>]*${SIGNED_OUT_ONLY}`));
+  });
+
+  it("renders archive page N with the subscribe form marked signed-out only", async () => {
+    repository.fetchNewsletterListPage.mockResolvedValue(pageOf(2, 3));
+
+    const html = await render(ArchivePageN({ params: Promise.resolve({ page: "2" }) }));
+
+    expect(repository.fetchNewsletterListPage).toHaveBeenCalledWith(2, 6);
+    expect(html).toContain(SAMPLE_CONTENT.title);
+    expect(html).toMatch(new RegExp(`<section[^>]*${SIGNED_OUT_ONLY}[^>]*id="subscribe"|<section[^>]*id="subscribe"[^>]*${SIGNED_OUT_ONLY}`));
+    expect(html).toContain('href="/archive/page/3"');
   });
 
   it("renders an issue in full, behind a lock marked signed-out only", async () => {
@@ -161,6 +173,13 @@ describe("public pages render the signed-out view without reading cookies", () =
     expect(html).toContain("Newsletter not found");
   });
 
+  it("does not render an empty archive when the issue list cannot be read", async () => {
+    repository.fetchNewsletterListPage.mockRejectedValue(new Error("database down"));
+
+    await expect(render(ArchivePage())).rejects.toThrow("database down");
+    await expect(render(ArchivePageN({ params: Promise.resolve({ page: "2" }) }))).rejects.toThrow("database down");
+  });
+
   it.each([
     ["privacy", PrivacyPage],
     ["terms", TermsPage],
@@ -171,3 +190,46 @@ describe("public pages render the signed-out view without reading cookies", () =
     expect(html).toMatch(new RegExp(`<button[^>]*${SIGNED_OUT_ONLY}[^>]*>Subscribe<`));
   });
 });
+
+describe("archive paging in the path", () => {
+  beforeEach(() => {
+    repository.fetchNewsletterListPage.mockReset();
+  });
+
+  it("sends /archive/page/1 to /archive", async () => {
+    await expect(render(ArchivePageN({ params: Promise.resolve({ page: "1" }) }))).rejects.toThrow(
+      "NEXT_REDIRECT /archive",
+    );
+  });
+
+  it.each(["abc", "0", "2abc", "-1", "1.5"])("answers not-found for /archive/page/%s", async (page) => {
+    await expect(render(ArchivePageN({ params: Promise.resolve({ page }) }))).rejects.toThrow("NEXT_NOT_FOUND");
+    expect(repository.fetchNewsletterListPage).not.toHaveBeenCalled();
+  });
+
+  it("shows the last page for a page past the end", async () => {
+    repository.fetchNewsletterListPage.mockImplementation(async (page: number) =>
+      page === 3 ? pageOf(3, 3) : { ...pageOf(page, 3), data: [] },
+    );
+
+    const html = await render(ArchivePageN({ params: Promise.resolve({ page: "99" }) }));
+
+    expect(repository.fetchNewsletterListPage).toHaveBeenLastCalledWith(3, 6);
+    expect(html).toContain(SAMPLE_CONTENT.title);
+    expect(html).toContain('href="/archive/page/2"');
+  });
+});
+
+function pageOf(currentPage: number, totalPages: number) {
+  return {
+    data: listPage.data,
+    pagination: {
+      currentPage,
+      totalPages,
+      totalCount: totalPages * 6,
+      limit: 6,
+      hasNextPage: currentPage < totalPages,
+      hasPreviousPage: currentPage > 1,
+    },
+  };
+}

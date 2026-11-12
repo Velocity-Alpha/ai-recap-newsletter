@@ -5,6 +5,7 @@ import Pagination from "./Pagination";
 import { Newsletter } from "../types/newsletter.types";
 import { Newspaper, Send } from "lucide-react";
 import { signedOutOnly } from "@/src/features/subscriber/subscriber-view";
+import { archivePagePath } from "@/src/features/newsletter/archive-paths";
 
 interface RecentNewslettersProps {
   newsletters: Newsletter[];
@@ -54,7 +55,7 @@ const RecentNewsletters: React.FC<RecentNewslettersProps> = ({
               Get Notified
             </Link>
             <Link
-              href={currentPage <= 1 ? "/archive" : `/archive?page=${currentPage}`}
+              href={archivePagePath(currentPage)}
               className="rounded border border-[var(--border)] bg-[var(--bg-card)] px-7 py-3 font-semibold text-[var(--text-primary)] transition-colors duration-200 hover:bg-[var(--bg-warm)]"
               style={{ fontSize: 'var(--text-small)' }}
             >
@@ -76,7 +77,6 @@ const RecentNewsletters: React.FC<RecentNewslettersProps> = ({
               <Pagination
                 currentPage={currentPage}
                 totalPages={totalPages}
-                basePath="/archive"
               />
             </div>
           )}

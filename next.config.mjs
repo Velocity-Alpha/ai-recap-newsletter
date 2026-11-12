@@ -29,6 +29,18 @@ const nextConfig = {
       },
     ],
   },
+  async redirects() {
+    return [
+      // Archive pages live in the path so the CDN can cache them. Old `?page=N` links and the archive's
+      // page-jump form land on /archive/page/N; Next.js carries the query string along and the page ignores it.
+      {
+        source: "/archive",
+        has: [{ type: "query", key: "page", value: "(?<page>\\d+)" }],
+        destination: "/archive/page/:page",
+        permanent: true,
+      },
+    ];
+  },
   turbopack: {
     root: __dirname,
   },
