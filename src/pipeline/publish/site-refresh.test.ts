@@ -221,7 +221,17 @@ describe("createSiteRefresher when a list page comes back without the new issue"
 
     const report = await site.refresh();
 
-    expect(site.calls).toEqual(["/api/revalidate", "/", "/archive", NEWEST, "/archive", "/api/revalidate", "/archive"]);
+    // The second refresh clears the newest issue page too, so it is loaded again with the old page.
+    expect(site.calls).toEqual([
+      "/api/revalidate",
+      "/",
+      "/archive",
+      NEWEST,
+      "/archive",
+      "/api/revalidate",
+      "/archive",
+      NEWEST,
+    ]);
     expect(site.pauses).toEqual([3000, 3000]);
     expect(report).toMatchObject({ warmed: ["/", "/archive", NEWEST], failed: [] });
   });

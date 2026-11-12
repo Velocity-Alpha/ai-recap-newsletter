@@ -154,7 +154,13 @@ export async function warmPagesUntilStored(
   for (let retry = 0; retry < RETRIES; retry++) {
     const again = report.warmed.filter((path) => oldPages.includes(path) || notStoredYet(report.cacheStatus?.[path]));
     if (again.length === 0) break;
-    if (retry === RETRIES - 1 && oldPages.length > 0 && options.refreshAgain) await options.refreshAgain();
+    if (retry === RETRIES - 1 && oldPages.length > 0 && options.refreshAgain) {
+      await options.refreshAgain();
+      // The second refresh clears the newest issue page too, so it is loaded again with the old pages.
+      if (load.newestIssue && report.warmed.includes(load.newestIssue) && !again.includes(load.newestIssue)) {
+        again.push(load.newestIssue);
+      }
+    }
     await pause(RETRY_PAUSE_MS);
     const retried = await loadPages(siteUrl, again, load);
     report.warmed = report.warmed.filter((path) => !retried.report.failed.some((failure) => failure.path === path));
