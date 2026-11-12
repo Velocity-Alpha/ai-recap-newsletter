@@ -8,6 +8,7 @@ import { getBeehiivSubscriberStatus } from "@/src/features/subscriber/beehiiv";
 import { getSubscriberProvider } from "@/src/features/subscriber/provider";
 import { consumeRateLimit, RATE_LIMITS } from "@/src/server/rate-limit";
 import { safeEqual } from "@/src/server/safe-compare";
+import { SIGNED_IN_HINT_COOKIE, SIGNED_IN_HINT_VALUE } from "@/src/features/subscriber/signed-in-hint";
 
 const COOKIE_NAME = "ai_recap_subscriber";
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
@@ -208,19 +209,25 @@ export function buildSubscriberSessionPayload(subscriber: SubscriberRecord): Sub
   };
 }
 
-export function setSubscriberSessionCookie(
+// The signed-in hint shares the session cookie's lifetime, path and SameSite, but the browser can read it.
+function getSignedInHintCookieOptions() {
+  return { ...getCookieOptions(), httpOnly: false };
+}
+
+/** Sets the session cookie and the signed-in hint together, so the two cannot drift apart. */
+export function setSubscriberSessionCookies(
   cookieStore: ResponseCookies,
   subscriber: SubscriberRecord,
 ) {
   const token = createSubscriberSessionToken(buildSubscriberSessionPayload(subscriber));
   cookieStore.set(COOKIE_NAME, token, getCookieOptions());
+  cookieStore.set(SIGNED_IN_HINT_COOKIE, SIGNED_IN_HINT_VALUE, getSignedInHintCookieOptions());
 }
 
-export function clearSubscriberSessionCookie(cookieStore: ResponseCookies) {
-  cookieStore.set(COOKIE_NAME, "", {
-    ...getCookieOptions(),
-    maxAge: 0,
-  });
+/** Clears the session cookie and the signed-in hint together. */
+export function clearSubscriberSessionCookies(cookieStore: ResponseCookies) {
+  cookieStore.set(COOKIE_NAME, "", { ...getCookieOptions(), maxAge: 0 });
+  cookieStore.set(SIGNED_IN_HINT_COOKIE, "", { ...getSignedInHintCookieOptions(), maxAge: 0 });
 }
 
 export async function getSubscriberSessionFromCookies(

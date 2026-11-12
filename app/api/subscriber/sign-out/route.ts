@@ -1,4 +1,4 @@
-import { clearSubscriberSessionCookie } from "@/src/features/subscriber/server";
+import { clearSubscriberSessionCookies } from "@/src/features/subscriber/server";
 import {
   createRequestLogContext,
   jsonWithRequestId,
@@ -11,7 +11,7 @@ export async function POST(request: Request) {
   logRequestStart(context);
 
   const response = jsonWithRequestId(context, { success: true });
-  clearSubscriberSessionCookie(response.cookies);
+  clearSubscriberSessionCookies(response.cookies);
   logRequestSuccess(context);
   return response;
 }
