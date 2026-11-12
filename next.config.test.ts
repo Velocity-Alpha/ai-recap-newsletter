@@ -22,3 +22,16 @@ describe("old archive links", () => {
     expect(matchesPage.test("")).toBe(false);
   });
 });
+
+describe("archive cache key", () => {
+  // Netlify's cache ignores query values unless the response asks for them. Without `page` in the key, a cached
+  // /archive answers /archive?page=N before the redirect above can run.
+  it("keeps the page query value in the Netlify cache key for /archive", async () => {
+    vi.stubEnv("APP_ENV", "development");
+    const { default: nextConfig } = await import("./next.config.mjs");
+    const headers = (await nextConfig.headers?.()) ?? [];
+    const rule = headers.find((header) => header.source === "/archive");
+
+    expect(rule?.headers).toContainEqual({ key: "Netlify-Vary", value: "query=page" });
+  });
+});
