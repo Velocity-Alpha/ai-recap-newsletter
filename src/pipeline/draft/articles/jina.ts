@@ -1,10 +1,11 @@
-import { fetchText } from "@/src/pipeline/draft/articles/http";
+import { fetchBody } from "@/src/pipeline/draft/articles/http";
 import { MethodError, PAGE_MAX_BYTES, READER_USER_AGENT, type MethodContext, type MethodText } from "@/src/pipeline/draft/articles/types";
 
 /**
- * Method 3 (#115): Jina Reader (https://jina.ai/reader/) loads the page in its own browser and returns Markdown.
- * It works with no key (20 requests a minute). JINA_API_KEY, when set, is sent as a Bearer token; a free key
- * probably lifts Jina's "anonymous access to domain blocked" answers.
+ * The last method (#115, #170): Jina Reader (https://jina.ai/reader/) loads the page in its own browser and returns
+ * Markdown. The call is anonymous (free, 20 requests a minute per server address): JINA_API_KEY is not set in
+ * production. A key, if one is ever set, is sent as a Bearer token. A refusal (402, 429, or any other error) leaves
+ * the article unread with Jina's reason; 403 and 451 count as blocked, the rest as failed.
  */
 
 const JINA_READER = "https://r.jina.ai/";
@@ -21,10 +22,10 @@ export async function readWithJina(url: string, context: MethodContext): Promise
   const headers: Record<string, string> = { Accept: "application/json", "X-Retain-Images": "none", "User-Agent": READER_USER_AGENT };
   if (context.jinaApiKey) headers.Authorization = `Bearer ${context.jinaApiKey}`;
 
-  const answer = await fetchText(`${JINA_READER}${url}`, { ...context, headers, maxBytes: PAGE_MAX_BYTES });
+  const answer = await fetchBody(`${JINA_READER}${url}`, { ...context, headers, maxBytes: PAGE_MAX_BYTES });
   let body: JinaAnswer;
   try {
-    body = JSON.parse(answer.body) as JinaAnswer;
+    body = JSON.parse(answer.text) as JinaAnswer;
   } catch {
     throw new MethodError("failed", answer.status >= 400 ? `Jina returned HTTP ${answer.status}.` : "Jina returned something other than JSON.");
   }

@@ -197,7 +197,7 @@ export function createDraftDeps(
   options: DraftDepsOptions = {},
 ): Omit<ProduceDraftDeps, "onStep" | "now" | "signal"> {
   return {
-    // Clears old saved text, reuses each story's saved copy, reads the rest (#115 order, 60 s deadline), and saves
+    // Clears old saved text, reuses each story's saved copy, reads the rest (#115 order, 120 s deadline), and saves
     // what it read (#120).
     readArticles: createDraftArticleReader({
       store: prismaArticleStore,

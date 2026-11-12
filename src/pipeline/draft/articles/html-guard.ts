@@ -1,7 +1,7 @@
 /**
  * A cheap check of a page before Readability, in one linear pass over the HTML. Readability's time grows fast with
  * how deep tags nest (#120 review: 800 levels took 1.4 s, 4,000 took 122 s) and its memory with the number of
- * elements, so a page past these limits is refused here, in milliseconds. The worker (html-worker.ts) is still the
+ * elements, so a page past these limits is refused here, in milliseconds. The worker (text-worker.ts) is still the
  * hard stop for pages that pass.
  *
  * It also drops what Readability throws away anyway (scripts, styles, SVG, templates, comments), so the size cap

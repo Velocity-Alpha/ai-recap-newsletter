@@ -9,8 +9,11 @@ import { checkSiteList, isOnSiteList } from "@/src/pipeline/ingest/paywall";
  * be a free link is not read.
  */
 
-/** The step's limit for reading all links of one story. */
-export const READ_DEADLINE_MS = 45_000;
+/**
+ * The step's limit for reading all links of one story: the draft step's 120 s, so a link whose page method uses its
+ * limits still gets to Jina. The free link job is a background function (15 minutes).
+ */
+export const READ_DEADLINE_MS = 120_000;
 
 export interface LinkCandidate {
   url: string;

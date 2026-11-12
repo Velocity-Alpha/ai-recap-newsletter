@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { fakeWeb, htmlPage, jinaAnswer, jinaUrl, prose } from "@/src/pipeline/draft/articles/fake-web.fixture";
 import answers from "@/src/pipeline/free-links/__fixtures__/search-answers.json";
-import { checkLinks, countWords, type LinkRead } from "@/src/pipeline/free-links/check-links";
+import { checkLinks, countWords, READ_DEADLINE_MS, type LinkRead } from "@/src/pipeline/free-links/check-links";
 import { parseSearchAnswer } from "@/src/pipeline/free-links/search";
 
 const STORY = { id: 7, url: "https://www.wsj.com/tech/ai/pretend-lab-toy-model" };
@@ -33,12 +34,26 @@ describe("countWords", () => {
 });
 
 describe("checkLinks", () => {
+  it("gives the reads of one story the draft step's 120 s deadline", () => {
+    expect(READ_DEADLINE_MS).toBe(120_000);
+  });
+
   it("keeps a link that reads as an article of 300 words or more, with its site, title and words", async () => {
     const deps = depsOf({ "https://www.free.example/a": 300 });
 
     const links = await checkLinks(STORY, [{ url: "https://www.free.example/a", title: "A" }], deps);
 
     expect(links).toEqual([{ url: "https://www.free.example/a", site: "free.example", title: "A", words: 300 }]);
+  });
+
+  it("reads with the draft's article reader, Jina last and with no key", async () => {
+    const link = "https://www.free.example/a";
+    const web = fakeWeb({ [link]: htmlPage("Forbidden", 403), [jinaUrl(link)]: jinaAnswer(link, prose("free", 3_000)) });
+
+    const links = await checkLinks(STORY, [{ url: link, title: "A" }], { readOptions: { fetch: web.fetch }, recordPaywalledSite: vi.fn(async () => {}) });
+
+    expect(links).toEqual([expect.objectContaining({ url: link, site: "free.example" })]);
+    expect(web.sentAuthorization(jinaUrl(link))).toBe(false);
   });
 
   it("drops a link on the site of the original link, without a read", async () => {

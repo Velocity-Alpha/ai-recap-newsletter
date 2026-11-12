@@ -4,11 +4,11 @@ import type { ArticleText } from "@/src/pipeline/draft/writer";
 
 /**
  * Reads the articles of a draft's feature-section stories (#120), all at once, with a deadline for the whole step
- * (#115: about 8 reads, 60 s). A story still being read at the deadline comes back unread, so drafting goes on
- * from its summary.
+ * (#170: 120 s; the draft job is a background function). It is the only limit on waiting for a host or text worker
+ * slot. A story still being read at the deadline comes back unread, so drafting goes on from its summary.
  */
 
-export const DEFAULT_DEADLINE_MS = 60_000;
+export const DEFAULT_DEADLINE_MS = 120_000;
 /** #115: keep at most 2 requests per host at once. */
 const PER_HOST = 2;
 

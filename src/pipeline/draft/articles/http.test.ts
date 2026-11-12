@@ -4,7 +4,7 @@ import type { AddressInfo } from "node:net";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { RefusedUrlError, type ResolveAll } from "@/src/pipeline/draft/articles/address-guard";
-import { createNodeFetch, fetchText, FetchFailure, HostLimiter, type FetchInit, type FetchLike } from "@/src/pipeline/draft/articles/http";
+import { createNodeFetch, fetchBody, FetchFailure, HostLimiter, type FetchInit, type FetchLike } from "@/src/pipeline/draft/articles/http";
 
 function page(body: string, init: { status?: number; headers?: Record<string, string> } = {}) {
   return new Response(body, { status: init.status ?? 200, headers: { "content-type": "text/html; charset=utf-8", ...init.headers } });
@@ -14,22 +14,22 @@ function redirect(location: string, status = 301) {
   return new Response(null, { status, headers: { location } });
 }
 
-const options = (fetch: FetchLike, extra: Partial<Parameters<typeof fetchText>[1]> = {}) => ({
+const options = (fetch: FetchLike, extra: Partial<Parameters<typeof fetchBody>[1]> = {}) => ({
   fetch,
   signal: new AbortController().signal,
   maxBytes: 1_000,
   ...extra,
 });
 
-describe("fetchText", () => {
+describe("fetchBody", () => {
   it("follows redirects by hand and returns the final URL, status, type and body", async () => {
     const fetch = vi.fn<FetchLike>(async (url) =>
       url === "http://news.example.com/a" ? redirect("/b") : url === "http://news.example.com/b" ? redirect("https://www.example.com/c", 308) : page("<p>hi</p>"),
     );
 
-    const result = await fetchText("http://news.example.com/a", options(fetch, { headers: { "User-Agent": "test" } }));
+    const result = await fetchBody("http://news.example.com/a", options(fetch, { headers: { "User-Agent": "test" } }));
 
-    expect(result).toEqual({ status: 200, url: "https://www.example.com/c", contentType: "text/html; charset=utf-8", body: "<p>hi</p>" });
+    expect(result).toEqual({ status: 200, url: "https://www.example.com/c", contentType: "text/html; charset=utf-8", kind: "text", text: "<p>hi</p>" });
     expect(fetch.mock.calls.map(([url]) => url)).toEqual(["http://news.example.com/a", "http://news.example.com/b", "https://www.example.com/c"]);
     expect(fetch.mock.calls[0][1]).toMatchObject({ method: "GET", redirect: "manual", headers: { "User-Agent": "test" } });
   });
@@ -37,20 +37,20 @@ describe("fetchText", () => {
   it("refuses a redirect to a private address before requesting it", async () => {
     const fetch = vi.fn<FetchLike>(async () => redirect("http://169.254.169.254/latest/meta-data/"));
 
-    await expect(fetchText("https://news.example.com/a", options(fetch))).rejects.toBeInstanceOf(RefusedUrlError);
+    await expect(fetchBody("https://news.example.com/a", options(fetch))).rejects.toBeInstanceOf(RefusedUrlError);
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
   it("refuses a private link without requesting it", async () => {
     const fetch = vi.fn<FetchLike>();
-    await expect(fetchText("http://localhost:9001/", options(fetch))).rejects.toThrow("local host name");
+    await expect(fetchBody("http://localhost:9001/", options(fetch))).rejects.toThrow("local host name");
     expect(fetch).not.toHaveBeenCalled();
   });
 
   it("drops the Authorization header when a redirect leaves the origin", async () => {
     const fetch = vi.fn<FetchLike>(async (url) => (url.startsWith("https://api.example.com") ? redirect("https://cdn.example.net/file") : page("ok")));
 
-    await fetchText("https://api.example.com/readme", options(fetch, { headers: { Authorization: "Bearer secret", Accept: "x" } }));
+    await fetchBody("https://api.example.com/readme", options(fetch, { headers: { Authorization: "Bearer secret", Accept: "x" } }));
 
     expect(fetch.mock.calls[0][1].headers).toMatchObject({ Authorization: "Bearer secret" });
     expect(fetch.mock.calls[1][1].headers).toEqual({ Accept: "x" });
@@ -59,16 +59,16 @@ describe("fetchText", () => {
   it("stops after 5 redirects", async () => {
     let hop = 0;
     const fetch = vi.fn<FetchLike>(async () => redirect(`/loop-${(hop += 1)}`));
-    await expect(fetchText("https://news.example.com/", options(fetch))).rejects.toThrow("Too many redirects");
+    await expect(fetchBody("https://news.example.com/", options(fetch))).rejects.toThrow("Too many redirects");
     expect(fetch).toHaveBeenCalledTimes(6);
   });
 
   it("refuses a body over the size cap, by its declared length or as it streams", async () => {
     const declared = vi.fn<FetchLike>(async () => page("x", { headers: { "content-length": "5000" } }));
-    await expect(fetchText("https://news.example.com/", options(declared))).rejects.toMatchObject({ kind: "too_large" });
+    await expect(fetchBody("https://news.example.com/", options(declared))).rejects.toMatchObject({ kind: "too_large" });
 
     const streamed = vi.fn<FetchLike>(async () => page("y".repeat(1_500)));
-    const error = await fetchText("https://news.example.com/", options(streamed)).catch((reason: unknown) => reason);
+    const error = await fetchBody("https://news.example.com/", options(streamed)).catch((reason: unknown) => reason);
     expect(error).toBeInstanceOf(FetchFailure);
     expect(error).toMatchObject({ kind: "too_large", message: expect.stringContaining("over the 1 KB cap") });
   });
@@ -76,7 +76,7 @@ describe("fetchText", () => {
   it("decodes the declared charset", async () => {
     const latin1 = new Uint8Array([0x63, 0x61, 0x66, 0xe9]); // "café" in ISO-8859-1
     const fetch = vi.fn<FetchLike>(async () => new Response(latin1, { headers: { "content-type": "text/html; charset=iso-8859-1" } }));
-    await expect(fetchText("https://news.example.com/", options(fetch))).resolves.toMatchObject({ body: "café" });
+    await expect(fetchBody("https://news.example.com/", options(fetch))).resolves.toMatchObject({ text: "café" });
   });
 
   it("retries once after a network error", async () => {
@@ -84,10 +84,10 @@ describe("fetchText", () => {
       .fn<FetchLike>()
       .mockRejectedValueOnce(Object.assign(new TypeError("fetch failed"), { cause: { code: "ECONNRESET" } }))
       .mockResolvedValueOnce(page("second try"));
-    await expect(fetchText("https://news.example.com/", options(fetch))).resolves.toMatchObject({ body: "second try" });
+    await expect(fetchBody("https://news.example.com/", options(fetch))).resolves.toMatchObject({ text: "second try" });
 
     const down = vi.fn<FetchLike>(async () => Promise.reject(Object.assign(new TypeError("fetch failed"), { cause: { code: "ECONNREFUSED" } })));
-    await expect(fetchText("https://news.example.com/", options(down))).rejects.toMatchObject({ kind: "network", message: "Network error: fetch failed (ECONNREFUSED)." });
+    await expect(fetchBody("https://news.example.com/", options(down))).rejects.toMatchObject({ kind: "network", message: "Network error: fetch failed (ECONNREFUSED)." });
     expect(down).toHaveBeenCalledTimes(2);
   });
 
@@ -95,7 +95,7 @@ describe("fetchText", () => {
     const refused = new RefusedUrlError("Refused news.example.com: news.example.com resolves to a private address.");
     const fetch = vi.fn<FetchLike>(async () => Promise.reject(Object.assign(new TypeError("fetch failed"), { cause: refused })));
 
-    await expect(fetchText("https://news.example.com/", options(fetch))).rejects.toBe(refused);
+    await expect(fetchBody("https://news.example.com/", options(fetch))).rejects.toBe(refused);
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
@@ -106,7 +106,7 @@ describe("fetchText", () => {
       controller.abort(reason);
       throw init.signal.reason;
     });
-    await expect(fetchText("https://news.example.com/", options(fetch, { signal: controller.signal }))).rejects.toBe(reason);
+    await expect(fetchBody("https://news.example.com/", options(fetch, { signal: controller.signal }))).rejects.toBe(reason);
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
@@ -117,7 +117,7 @@ describe("fetchText", () => {
     const fetch = vi.fn<FetchLike>(async () => new Response(body, { headers: { "content-type": "Application/PDF; name=x" } }));
     const rejectType = vi.fn((type: string) => (type === "text/html" ? null : `Not HTML (${type}).`));
 
-    const error = await fetchText("https://news.example.com/x.pdf", options(fetch, { rejectType })).catch((reason: unknown) => reason);
+    const error = await fetchBody("https://news.example.com/x.pdf", options(fetch, { rejectType })).catch((reason: unknown) => reason);
 
     expect(error).toBeInstanceOf(FetchFailure);
     expect(error).toMatchObject({ kind: "wrong_type", message: "Not HTML (application/pdf)." });
@@ -129,21 +129,23 @@ describe("fetchText", () => {
   it("leaves the type of an error page alone, so the status is what the caller sees", async () => {
     const fetch = vi.fn<FetchLike>(async () => new Response("{}", { status: 403, headers: { "content-type": "application/json" } }));
 
-    const result = await fetchText("https://news.example.com/", options(fetch, { rejectType: () => "never HTML" }));
+    const result = await fetchBody("https://news.example.com/", options(fetch, { rejectType: () => "never HTML" }));
 
-    expect(result).toMatchObject({ status: 403, body: "{}" });
+    expect(result).toMatchObject({ status: 403, text: "{}" });
   });
 
-  it("calls onStart only once the host slot is free, just before each request", async () => {
+  it("calls onWait as a request starts to wait for its host slot, and onStart once the slot is free, just before the request", async () => {
     const limiter = new HostLimiter(1);
     const signal = new AbortController().signal;
     let release = () => undefined as void;
     const busy = limiter.run("news.example.com", signal, () => new Promise<void>((resolve) => (release = resolve)));
+    const onWait = vi.fn();
     const onStart = vi.fn();
     const fetch = vi.fn<FetchLike>(async () => page("<p>hi</p>"));
 
-    const fetching = fetchText("https://news.example.com/a", options(fetch, { limiter, onStart }));
+    const fetching = fetchBody("https://news.example.com/a", options(fetch, { limiter, onWait, onStart }));
     await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(onWait).toHaveBeenCalledTimes(1);
     expect(onStart).not.toHaveBeenCalled();
 
     release();
@@ -177,7 +179,7 @@ describe("createNodeFetch", () => {
     const resolveAll = vi.fn<ResolveAll>((_hostname, callback) => callback(null, [{ address: "127.0.0.1", family: 4 }]));
     const fetch = createNodeFetch({ resolveAll });
 
-    const error = await fetchText(`http://news.example.com:${port}/a`, options(fetch)).catch((reason: unknown) => reason);
+    const error = await fetchBody(`http://news.example.com:${port}/a`, options(fetch)).catch((reason: unknown) => reason);
 
     expect(error).toBeInstanceOf(RefusedUrlError);
     expect(error).toMatchObject({ message: "Refused news.example.com: news.example.com resolves to a private address." });
@@ -193,7 +195,7 @@ describe("createNodeFetch", () => {
         { address: "::1", family: 6 },
       ]);
 
-    await expect(fetchText(`http://news.example.com:${port}/a`, options(createNodeFetch({ resolveAll })))).rejects.toBeInstanceOf(RefusedUrlError);
+    await expect(fetchBody(`http://news.example.com:${port}/a`, options(createNodeFetch({ resolveAll })))).rejects.toBeInstanceOf(RefusedUrlError);
     expect(requests).toBe(0);
   });
 });

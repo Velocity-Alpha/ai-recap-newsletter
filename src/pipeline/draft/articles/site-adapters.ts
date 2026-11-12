@@ -1,4 +1,4 @@
-import { fetchText } from "@/src/pipeline/draft/articles/http";
+import { fetchBody } from "@/src/pipeline/draft/articles/http";
 import { ADAPTER_MAX_BYTES, READER_USER_AGENT, type ArticleMethod, type MethodContext, type MethodText } from "@/src/pipeline/draft/articles/types";
 
 /**
@@ -43,9 +43,9 @@ function arxivAdapter(id: string): SiteAdapter {
     method: "arxiv",
     source,
     async read(context) {
-      const page = await fetchText(source, { ...context, headers: { "User-Agent": READER_USER_AGENT, Accept: "text/html" }, maxBytes: ADAPTER_MAX_BYTES });
-      // The paper's text (html-text.ts arxivPaperText), in the text worker.
-      const text = page.status < 400 ? await context.parse({ kind: "arxiv", html: page.body }, context.signal) : "";
+      const page = await fetchBody(source, { ...context, headers: { "User-Agent": READER_USER_AGENT, Accept: "text/html" }, maxBytes: ADAPTER_MAX_BYTES });
+      // The paper's text (text-job.ts arxivPaperText), in the text worker.
+      const text = page.status < 400 ? await context.parse({ kind: "arxiv", html: page.text }, context.signal) : "";
       return { text, httpStatus: page.status, finalUrl: page.url };
     },
   };
@@ -57,9 +57,9 @@ function markdownAdapter(method: SiteAdapter["method"], link: string, source: st
     source,
     async read(context) {
       const auth: Record<string, string> = method === "github" && context.githubToken ? { Authorization: `Bearer ${context.githubToken}` } : {};
-      const file = await fetchText(source, { ...context, headers: { ...headers, ...auth }, maxBytes: ADAPTER_MAX_BYTES });
+      const file = await fetchBody(source, { ...context, headers: { ...headers, ...auth }, maxBytes: ADAPTER_MAX_BYTES });
       // The story's link stays the final URL: the README is the repo or model page's own text.
-      const text = file.status < 400 ? await context.parse({ kind: "markdown", text: file.body }, context.signal) : "";
+      const text = file.status < 400 ? await context.parse({ kind: "markdown", text: file.text }, context.signal) : "";
       return { text, httpStatus: file.status, finalUrl: link };
     },
   };

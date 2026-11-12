@@ -4,6 +4,17 @@
 import { vi } from "vitest";
 
 import type { FetchInit, FetchLike } from "@/src/pipeline/draft/articles/http";
+import { parseJobText } from "@/src/pipeline/draft/articles/text-job";
+import type { MethodContext } from "@/src/pipeline/draft/articles/types";
+
+/**
+ * A method's text jobs, in this thread, for tests that call a method directly. It does not import text-worker.ts,
+ * which imports http.ts: tests that mock http.ts load this fixture inside the mock.
+ */
+export const parseHere: MethodContext["parse"] = async (job, signal) => {
+  if (signal.aborted) throw signal.reason;
+  return parseJobText(job);
+};
 
 /** A response, or `hang` for a request that never answers and ignores its abort signal. */
 export type Route = (() => Response | Promise<Response>) | "hang";
@@ -36,6 +47,37 @@ export function rawHtml(html: string): () => Response {
   return () => new Response(html, { headers: { "content-type": "text/html; charset=utf-8" } });
 }
 
+/**
+ * A one-page PDF of `text` in Helvetica, wrapped at about 80 characters a line. Built by hand (PDF 1.4, one font,
+ * one content stream), so the fixture is small and its text is known.
+ */
+export function pdfDocument(text: string): Uint8Array {
+  const lines = text.match(/.{1,80}(\s|$)/g)?.map((line) => line.trim()) ?? [text];
+  const escape = (line: string) => line.replace(/[\\()]/g, (char) => `\\${char}`);
+  const content = `BT /F1 10 Tf 13 TL 40 760 Td ${lines.map((line) => `(${escape(line)}) Tj T*`).join(" ")} ET`;
+  const objects = [
+    "<< /Type /Catalog /Pages 2 0 R >>",
+    "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+    `<< /Length ${content.length} >>\nstream\n${content}\nendstream`,
+  ];
+  let file = "%PDF-1.4\n";
+  const offsets = objects.map((object, index) => {
+    const offset = file.length;
+    file += `${index + 1} 0 obj\n${object}\nendobj\n`;
+    return offset;
+  });
+  const xref = file.length;
+  file += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n${offsets.map((offset) => `${String(offset).padStart(10, "0")} 00000 n \n`).join("")}`;
+  file += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+  return new TextEncoder().encode(file);
+}
+
+export function pdfResponse(bytes: Uint8Array, headers: Record<string, string> = {}): () => Response {
+  return () => new Response(bytes.slice(), { headers: { "content-type": "application/pdf", ...headers } });
+}
+
 export function jinaAnswer(url: string, text: string, httpStatus = 200): () => Response {
   return () =>
     new Response(JSON.stringify({ code: 200, status: 20000, data: { url, content: text, httpStatus } }), {
@@ -62,5 +104,11 @@ export function fakeWeb(routes: Record<string, Route>) {
     void init;
     return Promise.resolve(route());
   });
-  return { fetch, calls };
+  /** Whether the first request to `url` sent an Authorization header (in any case). */
+  const sentAuthorization = (url: string): boolean => {
+    const call = fetch.mock.calls.find(([called]) => called === url);
+    if (!call) throw new Error(`No request to ${url}.`);
+    return Object.keys(call[1].headers).some((name) => name.toLowerCase() === "authorization");
+  };
+  return { fetch, calls, sentAuthorization };
 }

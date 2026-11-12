@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { fakeWeb, hang, hostileHtml, htmlPage, jinaAnswer, jinaError, jinaUrl, prose, rawHtml } from "@/src/pipeline/draft/articles/fake-web.fixture";
-import { parseInThisThread, type HtmlParser } from "@/src/pipeline/draft/articles/html-worker";
+import { fakeWeb, hang, hostileHtml, htmlPage, jinaAnswer, jinaError, jinaUrl, pdfDocument, pdfResponse, prose, rawHtml } from "@/src/pipeline/draft/articles/fake-web.fixture";
+import { parseInThisThread, type TextParser } from "@/src/pipeline/draft/articles/text-worker";
 import { HostLimiter } from "@/src/pipeline/draft/articles/http";
-import { DEFAULT_TIMEOUTS, MAX_TEXT_CHARS, readArticle } from "@/src/pipeline/draft/articles/read-article";
+import { DEFAULT_LIMITS, MAX_TEXT_CHARS, readArticle } from "@/src/pipeline/draft/articles/read-article";
 
 const STORY = "https://news.example.com/toy-arm";
 const PAPER_ABS = "https://arxiv.org/abs/2401.01234";
@@ -17,8 +17,8 @@ function paperPage(text: string) {
 }
 
 describe("readArticle", () => {
-  it("uses the #115 order and timeouts: site adapter 20 s, fetch 12 s, Jina 30 s", () => {
-    expect(DEFAULT_TIMEOUTS).toEqual({ adapter: 20_000, fetch: 12_000, jina: 30_000 });
+  it("gives each method's network part a limit (site adapter 20 s, fetch 20 s, Jina 30 s) and every text part 20 s", () => {
+    expect(DEFAULT_LIMITS).toEqual({ adapter: 20_000, fetch: 20_000, jina: 30_000, text: 20_000 });
   });
 
   it("reads a paper with its site adapter first", async () => {
@@ -79,13 +79,34 @@ describe("readArticle", () => {
     await expect(readArticle(STORY, { fetch: web.fetch })).resolves.toMatchObject({ status: "blocked", error: "fetch: HTTP 403. jina: A bot check or block page." });
   });
 
-  it("cuts a method off at its timeout, even if it ignores the abort, and moves on", async () => {
-    const web = fakeWeb({ [STORY]: hang, [jinaUrl(STORY)]: jinaAnswer(STORY, prose("rescued")) });
+  it("asks Jina with no Authorization header when there is no Jina key", async () => {
+    const web = fakeWeb({ [STORY]: htmlPage("Forbidden", 403), [jinaUrl(STORY)]: jinaAnswer(STORY, prose("anonymous")) });
 
-    const read = await readArticle(STORY, { fetch: web.fetch, timeouts: { fetch: 20 } });
+    const read = await readArticle(STORY, { fetch: web.fetch });
 
     expect(read).toMatchObject({ status: "read", method: "jina" });
-    expect(read.attempts[0]).toMatchObject({ method: "fetch", outcome: "failed", error: "Timed out after 0.02 s." });
+    expect(web.sentAuthorization(jinaUrl(STORY))).toBe(false);
+  });
+
+  it.each([
+    [402, "Insufficient balance."],
+    [429, "Per IP rate limit exceeded."],
+  ])("leaves the article failed, with Jina's reason, when Jina answers HTTP %i", async (status, reason) => {
+    const web = fakeWeb({ [STORY]: htmlPage("Not found", 404), [jinaUrl(STORY)]: jinaError(status, reason) });
+
+    const read = await readArticle(STORY, { fetch: web.fetch });
+
+    expect(read).toMatchObject({ status: "failed", method: null, text: null });
+    expect(read.error).toBe(`fetch: HTTP 404. jina: Jina returned HTTP ${status}: ${reason}`);
+  });
+
+  it("cuts a method off at its network limit, even if it ignores the abort, and moves on", async () => {
+    const web = fakeWeb({ [STORY]: hang, [jinaUrl(STORY)]: jinaAnswer(STORY, prose("rescued")) });
+
+    const read = await readArticle(STORY, { fetch: web.fetch, limits: { fetch: 20 } });
+
+    expect(read).toMatchObject({ status: "read", method: "jina" });
+    expect(read.attempts[0]).toMatchObject({ method: "fetch", outcome: "failed", error: "Network part timed out after 0.02 s." });
   });
 
   it("stops, without trying another method, when the step's deadline signal fires", async () => {
@@ -124,7 +145,7 @@ describe("readArticle", () => {
     ["600,000 tiny elements", hostileHtml.tiny(600_000), "The page has over 30,000 HTML elements."],
   ])("refuses a hostile page (%s) before parsing it, well within the fetch timeout, and lets Jina try", async (_kind, html, reason) => {
     const web = fakeWeb({ [STORY]: rawHtml(html), [jinaUrl(STORY)]: jinaAnswer(STORY, prose("rescued")) });
-    const parse = vi.fn<HtmlParser>(parseInThisThread);
+    const parse = vi.fn<TextParser>(parseInThisThread);
     const started = performance.now();
 
     const read = await readArticle(STORY, { fetch: web.fetch, parse });
@@ -135,25 +156,84 @@ describe("readArticle", () => {
     expect(parse.mock.calls.map(([job]) => job.kind)).toEqual(["markdown"]);
   });
 
-  it("stops the parse at the method's timeout, as the worker is stopped, and moves on", async () => {
+  it("stops the parse at the text limit, as the worker is stopped, and moves on", async () => {
     const web = fakeWeb({ [STORY]: htmlPage(prose("slow")), [jinaUrl(STORY)]: jinaAnswer(STORY, prose("rescued")) });
     const stopped: unknown[] = [];
-    // Stands in for the worker: it ends only when its signal aborts.
-    const slowParse: HtmlParser = (job, signal) =>
+    // Stands in for the worker: it gets its slot at once, then ends only when its signal aborts.
+    const slowParse: TextParser = (job, signal, onStart) =>
       job.kind !== "readable"
-        ? parseInThisThread(job, signal)
-        : new Promise((_resolve, reject) =>
+        ? parseInThisThread(job, signal, onStart)
+        : new Promise((_resolve, reject) => {
+            onStart();
             signal.addEventListener("abort", () => {
               stopped.push(signal.reason);
               reject(signal.reason);
-            }),
-          );
+            });
+          });
 
-    const read = await readArticle(STORY, { fetch: web.fetch, parse: slowParse, timeouts: { fetch: 30 } });
+    const read = await readArticle(STORY, { fetch: web.fetch, parse: slowParse, limits: { text: 30 } });
 
-    expect(stopped).toEqual([expect.objectContaining({ message: "Timed out after 0.03 s." })]);
+    expect(stopped).toEqual([expect.objectContaining({ message: "Text part timed out after 0.03 s." })]);
     expect(read).toMatchObject({ status: "read", method: "jina" });
-    expect(read.attempts[0]).toMatchObject({ method: "fetch", outcome: "failed", error: "Timed out after 0.03 s." });
+    expect(read.attempts[0]).toMatchObject({ method: "fetch", outcome: "failed", error: "Text part timed out after 0.03 s." });
+  });
+
+  it("stores a PDF whose text job is stopped at the text limit as a pdf attempt", async () => {
+    const web = fakeWeb({ [STORY]: pdfResponse(pdfDocument(prose("slow"))), [jinaUrl(STORY)]: jinaAnswer(STORY, prose("rescued")) });
+    const slowParse: TextParser = (job, signal, onStart) =>
+      job.kind !== "pdf"
+        ? parseInThisThread(job, signal, onStart)
+        : new Promise((_resolve, reject) => {
+            onStart();
+            signal.addEventListener("abort", () => reject(signal.reason));
+          });
+
+    const read = await readArticle(STORY, { fetch: web.fetch, parse: slowParse, limits: { text: 30 } });
+
+    expect(read).toMatchObject({ status: "read", method: "jina" });
+    expect(read.attempts[0]).toMatchObject({ method: "pdf", outcome: "failed", error: "Text part timed out after 0.03 s." });
+  });
+
+  it("reads a page whose text job waits for a worker slot longer than the page's network limit", async () => {
+    const web = fakeWeb({ [STORY]: htmlPage(prose("queued")) });
+    // Stands in for a busy worker pool: the slot comes after 80 ms, past the 30 ms network limit.
+    const queuedParse: TextParser = (job, signal, onStart) =>
+      new Promise((resolve) => setTimeout(resolve, 80)).then(() => parseInThisThread(job, signal, onStart));
+
+    const read = await readArticle(STORY, { fetch: web.fetch, parse: queuedParse, limits: { fetch: 30, text: 1_000 } });
+
+    expect(read).toMatchObject({ status: "read", method: "fetch" });
+    expect(read.text).toContain("queued pretend lab");
+  });
+
+  it("records how long each attempt waited for its host and worker slots, and how long its text part took", async () => {
+    let clock = 0;
+    const limiter = new HostLimiter(1);
+    // Another read holds the host slot for 50 ms.
+    const busy = limiter.run("news.example.com", new AbortController().signal, async () => {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      clock += 50;
+    });
+    const web = fakeWeb({
+      [STORY]: () => {
+        clock += 100;
+        return htmlPage(prose("timed"))();
+      },
+    });
+    // 300 ms in the worker queue, then 200 ms of text work.
+    const parse: TextParser = async (job, signal, onStart) => {
+      clock += 300;
+      onStart();
+      const text = await parseInThisThread(job, signal, () => undefined);
+      clock += 200;
+      return text;
+    };
+
+    const read = await readArticle(STORY, { fetch: web.fetch, limiter, parse, now: () => clock });
+    await busy;
+
+    expect(read.attempts).toEqual([expect.objectContaining({ method: "fetch", outcome: "read", ms: 650, waitMs: 350, textMs: 200 })]);
+    expect(read.ms).toBe(650);
   });
 
   it("starts a method's clock once its host slot is free, so waiting on another read does not use up its timeout", async () => {
@@ -161,10 +241,96 @@ describe("readArticle", () => {
     const web = fakeWeb({ [STORY]: htmlPage(prose("patient")) });
     const busy = limiter.run("news.example.com", new AbortController().signal, () => new Promise((resolve) => setTimeout(resolve, 80)));
 
-    const read = await readArticle(STORY, { fetch: web.fetch, limiter, timeouts: { fetch: 40 } });
+    const read = await readArticle(STORY, { fetch: web.fetch, limiter, limits: { fetch: 40 } });
     await busy;
 
     expect(read).toMatchObject({ status: "read", method: "fetch" });
+  });
+
+  it("pauses a method's network limit while a redirect waits for its new host's slot, and counts every wait", async () => {
+    const limiter = new HostLimiter(1);
+    const moved = "https://other.example.com/toy-arm";
+    const web = fakeWeb({
+      [STORY]: () => new Response(null, { status: 302, headers: { location: moved } }),
+      [moved]: htmlPage(prose("moved")),
+    });
+    // Another read holds the new host's slot for 80 ms, past the 40 ms network limit.
+    const busy = limiter.run("other.example.com", new AbortController().signal, () => new Promise((resolve) => setTimeout(resolve, 80)));
+
+    const read = await readArticle(STORY, { fetch: web.fetch, limiter, limits: { fetch: 40 } });
+    await busy;
+
+    expect(read).toMatchObject({ status: "read", method: "fetch", finalUrl: moved });
+    expect(read.attempts[0].waitMs).toBeGreaterThanOrEqual(70);
+  });
+
+  it("reads a page served as Markdown", async () => {
+    const web = fakeWeb({
+      [STORY]: () =>
+        new Response(`# Pretend story\n\n**${prose("markdown")}**\n`, { headers: { "content-type": "text/markdown; charset=utf-8" } }),
+    });
+
+    const read = await readArticle(STORY, { fetch: web.fetch });
+
+    expect(read).toMatchObject({ status: "read", method: "fetch" });
+    expect(read.text).toContain("Pretend story");
+    expect(read.text).toContain("The markdown pretend lab shared");
+    expect(read.text).not.toContain("**");
+  });
+
+  it("reads a PDF link as a PDF, from the one download, and stores the method as pdf", async () => {
+    const web = fakeWeb({ [STORY]: pdfResponse(pdfDocument(prose("filing"))) });
+
+    const read = await readArticle(STORY, { fetch: web.fetch });
+
+    expect(web.calls).toEqual([STORY]);
+    expect(read).toMatchObject({ status: "read", method: "pdf", finalUrl: STORY, error: null });
+    expect(read.text).toContain("The filing pretend lab shared made-up results");
+    expect(read.attempts).toEqual([expect.objectContaining({ method: "pdf", outcome: "read", httpStatus: 200 })]);
+  });
+
+  it("reads a PDF over the 5 MB page cap, but refuses one over the 20 MB PDF cap as too large and lets Jina try", async () => {
+    const pdf = pdfDocument(prose("filing"));
+    const big = "https://news.example.com/big.pdf";
+    const huge = "https://news.example.com/huge.pdf";
+    const web = fakeWeb({
+      // The cap is checked against the declared length first, so these stand in for 6 MB and 21 MB files.
+      [big]: pdfResponse(pdf, { "content-length": "6000000" }),
+      [huge]: pdfResponse(pdf, { "content-length": "21000000" }),
+      [jinaUrl(huge)]: jinaError(422, "No content."),
+    });
+
+    await expect(readArticle(big, { fetch: web.fetch })).resolves.toMatchObject({ status: "read", method: "pdf" });
+    const read = await readArticle(huge, { fetch: web.fetch });
+
+    expect(read).toMatchObject({ status: "failed", method: null });
+    expect(read.attempts.map(({ method, outcome, error }) => ({ method, outcome, error }))).toEqual([
+      { method: "pdf", outcome: "failed", error: "The response is over the 20 MB cap." },
+      { method: "jina", outcome: "failed", error: "Jina returned HTTP 422: No content." },
+    ]);
+  });
+
+  it("fails a broken PDF as a pdf attempt and goes on to Jina", async () => {
+    const web = fakeWeb({
+      [STORY]: pdfResponse(new TextEncoder().encode("%PDF-1.4\nThis is not really a PDF.")),
+      [jinaUrl(STORY)]: jinaAnswer(STORY, prose("rescued")),
+    });
+
+    const read = await readArticle(STORY, { fetch: web.fetch });
+
+    expect(read).toMatchObject({ status: "read", method: "jina" });
+    expect(read.attempts.map(({ method, outcome, error }) => ({ method, outcome, error }))).toEqual([
+      { method: "pdf", outcome: "failed", error: expect.stringMatching(/^Not a readable PDF: /) },
+      { method: "jina", outcome: "read", error: undefined },
+    ]);
+  });
+
+  it("refuses an HTML page over the 5 MB cap", async () => {
+    const web = fakeWeb({ [STORY]: () => new Response("<html></html>", { headers: { "content-type": "text/html", "content-length": "6000000" } }) });
+
+    const read = await readArticle(STORY, { fetch: web.fetch });
+
+    expect(read.attempts[0]).toMatchObject({ method: "fetch", outcome: "failed", error: "The response is over the 5 MB cap." });
   });
 
   it("stops, without passing the link to Jina, when a redirect points at a private address", async () => {
@@ -178,15 +344,5 @@ describe("readArticle", () => {
     expect(web.calls).toEqual([STORY]);
     expect(read).toMatchObject({ status: "failed", method: null, error: "fetch: Refused 127.0.0.1: a private address." });
     expect(read.attempts).toHaveLength(1);
-  });
-
-  it("times each method and the whole read with the given clock", async () => {
-    let clock = 1_000;
-    const web = fakeWeb({ [STORY]: htmlPage("Short."), [jinaUrl(STORY)]: jinaAnswer(STORY, prose("timed")) });
-
-    const read = await readArticle(STORY, { fetch: web.fetch, now: () => (clock += 100) });
-
-    expect(read.attempts.map((attempt) => attempt.ms)).toEqual([100, 100]);
-    expect(read.ms).toBe(500);
   });
 });
