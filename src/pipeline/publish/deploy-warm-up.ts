@@ -56,6 +56,37 @@ export interface DeployWarmUp {
 export interface WarmDeployOptions {
   fetch?: typeof fetch;
   readPaths?: () => Promise<string[]>;
+  /** Waits between tries. Tests pass a stub. */
+  pause?: (ms: number) => Promise<void>;
+}
+
+/**
+ * In the first seconds after a deploy goes live, Netlify's durable cache can answer `fwd=bypass` and store
+ * nothing. A page it bypassed is loaded again after a pause, so the warm-up leaves a stored copy.
+ */
+const BYPASS_RETRY_PAUSE_MS = 3_000;
+const BYPASS_RETRIES = 2;
+
+const bypassedPaths = (report: WarmUpReport) =>
+  report.warmed.filter((path) => report.cacheStatus?.[path]?.startsWith("fwd=bypass"));
+
+async function warmUntilStored(
+  siteUrl: string,
+  paths: string[],
+  options: WarmDeployOptions,
+): Promise<WarmUpReport> {
+  const pause = options.pause ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+  const report = await warmPages(siteUrl, paths, { fetch: options.fetch });
+  for (let retry = 0; retry < BYPASS_RETRIES; retry++) {
+    const again = bypassedPaths(report);
+    if (again.length === 0) break;
+    await pause(BYPASS_RETRY_PAUSE_MS);
+    const retried = await warmPages(siteUrl, again, { fetch: options.fetch });
+    report.warmed = report.warmed.filter((path) => !retried.failed.some((failure) => failure.path === path));
+    report.failed.push(...retried.failed);
+    report.cacheStatus = { ...report.cacheStatus, ...retried.cacheStatus };
+  }
+  return report;
 }
 
 /** Returns undefined when neither the event nor the function context gives a deploy address. */
@@ -71,7 +102,7 @@ export async function warmDeploy(
   if (!siteUrl) return undefined;
   const source: DeployAddressSource = fromEvent ? "deploy event" : "function context";
   const paths = await (options.readPaths ?? readWarmPaths)();
-  return { siteUrl, source, report: await warmPages(siteUrl, paths, { fetch: options.fetch }) };
+  return { siteUrl, source, report: await warmUntilStored(siteUrl, paths, options) };
 }
 
 /** The deploy function's log line: the address, where it came from, then the shared warm-up line. */

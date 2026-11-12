@@ -114,3 +114,51 @@ describe("describeDeployWarmUp", () => {
     });
   });
 });
+
+describe("warmDeploy when the cache is not ready yet", () => {
+  const BYPASS = '"Netlify Durable"; fwd=bypass';
+  const STORED = '"Netlify Durable"; fwd=uri-miss; stored';
+
+  it("loads again, after a pause, a page Netlify's durable cache bypassed, so the stored copy is the warm one", async () => {
+    // Seen on the PR #173 preview: pages loaded in the first seconds after a deploy came back fwd=bypass.
+    const answers: Record<string, string[]> = { "/": [BYPASS, STORED], "/archive": [STORED] };
+    const fetchMock = vi.fn<typeof globalThis.fetch>(async (url) => {
+      const path = new URL(String(url)).pathname;
+      return new Response("ok", { headers: { "cache-status": answers[path]?.shift() ?? STORED } });
+    });
+    const pauses: number[] = [];
+
+    const warmUp = await warmDeploy(event(PUBLISHED_PRODUCTION), undefined, {
+      fetch: fetchMock,
+      readPaths: async () => ["/", "/archive"],
+      pause: async (ms) => void pauses.push(ms),
+    });
+
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      "https://airecap.news/",
+      "https://airecap.news/archive",
+      "https://airecap.news/",
+    ]);
+    expect(pauses).toEqual([3000]);
+    expect(warmUp?.report).toEqual({
+      warmed: ["/", "/archive"],
+      failed: [],
+      cacheStatus: { "/": "fwd=uri-miss; stored", "/archive": "fwd=uri-miss; stored" },
+    });
+  });
+
+  it("stops after two more tries and reports the last cache status", async () => {
+    const fetchMock = vi.fn<typeof globalThis.fetch>(async () => new Response("ok", { headers: { "cache-status": BYPASS } }));
+    const pauses: number[] = [];
+
+    const warmUp = await warmDeploy(event(PUBLISHED_PRODUCTION), undefined, {
+      fetch: fetchMock,
+      readPaths: async () => ["/"],
+      pause: async (ms) => void pauses.push(ms),
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(pauses).toEqual([3000, 3000]);
+    expect(warmUp?.report).toEqual({ warmed: ["/"], failed: [], cacheStatus: { "/": "fwd=bypass" } });
+  });
+});
