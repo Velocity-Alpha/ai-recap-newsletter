@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { createSiteRefresher, siteUrlForDeploy, warmPages } from "@/src/pipeline/publish/site-refresh";
+import { createSiteRefresher, describeWarmUp, siteUrlForDeploy, warmPages } from "@/src/pipeline/publish/site-refresh";
 import { isValidCacheRefreshToken } from "@/src/server/cache-refresh-auth";
 
 const NOW = new Date("2026-11-09T16:00:00.000Z");
@@ -59,7 +59,7 @@ describe("createSiteRefresher", () => {
     const pageLoad = fetch.mock.calls[1] as unknown as [string, RequestInit];
     expect(pageLoad[1].method ?? "GET").toBe("GET");
     expect(new Headers(pageLoad[1].headers).get("authorization")).toBeNull();
-    expect(report).toEqual({ warmed: ["/", "/archive", "/issue/ai-recap-2026-11-12"], failed: [] });
+    expect(report).toEqual({ warmed: ["/", "/archive", "/issue/ai-recap-2026-11-12"], failed: [], cacheStatus: {} });
   });
 
   it("reports a page that fails to load and still loads the rest", async () => {
@@ -80,6 +80,7 @@ describe("createSiteRefresher", () => {
         { path: "/archive", reason: "HTTP 500" },
         { path: "/issue/x", reason: "The operation was aborted due to timeout" },
       ],
+      cacheStatus: {},
     });
   });
 
@@ -87,7 +88,7 @@ describe("createSiteRefresher", () => {
     const fetch = vi.fn(async () => Response.json({ refreshed: ["published-issues"] }));
     const refresh = createSiteRefresher({ siteUrl: "https://airecap.news", secret: "s3cret", fetch, now: () => NOW });
 
-    expect(await refresh?.()).toEqual({ warmed: [], failed: [] });
+    expect(await refresh?.()).toEqual({ warmed: [], failed: [], cacheStatus: {} });
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
@@ -114,5 +115,32 @@ describe("warmPages", () => {
 
     const headers = new Headers(fetchMock.mock.calls[0]?.[1]?.headers);
     expect(headers.get("accept-encoding")).toBe("br, gzip");
+  });
+});
+
+describe("warmPages cache status", () => {
+  it("records what Netlify's durable cache did with each page, so the log shows whether the warm-up was stored", async () => {
+    const fetchMock = vi.fn(
+      async () =>
+        new Response("ok", {
+          headers: { "cache-status": '"Next.js"; hit, "Netlify Durable"; fwd=uri-miss; stored, "Netlify Edge"; fwd=miss' },
+        }),
+    );
+
+    const report = await warmPages("https://site.example", ["/", "/archive"], { fetch: fetchMock as unknown as typeof fetch });
+
+    expect(report.cacheStatus).toEqual({ "/": "fwd=uri-miss; stored", "/archive": "fwd=uri-miss; stored" });
+    expect(describeWarmUp(report).message).toBe(
+      "Loaded 2 of 2 pages for the cache: / (fwd=uri-miss; stored), /archive (fwd=uri-miss; stored).",
+    );
+  });
+
+  it("leaves a page out of the cache status when Netlify sends none (local runs)", async () => {
+    const fetchMock = vi.fn(async () => new Response("ok"));
+
+    const report = await warmPages("https://site.example", ["/"], { fetch: fetchMock as unknown as typeof fetch });
+
+    expect(report.cacheStatus).toEqual({});
+    expect(describeWarmUp(report).message).toBe("Loaded 1 of 1 pages for the cache: /.");
   });
 });

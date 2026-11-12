@@ -41,7 +41,7 @@ describe("warmDeploy", () => {
     expect(warmUp).toEqual({
       siteUrl: "https://airecap.news",
       source: "deploy event",
-      report: { warmed: PATHS, failed: [] },
+      report: { warmed: PATHS, failed: [], cacheStatus: {} },
     });
   });
 

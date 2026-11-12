@@ -28,22 +28,34 @@ export interface SiteRefresherOptions {
 export interface WarmUpReport {
   warmed: string[];
   failed: { path: string; reason: string }[];
+  /** What Netlify's durable cache did with each warmed page (for example "fwd=uri-miss; stored"), when it says. */
+  cacheStatus?: Record<string, string>;
 }
 
 /**
  * One line about a warm-up, for the publish run log and the deploy function log. A page that failed to load
  * still works (its first reader waits for a render), so failures are a warning.
  */
-export function describeWarmUp({ warmed, failed }: WarmUpReport): { level: "info" | "warn"; message: string } {
+export function describeWarmUp({ warmed, failed, cacheStatus = {} }: WarmUpReport): {
+  level: "info" | "warn";
+  message: string;
+} {
   const loaded = `Loaded ${warmed.length} of ${warmed.length + failed.length} pages for the cache`;
+  const warmedPages = warmed.map((path) => (cacheStatus[path] ? `${path} (${cacheStatus[path]})` : path)).join(", ");
   if (failed.length === 0) {
-    return { level: "info", message: warmed.length > 0 ? `${loaded}: ${warmed.join(", ")}.` : `${loaded}.` };
+    return { level: "info", message: warmed.length > 0 ? `${loaded}: ${warmedPages}.` : `${loaded}.` };
   }
   const failedPages = failed.map(({ path, reason }) => `${path} (${reason})`).join(", ");
   return {
     level: "warn",
     message: `${loaded}. Could not load ${failedPages}. The first reader of those pages waits for a fresh render.`,
   };
+}
+
+/** The Netlify Durable entry of a `cache-status` header, without its name: `"Netlify Durable"; hit` gives `hit`. */
+function durableCacheStatus(header: string | null): string | undefined {
+  const entry = header?.split(",").find((part) => part.includes('"Netlify Durable"'));
+  return entry?.replace(/^\s*"Netlify Durable";\s*/, "").trim() || undefined;
 }
 
 function withoutTrailingSlash(siteUrl: string): string {
@@ -70,7 +82,7 @@ export async function warmPages(
 ): Promise<WarmUpReport> {
   const send = options.fetch ?? fetch;
   const base = withoutTrailingSlash(siteUrl);
-  const report: WarmUpReport = { warmed: [], failed: [] };
+  const report: WarmUpReport = { warmed: [], failed: [], cacheStatus: {} };
   for (const path of paths) {
     try {
       const response = await send(`${base}${path}`, {
@@ -79,6 +91,8 @@ export async function warmPages(
       });
       // Read the body so the whole page has rendered before the next one starts.
       await response.text();
+      const durable = durableCacheStatus(response.headers.get("cache-status"));
+      if (durable && report.cacheStatus) report.cacheStatus[path] = durable;
       if (response.ok) report.warmed.push(path);
       else report.failed.push({ path, reason: `HTTP ${response.status}` });
     } catch (error) {
