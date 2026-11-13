@@ -23,7 +23,7 @@ export const BOOTSTRAP_RESAMPLES = 2000;
 const BOOTSTRAP_SEED = 20261111;
 
 /** mulberry32: a small seeded random number generator, so a bootstrap gives the same interval every time. */
-function seededRandom(seed: number): () => number {
+export function seededRandom(seed: number): () => number {
   let state = seed >>> 0;
   return () => {
     state = (state + 0x6d2b79f5) >>> 0;

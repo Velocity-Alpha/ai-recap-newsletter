@@ -9,7 +9,6 @@
  *
  * SECTION_SCORING_LIMIT=20 scores only the first 20 stories (a smoke test).
  */
-import { createHash } from "crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import path from "path";
 
@@ -19,6 +18,7 @@ import {
   buildQuestions,
   DEVELOPER_MESSAGE,
   NONE,
+  scoringVersion,
   SECTIONS,
   type StoryScores,
 } from "@/evals/section-scoring/sections";
@@ -69,10 +69,7 @@ interface Answer {
 }
 
 const QUESTIONS = buildQuestions();
-const VERSION = createHash("sha1")
-  .update(JSON.stringify([DEVELOPER_MESSAGE, QUESTIONS]))
-  .digest("hex")
-  .slice(0, 8);
+const VERSION = scoringVersion();
 const CACHE_FILE = path.join(OUT_DIR, `scores-${VERSION}.json`);
 
 let inputTokens = 0;

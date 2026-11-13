@@ -1,3 +1,5 @@
+import { createHash } from "crypto";
+
 /**
  * First draft of "sections as data" (#176), for the scoring test only. The definitions are written from today's
  * extraction rules (`src/pipeline/ingest/extract.ts`) and are to tune with the owner.
@@ -115,6 +117,14 @@ export function buildQuestions(sections: readonly SectionDraft[] = SECTIONS): Qu
       }),
     ),
   ];
+}
+
+/** The scoring version: a hash of the text the scorer reads. Scores are cached by it (`scores-<version>.json`). */
+export function scoringVersion(sections: readonly SectionDraft[] = SECTIONS): string {
+  return createHash("sha1")
+    .update(JSON.stringify([DEVELOPER_MESSAGE, buildQuestions(sections)]))
+    .digest("hex")
+    .slice(0, 8);
 }
 
 /** What the test keeps for each story: the full distributions, so any formula can be tried later with no new calls. */
