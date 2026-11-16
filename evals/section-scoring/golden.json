@@ -1,0 +1,1806 @@
+{
+  "about": "Section-scoring golden set (#177): per story id, the owner's kind, 'also fits', importance (1 to 5) and state (confirmed, overridden, either, unprompted), with the reason on an override. set says tuning or check; never tune on check. inputHash is the hash of the headline, summary and source the owner saw.",
+  "producer": "owner",
+  "entries": {
+    "9484": {
+      "inputHash": "5217e7fce56e4d35",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "general",
+          "importance": 2
+        },
+        "kind": "research",
+        "also": null,
+        "importance": 2,
+        "state": "overridden",
+        "reason": "its a PAPER! on Arxiv. these are ALways rsearch and analysis"
+      }
+    },
+    "9487": {
+      "inputHash": "18b303ec990eb119",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "general",
+          "importance": 2
+        },
+        "kind": "general",
+        "also": null,
+        "importance": 2,
+        "state": "confirmed",
+        "reason": ""
+      }
+    },
+    "9536": {
+      "inputHash": "2583c704f835952a",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "general",
+          "importance": 2
+        },
+        "kind": "general",
+        "also": null,
+        "importance": 2,
+        "state": "confirmed",
+        "reason": ""
+      }
+    },
+    "9546": {
+      "inputHash": "6b47d1d9bf4cb39b",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "research",
+          "importance": 2
+        },
+        "kind": "research",
+        "also": null,
+        "importance": 3,
+        "state": "overridden",
+        "reason": "Amazing cause we've always used backprop to train neural nets!"
+      }
+    },
+    "9572": {
+      "inputHash": "14faa0215384ce08",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "general",
+          "importance": 2
+        },
+        "kind": "general",
+        "also": null,
+        "importance": 2,
+        "state": "confirmed",
+        "reason": ""
+      }
+    },
+    "9577": {
+      "inputHash": "f17f6a3b4663072d",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "general",
+          "importance": 2
+        },
+        "kind": "general",
+        "also": null,
+        "importance": 1,
+        "state": "overridden",
+        "reason": "strategy move. future gains"
+      }
+    },
+    "9579": {
+      "inputHash": "31ad19b7100b08eb",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "none",
+          "importance": 1
+        },
+        "kind": "tools",
+        "also": null,
+        "importance": 1,
+        "state": "overridden",
+        "reason": "Its an AI enabled tool people can use"
+      }
+    },
+    "9605": {
+      "inputHash": "058e919c558e4439",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "general",
+          "importance": 2
+        },
+        "kind": "research",
+        "also": null,
+        "importance": 2,
+        "state": "overridden",
+        "reason": "More of an analysis of how it was done. technical"
+      }
+    },
+    "9614": {
+      "inputHash": "23beac69525b99ab",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "tools",
+          "importance": 2
+        },
+        "kind": "tools",
+        "also": "general",
+        "importance": 2,
+        "state": "confirmed",
+        "reason": ""
+      }
+    },
+    "9628": {
+      "inputHash": "8676280db7385b8f",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "tools",
+          "importance": 2
+        },
+        "kind": "tools",
+        "also": null,
+        "importance": 1,
+        "state": "overridden",
+        "reason": "low rank (#53) in a crowded space"
+      }
+    },
+    "9629": {
+      "inputHash": "43578f4832113b6e",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "tools",
+          "importance": 2
+        },
+        "kind": "tools",
+        "also": null,
+        "importance": 2,
+        "state": "confirmed",
+        "reason": ""
+      }
+    },
+    "9632": {
+      "inputHash": "c5a6a10df73544ca",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "tools",
+          "importance": 2
+        },
+        "kind": "tools",
+        "also": null,
+        "importance": 1,
+        "state": "overridden",
+        "reason": "seems kinda small and marginall useful"
+      }
+    },
+    "9645": {
+      "inputHash": "636975b01e364c1b",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "tools",
+          "importance": 2
+        },
+        "kind": "tools",
+        "also": "general",
+        "importance": 2,
+        "state": "confirmed",
+        "reason": ""
+      }
+    },
+    "9689": {
+      "inputHash": "810b38c6ca12b04d",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "tools",
+          "importance": 2
+        },
+        "kind": "tools",
+        "also": null,
+        "importance": 2,
+        "state": "confirmed",
+        "reason": ""
+      }
+    },
+    "9699": {
+      "inputHash": "75213e6b04babd27",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "general",
+          "importance": 2
+        },
+        "kind": "general",
+        "also": "tools",
+        "importance": 2,
+        "state": "confirmed",
+        "reason": ""
+      }
+    },
+    "9718": {
+      "inputHash": "b162594947145a5d",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "general",
+          "importance": 2
+        },
+        "kind": "none",
+        "also": null,
+        "importance": null,
+        "state": "overridden",
+        "reason": "Tiny story (body is just 2 paragraphs), and unknown company."
+      }
+    },
+    "9741": {
+      "inputHash": "e33bcb9c1be09793",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "tools",
+          "importance": 2
+        },
+        "kind": "tools",
+        "also": null,
+        "importance": 1,
+        "state": "overridden",
+        "reason": "feels like a marketing PR post"
+      }
+    },
+    "9745": {
+      "inputHash": "449b9430174a1529",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "tools",
+          "importance": 2
+        },
+        "kind": "tools",
+        "also": null,
+        "importance": 2,
+        "state": "confirmed",
+        "reason": ""
+      }
+    },
+    "9764": {
+      "inputHash": "4161a542a785f554",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "general",
+          "importance": 2
+        },
+        "kind": "general",
+        "also": null,
+        "importance": 2,
+        "state": "confirmed",
+        "reason": ""
+      }
+    },
+    "9817": {
+      "inputHash": "121a3a632b93f5f8",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "tools",
+          "importance": 2
+        },
+        "kind": "tools",
+        "also": null,
+        "importance": 2,
+        "state": "confirmed",
+        "reason": ""
+      }
+    },
+    "9827": {
+      "inputHash": "aec9f153d8cc5f11",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "general",
+          "importance": 2
+        },
+        "kind": "tools",
+        "also": null,
+        "importance": 2,
+        "state": "overridden",
+        "reason": "Its a huggingface repo link. can't be other categories. has to be tools. no paper attached AFAIK so not research"
+      }
+    },
+    "9838": {
+      "inputHash": "c3c610bda6897764",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "tools",
+          "importance": 3
+        },
+        "kind": "tools",
+        "also": "general",
+        "importance": 3,
+        "state": "confirmed",
+        "reason": ""
+      }
+    },
+    "9853": {
+      "inputHash": "b09e38fb1205ac81",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "tools",
+          "importance": 2
+        },
+        "kind": "tools",
+        "also": null,
+        "importance": 3,
+        "state": "overridden",
+        "reason": "SOOO many people use ChatGPT voice"
+      }
+    },
+    "9862": {
+      "inputHash": "c65f2c30dd9d9553",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "none",
+          "importance": 2
+        },
+        "kind": "none",
+        "also": null,
+        "importance": null,
+        "state": "confirmed",
+        "reason": ""
+      }
+    },
+    "9917": {
+      "inputHash": "bf7a5d0c157cc5cb",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "research",
+          "importance": 2
+        },
+        "kind": "research",
+        "also": "tools",
+        "importance": 2,
+        "state": "confirmed",
+        "reason": ""
+      }
+    },
+    "9927": {
+      "inputHash": "d0a31656388743be",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "general",
+          "importance": 2
+        },
+        "kind": "tools",
+        "also": "general",
+        "importance": 2,
+        "state": "overridden",
+        "reason": "more of a tool folks can use now. it's not a leading company so low on importance"
+      }
+    },
+    "9928": {
+      "inputHash": "0efc12b3e4532a07",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "general",
+          "importance": 2
+        },
+        "kind": "general",
+        "also": "tools",
+        "importance": 2,
+        "state": "confirmed",
+        "reason": ""
+      }
+    },
+    "9950": {
+      "inputHash": "d400ddd98f7e691c",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "none",
+          "importance": 2
+        },
+        "kind": "none",
+        "also": null,
+        "importance": null,
+        "state": "confirmed",
+        "reason": ""
+      }
+    },
+    "9989": {
+      "inputHash": "8de2dac2fa112665",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "tools",
+          "importance": 1
+        },
+        "kind": "none",
+        "also": null,
+        "importance": null,
+        "state": "overridden",
+        "reason": "Not a story cause the link is a reference to competitor newsletter (rundown AI)"
+      }
+    },
+    "9990": {
+      "inputHash": "087b23a9077ef0e4",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "general",
+          "importance": 2
+        },
+        "kind": "general",
+        "also": null,
+        "importance": 2,
+        "state": "confirmed",
+        "reason": ""
+      }
+    },
+    "10041": {
+      "inputHash": "c975a2177deb0fb8",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "tools",
+          "importance": 4
+        },
+        "kind": "tools",
+        "also": null,
+        "importance": 4,
+        "state": "confirmed",
+        "reason": ""
+      }
+    },
+    "10044": {
+      "inputHash": "4c8489ff121f0ce3",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "research",
+          "importance": 3
+        },
+        "kind": "research",
+        "also": null,
+        "importance": 3,
+        "state": "confirmed",
+        "reason": ""
+      }
+    },
+    "10061": {
+      "inputHash": "eb62232452327115",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "general",
+          "importance": 2
+        },
+        "kind": "research",
+        "also": null,
+        "importance": 2,
+        "state": "overridden",
+        "reason": "This is clearly applied research findings"
+      }
+    },
+    "10092": {
+      "inputHash": "06938c7529a4f4e9",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "general",
+          "importance": 2
+        },
+        "kind": "general",
+        "also": null,
+        "importance": 2,
+        "state": "confirmed",
+        "reason": ""
+      }
+    },
+    "10100": {
+      "inputHash": "bc3ee22699d28d86",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "tools",
+          "importance": 3
+        },
+        "kind": "tools",
+        "also": null,
+        "importance": 3,
+        "state": "confirmed",
+        "reason": ""
+      }
+    },
+    "10154": {
+      "inputHash": "2da8c6e9aed137cd",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "general",
+          "importance": 2
+        },
+        "kind": "research",
+        "also": null,
+        "importance": 2,
+        "state": "overridden",
+        "reason": "this is clearly research. It's an Arxiv paper!"
+      }
+    },
+    "10166": {
+      "inputHash": "e37908ac7bed1ca8",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "tools",
+          "importance": 2
+        },
+        "kind": "tools",
+        "also": null,
+        "importance": 2,
+        "state": "confirmed",
+        "reason": ""
+      }
+    },
+    "10170": {
+      "inputHash": "ae2e29bb5d5d8112",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "general",
+          "importance": 2
+        },
+        "kind": "general",
+        "also": null,
+        "importance": 2,
+        "state": "confirmed",
+        "reason": ""
+      }
+    },
+    "10185": {
+      "inputHash": "a9df9f0e878cb56e",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "tools",
+          "importance": 2
+        },
+        "kind": "general",
+        "also": "tools",
+        "importance": 4,
+        "state": "overridden",
+        "reason": "It's a long awaited LARGE model from the leading Europian lab"
+      }
+    },
+    "10202": {
+      "inputHash": "a022bed330cdc5e5",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "general",
+          "importance": 2
+        },
+        "kind": "general",
+        "also": null,
+        "importance": 2,
+        "state": "confirmed",
+        "reason": ""
+      }
+    },
+    "10204": {
+      "inputHash": "46be50d6238a4f6b",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "tools",
+          "importance": 2
+        },
+        "kind": "tools",
+        "also": null,
+        "importance": 2,
+        "state": "confirmed",
+        "reason": ""
+      }
+    },
+    "10211": {
+      "inputHash": "d8eab27d269392ef",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "tools",
+          "importance": 1
+        },
+        "kind": "general",
+        "also": "tools",
+        "importance": 2,
+        "state": "overridden",
+        "reason": "just a feature update"
+      }
+    },
+    "10219": {
+      "inputHash": "6172924a91a42e1c",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "general",
+          "importance": 2
+        },
+        "kind": "general",
+        "also": "tools",
+        "importance": 1,
+        "state": "overridden",
+        "reason": "super light on details, incremental"
+      }
+    },
+    "10221": {
+      "inputHash": "b4e254cf05b5f9aa",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "general",
+          "importance": 4
+        },
+        "kind": "general",
+        "also": null,
+        "importance": 1,
+        "state": "overridden",
+        "reason": "Just some commentary on someones opinion, its still good to know, but not front-page news"
+      }
+    },
+    "10224": {
+      "inputHash": "777ac601a6dcbb7c",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "none",
+          "importance": 1
+        },
+        "kind": "none",
+        "also": null,
+        "importance": null,
+        "state": "confirmed",
+        "reason": ""
+      }
+    },
+    "10240": {
+      "inputHash": "c2157f5932993d3f",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "tools",
+          "importance": 2
+        },
+        "kind": "tools",
+        "also": null,
+        "importance": 2,
+        "state": "confirmed",
+        "reason": ""
+      }
+    },
+    "10241": {
+      "inputHash": "9b4b442d1e0dbe11",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "general",
+          "importance": 2
+        },
+        "kind": "general",
+        "also": null,
+        "importance": 2,
+        "state": "confirmed",
+        "reason": ""
+      }
+    },
+    "10267": {
+      "inputHash": "dbcb2e0d312ba413",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "general",
+          "importance": 2
+        },
+        "kind": "general",
+        "also": null,
+        "importance": 2,
+        "state": "confirmed",
+        "reason": ""
+      }
+    },
+    "10285": {
+      "inputHash": "a7c3430242570339",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "general",
+          "importance": 2
+        },
+        "kind": "general",
+        "also": null,
+        "importance": 2,
+        "state": "confirmed",
+        "reason": ""
+      }
+    },
+    "10290": {
+      "inputHash": "35e6ff8543f6bade",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "general",
+          "importance": 4
+        },
+        "kind": "research",
+        "also": "general",
+        "importance": 3,
+        "state": "overridden",
+        "reason": "This is REserach and ANALYSIS of how the model behaves. could also be elevated to a top story but low on the radar cause its a bit doom and gloom"
+      }
+    },
+    "10349": {
+      "inputHash": "5c428d434eb96d76",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "tools",
+          "importance": 2
+        },
+        "kind": "tools",
+        "also": "general",
+        "importance": 4,
+        "state": "overridden",
+        "reason": "It's a new model by huge lab with good relative performance to the frontier"
+      }
+    },
+    "10358": {
+      "inputHash": "23ee7e1c24a7fa0e",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "general",
+          "importance": 2
+        },
+        "kind": "research",
+        "also": null,
+        "importance": 3,
+        "state": "overridden",
+        "reason": "relatively well-knwn lab and OBVIOUSLY RESEARCH. It's an arxiv link!"
+      }
+    },
+    "10359": {
+      "inputHash": "0745996cce456765",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "general",
+          "importance": 2
+        },
+        "kind": "general",
+        "also": "tools",
+        "importance": 2,
+        "state": "confirmed",
+        "reason": ""
+      }
+    },
+    "10368": {
+      "inputHash": "9ef4164f85be5a31",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "general",
+          "importance": 2
+        },
+        "kind": "general",
+        "also": "research",
+        "importance": 1,
+        "state": "overridden",
+        "reason": "It's an analysis and \"blog piece\" taking into account his own research"
+      }
+    },
+    "10381": {
+      "inputHash": "9ad9961a553ebd43",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "general",
+          "importance": 1
+        },
+        "kind": "research",
+        "also": null,
+        "importance": 1,
+        "state": "overridden",
+        "reason": "It's more of an opinion/experience thing rather than deep analysis"
+      }
+    },
+    "10387": {
+      "inputHash": "b9c5f892d53c6b0b",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "general",
+          "importance": 2
+        },
+        "kind": "tools",
+        "also": "general",
+        "importance": 1,
+        "state": "overridden",
+        "reason": "mostly a marketing thing, but still news."
+      }
+    },
+    "10394": {
+      "inputHash": "b5110e6ceacfb41c",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "none",
+          "importance": 1
+        },
+        "kind": "none",
+        "also": null,
+        "importance": null,
+        "state": "confirmed",
+        "reason": ""
+      }
+    },
+    "10401": {
+      "inputHash": "6c91d5ebe54ef43c",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "general",
+          "importance": 2
+        },
+        "kind": "general",
+        "also": null,
+        "importance": 2,
+        "state": "confirmed",
+        "reason": ""
+      }
+    },
+    "10415": {
+      "inputHash": "d50c744292a70642",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "research",
+          "importance": 3
+        },
+        "kind": "research",
+        "also": null,
+        "importance": 2,
+        "state": "overridden",
+        "reason": "Weather forecasts are pretty niche"
+      }
+    },
+    "10452": {
+      "inputHash": "3efe95790bc5b469",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "tools",
+          "importance": 2
+        },
+        "kind": "tools",
+        "also": "general",
+        "importance": 3,
+        "state": "overridden",
+        "reason": "major open model released from leading lab"
+      }
+    },
+    "10465": {
+      "inputHash": "934f67591f473dfc",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "research",
+          "importance": 4
+        },
+        "kind": "research",
+        "also": null,
+        "importance": 4,
+        "state": "confirmed",
+        "reason": ""
+      }
+    },
+    "10477": {
+      "inputHash": "7c295e7b2d138eee",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "general",
+          "importance": 2
+        },
+        "kind": "tools",
+        "also": null,
+        "importance": 2,
+        "state": "overridden",
+        "reason": "more of a tool people can use now, sort of niche, but still fairly low barrier to entry"
+      }
+    },
+    "10487": {
+      "inputHash": "03e2f7d37e922b9a",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "tools",
+          "importance": 3
+        },
+        "kind": "tools",
+        "also": "general",
+        "importance": 3,
+        "state": "confirmed",
+        "reason": ""
+      }
+    },
+    "10511": {
+      "inputHash": "a0f964a29175fd3d",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "tools",
+          "importance": 2
+        },
+        "kind": "tools",
+        "also": null,
+        "importance": 2,
+        "state": "confirmed",
+        "reason": ""
+      }
+    },
+    "10535": {
+      "inputHash": "ec65227d71efdd90",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "research",
+          "importance": 2
+        },
+        "kind": "tools",
+        "also": "general",
+        "importance": 3,
+        "state": "overridden",
+        "reason": "It outperforms a leading model, its MUCH faster, and it's AVAILABLE to USE (tools)"
+      }
+    },
+    "10553": {
+      "inputHash": "2b7556310a91ca81",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "general",
+          "importance": 2
+        },
+        "kind": "general",
+        "also": null,
+        "importance": 1,
+        "state": "overridden",
+        "reason": "steady beat of the drum of progress, not a huge story"
+      }
+    },
+    "10613": {
+      "inputHash": "10d6359622296488",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "general",
+          "importance": 2
+        },
+        "kind": "general",
+        "also": null,
+        "importance": 1,
+        "state": "overridden",
+        "reason": "low-priority strategy post"
+      }
+    },
+    "10624": {
+      "inputHash": "101c319d94c66e3b",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "tools",
+          "importance": 2
+        },
+        "kind": "tools",
+        "also": null,
+        "importance": 1,
+        "state": "overridden",
+        "reason": "pretty niche"
+      }
+    },
+    "10641": {
+      "inputHash": "554cb3039df436c9",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "tools",
+          "importance": 2
+        },
+        "kind": "tools",
+        "also": null,
+        "importance": 2,
+        "state": "confirmed",
+        "reason": ""
+      }
+    },
+    "10663": {
+      "inputHash": "8009758b8142a8f5",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "tools",
+          "importance": 2
+        },
+        "kind": "tools",
+        "also": null,
+        "importance": 1,
+        "state": "overridden",
+        "reason": "Small feature for a not too popular app"
+      }
+    },
+    "10680": {
+      "inputHash": "8eccf355a6e7c58c",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "general",
+          "importance": 2
+        },
+        "kind": "general",
+        "also": "tools",
+        "importance": 1,
+        "state": "overridden",
+        "reason": "never heard of Monaco. Could this be just a marketing launch thing rather than a \"story\"?"
+      }
+    },
+    "10701": {
+      "inputHash": "0b58c5e8d01f883f",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "general",
+          "importance": 2
+        },
+        "kind": "none",
+        "also": null,
+        "importance": null,
+        "state": "overridden",
+        "reason": "A: its a paywall (subscribe wall) B: not very actionable; I guess it COULD be a low priority quick hits"
+      }
+    },
+    "10712": {
+      "inputHash": "a616cf4ddb92f197",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "tools",
+          "importance": 2
+        },
+        "kind": "research",
+        "also": null,
+        "importance": 2,
+        "state": "overridden",
+        "reason": "Interesting cause it's a bti counterintuitive that its possible, low importance cause it's applied research and not a rigorous paper; the outcome of the analysis is limited"
+      }
+    },
+    "10717": {
+      "inputHash": "0cfc5d83a2dd6533",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "general",
+          "importance": 2
+        },
+        "kind": "general",
+        "also": null,
+        "importance": 2,
+        "state": "confirmed",
+        "reason": ""
+      }
+    },
+    "10719": {
+      "inputHash": "5e15530d96457c91",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "general",
+          "importance": 4
+        },
+        "kind": "general",
+        "also": "tools",
+        "importance": 3,
+        "state": "overridden",
+        "reason": "It's a TOOL people can use now. it's also a top story cause its a entirely new line, but they're also late to the game, so its less important"
+      }
+    },
+    "10738": {
+      "inputHash": "df8a721ddf2b5a8d",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "research",
+          "importance": 2
+        },
+        "kind": "research",
+        "also": null,
+        "importance": 2,
+        "state": "confirmed",
+        "reason": ""
+      }
+    },
+    "10753": {
+      "inputHash": "9114cd8f51da776b",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "general",
+          "importance": 1
+        },
+        "kind": "general",
+        "also": null,
+        "importance": 1,
+        "state": "confirmed",
+        "reason": ""
+      }
+    },
+    "10780": {
+      "inputHash": "a1d66f6543c92e7e",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "general",
+          "importance": 1
+        },
+        "kind": "general",
+        "also": null,
+        "importance": 1,
+        "state": "confirmed",
+        "reason": ""
+      }
+    },
+    "10795": {
+      "inputHash": "006200a28e97695a",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "general",
+          "importance": 4
+        },
+        "kind": "tools",
+        "also": null,
+        "importance": 2,
+        "state": "overridden",
+        "reason": "Not really a TOP story. just a feature relevant for AI engineers"
+      }
+    },
+    "10806": {
+      "inputHash": "0e7192cfab9ec85f",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "general",
+          "importance": 2
+        },
+        "kind": "tools",
+        "also": null,
+        "importance": 3,
+        "state": "overridden",
+        "reason": "Tool I can use now. very common usecase, interesting approach"
+      }
+    },
+    "10838": {
+      "inputHash": "a59cb58b8961f0de",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "research",
+          "importance": 3
+        },
+        "kind": "research",
+        "also": "tools",
+        "importance": 3,
+        "state": "confirmed",
+        "reason": ""
+      }
+    },
+    "10855": {
+      "inputHash": "91d8766c481cc41c",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "general",
+          "importance": 2
+        },
+        "kind": "general",
+        "also": null,
+        "importance": 2,
+        "state": "confirmed",
+        "reason": ""
+      }
+    },
+    "10879": {
+      "inputHash": "91b58f28ac82393d",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "tools",
+          "importance": 4
+        },
+        "kind": "tools",
+        "also": null,
+        "importance": 4,
+        "state": "confirmed",
+        "reason": ""
+      }
+    },
+    "10894": {
+      "inputHash": "4fbd482ccfca88fb",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "general",
+          "importance": 2
+        },
+        "kind": "tools",
+        "also": null,
+        "importance": 1,
+        "state": "overridden",
+        "reason": "more marketing. low imporatnce cause private beta"
+      }
+    },
+    "10898": {
+      "inputHash": "2d0908aeaf96306d",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "tools",
+          "importance": 2
+        },
+        "kind": "tools",
+        "also": null,
+        "importance": 1,
+        "state": "overridden",
+        "reason": "wtf is floot? unknown company"
+      }
+    },
+    "10927": {
+      "inputHash": "aeff82eb8f200d53",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "general",
+          "importance": 2
+        },
+        "kind": "general",
+        "also": "tools",
+        "importance": 2,
+        "state": "confirmed",
+        "reason": ""
+      }
+    },
+    "10928": {
+      "inputHash": "c78299c27043833e",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "general",
+          "importance": 2
+        },
+        "kind": "tools",
+        "also": "general",
+        "importance": 4,
+        "state": "overridden",
+        "reason": "Topping the speech arena is an accomplishment, but only in the tools category. would be as important in the top stories category"
+      }
+    },
+    "10938": {
+      "inputHash": "96f3466d0630b7b8",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "tools",
+          "importance": 4
+        },
+        "kind": "tools",
+        "also": "general",
+        "importance": 3,
+        "state": "overridden",
+        "reason": "Mistral is a big famous lab for EU. first model of its kind"
+      }
+    },
+    "10950": {
+      "inputHash": "b9b90f14c929bb04",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "general",
+          "importance": 2
+        },
+        "kind": "general",
+        "also": null,
+        "importance": 1,
+        "state": "overridden",
+        "reason": "It's just a small change like a naming change with a ultra usage change for a very limited set of people"
+      }
+    },
+    "11026": {
+      "inputHash": "4f5de18b86d4db74",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "research",
+          "importance": 3
+        },
+        "kind": "research",
+        "also": null,
+        "importance": 4,
+        "state": "overridden",
+        "reason": "AI beat humans is generally suprprising so gets higher importance"
+      }
+    },
+    "11036": {
+      "inputHash": "03cb0aaec0ad1d57",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "general",
+          "importance": 2
+        },
+        "kind": "general",
+        "also": null,
+        "importance": 2,
+        "state": "confirmed",
+        "reason": ""
+      }
+    },
+    "11059": {
+      "inputHash": "d263085073d68805",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "tools",
+          "importance": 2
+        },
+        "kind": "tools",
+        "also": null,
+        "importance": 2,
+        "state": "confirmed",
+        "reason": ""
+      }
+    },
+    "11073": {
+      "inputHash": "30cc6320116f6b51",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "tools",
+          "importance": 2
+        },
+        "kind": "tools",
+        "also": "general",
+        "importance": 2,
+        "state": "confirmed",
+        "reason": ""
+      }
+    },
+    "11078": {
+      "inputHash": "a057386637834e0a",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "general",
+          "importance": 2
+        },
+        "kind": "general",
+        "also": null,
+        "importance": 1,
+        "state": "overridden",
+        "reason": "relatively small strategy move. effects seen later"
+      }
+    },
+    "11086": {
+      "inputHash": "2c336d59f606a663",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "general",
+          "importance": 2
+        },
+        "kind": "tools",
+        "also": null,
+        "importance": 2,
+        "state": "overridden",
+        "reason": "not a top AI story. just an AI feature of a non AI company"
+      }
+    },
+    "11120": {
+      "inputHash": "740b56d3d6d1c46b",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "general",
+          "importance": 5
+        },
+        "kind": "general",
+        "also": null,
+        "importance": 4,
+        "state": "overridden",
+        "reason": "It's a model variant that's been on the radar for a while. seems less \"groundbraking\""
+      }
+    },
+    "11148": {
+      "inputHash": "a304ac1aea420b55",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "general",
+          "importance": 2
+        },
+        "kind": "tools",
+        "also": "general",
+        "importance": 2,
+        "state": "overridden",
+        "reason": "more of a feature update of devin the tool. could be low pririoty top story kind cause of the 82% claim which is a bit surprising"
+      }
+    },
+    "11169": {
+      "inputHash": "fa7c73cb5a7d85ae",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "general",
+          "importance": 2
+        },
+        "kind": "tools",
+        "also": null,
+        "importance": 2,
+        "state": "overridden",
+        "reason": "niche to deployments of claude, not broad appeal stories"
+      }
+    },
+    "11178": {
+      "inputHash": "89bcc8cf58205267",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "general",
+          "importance": 1
+        },
+        "kind": "tools",
+        "also": null,
+        "importance": 1,
+        "state": "overridden",
+        "reason": "mainly an app feature for integrations, not even a new capability"
+      }
+    },
+    "11342": {
+      "inputHash": "629e2620c0aad2ea",
+      "date": "2026-11-16",
+      "value": {
+        "set": "tuning",
+        "batch": "tuning-1",
+        "scoringVersion": "7ca6fcd6",
+        "recommendation": {
+          "kind": "general",
+          "importance": 2
+        },
+        "kind": "general",
+        "also": "tools",
+        "importance": 2,
+        "state": "confirmed",
+        "reason": ""
+      }
+    }
+  }
+}
