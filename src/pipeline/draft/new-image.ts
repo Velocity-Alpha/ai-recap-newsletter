@@ -7,6 +7,7 @@ import {
   makeImageFromScene,
   type FeaturedImage,
 } from "@/src/pipeline/draft/image/featured-image";
+import { writeSceneFromChat, type SceneChatMessage, type SceneChatReply } from "@/src/pipeline/draft/image/scene-chat";
 import { suggestSceneIdeas, type SceneIdea } from "@/src/pipeline/draft/image/scene-ideas";
 import { imageContextFor } from "@/src/pipeline/draft/produce-draft";
 
@@ -25,6 +26,9 @@ export const BOARD_IMAGE_TIMEOUT_MS = 40_000;
 export const BOARD_UPLOAD_TIMEOUT_MS = 10_000;
 /** The n8n scene prompts are 200 to 300 words. This leaves room for edits, and stops a pasted essay. */
 export const MAX_SCENE_PROMPT_CHARS = 4_000;
+/** The scene chat: enough turns to iterate, short enough to stay one cheap call. */
+export const MAX_SCENE_CHAT_MESSAGES = 20;
+export const MAX_SCENE_CHAT_MESSAGE_CHARS = 1_000;
 
 /** The request is not usable (400). */
 export class NewImageInputError extends Error {
@@ -59,6 +63,45 @@ function sceneFrom(value: unknown): string {
     throw new NewImageInputError(`The scene prompt is ${scene.length} characters. Keep it under ${MAX_SCENE_PROMPT_CHARS}.`);
   }
   return scene;
+}
+
+function chatFrom(body: unknown): { scene: string; messages: SceneChatMessage[] } {
+  const { scene, messages } = (body ?? {}) as { scene?: unknown; messages?: unknown };
+  if (!Array.isArray(messages) || messages.length === 0) throw new NewImageInputError("Describe the picture first.");
+  if (messages.length > MAX_SCENE_CHAT_MESSAGES) {
+    throw new NewImageInputError(`This chat is long. Close the panel and start again, or edit the prompt by hand.`);
+  }
+  const turns = messages.map((message) => {
+    const { role, text } = (message ?? {}) as { role?: unknown; text?: unknown };
+    if ((role !== "owner" && role !== "helper") || typeof text !== "string" || !text.trim()) {
+      throw new NewImageInputError("The chat has a message that is not usable.");
+    }
+    if (text.trim().length > MAX_SCENE_CHAT_MESSAGE_CHARS) {
+      throw new NewImageInputError(`Keep each message under ${MAX_SCENE_CHAT_MESSAGE_CHARS} characters.`);
+    }
+    return { role, text: text.trim() } as SceneChatMessage;
+  });
+  if (turns[turns.length - 1].role !== "owner") throw new NewImageInputError("Describe the picture first.");
+  const current = typeof scene === "string" ? scene.trim() : "";
+  if (current.length > MAX_SCENE_PROMPT_CHARS) {
+    throw new NewImageInputError(`The scene prompt is ${current.length} characters. Keep it under ${MAX_SCENE_PROMPT_CHARS}.`);
+  }
+  return { scene: current, messages: turns };
+}
+
+/**
+ * The scene chat: the owner's plain words become a scene prompt (one GPT-6 Luna call). The draft does not change;
+ * the owner still presses "Make this image", then "Use this image".
+ */
+export async function writeSceneForDraft(draftId: number, body: unknown, options: { env?: Env } = {}): Promise<SceneChatReply> {
+  const env = options.env ?? process.env;
+  const request = chatFrom(body);
+  await readCurrentDraft(draftId);
+  try {
+    return await writeSceneFromChat(request, { apiKey: env.OPENAI_API_KEY });
+  } catch (error) {
+    throw new NewImageServiceError(error instanceof Error ? error.message : String(error), error);
+  }
 }
 
 /** Three scene ideas from the draft's subject line and top stories (one GPT-6 Luna call). */

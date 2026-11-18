@@ -13,10 +13,13 @@ function render(props: Partial<NewImagePanelProps> = {}) {
       currentImageUrl={CURRENT}
       scene="A pretend robot at a desk."
       ideas={{ status: "loading" }}
+      chat={{ turns: [], busy: false, error: null }}
       generated={null}
       busy={null}
       error={null}
       onSceneChange={noop}
+      onSend={noop}
+      onMake={noop}
       onRetryIdeas={noop}
       onGenerate={noop}
       onChoose={noop}
@@ -111,6 +114,51 @@ describe("NewImagePanel", () => {
     const ideas = render({ ideas: { status: "error", error: "Too many scene idea requests this hour. Try again in about a minute." } });
     expect(ideas).toContain("Too many scene idea requests this hour. Try again in about a minute.");
     expect(ideas).toMatch(/<button[^>]*>Try again<\/button>/);
+  });
+
+  it("opens with the scene chat: a greeting and a box to describe the scene", () => {
+    const html = render();
+
+    expect(html).toContain("Describe the picture, or what to change.");
+    expect(html).toMatch(/<input[^>]*aria-label="Describe the scene"[^>]*placeholder="e.g. a star and a sun circling each other"/);
+    expect(html).toMatch(/<summary[^>]*>Write the prompt yourself<\/summary>/);
+    expect(html).not.toContain("Make this image");
+  });
+
+  it("shows each helper reply with its prompt folded away and a Make this image button", () => {
+    const html = render({
+      chat: {
+        turns: [
+          { role: "owner", text: "A star and a sun circling each other." },
+          { role: "helper", text: "Two bodies in a slow orbit.", scene: "A pretend orbit scene." },
+        ],
+        busy: false,
+        error: null,
+      },
+    });
+
+    expect(html).toContain("A star and a sun circling each other.");
+    expect(html).toContain("Two bodies in a slow orbit.");
+    expect(html).toMatch(/<details[^>]*><summary[^>]*>Prompt<\/summary><p[^>]*>A pretend orbit scene.<\/p><\/details>/);
+    expect(html.match(/data-helper-turn/g)).toHaveLength(1);
+    expect(html).toMatch(/<button[^>]*>Make this image<\/button>/);
+    expect(html).toContain('placeholder="What to change?"');
+  });
+
+  it("shows the chat as busy, and its error in plain words", () => {
+    const busy = render({ chat: { turns: [{ role: "owner", text: "A sun." }], busy: true, error: null } });
+    expect(busy).toContain("Writing the scene…");
+    expect(busy).toMatch(/<input[^>]*aria-label="Describe the scene"[^>]*disabled=""/);
+
+    expect(render({ chat: { turns: [], busy: false, error: "Scene chat failed: Request timed out." } })).toContain("Scene chat failed: Request timed out.");
+  });
+
+  it("does not let the owner make an image from the chat while another image is being made", () => {
+    const html = render({
+      busy: "generate",
+      chat: { turns: [{ role: "owner", text: "A sun." }, { role: "helper", text: "Done.", scene: "A sun." }], busy: false, error: null },
+    });
+    expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Make this image<\/button>/);
   });
 
   it("says when the draft has no image yet", () => {

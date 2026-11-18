@@ -8,6 +8,9 @@ vi.mock("@/src/server/prisma", async () => {
 const ideas = vi.hoisted(() => ({ suggestSceneIdeas: vi.fn() }));
 vi.mock("@/src/pipeline/draft/image/scene-ideas", () => ideas);
 
+const chat = vi.hoisted(() => ({ writeSceneFromChat: vi.fn() }));
+vi.mock("@/src/pipeline/draft/image/scene-chat", () => chat);
+
 const images = vi.hoisted(() => ({ makeImageFromScene: vi.fn() }));
 vi.mock("@/src/pipeline/draft/image/featured-image", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/src/pipeline/draft/image/featured-image")>()),
@@ -24,12 +27,15 @@ import {
   BOARD_UPLOAD_TIMEOUT_MS,
   chooseNewImage,
   generateImageForDraft,
+  MAX_SCENE_CHAT_MESSAGE_CHARS,
+  MAX_SCENE_CHAT_MESSAGES,
   MAX_SCENE_PROMPT_CHARS,
   NewImageConfigError,
   newImageErrorResponse,
   NewImageInputError,
   NewImageServiceError,
   suggestIdeasForDraft,
+  writeSceneForDraft,
 } from "@/src/pipeline/draft/new-image";
 
 const DATE = "2027-01-04";
@@ -63,6 +69,59 @@ beforeEach(() => {
   fakeDb.reset();
   ideas.suggestSceneIdeas.mockReset().mockResolvedValue([{ label: "Lighthouse", scene: "A pretend lighthouse." }]);
   images.makeImageFromScene.mockReset().mockResolvedValue(NEW_IMAGE);
+});
+
+describe("writeSceneForDraft", () => {
+  const OWNER = { role: "owner", text: "A star and a sun circling each other." };
+
+  beforeEach(() => {
+    chat.writeSceneFromChat.mockReset().mockResolvedValue({ reply: "Done.", scene: "A star and a sun in orbit." });
+  });
+
+  it("sends the scene and the conversation to the model, and returns its reply", async () => {
+    const source = await readyDraft();
+    const body = { scene: " A pretend robot. ", messages: [OWNER, { role: "helper", text: "Warm?" }, { role: "owner", text: " Yes. " }] };
+
+    await expect(writeSceneForDraft(source.draftId, body, { env: ENV })).resolves.toEqual({ reply: "Done.", scene: "A star and a sun in orbit." });
+
+    expect(chat.writeSceneFromChat).toHaveBeenCalledWith(
+      {
+        scene: "A pretend robot.",
+        messages: [OWNER, { role: "helper", text: "Warm?" }, { role: "owner", text: "Yes." }],
+      },
+      { apiKey: "test-openai" },
+    );
+  });
+
+  it.each([
+    ["no messages", { scene: "", messages: [] }],
+    ["messages not a list", { scene: "", messages: "hi" }],
+    ["a bad role", { scene: "", messages: [{ role: "system", text: "hi" }] }],
+    ["an empty message", { scene: "", messages: [{ role: "owner", text: " " }] }],
+    ["the helper speaking last", { scene: "", messages: [OWNER, { role: "helper", text: "Warm?" }] }],
+    ["a long message", { scene: "", messages: [{ role: "owner", text: "x".repeat(MAX_SCENE_CHAT_MESSAGE_CHARS + 1) }] }],
+    ["too many messages", { scene: "", messages: Array.from({ length: MAX_SCENE_CHAT_MESSAGES + 1 }, () => OWNER) }],
+    ["a long scene", { scene: "x".repeat(MAX_SCENE_PROMPT_CHARS + 1), messages: [OWNER] }],
+  ])("refuses %s without calling the model", async (_name, body) => {
+    const source = await readyDraft();
+    await expect(writeSceneForDraft(source.draftId, body, { env: ENV })).rejects.toBeInstanceOf(NewImageInputError);
+    expect(chat.writeSceneFromChat).not.toHaveBeenCalled();
+  });
+
+  it("refuses an older draft without calling the model", async () => {
+    const source = await readyDraft();
+    await createDraft(fakeDb.state.outlines.rows[0].id);
+    await expect(writeSceneForDraft(source.draftId, { scene: "", messages: [OWNER] }, { env: ENV })).rejects.toMatchObject({ reason: "not_current" });
+    expect(chat.writeSceneFromChat).not.toHaveBeenCalled();
+  });
+
+  it("reports a model failure as a service error", async () => {
+    const source = await readyDraft();
+    chat.writeSceneFromChat.mockRejectedValue(new Error("Scene chat failed: Request timed out."));
+    const failure = writeSceneForDraft(source.draftId, { scene: "", messages: [OWNER] }, { env: ENV });
+    await expect(failure).rejects.toBeInstanceOf(NewImageServiceError);
+    await expect(failure).rejects.toThrow("Scene chat failed: Request timed out.");
+  });
 });
 
 describe("suggestIdeasForDraft", () => {

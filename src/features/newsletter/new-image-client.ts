@@ -1,5 +1,6 @@
 import { DraftRequestError, jsonPost } from "@/src/features/newsletter/draft-links";
 import type { FeaturedImage } from "@/src/pipeline/draft/image/featured-image";
+import type { SceneChatMessage, SceneChatReply } from "@/src/pipeline/draft/image/scene-chat";
 import type { SceneIdea } from "@/src/pipeline/draft/image/scene-ideas";
 
 /**
@@ -30,6 +31,17 @@ export async function requestSceneIdeas(draftId: number, fetcher: Fetch = fetch)
   const { response, body } = await post(fetcher, `/api/approval/drafts/${draftId}/image/ideas`);
   if (!response.ok || !Array.isArray(body.ideas)) throw new DraftRequestError(reason(body, "Could not suggest scene ideas."), response.status);
   return body.ideas as SceneIdea[];
+}
+
+/** The scene chat: the whole conversation and the scene it changes, then the helper's reply and new scene. */
+export async function requestSceneReply(
+  draftId: number,
+  chat: { scene: string; messages: SceneChatMessage[] },
+  fetcher: Fetch = fetch,
+): Promise<SceneChatReply> {
+  const { response, body } = await post(fetcher, `/api/approval/drafts/${draftId}/image/chat`, chat);
+  if (!response.ok || typeof body.scene !== "string" || !body.scene) throw new DraftRequestError(reason(body, "Could not write the scene."), response.status);
+  return { reply: typeof body.reply === "string" ? body.reply : "", scene: body.scene };
 }
 
 /** "Generate": one image from the scene in the box. */

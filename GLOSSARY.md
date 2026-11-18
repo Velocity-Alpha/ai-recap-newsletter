@@ -142,6 +142,10 @@ _Avoid_: hero image, cover
 **Scene prompt**:
 The part of the image prompt that describes the day's picture. The owner can edit it.
 
+**Scene chat**:
+The short chat in "New image" where the owner describes a picture in plain words and the model writes the scene
+prompt. It does not change the draft until the owner uses an image.
+
 **Style prompt**:
 The fixed part of the image prompt that gives every featured image the same watercolor look.
 

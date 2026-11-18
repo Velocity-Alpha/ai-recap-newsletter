@@ -27,6 +27,8 @@ export const RATE_LIMITS = {
   approvalImageGenerate: { name: "approval-image-generate:session", limit: 20, windowSeconds: HOUR },
   /** "New image" scene ideas per approval session: each call is one OpenAI call. */
   approvalImageIdeas: { name: "approval-image-ideas:session", limit: 30, windowSeconds: HOUR },
+  /** "New image" scene chat messages per approval session: each message is one OpenAI call. */
+  approvalSceneChat: { name: "approval-scene-chat:session", limit: 60, windowSeconds: HOUR },
 } as const satisfies Record<string, RateLimitRule>;
 
 // Keys hold a hash, so the table stores no email or IP address.
