@@ -2,19 +2,26 @@
 
 import { useReducer, useState } from "react";
 import Image from "next/image";
-import { ImageIcon, Loader2, X } from "lucide-react";
+import { ArrowUp, ImageIcon, Loader2, X } from "lucide-react";
 
 import { isRefusal } from "@/src/features/newsletter/draft-links";
 import { chooseImage, initialNewImageState, newImageReducer, type NewImageState } from "@/src/features/newsletter/draft-view-state";
-import { requestImage, requestSceneIdeas } from "@/src/features/newsletter/new-image-client";
+import { requestImage, requestSceneIdeas, requestSceneReply } from "@/src/features/newsletter/new-image-client";
 import type { DraftBoardView } from "@/src/pipeline/draft/draft-board";
 import type { FeaturedImage } from "@/src/pipeline/draft/image/featured-image";
+import type { SceneChatMessage } from "@/src/pipeline/draft/image/scene-chat";
 import type { SceneIdea } from "@/src/pipeline/draft/image/scene-ideas";
 
 /**
- * "New image" on the current draft (#116, #149): the current image and scene prompt, three scene ideas, "Generate"
- * as often as needed, then "Use this image", which puts the image into the same draft (ADR 0005).
+ * "New image" on the current draft (#116, #149): a short scene chat, where the owner describes the picture in
+ * plain words and each reply carries a full scene prompt to "Make this image" from. The scene prompt box and three
+ * scene ideas sit under "Write the prompt yourself". "Use this image" puts the image into the same draft (ADR 0005).
  */
+
+/** One turn in the scene chat. A helper turn carries the scene prompt it wrote. */
+export type ChatTurn = { role: "owner"; text: string } | { role: "helper"; text: string; scene: string };
+
+export type ChatState = { turns: ChatTurn[]; busy: boolean; error: string | null };
 
 export type IdeasState = { status: "loading" } | { status: "ready"; ideas: SceneIdea[] } | { status: "error"; error: string };
 
@@ -22,10 +29,14 @@ export type NewImagePanelProps = {
   currentImageUrl: string | null;
   scene: string;
   ideas: IdeasState;
+  chat: ChatState;
   generated: FeaturedImage | null;
   busy: NewImageState["busy"];
   error: string | null;
   onSceneChange: (scene: string) => void;
+  onSend: (text: string) => void;
+  /** "Make this image" on a helper reply: puts its scene in the box and generates. */
+  onMake: (scene: string) => void;
   onRetryIdeas: () => void;
   onGenerate: () => void;
   onChoose: () => void;
@@ -70,6 +81,84 @@ function Ideas({ ideas, disabled, onPick, onRetry }: { ideas: IdeasState; disabl
           {idea.label}
         </button>
       ))}
+    </div>
+  );
+}
+
+const GREETING = "Describe the picture, or what to change. I keep the watercolor style and write the prompt.";
+
+function SceneChat({ chat, disabled, onSend, onMake }: { chat: ChatState; disabled: boolean; onSend: (text: string) => void; onMake: (scene: string) => void }) {
+  const [text, setText] = useState("");
+  const blocked = disabled || chat.busy;
+
+  function send() {
+    if (blocked || !text.trim()) return;
+    onSend(text.trim());
+    setText("");
+  }
+
+  return (
+    <div>
+      <div className="flex max-h-80 flex-col gap-2.5 overflow-y-auto py-1" data-scene-chat>
+        <p className="max-w-[88%] self-start rounded-2xl rounded-bl-md border border-[var(--border-light)] bg-white px-3 py-2 text-sm text-[var(--text-primary)]">
+          {GREETING}
+        </p>
+        {chat.turns.map((turn, index) =>
+          turn.role === "owner" ? (
+            <p key={index} className="max-w-[80%] self-end whitespace-pre-wrap rounded-2xl rounded-br-md bg-[var(--text-primary)] px-3 py-2 text-sm text-white">
+              {turn.text}
+            </p>
+          ) : (
+            <div key={index} data-helper-turn className="max-w-[88%] self-start rounded-2xl rounded-bl-md border border-[var(--border-light)] bg-white px-3 py-2 text-sm text-[var(--text-primary)]">
+              <p>{turn.text}</p>
+              <details className="mt-1">
+                <summary className="cursor-pointer text-xs text-[var(--accent-primary)]">Prompt</summary>
+                <p className="mt-1 whitespace-pre-wrap text-xs leading-relaxed text-[var(--text-secondary)]">{turn.scene}</p>
+              </details>
+              <button
+                type="button"
+                className="mt-1.5 text-xs font-medium text-[var(--accent-primary)] hover:text-[var(--text-primary)] disabled:opacity-60"
+                disabled={disabled}
+                onClick={() => onMake(turn.scene)}
+              >
+                Make this image
+              </button>
+            </div>
+          ),
+        )}
+        {chat.busy ? (
+          <p className="flex items-center gap-2 self-start text-sm text-[var(--text-secondary)]">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+            Writing the scene…
+          </p>
+        ) : null}
+      </div>
+      {chat.error ? <p className="mt-2 text-sm text-[var(--accent-warm)]">{chat.error}</p> : null}
+      <form
+        className="relative mt-2"
+        onSubmit={(event) => {
+          event.preventDefault();
+          send();
+        }}
+      >
+        <input
+          type="text"
+          aria-label="Describe the scene"
+          className="w-full rounded-full border border-[var(--border-light)] bg-white py-2 pl-4 pr-11 text-sm text-[var(--text-primary)] focus:border-[var(--accent-primary)] focus:outline-none"
+          placeholder={chat.turns.length ? "What to change?" : "e.g. a star and a sun circling each other"}
+          value={text}
+          onChange={(event) => setText(event.target.value)}
+          disabled={blocked}
+        />
+        <button
+          type="submit"
+          aria-label="Send"
+          className="absolute right-1 top-1 inline-flex h-7 w-7 items-center justify-center rounded-full bg-[var(--text-primary)] text-white disabled:opacity-50"
+          disabled={blocked || !text.trim()}
+        >
+          <ArrowUp className="h-3.5 w-3.5" aria-hidden />
+        </button>
+      </form>
     </div>
   );
 }
@@ -127,7 +216,14 @@ export function NewImagePanel(props: NewImagePanelProps) {
         </figure>
       </div>
 
-      <label className={`mt-5 block ${LABEL}`} htmlFor="new-image-scene">
+      <p className={`mt-5 ${LABEL}`}>Describe the scene</p>
+      <div className="mt-2">
+        <SceneChat chat={props.chat} disabled={working} onSend={props.onSend} onMake={props.onMake} />
+      </div>
+
+      <details className="mt-5">
+        <summary className="cursor-pointer text-sm text-[var(--accent-primary)]">Write the prompt yourself</summary>
+      <label className={`mt-3 block ${LABEL}`} htmlFor="new-image-scene">
         Scene prompt
       </label>
       <textarea
@@ -151,6 +247,7 @@ export function NewImagePanel(props: NewImagePanelProps) {
         </button>
         <span className="text-xs text-[var(--text-secondary)]">Edit the scene and generate again.</span>
       </div>
+      </details>
 
       {error ? (
         <p className="mt-4 whitespace-pre-wrap break-words rounded-xl border border-[rgba(184,133,110,0.28)] bg-[rgba(255,244,236,0.92)] px-4 py-3 text-sm text-[var(--accent-warm)]">
@@ -173,6 +270,7 @@ function messageOf(error: unknown): string {
 export default function NewImage({ draft, onChanged }: { draft: DraftBoardView; onChanged?: () => void }) {
   const [state, dispatch] = useReducer(newImageReducer, draft.scenePrompt, initialNewImageState);
   const [ideas, setIdeas] = useState<IdeasState | null>(null);
+  const [chat, setChat] = useState<ChatState>({ turns: [], busy: false, error: null });
   const { generated } = state;
 
   async function loadIdeas() {
@@ -189,12 +287,29 @@ export default function NewImage({ draft, onChanged }: { draft: DraftBoardView; 
     if (ideas?.status !== "ready") void loadIdeas();
   }
 
-  async function generate() {
+  async function generate(scene: string = state.scene) {
     dispatch({ type: "generating" });
     try {
-      dispatch({ type: "generated", image: await requestImage(draft.id, state.scene) });
+      dispatch({ type: "generated", image: await requestImage(draft.id, scene) });
     } catch (reason) {
       dispatch({ type: "failed", error: messageOf(reason) });
+      if (isRefusal(reason)) onChanged?.();
+    }
+  }
+
+  async function send(text: string) {
+    const turns: ChatTurn[] = [...chat.turns, { role: "owner", text }];
+    // The newest scene the chat wrote, or the one in the box (the draft's own, at first), so "make the sun bigger" works.
+    const lastHelper = [...chat.turns].reverse().find((turn) => turn.role === "helper");
+    const scene = lastHelper?.role === "helper" ? lastHelper.scene : state.scene;
+    const messages: SceneChatMessage[] = turns.map(({ role, text }) => ({ role, text }));
+    setChat({ turns, busy: true, error: null });
+    try {
+      const reply = await requestSceneReply(draft.id, { scene, messages });
+      setChat({ turns: [...turns, { role: "helper", text: reply.reply || "Here is the scene.", scene: reply.scene }], busy: false, error: null });
+    } catch (reason) {
+      // Drop the unanswered message, so the next send starts from a clean turn.
+      setChat({ turns: chat.turns, busy: false, error: messageOf(reason) });
       if (isRefusal(reason)) onChanged?.();
     }
   }
@@ -214,10 +329,16 @@ export default function NewImage({ draft, onChanged }: { draft: DraftBoardView; 
         currentImageUrl={draft.featuredImageUrl}
         scene={state.scene}
         ideas={ideas ?? { status: "loading" }}
+        chat={chat}
         generated={generated}
         busy={state.busy}
         error={state.error}
         onSceneChange={(scene) => dispatch({ type: "scene_changed", scene })}
+        onSend={(text) => void send(text)}
+        onMake={(scene) => {
+          dispatch({ type: "scene_changed", scene });
+          void generate(scene);
+        }}
         onRetryIdeas={() => void loadIdeas()}
         onGenerate={() => void generate()}
         onChoose={() => {

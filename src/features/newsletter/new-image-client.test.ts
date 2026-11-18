@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { requestImage, requestSceneIdeas, requestUseImage } from "@/src/features/newsletter/new-image-client";
+import { requestImage, requestSceneIdeas, requestSceneReply, requestUseImage } from "@/src/features/newsletter/new-image-client";
 
 const IMAGE = { imageUrl: "https://example-bucket.s3.amazonaws.com/newsletter-dev/2026-05-21-abc123.jpg", scenePrompt: "A pretend lamp." };
 
@@ -29,6 +29,28 @@ describe("requestSceneIdeas", () => {
     await expect(requestSceneIdeas(41, vi.fn<typeof fetch>(async () => Promise.reject(new TypeError("offline"))))).rejects.toThrow(
       "Could not reach the server. Try again.",
     );
+  });
+});
+
+describe("requestSceneReply", () => {
+  const CHAT = { scene: "", messages: [{ role: "owner" as const, text: "A star and a sun circling each other." }] };
+
+  it("posts the chat as JSON to the draft's chat route, and returns the reply and scene", async () => {
+    const fetcher = answer(200, { reply: "Done.", scene: "A pretend orbit." });
+
+    await expect(requestSceneReply(41, CHAT, fetcher)).resolves.toEqual({ reply: "Done.", scene: "A pretend orbit." });
+    expect(fetcher).toHaveBeenCalledWith("/api/approval/drafts/41/image/chat", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(CHAT),
+    });
+  });
+
+  it("throws the server's plain reason, or a plain fallback", async () => {
+    await expect(requestSceneReply(41, CHAT, answer(502, { error: "Scene chat failed: Request timed out." }))).rejects.toThrow(
+      "Scene chat failed: Request timed out.",
+    );
+    await expect(requestSceneReply(41, CHAT, answer(200, { reply: "Done." }))).rejects.toThrow("Could not write the scene.");
   });
 });
 
